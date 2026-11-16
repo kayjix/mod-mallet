@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MeshView",
+  "description": "One version of a mesh of the setup, as the window draws it.",
+  "type": "object",
+  "properties": {
+    "archive": {
+      "description": "The archive the version is in, or `None` for a loose file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The mesh, below the data directory.",
+      "type": "string"
+    },
+    "shapes": {
+      "description": "Its surfaces.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/MeshShape"
+      }
+    },
+    "tint": {
+      "description": "For a face, the face texture that colours the head, as a PNG\n`data:` address.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "path",
+    "shapes"
+  ],
+  "$defs": {
+    "MeshShape": {
+      "description": "One surface of a mesh. Numbers are little-endian and Base64-encoded,\nwhich keeps a face of a few thousand points small.",
+      "type": "object",
+      "properties": {
+        "alphaTest": {
+          "description": "Whether the transparent parts of the texture are left out, as\nbetween strands of hair.",
+          "type": "boolean",
+          "default": false
+        },
+        "indices": {
+          "description": "The triangles: three 32-bit point numbers each.",
+          "type": "string"
+        },
+        "positions": {
+          "description": "The points: three 32-bit floats each.",
+          "type": "string"
+        },
+        "texture": {
+          "description": "The colour texture as a PNG `data:` address, if it could be read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tinted": {
+          "description": "Whether the face texture colours this surface: the head itself.",
+          "type": "boolean"
+        },
+        "uvs": {
+          "description": "The texture coordinates: two 32-bit floats per point, or empty.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "positions",
+        "uvs",
+        "indices",
+        "tinted"
+      ]
+    }
+  }
+}

@@ -81,6 +81,22 @@ plugins-identical-records = A plugin contains unchanged copies of records
     .explanation = A record that a plugin copies without changing it does nothing by itself. It matters only when another mod that loads earlier changes the same record: the unchanged copy then quietly puts the original back. That is usually harmless, but it can hide another mod's change. LOOT's list records which released versions of a plugin contain such copies; it recognises a version by the file's checksum.
     .remedy = Usually nothing to do. If a change of another mod does not show in the game, clean this plugin with SSEEdit's "Quick Auto Clean" or let it load before that mod.
 
+plugins-loot-warning = LOOT warns about a plugin
+    .headline = LOOT warns about { $plugin }
+    .summary = LOOT says about { $plugin }, in its own words: { $messages }
+    .explanation = LOOT, the tool that sorts plugins, keeps notes about thousands of plugins and shows them when they apply to a setup: a missing compatibility patch, a mod that should not be used together with another, a plugin that should be deleted because another mod already contains it. Mod managers such as Vortex show these notes in their plugin list as well. Mod Mallet quotes them as LOOT writes them, in English, and only those whose conditions hold for your setup.
+    .remedy = Read the message and follow it. A missing patch is usually on the page the message names, or offered by the installer of one of the two mods. If the message says to delete or disable a plugin, disable the mod it belongs to in your mod manager.
+
+plugins-loot-note = LOOT has a note about a plugin
+    .headline =
+        LOOT has { $count ->
+            [one] a note
+           *[other] { $count } notes
+        } about { $plugin }
+    .summary = LOOT says about { $plugin }, in its own words: { $messages }
+    .explanation = LOOT, the tool that sorts plugins, keeps notes about thousands of plugins and shows them when they apply to a setup: an update patch that fixes the mod, a patch collection for it, compatibility notes worth reading, or a hint that the mod needs a new save. Mod Mallet quotes them as LOOT writes them, in English, and only those whose conditions hold for your setup.
+    .remedy = Nothing has to be done. Look at the note when you change something about this mod, or when it does not behave as expected.
+
 
 npcs-face-mismatch = Characters with dark or mismatched faces
     .headline =

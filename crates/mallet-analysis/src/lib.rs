@@ -20,6 +20,7 @@ pub(crate) fn offer_disabling(finding: mallet_core::Finding) -> mallet_core::Fin
 }
 
 pub mod assets;
+pub mod duels;
 pub mod extender;
 pub mod faces;
 pub mod installer;
@@ -28,6 +29,7 @@ pub mod map;
 pub mod masters;
 pub mod meshes;
 pub mod objects;
+mod places;
 pub mod setup;
 
 use std::cell::OnceCell;

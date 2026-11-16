@@ -94,6 +94,18 @@ fn provider(context: &Context<'_>, path: &GamePath) -> Option<Option<ModRef>> {
 }
 
 fn finding(mesh_mod: Option<&ModRef>, texture_mod: &ModRef, meshes: &[&MeshOverride]) -> Finding {
+    // For the first mesh: the texture it brings, and the one the texture mod
+    // replaced for the mesh it hides.
+    // The first mesh with its texture and the one it bypasses, then the
+    // other meshes, up to 40 files in all.
+    let mut previews: Vec<GamePath> = meshes.first().map_or_else(Vec::new, |mesh| {
+        std::iter::once(&mesh.path)
+            .chain(mesh.textures.first())
+            .chain(mesh.replaced_textures.first())
+            .cloned()
+            .collect()
+    });
+    previews.extend(meshes.iter().skip(1).take(37).map(|mesh| mesh.path.clone()));
     Finding::new(
         &kinds::MESHES_RETEXTURE_BYPASSED,
         Subject::Override {
@@ -125,6 +137,7 @@ fn finding(mesh_mod: Option<&ModRef>, texture_mod: &ModRef, meshes: &[&MeshOverr
         mesh_mod.map_or("", |mesh_mod| mesh_mod.name.as_str()),
     )
     .with_arg("textureMod", texture_mod.name.as_str())
+    .with_previews(previews)
 }
 
 #[cfg(test)]

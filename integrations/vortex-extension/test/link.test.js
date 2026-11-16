@@ -454,3 +454,126 @@ test("a mod is switched off in the active profile as Vortex's mod list does it",
   );
   assert.equal(unclear.code, "failed");
 });
+
+const VIGIL = { step: "Patches", group: "Guilds", option: "Vigil", index: 3 };
+
+test("options to tick are added to the choices saved last time", () => {
+  const saved = {
+    type: "fomod",
+    options: [
+      { name: "Patches", groups: [{ name: "Guilds", choices: [{ name: "Thieves", idx: 1 }] }] },
+    ],
+  };
+  const ticked = link.withTicked(saved, [
+    VIGIL,
+    { step: "Patches", group: "Towns", option: "Riverwood", index: 0 },
+    { step: "Extras", group: "Maps", option: "Paper Map", index: 2 },
+  ]);
+
+  assert.deepEqual(ticked.options, [
+    {
+      name: "Patches",
+      groups: [
+        {
+          name: "Guilds",
+          choices: [
+            { name: "Thieves", idx: 1 },
+            { name: "Vigil", idx: 3 },
+          ],
+        },
+        { name: "Towns", choices: [{ name: "Riverwood", idx: 0 }] },
+      ],
+    },
+    { name: "Extras", groups: [{ name: "Maps", choices: [{ name: "Paper Map", idx: 2 }] }] },
+  ]);
+  // The saved choices themselves are not changed.
+  assert.equal(saved.options[0].groups[0].choices.length, 1);
+});
+
+test("nothing is ticked without saved FOMOD choices, twice, or from a malformed list", () => {
+  assert.equal(link.withTicked(undefined, [VIGIL]), undefined);
+  const other = { type: "something-else", options: [] };
+  assert.equal(link.withTicked(other, [VIGIL]), other);
+
+  const saved = {
+    type: "fomod",
+    options: [
+      { name: "Patches", groups: [{ name: "Guilds", choices: [{ name: "Vigil", idx: 3 }] }] },
+    ],
+  };
+  assert.equal(link.withTicked(saved, [VIGIL]), saved);
+  for (const tick of [
+    undefined,
+    "Vigil",
+    [{ ...VIGIL, index: -1 }],
+    [{ ...VIGIL, option: "" }],
+    [null],
+  ]) {
+    assert.equal(link.withTicked(saved, tick), saved, JSON.stringify(tick));
+  }
+});
+
+test("a reinstall with options to tick plans them as the installer's starting point", () => {
+  const planned = link.plan(state(), request({ tick: [VIGIL] }), NOW);
+
+  assert.equal(planned.code, "started");
+  const groups = planned.install.preset.options[0].groups;
+  assert.deepEqual(groups, [{ name: "Guilds", choices: [{ name: "Vigil", idx: 3 }] }]);
+  assert.equal(planned.install.options.choices, planned.install.preset);
+  assert.deepEqual(planned.install.previous.options[0].groups, []);
+});
+
+/** An API with a store that records what is dispatched to it. */
+function apiWithStore(current = state()) {
+  const api = fakeApi(current);
+  api.dispatched = [];
+  api.store = { dispatch: (action) => api.dispatched.push(action) };
+  return api;
+}
+
+test("the choices are saved with the mod before its installer starts", () => {
+  const api = apiWithStore();
+  link.handle(api, request({ tick: [VIGIL] }), NOW);
+
+  assert.equal(api.dispatched.length, 1);
+  const [saved] = api.dispatched;
+  assert.equal(saved.type, "SET_MOD_ATTRIBUTE");
+  assert.equal(saved.payload.gameId, "skyrimse");
+  assert.equal(saved.payload.modId, "patch-hub");
+  assert.equal(saved.payload.attribute, "installerChoices");
+  assert.equal(saved.payload.value.options[0].groups[0].choices[0].name, "Vigil");
+  assert.equal(api.emitted[0][0], "start-install-download");
+});
+
+test("a cancelled installer gets the mod's previous choices back", () => {
+  const api = apiWithStore();
+  link.handle(api, request({ tick: [VIGIL] }), NOW);
+  const finished = api.emitted[0][3];
+
+  const cancelled = new Error("cancelled by the user");
+  cancelled.name = "UserCanceled";
+  finished(cancelled);
+
+  assert.equal(api.dispatched.length, 2);
+  assert.deepEqual(api.dispatched[1].payload.value.options, [{ name: "Patches", groups: [] }]);
+});
+
+test("choices are not put back on a mod that is gone, nor after a finished install", () => {
+  const current = state();
+  const api = apiWithStore(current);
+  link.handle(api, request({ tick: [VIGIL] }), NOW);
+  delete current.persistent.mods.skyrimse["patch-hub"];
+  api.emitted[0][3](new Error("archive is damaged"));
+  assert.equal(api.dispatched.length, 1);
+
+  const other = apiWithStore();
+  link.handle(other, request({ tick: [VIGIL] }), NOW);
+  other.emitted[0][3](null, "patch-hub");
+  assert.equal(other.dispatched.length, 1);
+});
+
+test("a reinstall without options to tick saves nothing with the mod", () => {
+  const api = apiWithStore();
+  link.handle(api, request(), NOW);
+  assert.deepEqual(api.dispatched, []);
+});

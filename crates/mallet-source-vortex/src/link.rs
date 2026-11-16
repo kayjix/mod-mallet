@@ -25,6 +25,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use mallet_core::OptionToTick;
 use serde::{Deserialize, Serialize};
 
 /// Version of the request and reply format.
@@ -94,7 +95,19 @@ struct Request<'a> {
     after: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     enabled: Option<bool>,
+    #[serde(skip_serializing_if = "<[TickRequest<'a>]>::is_empty")]
+    tick: Vec<TickRequest<'a>>,
     created_at: u64,
+}
+
+/// An option of a mod's installer that the extension ticks in advance
+/// when it reinstalls the mod.
+#[derive(Serialize)]
+struct TickRequest<'a> {
+    step: &'a str,
+    group: &'a str,
+    option: &'a str,
+    index: u32,
 }
 
 /// What a request names besides its action and game.
@@ -105,6 +118,7 @@ struct Subject<'a> {
     plugin: Option<&'a str>,
     after: Option<&'a str>,
     enabled: Option<bool>,
+    tick: &'a [OptionToTick],
 }
 
 #[derive(Deserialize)]
@@ -140,17 +154,20 @@ impl Link {
     /// Asks Vortex to reinstall the mod `mod_id` of `game`, and waits up to
     /// `timeout` for the reply.
     ///
-    /// `mod_id` is the mod's folder in Vortex's staging directory. A reply
-    /// of `started` means Vortex has opened the mod's installer; what the
-    /// user does there is not waited for.
+    /// `mod_id` is the mod's folder in Vortex's staging directory. The
+    /// installer options in `tick` are ticked in advance, on top of the
+    /// choices made last time. A reply of `started` means Vortex has opened
+    /// the mod's installer; what the user does there is not waited for.
     pub fn reinstall_mod(
         &self,
         game: &str,
         mod_id: &str,
+        tick: &[OptionToTick],
         timeout: Duration,
     ) -> Result<Reply, LinkError> {
         let subject = Subject {
             mod_id: Some(mod_id),
+            tick,
             ..Subject::default()
         };
         self.ask("reinstall-mod", game, &subject, timeout)
@@ -241,6 +258,16 @@ impl Link {
             plugin: subject.plugin,
             after: subject.after,
             enabled: subject.enabled,
+            tick: subject
+                .tick
+                .iter()
+                .map(|option| TickRequest {
+                    step: &option.step,
+                    group: &option.group,
+                    option: &option.option,
+                    index: option.index,
+                })
+                .collect(),
             created_at: now_ms(),
         };
 
@@ -399,8 +426,17 @@ mod tests {
             r#"{"id":"x","ok":true,"code":"started"}"#,
         );
 
+        let tick = [OptionToTick {
+            page: 2,
+            pages: 3,
+            step: "Patches".to_owned(),
+            group: "Cities".to_owned(),
+            option: "Vigil".to_owned(),
+            index: 4,
+            description: "Words of the author".to_owned(),
+        }];
         let reply = link
-            .reinstall_mod("skyrimse", "Patch Hub 1.0", Duration::from_secs(5))
+            .reinstall_mod("skyrimse", "Patch Hub 1.0", &tick, Duration::from_secs(5))
             .unwrap();
         assert_eq!(
             reply,
@@ -416,6 +452,10 @@ mod tests {
         assert_eq!(request["action"], "reinstall-mod");
         assert_eq!(request["game"], "skyrimse");
         assert_eq!(request["modId"], "Patch Hub 1.0");
+        assert_eq!(
+            request["tick"],
+            serde_json::json!([{"step": "Patches", "group": "Cities", "option": "Vigil", "index": 4}])
+        );
         assert!(request["createdAt"].as_u64().unwrap() > 0);
         let id = request["id"].as_str().unwrap();
         assert!(id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'));
@@ -437,7 +477,7 @@ mod tests {
             r#"{"id":"x","ok":false,"code":"unknown-mod"}"#,
         );
         let reply = link
-            .reinstall_mod("skyrimse", "Gone", Duration::from_secs(5))
+            .reinstall_mod("skyrimse", "Gone", &[], Duration::from_secs(5))
             .unwrap();
         extension.join().unwrap();
         assert!(!reply.ok);
@@ -447,7 +487,7 @@ mod tests {
     #[test]
     fn nothing_is_asked_of_a_vortex_that_is_not_running() {
         let (dir, link) = shared_folder();
-        let result = link.reinstall_mod("skyrimse", "Patch Hub 1.0", Duration::from_secs(5));
+        let result = link.reinstall_mod("skyrimse", "Patch Hub 1.0", &[], Duration::from_secs(5));
         assert!(matches!(result, Err(LinkError::NotRunning)));
         assert_eq!(
             fs::read_dir(dir.path().join("requests")).unwrap().count(),
@@ -459,7 +499,8 @@ mod tests {
     fn a_request_nobody_answers_is_withdrawn() {
         let (dir, link) = shared_folder();
         write_status(dir.path(), now_ms());
-        let result = link.reinstall_mod("skyrimse", "Patch Hub 1.0", Duration::from_millis(300));
+        let result =
+            link.reinstall_mod("skyrimse", "Patch Hub 1.0", &[], Duration::from_millis(300));
         assert!(matches!(result, Err(LinkError::NoAnswer)));
         assert_eq!(
             fs::read_dir(dir.path().join("requests")).unwrap().count(),

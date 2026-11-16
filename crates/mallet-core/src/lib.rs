@@ -17,10 +17,12 @@
 
 pub mod action;
 pub mod cache;
+pub mod duel;
 pub mod encoding;
 pub mod facts;
 pub mod finding;
 pub mod kinds;
+pub mod mesh;
 pub mod mods;
 pub mod path;
 pub mod report;
@@ -34,7 +36,8 @@ pub use kinds::KindInfo;
 pub use mods::{ModRef, ModSource, NoModSource};
 pub use path::GamePath;
 pub use report::{
-    GameInfo, InstalledPatch, LocationOrigin, LocationRole, MapCell, MapImage, MapSpot, MapTerrain,
-    MapWorld, ModInfo, ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
+    FilePreview, GameInfo, InstalledPatch, LocationOrigin, LocationRole, MapCell, MapImage,
+    MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo, PlaceKind, PlaceOrigin, PreviewVersion,
+    ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};

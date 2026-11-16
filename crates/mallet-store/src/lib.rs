@@ -231,6 +231,7 @@ mod tests {
             map: mallet_core::WorldMap::default(),
             object_swapper: false,
             installed_patch: None,
+            duels: Vec::new(),
             findings: file_names
                 .iter()
                 .map(|file_name| {

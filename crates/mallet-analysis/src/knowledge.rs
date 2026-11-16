@@ -10,7 +10,7 @@
 
 use std::collections::HashSet;
 
-use mallet_core::facts::knowledge::{KnownFile, PluginKnowledge};
+use mallet_core::facts::knowledge::{KnownFile, MessageLevel, PluginKnowledge};
 use mallet_core::{Action, Finding, GamePath, Party, Subject, kinds};
 
 use crate::{Analysis, Context, examples};
@@ -50,6 +50,7 @@ impl Analysis for KnownRules {
             if let Some(finding) = needs_cleaning(context, plugin) {
                 findings.push(finding);
             }
+            findings.extend(loot_messages(context, plugin));
         }
         findings
     }
@@ -124,6 +125,48 @@ fn incompatibilities<'a>(
         })
 }
 
+/// LOOT's messages about a plugin, quoted: one finding for its errors and
+/// warnings, one for its notes.
+fn loot_messages<'a>(
+    context: &'a Context<'_>,
+    plugin: &'a PluginKnowledge,
+) -> impl Iterator<Item = Finding> + 'a {
+    [
+        (&kinds::PLUGINS_LOOT_WARNING, true),
+        (&kinds::PLUGINS_LOOT_NOTE, false),
+    ]
+    .into_iter()
+    .filter_map(move |(kind, warns)| {
+        let texts: Vec<&str> = plugin
+            .messages
+            .iter()
+            .filter(|message| (message.level >= MessageLevel::Warning) == warns)
+            .map(|message| message.text.as_str())
+            .collect();
+        if texts.is_empty() {
+            return None;
+        }
+        Some(
+            Finding::new(
+                kind,
+                Subject::File {
+                    path: plugin.path.clone(),
+                },
+            )
+            .with_arg("plugin", plugin.plugin.as_str())
+            .with_arg("count", i64::try_from(texts.len()).unwrap_or(i64::MAX))
+            .with_arg(
+                "messages",
+                texts.join(
+                    "
+",
+                ),
+            )
+            .with_provider(context.mods.provider_of(&plugin.path)),
+        )
+    })
+}
+
 fn needs_cleaning(context: &Context<'_>, plugin: &PluginKnowledge) -> Option<Finding> {
     // The game's updates replace its own plugins, so cleaning them does
     // not last, and whether they should be cleaned at all is disputed.
@@ -157,7 +200,7 @@ fn needs_cleaning(context: &Context<'_>, plugin: &PluginKnowledge) -> Option<Fin
 #[cfg(test)]
 mod tests {
     use mallet_core::facts::PluginFacts;
-    use mallet_core::facts::knowledge::{Cleaning, KnowledgeFacts};
+    use mallet_core::facts::knowledge::{Cleaning, KnowledgeFacts, KnownMessage};
     use mallet_core::{ArgValue, Confidence, Facts, NoModSource, Severity};
 
     use super::*;
@@ -189,6 +232,7 @@ mod tests {
             requirements: Vec::new(),
             incompatibilities: Vec::new(),
             dirty: Vec::new(),
+            messages: Vec::new(),
         }
     }
 
@@ -322,6 +366,40 @@ mod tests {
         assert_eq!(
             findings(&["Update.esm"], vec![update]),
             Vec::<Finding>::new()
+        );
+    }
+
+    #[test]
+    fn loots_messages_are_quoted_as_a_warning_and_a_note() {
+        let message = |level, text: &str| KnownMessage {
+            level,
+            text: text.to_owned(),
+        };
+        let mut city = rules("City.esp");
+        city.messages = vec![
+            message(MessageLevel::Error, "A patch for Town is missing."),
+            message(MessageLevel::Note, "Requires a new save."),
+            message(MessageLevel::Warning, "Do not use with Old Town."),
+        ];
+        let findings = findings(&["City.esp"], vec![city]);
+
+        let [warning, note] = findings.as_slice() else {
+            panic!("expected two findings, got {findings:?}");
+        };
+        assert_eq!(warning.kind, "plugins.loot-warning");
+        assert_eq!(warning.args["count"], ArgValue::Number(2));
+        assert_eq!(
+            warning.args["messages"],
+            ArgValue::from(
+                "A patch for Town is missing.
+Do not use with Old Town."
+            )
+        );
+        assert_eq!(note.kind, "plugins.loot-note");
+        assert_eq!(note.severity, Severity::Info);
+        assert_eq!(
+            note.args["messages"],
+            ArgValue::from("Requires a new save.")
         );
     }
 

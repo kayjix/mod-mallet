@@ -210,6 +210,17 @@ pub fn read_request<R: Read + Seek>(
     reader: &mut R,
     request: &Request<'_>,
 ) -> Result<Plugin, PluginError> {
+    read_request_where(reader, request, &|_| true)
+}
+
+/// Reads the header of a plugin and the records `request` asks for, but
+/// only from the nested groups that `descend` accepts. A group that is
+/// refused is skipped with everything in it, without being unpacked.
+pub fn read_request_where<R: Read + Seek>(
+    reader: &mut R,
+    request: &Request<'_>,
+    descend: &dyn Fn(GroupLabel) -> bool,
+) -> Result<Plugin, PluginError> {
     let header = read_plugin_header(reader)?;
     let mut plugin = Plugin {
         header,
@@ -247,7 +258,7 @@ pub fn read_request<R: Read + Seek>(
             } else {
                 Scope::Flat
             };
-            read_group(&body, scope, &mut Vec::new(), &mut plugin);
+            read_group(&body, scope, descend, &mut Vec::new(), &mut plugin);
         } else {
             let Ok(offset) = i64::try_from(body_len) else {
                 plugin.damaged += 1;
@@ -333,7 +344,13 @@ enum Scope<'a> {
 
 /// Reads the records in the body of a group. `groups` are the nested
 /// groups the body lies in.
-fn read_group(body: &[u8], scope: Scope<'_>, groups: &mut Vec<GroupLabel>, plugin: &mut Plugin) {
+fn read_group(
+    body: &[u8],
+    scope: Scope<'_>,
+    descend: &dyn Fn(GroupLabel) -> bool,
+    groups: &mut Vec<GroupLabel>,
+    plugin: &mut Plugin,
+) {
     let mut bytes = Bytes::new(body);
     while bytes.remaining() > 0 {
         let (Some(signature), Some(size), Some(third), Some(form_id)) =
@@ -358,10 +375,13 @@ fn read_group(body: &[u8], scope: Scope<'_>, groups: &mut Vec<GroupLabel>, plugi
                 plugin.damaged += 1;
                 return;
             };
-            if let Scope::Nested(_) = scope {
+            let group = GroupLabel { group_type, label };
+            if let Scope::Nested(_) = scope
+                && descend(group)
+            {
                 if groups.len() < MAX_GROUP_DEPTH {
-                    groups.push(GroupLabel { group_type, label });
-                    read_group(nested, scope, groups, plugin);
+                    groups.push(group);
+                    read_group(nested, scope, descend, groups, plugin);
                     groups.pop();
                 } else {
                     plugin.damaged += 1;
@@ -645,6 +665,23 @@ mod tests {
                 (group_type::CELL_TEMPORARY_CHILDREN, 0x0100_0802),
             ]
         );
+    }
+
+    #[test]
+    fn refused_groups_are_skipped_with_everything_in_them() {
+        let plugin = read_request_where(
+            &mut Cursor::new(places()),
+            &Request {
+                flat: &[NPC],
+                nested: &[*b"CELL", *b"WRLD"],
+                nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+            },
+            &|group| group.group_type != group_type::CELL_TEMPORARY_CHILDREN,
+        )
+        .unwrap();
+        let found: Vec<_> = plugin.records.iter().map(|record| record.form_id).collect();
+        // Both objects lie in temporary children; the cells are still read.
+        assert_eq!(found, [0x0100_0900, 0x0100_0801, 0x0000_003C, 0x0100_0802]);
     }
 
     #[test]

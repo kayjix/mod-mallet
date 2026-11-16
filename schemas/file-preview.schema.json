@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FilePreview",
+  "description": "Every version of one file that the setup has, as pictures for the\nwindow: the copies in archives first, the one the game uses last.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "description": "The file, below the data directory.",
+      "type": "string"
+    },
+    "versions": {
+      "description": "Its versions, the one the game uses last.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PreviewVersion"
+      }
+    }
+  },
+  "required": [
+    "path",
+    "versions"
+  ],
+  "$defs": {
+    "ModRef": {
+      "description": "A mod as a mod manager knows it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The manager's own identifier of the mod.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name to show to people.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The manager that knows this mod, for example `vortex`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "name"
+      ]
+    },
+    "PreviewVersion": {
+      "description": "One version of a file.",
+      "type": "object",
+      "properties": {
+        "archive": {
+          "description": "The archive it is in, or `None` for a loose file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "description": "The picture, a PNG as a `data:` address, if the file could be shown.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "description": "The mod it comes from, if the mod manager knows.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

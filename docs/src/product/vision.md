@@ -47,9 +47,12 @@ that will be declined.
   order mods. It tells the mod manager what to change.
 - **Not a plugin editor.** It does not try to be xEdit. Complex patches are
   produced as xEdit scripts.
-- **Not a renderer.** There is no 3D view of the game world. For looking at a
-  problem there is the game, reached by a console command or, later, an
-  in-game bridge.
+- **Not a renderer of the world.** There is no 3D view of the game world.
+  Single things a finding is about, a mesh or a head, are shown turning in
+  3D (ADR 0029, 0033). The map can show the shape of the land as a relief,
+  with the places of the game and of mods standing on it (ADR 0031), but
+  nothing that stands on the land. For looking at a place there is the
+  game, reached by a console command or, later, an in-game bridge.
 - **Not an automatic navmesh generator.** Navmesh conflicts are detected and
   explained. Repairing them stays manual work in the Creation Kit for now.
 - **Not a universal modding platform.** The design targets the Bethesda

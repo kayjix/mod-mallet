@@ -25,7 +25,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const PROTOCOL = 1;
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 
 /** How often status.json is refreshed. */
 const HEARTBEAT_MS = 5000;
@@ -130,14 +130,75 @@ function plan(state, request, now, env = process.env) {
   // Exactly what Vortex's own "Reinstall" does: install the mod's archive
   // again, with the choices made last time as the starting point of the
   // installer dialog, and without changing whether the mod is enabled.
-  const choices = mod.attributes?.installerChoices;
+  // The options Mod Mallet names are added to those choices. Vortex starts
+  // the dialog of a reinstall from the choices saved with the mod, so they
+  // are saved there just before (see `handle`).
+  const previous = mod.attributes?.installerChoices;
+  const choices = withTicked(previous, request.tick);
+  const preset = choices === previous ? undefined : choices;
   const options =
     choices === undefined ? { allowAutoEnable: false } : { choices, allowAutoEnable: false };
   const attributes = mod.attributes ?? {};
   const modName =
     attributes.customFileName || attributes.logicalFileName || attributes.name || request.modId;
   const wasEnabled = activeProfile(state)?.modState?.[modId]?.enabled === true;
-  return { code: "started", install: { archiveId, options, modId, game, wasEnabled }, modName };
+  return {
+    code: "started",
+    install: { archiveId, options, modId, game, wasEnabled, preset, previous },
+    modName,
+  };
+}
+
+/** A field of an option to tick, as Mod Mallet sends it. */
+function isTitle(value) {
+  return typeof value === "string" && value.length > 0 && value.length <= 500;
+}
+
+/**
+ * The choices a FOMOD installer saved last time, with the options in
+ * `tick` added, each with its title and its position in its group. Without
+ * saved FOMOD choices nothing is added: the installer then starts from its
+ * own defaults, which a list of a few options must not replace. Returns
+ * `choices` itself if nothing was added.
+ */
+function withTicked(choices, tick) {
+  const wanted = (Array.isArray(tick) ? tick : []).filter(
+    (item) =>
+      isTitle(item?.step) &&
+      isTitle(item?.group) &&
+      isTitle(item?.option) &&
+      Number.isInteger(item?.index) &&
+      item.index >= 0 &&
+      item.index < 10000,
+  );
+  if (wanted.length === 0 || choices?.type !== "fomod" || !Array.isArray(choices.options)) {
+    return choices;
+  }
+  const options = structuredClone(choices.options);
+  let added = 0;
+  for (const { step, group, option, index } of wanted) {
+    let stepChoice = options.find((entry) => entry?.name === step);
+    if (stepChoice === undefined) {
+      stepChoice = { name: step, groups: [] };
+      options.push(stepChoice);
+    }
+    if (!Array.isArray(stepChoice.groups)) {
+      stepChoice.groups = [];
+    }
+    let groupChoice = stepChoice.groups.find((entry) => entry?.name === group);
+    if (groupChoice === undefined) {
+      groupChoice = { name: group, choices: [] };
+      stepChoice.groups.push(groupChoice);
+    }
+    if (!Array.isArray(groupChoice.choices)) {
+      groupChoice.choices = [];
+    }
+    if (!groupChoice.choices.some((entry) => entry?.name === option)) {
+      groupChoice.choices.push({ name: option, idx: index });
+      added += 1;
+    }
+  }
+  return added === 0 ? choices : { ...choices, options };
 }
 
 /**
@@ -280,6 +341,17 @@ function handle(
     api.events.emit("mods-enabled", [modId], enabled, game);
   }
   if (planned.install !== undefined) {
+    const { game, modId, preset, previous } = planned.install;
+    // What Vortex does when it saves a mod's installer choices.
+    const saveChoices = (value) =>
+      api.store?.dispatch({
+        type: "SET_MOD_ATTRIBUTE",
+        payload: { gameId: game, modId, attribute: "installerChoices", value },
+      });
+    if (preset !== undefined) {
+      saveChoices(preset);
+      log("info", "options ticked in advance", { modId, ticked: request.tick?.length });
+    }
     api.events.emit(
       "start-install-download",
       planned.install.archiveId,
@@ -290,6 +362,11 @@ function handle(
             modId: planned.install.modId,
             error: String(error?.message ?? error),
           });
+          // The installer did not run to its end, so the choices saved
+          // with the mod are put back, if the mod is still there.
+          if (preset !== undefined && api.getState()?.persistent?.mods?.[game]?.[modId]) {
+            saveChoices(previous);
+          }
           // The user closing the installer is not an error.
           if (error.name !== "UserCanceled") {
             api.showErrorNotification?.("Mod Mallet: the mod could not be reinstalled", error, {
@@ -545,6 +622,7 @@ module.exports = {
   appendLog,
   bridgeDir,
   plan,
+  withTicked,
   patchesDir,
   snapshot,
   writeStateIfChanged,

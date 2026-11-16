@@ -34,6 +34,30 @@ pub struct PluginKnowledge {
     /// Empty unless the plugin's checksum matches a version the rules know
     /// to need cleaning.
     pub dirty: Vec<Cleaning>,
+    /// What LOOT tells about the plugin in this setup, in its own words.
+    pub messages: Vec<KnownMessage>,
+}
+
+/// A message LOOT shows for a plugin, such as "a compatibility patch is
+/// available". Messages are LOOT's prose; Mod Mallet quotes them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownMessage {
+    /// How much LOOT says it matters.
+    pub level: MessageLevel,
+    /// The message in English, as plain text. Links are written as their
+    /// text followed by the address in brackets.
+    pub text: String,
+}
+
+/// How much a message of LOOT matters, in LOOT's own three steps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageLevel {
+    /// Worth knowing.
+    Note,
+    /// Something to look at.
+    Warning,
+    /// Something to fix.
+    Error,
 }
 
 /// A file a rule names.

@@ -102,6 +102,8 @@ struct Found {
     location: SpotLocation,
     /// The two objects, each with the plugin that placed it.
     parts: [(String, SpotPart); 2],
+    /// The point between the two objects.
+    position: [i32; 3],
 }
 
 /// Compares the placed objects. Called once per scan through
@@ -147,6 +149,9 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
         let Some(clash) = clash(a, b) else {
             continue;
         };
+        if !caused_by_moving(a, b) {
+            continue;
+        }
         let (first, second) = if a.owner() <= b.owner() {
             (a.owner(), b.owner())
         } else {
@@ -173,16 +178,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
             } else {
                 &second
             };
-            for found in &mut found {
-                let pick = found
-                    .parts
-                    .iter()
-                    .position(|(plugin, part)| plugin == smaller && part.hideable)
-                    .or_else(|| found.parts.iter().position(|(_, part)| part.hideable));
-                if let Some(part) = pick.and_then(|index| found.parts.get_mut(index)) {
-                    part.1.suggested = true;
-                }
-            }
+            suggest_hiding(&mut found, smaller);
         }
         let finding = match clash {
             Clash::Duplicate => {
@@ -204,10 +200,45 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
                 location: found.location,
                 objects: found.objects,
                 parts: found.parts.into_iter().map(|(_, part)| part).collect(),
+                position: Some(found.position),
             }));
         collisions.findings.push(finding);
     }
     collisions
+}
+
+/// Marks in each place the copy to hide: the one of `smaller` if it can
+/// be hidden, else any that can.
+fn suggest_hiding(found: &mut [Found], smaller: &str) {
+    for found in found {
+        let pick = found
+            .parts
+            .iter()
+            .position(|(plugin, part)| plugin == smaller && part.hideable)
+            .or_else(|| found.parts.iter().position(|(_, part)| part.hideable));
+        if let Some(part) = pick.and_then(|index| found.parts.get_mut(index)) {
+            part.1.suggested = true;
+        }
+    }
+}
+
+/// Whether a clash that involves an object of the game that a mod moved
+/// comes from the move: where the game has it, it would not clash. The
+/// game's objects as shipped are not compared, so a clash that was there
+/// before is not the mod's doing.
+fn caused_by_moving(a: &Solid<'_>, b: &Solid<'_>) -> bool {
+    [(a, b), (b, a)].into_iter().all(|(moved, other)| {
+        let Some(from) = moved.object.moved.as_ref().and_then(|moved| moved.from) else {
+            return true;
+        };
+        let original = PlacedObject {
+            position: from.position,
+            rotation: from.rotation,
+            scale: from.scale,
+            ..moved.object.clone()
+        };
+        Solid::new(&original, moved.base).is_none_or(|solid| clash(&solid, other).is_none())
+    })
 }
 
 /// How two objects collide.
@@ -331,7 +362,17 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
         objects,
         location,
         parts: [part(a), part(b)],
+        position: middle(a.object.position, b.object.position),
     }
+}
+
+/// The point halfway between two positions.
+fn middle([ax, ay, az]: [i32; 3], [bx, by, bz]: [i32; 3]) -> [i32; 3] {
+    let half = |a: i32, b: i32| {
+        // Summed wide, so that no position can overflow.
+        i32::try_from((i64::from(a) + i64::from(b)).div_euclid(2)).unwrap_or(a)
+    };
+    [half(ax, bx), half(ay, by), half(az, bz)]
 }
 
 /// The cell a coordinate lies in. The world is laid out in cells of 4096
@@ -587,9 +628,10 @@ impl<'a> Solid<'a> {
         Some(solid)
     }
 
-    /// The plugin that placed the object first.
+    /// The plugin the object counts as: the one that placed it first, or
+    /// the one that moved it, if it is an object of the game.
     fn owner(&self) -> &str {
-        &self.object.id.plugin
+        self.object.owner()
     }
 
     fn name(&self) -> String {
@@ -841,7 +883,7 @@ impl Matrix {
 #[cfg(test)]
 mod tests {
     use mallet_core::facts::PluginFacts;
-    use mallet_core::facts::objects::{BaseKind, Bounds, ObjectFacts, PlaceName};
+    use mallet_core::facts::objects::{BaseKind, Bounds, Moved, ObjectFacts, PlaceName, Pose};
     use mallet_core::{ArgValue, Confidence, Facts, NoModSource, Severity};
 
     use super::*;
@@ -859,6 +901,8 @@ mod tests {
 
     fn base(local_id: u32, name: &str, min: [i32; 3], max: [i32; 3]) -> BaseObject {
         BaseObject {
+            name: None,
+            model: None,
             id: id("Skyrim.esm", local_id),
             editor_id: Some(name.to_owned()),
             kind: BaseKind::Static,
@@ -897,6 +941,7 @@ mod tests {
             scale: 1000,
             persistent: false,
             large: false,
+            moved: None,
         }
     }
 
@@ -966,6 +1011,56 @@ mod tests {
             finding.args["examples"],
             ArgValue::from("House (Town -2, -1), House (Town 1, 2)")
         );
+    }
+
+    #[test]
+    fn a_house_of_the_game_that_one_mod_moves_onto_another_mods_house_is_reported() {
+        let moved = PlacedObject {
+            moved: Some(Moved {
+                by: "village.esp".to_owned(),
+                from: Some(Pose {
+                    position: [-5000, -5000, 0],
+                    rotation: [0; 3],
+                    scale: 1000,
+                }),
+            }),
+            plugin: "Village.esp".to_owned(),
+            ..placed("Skyrim.esm", 0x99, HOUSE, [5000, 9000, 0], 0)
+        };
+        let facts = facts(
+            two_mods(),
+            vec![moved, placed("Hamlet.esp", 1, HOUSE, [5010, 9005, 2], 0)],
+        );
+        let findings = findings(&facts);
+
+        let [finding] = findings.as_slice() else {
+            panic!("expected one finding, got {findings:?}");
+        };
+        assert_eq!(
+            finding.id.as_str(),
+            "objects.duplicated:pair:file:data/hamlet.esp+file:data/village.esp"
+        );
+    }
+
+    #[test]
+    fn a_clash_that_was_there_before_the_move_is_not_the_movers() {
+        let nudged = PlacedObject {
+            moved: Some(Moved {
+                by: "village.esp".to_owned(),
+                from: Some(Pose {
+                    position: [5000, 9040, 0],
+                    rotation: [0; 3],
+                    scale: 1000,
+                }),
+            }),
+            plugin: "Village.esp".to_owned(),
+            ..placed("Skyrim.esm", 0x99, HOUSE, [5000, 9000, 0], 0)
+        };
+        let facts = facts(
+            two_mods(),
+            vec![nudged, placed("Hamlet.esp", 1, HOUSE, [5010, 9005, 2], 0)],
+        );
+        assert_eq!(findings(&facts), Vec::new());
     }
 
     #[test]

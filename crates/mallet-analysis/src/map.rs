@@ -8,12 +8,14 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use mallet_core::facts::RecordId;
+use mallet_core::facts::markers::MapMarkerFact;
 use mallet_core::facts::objects::Place;
 use mallet_core::facts::terrain::{SAMPLES_PER_CELL, TerrainWorld};
-use mallet_core::{MapCell, MapTerrain, MapWorld, WorldMap};
+use mallet_core::{MapCell, MapMarker, MapTerrain, MapWorld, WorldMap};
 
 use crate::Context;
 use crate::objects::Owners;
+use crate::places::{self, Origin};
 
 /// The objects of one cell: how many, and which plugins place them.
 type CellCount<'a> = (u32, BTreeSet<&'a str>);
@@ -40,7 +42,14 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
             .entry((x.div_euclid(4096), y.div_euclid(4096)))
             .or_default();
         cell.0 = cell.0.saturating_add(1);
-        cell.1.insert(object.id.plugin.as_str());
+        cell.1.insert(object.owner());
+    }
+
+    // A worldspace with places is on the map even if no mod places objects
+    // in it.
+    let places_by_world = places_by_world(&context.facts.markers.markers);
+    for worldspace in places_by_world.keys() {
+        worlds.entry(worldspace).or_default();
     }
 
     // Plugins of the same mod become one owner, and owners are listed by
@@ -50,6 +59,7 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
         .values()
         .flat_map(|cells| cells.values())
         .flat_map(|(_, plugins)| plugins.iter().copied())
+        .chain(place_plugins(&places_by_world))
         .map(|plugin| (plugin, owners.display(plugin)))
         .collect();
     let names_of_owners: Vec<String> = display
@@ -71,8 +81,9 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
             .unwrap_or_default()
     };
 
-    // The worldspace where most mods meet comes first, then the busiest.
-    let mut map_worlds: Vec<((usize, u64), MapWorld)> = worlds
+    // The worldspace where most mods meet comes first, then the busiest,
+    // then the one with the most places.
+    let mut map_worlds: Vec<((usize, u64, usize), MapWorld)> = worlds
         .into_iter()
         .map(|(worldspace, cells)| {
             let total: u64 = cells.values().map(|(count, _)| u64::from(*count)).sum();
@@ -94,19 +105,21 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
                 .get(worldspace)
                 .map_or_else(|| worldspace.to_string(), |name| (*name).to_owned());
             let shared = cells.iter().filter(|cell| cell.owners.len() > 1).count();
+            let markers = world_markers(&places_by_world, worldspace, &name, &owner);
             let terrain = context
                 .facts
                 .terrain
                 .worlds
                 .iter()
                 .find(|land| &land.worldspace == worldspace)
-                .and_then(|land| terrain(land, around(&cells)));
+                .and_then(|land| terrain(land, around(&occupied(&cells, &markers))));
             (
-                (shared, total),
+                (shared, total, markers.len()),
                 MapWorld {
                     name,
                     cells,
                     terrain,
+                    markers,
                 },
             )
         })
@@ -124,14 +137,91 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
 /// objects.
 const MARGIN: i32 = 8;
 
+/// Map markers grouped by their worldspace, each with whose it is.
+type PlacesByWorld<'a> = BTreeMap<&'a RecordId, Vec<(&'a MapMarkerFact, Origin<'a>)>>;
+
+/// The places of the world map by worldspace, and whose they are.
+fn places_by_world(markers: &[MapMarkerFact]) -> PlacesByWorld<'_> {
+    let mut by_world: PlacesByWorld<'_> = BTreeMap::new();
+    for marker in markers {
+        by_world
+            .entry(&marker.worldspace)
+            .or_default()
+            .push((marker, places::origin(marker)));
+    }
+    by_world
+}
+
+/// The plugins that added, changed or removed a place.
+fn place_plugins<'a>(places: &'a PlacesByWorld<'a>) -> impl Iterator<Item = &'a str> {
+    places
+        .values()
+        .flatten()
+        .filter_map(|(_, origin)| origin.plugin)
+}
+
+/// The places of `worldspace`, named `world`, for the report. `owner` gives
+/// the position of a plugin's mod among the owners of the map.
+fn world_markers(
+    places: &PlacesByWorld<'_>,
+    worldspace: &RecordId,
+    world: &str,
+    owner: &impl Fn(&str) -> u32,
+) -> Vec<MapMarker> {
+    places
+        .get(worldspace)
+        .into_iter()
+        .flatten()
+        .map(|(marker, origin)| map_marker(marker, origin, world, owner))
+        .collect()
+}
+
+/// The cells with objects of mods or a place, whose land is shown.
+fn occupied(cells: &[MapCell], markers: &[MapMarker]) -> Vec<(i32, i32)> {
+    cells
+        .iter()
+        .map(|cell| (cell.x, cell.y))
+        .chain(markers.iter().map(|marker| {
+            let [x, y, _] = marker.position;
+            (x.div_euclid(4096), y.div_euclid(4096))
+        }))
+        .collect()
+}
+
 /// The cells around the cells of the map, as west, east, south, north.
-fn around(cells: &[MapCell]) -> Option<(i32, i32, i32, i32)> {
+fn around(cells: &[(i32, i32)]) -> Option<(i32, i32, i32, i32)> {
     Some((
-        cells.iter().map(|cell| cell.x).min()? - MARGIN,
-        cells.iter().map(|cell| cell.x).max()? + MARGIN,
-        cells.iter().map(|cell| cell.y).min()? - MARGIN,
-        cells.iter().map(|cell| cell.y).max()? + MARGIN,
+        cells.iter().map(|(x, _)| *x).min()?.saturating_sub(MARGIN),
+        cells.iter().map(|(x, _)| *x).max()?.saturating_add(MARGIN),
+        cells.iter().map(|(_, y)| *y).min()?.saturating_sub(MARGIN),
+        cells.iter().map(|(_, y)| *y).max()?.saturating_add(MARGIN),
     ))
+}
+
+/// A place of the world map in `world`, for the report. `owner` gives the
+/// position of a plugin's mod among the owners of the map.
+fn map_marker(
+    marker: &MapMarkerFact,
+    origin: &Origin<'_>,
+    world: &str,
+    owner: impl Fn(&str) -> u32,
+) -> MapMarker {
+    let version = &marker.last;
+    let [x, y, _] = version.position;
+    MapMarker {
+        name: version
+            .name
+            .clone()
+            .or_else(|| marker.first.name.clone())
+            .unwrap_or_default(),
+        kind: places::kind(version.kind),
+        position: version.position,
+        origin: origin.whose,
+        owner: origin.plugin.map(owner),
+        moved_from: origin.moved_from,
+        renamed_from: origin.renamed_from.map(str::to_owned),
+        console: format!("cow {world} {} {}", x.div_euclid(4096), y.div_euclid(4096)),
+    }
 }
 
 /// The land of a worldspace as a height image, limited to `within` (west,
@@ -231,6 +321,7 @@ mod tests {
             scale: 1000,
             persistent: false,
             large: false,
+            moved: None,
         }
     }
 
@@ -310,5 +401,94 @@ mod tests {
             .map(|cell| (cell.x, cell.y, cell.objects, cell.owners.clone()))
             .collect();
         assert_eq!(cells, [(-1, 1, 1, vec![1]), (0, 0, 3, vec![0, 1])]);
+    }
+
+    #[test]
+    fn places_are_on_the_map_with_their_origin_and_mod() {
+        use mallet_core::facts::markers::{MapMarkerFact, MarkerFacts, MarkerVersion};
+        use mallet_core::{PlaceKind, PlaceOrigin};
+
+        let version = |plugin: &str, kind: u8, name: &str, x: i32| MarkerVersion {
+            plugin: plugin.to_owned(),
+            official: plugin == "Skyrim.esm",
+            kind,
+            name: Some(name.to_owned()),
+            position: [x, 0, 0],
+            removed: false,
+        };
+        let marker = |local_id: u32, first: MarkerVersion, last: MarkerVersion| MapMarkerFact {
+            id: id(&first.plugin, local_id),
+            worldspace: id("skyrim.esm", 0x3C),
+            first,
+            last,
+        };
+        let facts = Facts {
+            markers: MarkerFacts {
+                markers: vec![
+                    marker(
+                        1,
+                        version("Skyrim.esm", 2, "Millbrook", 0),
+                        version("Skyrim.esm", 2, "Millbrook", 0),
+                    ),
+                    marker(
+                        2,
+                        version("Skyrim.esm", 4, "Echo Hollow", 0),
+                        version("Caves.esp", 4, "Echo Hollow", 9000),
+                    ),
+                    marker(
+                        3,
+                        version("Village.esp", 3, "New Village", -5000),
+                        version("Village.esp", 3, "New Village", -5000),
+                    ),
+                ],
+            },
+            objects: ObjectFacts {
+                place_names: vec![PlaceName {
+                    id: id("skyrim.esm", 0x3C),
+                    editor_id: "Tamriel".to_owned(),
+                }],
+                ..ObjectFacts::default()
+            },
+            ..Facts::default()
+        };
+        let map = world_map(&Context::new(&facts, &NoModSource));
+
+        assert_eq!(map.owners, ["Caves.esp", "Village.esp"]);
+        let [world] = map.worlds.as_slice() else {
+            panic!("expected one world, got {:?}", map.worlds);
+        };
+        let found: Vec<_> = world
+            .markers
+            .iter()
+            .map(|marker| {
+                (
+                    marker.name.as_str(),
+                    marker.kind,
+                    marker.origin,
+                    marker.owner,
+                )
+            })
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("Millbrook", PlaceKind::Town, PlaceOrigin::Game, None),
+                (
+                    "Echo Hollow",
+                    PlaceKind::Cave,
+                    PlaceOrigin::Changed,
+                    Some(0)
+                ),
+                (
+                    "New Village",
+                    PlaceKind::Settlement,
+                    PlaceOrigin::Added,
+                    Some(1)
+                ),
+            ]
+        );
+        let cave = &world.markers[1];
+        assert_eq!(cave.moved_from, Some([0, 0, 0]));
+        assert_eq!(cave.console, "cow Tamriel 2 0");
     }
 }

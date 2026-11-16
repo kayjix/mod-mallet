@@ -4,6 +4,13 @@
 // translated (crates/mallet-messages), so that the app and the command line
 // always say the same thing. Only the words of the window itself live here.
 
+import type { MapMarker } from "./generated/rendered-report";
+
+/** Whose a place of the map is. */
+export type PlaceOrigin = MapMarker["origin"];
+/** What kind of place it is. */
+export type PlaceKind = MapMarker["kind"];
+
 export type Lang = "en" | "de";
 
 export const languages: Record<Lang, string> = {
@@ -148,6 +155,81 @@ export interface Texts {
   choiceToPatch: string;
   choiceByHand: string;
   moreAbout: string;
+  previewTitle: string;
+  viewer3d: string;
+  viewerHint: string;
+  viewerClose: string;
+  viewerNothing: string;
+  view3d: string;
+  view3dBoth: string;
+  duelsTitle: string;
+  duelsHint: string;
+  duelsDecided: (count: number) => string;
+  duelsMore: (count: number) => string;
+  duelWinner: string;
+  duelNow: (name: string) => string;
+  duelPick: (name: string) => string;
+  duelCompare: string;
+  duelCompareClose: string;
+  duelUndo: string;
+  duelPatchChosen: (count: number) => string;
+  duelNoPictures: string;
+  duelOriginal: string;
+  previewLoading: string;
+  previewInGame: string;
+  previewLoose: string;
+  previewNoPicture: string;
+  viewCompare: string;
+  compareOpen: string;
+  compareBack: string;
+  compareDuels: string;
+  compareRanking: string;
+  compareOpenLabel: string;
+  compareDecidedLabel: string;
+  compareSearch: string;
+  compareAllTopics: string;
+  compareShowDecided: string;
+  compareFiles: (count: number) => string;
+  compareNone: string;
+  compareCannotShow: string;
+  compareObjects: string;
+  compareTechnical: (count: number) => string;
+  topicName: Record<"faces" | "textures" | "meshes" | "objects" | "contained", string>;
+  objectKinds: Record<string, string>;
+  rankedMark: string;
+  rankedFor: (name: string) => string;
+  rankingHint: string;
+  rankingOthers: (count: number) => string;
+  rankingUp: string;
+  rankingDown: string;
+  rankingRemove: string;
+  rankingPrefer: string;
+  rankingDefer: string;
+  rankingUnplaced: string;
+  rankingDuels: (count: number) => string;
+  rankingApply: (count: number) => string;
+  rankingConfirm: (count: number) => string;
+  rankingRunning: (done: number, total: number) => string;
+  rankingDone: (decided: number, hidden: number, failed: number) => string;
+  rankingNothing: string;
+  duelCompareFiles: (count: number) => string;
+  arrangeLabel: string;
+  arrangeCategory: string;
+  arrangePairs: string;
+  arrangeDuelsAside: (count: number) => string;
+  stageStop: string;
+  stageTurn: string;
+  stageReset: string;
+  stageBrightness: string;
+  stageLightAround: string;
+  stageLightHeight: string;
+  stageScene: string;
+  sceneDark: string;
+  sceneWhite: string;
+  sceneMeadow: string;
+  sceneForest: string;
+  sceneCave: string;
+  sceneSnow: string;
   whatItMeans: string;
   file: string;
   mod: string;
@@ -193,6 +275,32 @@ export interface Texts {
   mapCollisions: string;
   mapCells: string;
   mapShared: string;
+
+  // The places of the map and the 3D relief (ADR 0031).
+  mapFlat: string;
+  mapRelief: string;
+  mapNoRelief: string;
+  mapReliefHint: string;
+  mapHeight: string;
+  mapModCells: string;
+  mapTopView: string;
+  mapPlaces: string;
+  placesShowAll: string;
+  placesHideAll: string;
+  placesOrigin: Record<PlaceOrigin, string>;
+  placesOriginHint: Record<PlaceOrigin, string>;
+  placesKind: Record<PlaceKind, string>;
+  placesCollisions: string;
+  placesUnnamed: string;
+  placesBy: (owner: string) => string;
+  placesMoved: (distance: string) => string;
+  placesRenamed: (name: string) => string;
+  placesNear: string;
+  placesNearby: string;
+  placesNone: string;
+  placesCollisionsNear: string;
+  placesDistance: (metres: number) => string;
+  placesPick: string;
 
   // The mods.
   modsOnlyProblems: string;
@@ -376,6 +484,121 @@ export const texts: Record<Lang, Texts> = {
     choiceToPatch: "To the patch",
     choiceByHand: "By hand",
     moreAbout: "More about it",
+    previewTitle: "What it looks like",
+    viewer3d: "In 3D",
+    viewerHint: "Drag to turn, scroll to zoom.",
+    viewerClose: "Close",
+    viewerNothing: "This mesh cannot be shown.",
+    view3d: "View in 3D",
+    view3dBoth: "Both in 3D",
+    duelsTitle: "Mod against mod",
+    duelsHint:
+      "Two mods that get in each other's way, with everything they disagree about. Pick the one that should win; it then wins everywhere at once.",
+    duelsDecided: (count) => (count === 1 ? "1 decided" : `${count} decided`),
+    duelsMore: (count) => `Show ${Math.min(count, 8)} more (${count} left)`,
+    duelWinner: "wins",
+    duelNow: (name) => `now: ${name}`,
+    duelPick: (name) => `${name} wins`,
+    duelCompare: "Compare",
+    duelCompareClose: "Close comparison",
+    duelUndo: "Decide again",
+    duelPatchChosen: (count) =>
+      count === 1
+        ? "1 object of the other mod goes into the patch."
+        : `${count} objects of the other mod go into the patch.`,
+    duelNoPictures: "There is nothing to show as a picture for these two.",
+    duelOriginal: "the game's original",
+    previewLoading: "Loading the pictures…",
+    previewInGame: "in the game",
+    previewLoose: "loose file",
+    previewNoPicture: "no picture",
+    viewCompare: "Compare mods",
+    compareOpen: "Open the comparison",
+    compareBack: "Back",
+    compareDuels: "Pairs",
+    compareRanking: "Ranking",
+    compareOpenLabel: "open",
+    compareDecidedLabel: "decided",
+    compareSearch: "Search mods or objects",
+    compareAllTopics: "Everything",
+    compareShowDecided: "Show decided ones",
+    compareFiles: (count) => (count === 1 ? "1 file" : `${count} files`),
+    compareNone: "There are no two mods that get in each other's way.",
+    compareCannotShow: "This file cannot be shown as a picture.",
+    compareObjects: "What they disagree about",
+    compareTechnical: (count) => `Show normal, gloss and glow maps (${count})`,
+    topicName: {
+      faces: "Faces",
+      textures: "Textures",
+      meshes: "Meshes",
+      objects: "Objects in the world",
+      contained: "Files inside each other",
+    },
+    objectKinds: {
+      static: "Static object",
+      "movable-static": "Movable object",
+      "static-collection": "Group of objects",
+      tree: "Tree or plant",
+      furniture: "Furniture",
+      container: "Container",
+      door: "Door",
+      activator: "Activator",
+    },
+    rankedMark: "ranking",
+    rankedFor: (name) => `Your ranking: ${name}`,
+    rankingHint:
+      "Put the mods you like best at the top. In every pair, the one higher up wins. All mods you have not placed stand where the grey line is: move a mod below it, and it loses against all of them.",
+    rankingOthers: (count) => `All other mods (${count})`,
+    rankingUp: "Move up",
+    rankingDown: "Move down",
+    rankingRemove: "Take out of the ranking",
+    rankingPrefer: "↑ prefer",
+    rankingDefer: "↓ put last",
+    rankingUnplaced: "Not placed yet",
+    rankingDuels: (count) => (count === 1 ? "1 pair" : `${count} pairs`),
+    rankingApply: (count) =>
+      count === 1
+        ? "Decide 1 open pair by the ranking"
+        : `Decide ${count} open pairs by the ranking`,
+    rankingConfirm: (count) =>
+      `This asks Vortex to change the load order for ${count === 1 ? "1 pair" : `${count} pairs`}. Decisions you made yourself stay as they are, and every pair can be decided again later.`,
+    rankingRunning: (done, total) => `Deciding… ${done} of ${total}`,
+    rankingDone: (decided, hidden, failed) =>
+      [
+        decided === 1 ? "1 pair decided." : `${decided} pairs decided.`,
+        hidden === 1
+          ? "1 object goes into the patch."
+          : hidden > 1
+            ? `${hidden} objects go into the patch.`
+            : "",
+        failed === 1
+          ? "1 change did not work."
+          : failed > 1
+            ? `${failed} changes did not work.`
+            : "",
+      ]
+        .filter((part) => part !== "")
+        .join(" "),
+    rankingNothing: "The ranking decides no open pair yet",
+    duelCompareFiles: (count) => `Compare (${count === 1 ? "1 file" : `${count} files`})`,
+    arrangeLabel: "Arrange the tasks",
+    arrangeCategory: "By kind",
+    arrangePairs: "Mod against mod",
+    arrangeDuelsAside: (count) =>
+      `${count === 1 ? "1 pair of mods that disagree is" : `${count} pairs of mods that disagree are`} under "Mod against mod".`,
+    stageStop: "Stop turning",
+    stageTurn: "Turn",
+    stageReset: "Reset",
+    stageBrightness: "Brightness",
+    stageLightAround: "Light around",
+    stageLightHeight: "Light height",
+    stageScene: "Scene",
+    sceneDark: "Dark room",
+    sceneWhite: "White room",
+    sceneMeadow: "Meadow",
+    sceneForest: "Forest",
+    sceneCave: "Cave",
+    sceneSnow: "Snow",
     whatItMeans: "What this means",
     file: "File",
     mod: "Mod",
@@ -420,6 +643,79 @@ export const texts: Record<Lang, Texts> = {
     mapCollisions: "Collisions here",
     mapCells: "Cells with objects of mods",
     mapShared: "Cells where several mods meet",
+
+    mapFlat: "Map",
+    mapRelief: "3D relief",
+    mapNoRelief: "The land of this worldspace is not known, so there is no relief to show.",
+    mapReliefHint: "Drag to move · right-drag to turn · wheel to zoom",
+    mapHeight: "Height",
+    mapModCells: "Cells of mods",
+    mapTopView: "From above",
+    mapPlaces: "Places",
+    placesShowAll: "Show all",
+    placesHideAll: "Hide all",
+    placesOrigin: {
+      game: "The game's",
+      added: "Added by a mod",
+      changed: "Changed by a mod",
+      removed: "Removed by a mod",
+    },
+    placesOriginHint: {
+      game: "Places as the game has them, untouched by mods.",
+      added: "New places that a mod brings.",
+      changed: "Places of the game that a mod moved, renamed or turned into something else.",
+      removed: "Places that a mod took off the map.",
+    },
+    placesKind: {
+      city: "City",
+      town: "Town",
+      settlement: "Settlement",
+      castle: "Castle",
+      cave: "Cave",
+      camp: "Camp",
+      fort: "Fort",
+      "nordic-ruin": "Nordic ruin",
+      "dwemer-ruin": "Dwemer ruin",
+      shipwreck: "Shipwreck",
+      grove: "Grove",
+      landmark: "Landmark",
+      "dragon-lair": "Dragon lair",
+      farm: "Farm",
+      "wood-mill": "Wood mill",
+      mine: "Mine",
+      "imperial-camp": "Imperial camp",
+      "stormcloak-camp": "Stormcloak camp",
+      doomstone: "Standing stone",
+      "wheat-mill": "Wheat mill",
+      smelter: "Smelter",
+      stable: "Stable",
+      "imperial-tower": "Imperial tower",
+      clearing: "Clearing",
+      pass: "Pass",
+      shrine: "Shrine",
+      lighthouse: "Lighthouse",
+      "orc-stronghold": "Orc stronghold",
+      "giant-camp": "Giant camp",
+      shack: "Shack",
+      "nordic-tower": "Nordic tower",
+      "nordic-dwelling": "Nordic dwelling",
+      docks: "Docks",
+      "daedric-shrine": "Daedric shrine",
+      passage: "Passage",
+      other: "Other",
+    },
+    placesCollisions: "Collisions of mods",
+    placesUnnamed: "Unnamed place",
+    placesBy: (owner) => `by ${owner}`,
+    placesMoved: (distance) => `Moved ${distance} away from where the game has it.`,
+    placesRenamed: (name) => `The game calls it “${name}”.`,
+    placesNear: "Near",
+    placesNearby: "Nearest places",
+    placesNone: "No place of the map nearby.",
+    placesCollisionsNear: "Collisions nearby",
+    placesDistance: (metres) =>
+      metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${Math.round(metres)} m`,
+    placesPick: "Pick a place, a collision or a cell on the map.",
 
     modsOnlyProblems: "Only mods with something open",
     modsSearch: "Search",
@@ -604,6 +900,117 @@ export const texts: Record<Lang, Texts> = {
     choiceToPatch: "Zum Patch",
     choiceByHand: "Von Hand",
     moreAbout: "Mehr dazu",
+    previewTitle: "So sieht es aus",
+    viewer3d: "In 3D",
+    viewerHint: "Ziehen zum Drehen, Mausrad zum Zoomen.",
+    viewerClose: "Schließen",
+    viewerNothing: "Dieses Mesh lässt sich nicht zeigen.",
+    view3d: "In 3D ansehen",
+    view3dBoth: "Beide in 3D",
+    duelsTitle: "Mod gegen Mod",
+    duelsHint:
+      "Zwei Mods, die sich in die Quere kommen, mit allem, worin sie sich uneins sind. Wähle die, die gewinnen soll; sie gewinnt dann überall auf einmal.",
+    duelsDecided: (count) => `${count} entschieden`,
+    duelsMore: (count) => `${Math.min(count, 8)} weitere zeigen (${count} übrig)`,
+    duelWinner: "gewinnt",
+    duelNow: (name) => `jetzt: ${name}`,
+    duelPick: (name) => `${name} gewinnt`,
+    duelCompare: "Vergleichen",
+    duelCompareClose: "Vergleich schließen",
+    duelUndo: "Neu entscheiden",
+    duelPatchChosen: (count) =>
+      count === 1
+        ? "1 Objekt der anderen Mod kommt in den Patch."
+        : `${count} Objekte der anderen Mod kommen in den Patch.`,
+    duelNoPictures: "Für diese beiden gibt es nichts als Bild zu zeigen.",
+    duelOriginal: "Original des Spiels",
+    previewLoading: "Bilder werden geladen …",
+    previewInGame: "im Spiel",
+    previewLoose: "lose Datei",
+    previewNoPicture: "kein Bild",
+    viewCompare: "Mods vergleichen",
+    compareOpen: "Vergleich öffnen",
+    compareBack: "Zurück",
+    compareDuels: "Paare",
+    compareRanking: "Rangfolge",
+    compareOpenLabel: "offen",
+    compareDecidedLabel: "entschieden",
+    compareSearch: "Mods oder Objekte suchen",
+    compareAllTopics: "Alles",
+    compareShowDecided: "Entschiedene zeigen",
+    compareFiles: (count) => (count === 1 ? "1 Datei" : `${count} Dateien`),
+    compareNone: "Es gibt keine zwei Mods, die sich in die Quere kommen.",
+    compareCannotShow: "Diese Datei lässt sich nicht als Bild zeigen.",
+    compareObjects: "Worum sie streiten",
+    compareTechnical: (count) => `Normal-, Glanz- und Leuchtkarten zeigen (${count})`,
+    topicName: {
+      faces: "Gesichter",
+      textures: "Texturen",
+      meshes: "Meshes",
+      objects: "Objekte in der Welt",
+      contained: "Dateien ineinander",
+    },
+    objectKinds: {
+      static: "Festes Objekt",
+      "movable-static": "Bewegliches Objekt",
+      "static-collection": "Objektgruppe",
+      tree: "Baum oder Pflanze",
+      furniture: "Möbel",
+      container: "Behälter",
+      door: "Tür",
+      activator: "Aktivator",
+    },
+    rankedMark: "Rangfolge",
+    rankedFor: (name) => `Deine Rangfolge: ${name}`,
+    rankingHint:
+      "Die Mods, die dir am besten gefallen, nach oben. In jedem Paar gewinnt der weiter oben. Alle Mods, die du nicht einordnest, stehen bei der grauen Linie: Schiebst du einen Mod darunter, verliert er gegen alle.",
+    rankingOthers: (count) => `Alle anderen Mods (${count})`,
+    rankingUp: "Nach oben",
+    rankingDown: "Nach unten",
+    rankingRemove: "Aus der Rangfolge nehmen",
+    rankingPrefer: "↑ bevorzugen",
+    rankingDefer: "↓ ganz nach hinten",
+    rankingUnplaced: "Noch nicht eingeordnet",
+    rankingDuels: (count) => (count === 1 ? "1 Paar" : `${count} Paare`),
+    rankingApply: (count) =>
+      count === 1
+        ? "1 offenes Paar nach Rangfolge entscheiden"
+        : `${count} offene Paare nach Rangfolge entscheiden`,
+    rankingConfirm: (count) =>
+      `Das bittet Vortex, die Ladereihenfolge für ${count === 1 ? "1 Paar" : `${count} Paare`} zu ändern. Was du selbst entschieden hast, bleibt, und jedes Paar lässt sich später neu entscheiden.`,
+    rankingRunning: (done, total) => `Wird entschieden … ${done} von ${total}`,
+    rankingDone: (decided, hidden, failed) =>
+      [
+        decided === 1 ? "1 Paar entschieden." : `${decided} Paare entschieden.`,
+        hidden > 0 ? `${hidden} Objekte kommen in den Patch.` : "",
+        failed === 1
+          ? "1 Änderung hat nicht geklappt."
+          : failed > 1
+            ? `${failed} Änderungen haben nicht geklappt.`
+            : "",
+      ]
+        .filter((part) => part !== "")
+        .join(" "),
+    rankingNothing: "Die Rangfolge entscheidet noch kein offenes Paar",
+    duelCompareFiles: (count) => `Vergleichen (${count === 1 ? "1 Datei" : `${count} Dateien`})`,
+    arrangeLabel: "Aufgaben ordnen",
+    arrangeCategory: "Nach Art",
+    arrangePairs: "Mod gegen Mod",
+    arrangeDuelsAside: (count) =>
+      `${count === 1 ? "1 Paar von Mods, die sich widersprechen, steht" : `${count} Paare von Mods, die sich widersprechen, stehen`} unter „Mod gegen Mod“.`,
+    stageStop: "Drehen anhalten",
+    stageTurn: "Drehen",
+    stageReset: "Zurücksetzen",
+    stageBrightness: "Helligkeit",
+    stageLightAround: "Licht ringsum",
+    stageLightHeight: "Lichthöhe",
+    stageScene: "Umgebung",
+    sceneDark: "Dunkler Raum",
+    sceneWhite: "Weißer Raum",
+    sceneMeadow: "Wiese",
+    sceneForest: "Wald",
+    sceneCave: "Höhle",
+    sceneSnow: "Schnee",
     whatItMeans: "Was das bedeutet",
     file: "Datei",
     mod: "Mod",
@@ -649,6 +1056,82 @@ export const texts: Record<Lang, Texts> = {
     mapCollisions: "Zusammenstöße hier",
     mapCells: "Zellen mit Objekten von Mods",
     mapShared: "Zellen, in denen sich Mods begegnen",
+
+    mapFlat: "Karte",
+    mapRelief: "3D-Relief",
+    mapNoRelief: "Das Gelände dieses Weltraums ist nicht bekannt, darum gibt es kein Relief.",
+    mapReliefHint: "Ziehen verschiebt · rechts ziehen dreht · Mausrad zoomt",
+    mapHeight: "Höhe",
+    mapModCells: "Zellen von Mods",
+    mapTopView: "Von oben",
+    mapPlaces: "Orte",
+    placesShowAll: "Alle zeigen",
+    placesHideAll: "Alle ausblenden",
+    placesOrigin: {
+      game: "Vom Spiel",
+      added: "Von Mod hinzugefügt",
+      changed: "Von Mod verändert",
+      removed: "Von Mod entfernt",
+    },
+    placesOriginHint: {
+      game: "Orte, wie das Spiel sie hat, von keiner Mod berührt.",
+      added: "Neue Orte, die eine Mod mitbringt.",
+      changed:
+        "Orte des Spiels, die eine Mod verschoben, umbenannt oder zu etwas anderem gemacht hat.",
+      removed: "Orte, die eine Mod von der Karte genommen hat.",
+    },
+    placesKind: {
+      city: "Stadt",
+      town: "Dorf",
+      settlement: "Siedlung",
+      castle: "Burg",
+      cave: "Höhle",
+      camp: "Lager",
+      fort: "Festung",
+      "nordic-ruin": "Nordische Ruine",
+      "dwemer-ruin": "Dwemer-Ruine",
+      shipwreck: "Schiffswrack",
+      grove: "Hain",
+      landmark: "Wahrzeichen",
+      "dragon-lair": "Drachenhort",
+      farm: "Hof",
+      "wood-mill": "Sägewerk",
+      mine: "Mine",
+      "imperial-camp": "Kaiserliches Lager",
+      "stormcloak-camp": "Lager der Sturmmäntel",
+      doomstone: "Menhir",
+      "wheat-mill": "Mühle",
+      smelter: "Schmelze",
+      stable: "Stall",
+      "imperial-tower": "Kaiserlicher Wachturm",
+      clearing: "Lichtung",
+      pass: "Pass",
+      shrine: "Schrein",
+      lighthouse: "Leuchtturm",
+      "orc-stronghold": "Orkfestung",
+      "giant-camp": "Riesenlager",
+      shack: "Hütte",
+      "nordic-tower": "Nordischer Turm",
+      "nordic-dwelling": "Nordische Behausung",
+      docks: "Hafen",
+      "daedric-shrine": "Daedra-Schrein",
+      passage: "Überfahrt",
+      other: "Sonstiges",
+    },
+    placesCollisions: "Zusammenstöße von Mods",
+    placesUnnamed: "Ort ohne Namen",
+    placesBy: (owner) => `durch ${owner}`,
+    placesMoved: (distance) => `Um ${distance} verschoben gegenüber dem Spiel.`,
+    placesRenamed: (name) => `Im Spiel heißt er „${name}“.`,
+    placesNear: "Nahe",
+    placesNearby: "Nächste Orte",
+    placesNone: "Kein Ort der Karte in der Nähe.",
+    placesCollisionsNear: "Zusammenstöße in der Nähe",
+    placesDistance: (metres) =>
+      metres >= 1000
+        ? `${(metres / 1000).toFixed(1).replace(".", ",")} km`
+        : `${Math.round(metres)} m`,
+    placesPick: "Wähle einen Ort, einen Zusammenstoß oder eine Zelle auf der Karte.",
 
     modsOnlyProblems: "Nur Mods mit offenen Punkten",
     modsSearch: "Suchen",

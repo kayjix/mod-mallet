@@ -5,7 +5,9 @@
 // that the other does not follow fails the type check.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { FilePreview } from "./generated/file-preview";
 import type { MapImage } from "./generated/map-image";
+import type { MeshView } from "./generated/mesh-view";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
@@ -53,6 +55,18 @@ export interface Api {
   gameArt(game: string): Promise<string | null>;
   /** A picture of a worldspace from the game's terrain textures, if it has them. */
   mapImage(world: string): Promise<MapImage | null>;
+  /** Every version of a file of the setup, as pictures where it is a texture. */
+  filePreview(path: string): Promise<FilePreview | null>;
+  /** A version of a mesh, ready to draw; the one in the game unless `version` names another. */
+  meshView(path: string, version: number | null): Promise<MeshView | null>;
+  /** The mods in the order the user likes them, the favourite first. */
+  ranking(): Promise<string[]>;
+  /** Remembers the order the user likes the mods in. */
+  setRanking(ranking: string[]): Promise<string[]>;
+  /** The sides the user picked in duels between mods, by duel. */
+  decisions(): Promise<Record<string, number>>;
+  /** Remembers the side picked in a duel, or forgets it with null. */
+  setDecision(id: string, side: number | null): Promise<Record<string, number>>;
 }
 
 const tauriApi: Api = {
@@ -74,6 +88,12 @@ const tauriApi: Api = {
   restartManager: () => invoke<void>("restart_manager"),
   gameArt: (game) => invoke<string | null>("game_art", { game }),
   mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
+  filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
+  meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
+  ranking: () => invoke<string[]>("ranking"),
+  setRanking: (ranking) => invoke<string[]>("set_ranking", { ranking }),
+  decisions: () => invoke<Record<string, number>>("decisions"),
+  setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),
 };
 
 function runsInsideTauri(): boolean {

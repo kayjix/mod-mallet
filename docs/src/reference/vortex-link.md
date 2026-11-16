@@ -39,7 +39,7 @@ never sees half a file. `<id>` consists of hexadecimal digits and `-`.
 ## status.json
 
 ```json
-{ "protocol": 1, "extensionVersion": "0.5.0", "startedAt": 1794700000000, "heartbeatAt": 1794700005000 }
+{ "protocol": 1, "extensionVersion": "0.6.0", "startedAt": 1794700000000, "heartbeatAt": 1794700005000 }
 ```
 
 Times are milliseconds since 1970-01-01 UTC. Mod Mallet takes the extension
@@ -110,6 +110,7 @@ newer of the two. The file stays when Vortex is closed.
 | `modId` | For `reinstall-mod` and `set-mod-enabled`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
 | `plugin`, `after` | For `load-after`: two plugin file names (`.esp`, `.esm`, `.esl`). |
 | `enabled` | For `set-mod-enabled`: `true` or `false`. |
+| `tick` | For `reinstall-mod`, optional: installer options to tick in advance, each `{ "step", "group", "option", "index" }`, with `index` the option's position in its group, counting from 0, in the order the installer shows them. Since extension 0.6.0. |
 | `path` | For `install-archive`: a zip archive in `%LOCALAPPDATA%\mod-mallet\patches`. Archives anywhere else are refused (`not-allowed`). |
 | `createdAt` | When the request was written. A request older than a minute is refused. |
 
@@ -129,6 +130,17 @@ the installer has finished and the mod was enabled, the extension therefore
 emits `mods-enabled` for it, again as Vortex's own entry does. Vortex then
 deploys, or tells the user that a deployment is due, depending on its
 settings. If the user cancels the installer, nothing further happens.
+
+With `tick`, the options are added to the choices saved with the mod, and
+the result is saved as the mod's `installerChoices` attribute
+(`SET_MOD_ATTRIBUTE`) just before the event. Vortex starts the dialog of a
+reinstall from the choices saved with the mod and ignores choices passed
+with the event, so this is what makes the options appear ticked. The user
+still sees every page and can untick them. If the installer is cancelled
+or fails, the previous choices are saved back, provided the mod still
+exists. A mod without saved FOMOD choices is reinstalled without anything
+ticked in advance: the installer then starts from its own defaults. See
+[ADR 0034](../adr/0034-installer-options-ticked-in-advance.md).
 
 ### install-archive
 

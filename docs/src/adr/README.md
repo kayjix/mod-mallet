@@ -54,4 +54,11 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0025](0025-patches-through-base-object-swapper.md) | Patches hide objects through Base Object Swapper | accepted |
 | [0026](0026-toolbox-log-and-restarting-vortex.md) | The app has a toolbox, a log, and can restart Vortex | accepted |
 | [0027](0027-findings-offer-decisions.md) | Findings offer decisions; the window has a home and themes | accepted |
+| [0028](0028-pictures-of-textures.md) | Findings show the textures they are about | accepted |
+| [0029](0029-duels-and-a-3d-view-of-single-things.md) | Mods are decided pair by pair; single things are shown in 3D | accepted |
 | [0030](0030-rules-from-the-loot-masterlist.md) | Rules from the LOOT masterlist, evaluated by libloot | accepted |
+| [0031](0031-places-on-the-map-and-a-3d-relief.md) | The map shows the places of the game and of mods, also as a 3D relief | accepted |
+| [0032](0032-objects-of-the-game-that-mods-move.md) | Objects of the game that mods move count as the mod's | accepted |
+| [0033](0033-comparison-stage-and-ranking.md) | Mods are compared on a stage and decided by a ranking | accepted |
+| [0034](0034-installer-options-ticked-in-advance.md) | Missing installer options are ticked in advance | accepted |
+| [0035](0035-loots-messages-are-quoted.md) | LOOT's messages are quoted | accepted |

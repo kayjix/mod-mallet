@@ -5,8 +5,8 @@
 //! square with a full chain of mipmaps. A map needs a few pixels per cell,
 //! so a smaller level is decoded, and only that level has to be read from
 //! the file: [`locate_level`] says where it is, [`decode`] turns its bytes
-//! into colours. BC3 (`DXT5`) textures are read for their colour as well;
-//! their alpha is ignored.
+//! into colours. BC3 (`DXT5`) and BC7 textures are read for their colour
+//! as well; their alpha is ignored.
 
 use thiserror::Error;
 
@@ -40,6 +40,8 @@ pub struct Rgb {
     pub height: u32,
     /// Red, green and blue of each pixel.
     pub pixels: Vec<u8>,
+    /// The opacity of each pixel, 255 for opaque.
+    pub alpha: Vec<u8>,
 }
 
 /// The block-compressed formats this reader decodes.
@@ -49,13 +51,15 @@ pub enum Format {
     Bc1,
     /// 16 bytes per block: 8 bytes of alpha, then a BC1 colour block.
     Bc3,
+    /// 16 bytes per block in one of eight modes; see `crate::bc7`.
+    Bc7,
 }
 
 impl Format {
     fn block_size(self) -> usize {
         match self {
             Self::Bc1 => 8,
-            Self::Bc3 => 16,
+            Self::Bc3 | Self::Bc7 => 16,
         }
     }
 }
@@ -110,6 +114,8 @@ fn header(bytes: &[u8]) -> Result<(Size, Format, usize), DdsError> {
                 70..=72 => Format::Bc1,
                 // BC3_TYPELESS, BC3_UNORM, BC3_UNORM_SRGB
                 76..=78 => Format::Bc3,
+                // BC7_TYPELESS, BC7_UNORM, BC7_UNORM_SRGB
+                97..=99 => Format::Bc7,
                 other => return Err(DdsError::Unsupported(format!("DXGI {other}"))),
             };
             (format, HEADER_SIZE + DX10_HEADER_SIZE)
@@ -186,13 +192,23 @@ pub fn decode(level: &Level, data: &[u8]) -> Rgb {
     let width = level.width as usize;
     let height = level.height as usize;
     let mut pixels = vec![0u8; width.saturating_mul(height).saturating_mul(3)];
+    let mut alpha = vec![255u8; width.saturating_mul(height)];
     let blocks_wide = width.div_ceil(4).max(1);
     for (index, block) in data.chunks_exact(level.format.block_size()).enumerate() {
-        let color = match level.format {
-            Format::Bc1 => block,
-            Format::Bc3 => block.get(8..).unwrap_or_default(),
+        let (texels, opacity) = match level.format {
+            Format::Bc1 => (bc1_block(block), bc1_alpha(block)),
+            Format::Bc3 => (
+                bc1_block(block.get(8..).unwrap_or_default()),
+                bc3_alpha(block),
+            ),
+            Format::Bc7 => {
+                let decoded = crate::bc7::decode_block(block);
+                (
+                    decoded.map(|[r, g, b, _]| [r, g, b]),
+                    decoded.map(|[_, _, _, a]| a),
+                )
+            }
         };
-        let texels = bc1_block(color);
         let block_x = (index % blocks_wide) * 4;
         let block_y = (index / blocks_wide) * 4;
         for (texel, rgb) in texels.iter().enumerate() {
@@ -205,13 +221,86 @@ pub fn decode(level: &Level, data: &[u8]) -> Rgb {
             if let Some(target) = pixels.get_mut(at..at + 3) {
                 target.copy_from_slice(rgb);
             }
+            if let (Some(target), Some(value)) = (alpha.get_mut(y * width + x), opacity.get(texel))
+            {
+                *target = *value;
+            }
         }
     }
     Rgb {
         width: level.width,
         height: level.height,
         pixels,
+        alpha,
     }
+}
+
+/// The opacity of a BC1 block: in its three-colour mode, index 3 is clear.
+fn bc1_alpha(block: &[u8]) -> [u8; 16] {
+    let word = |at: usize| {
+        block
+            .get(at..at + 2)
+            .and_then(|bytes| bytes.try_into().ok())
+            .map_or(0, u16::from_le_bytes)
+    };
+    let mut opacity = [255u8; 16];
+    if word(0) <= word(2) {
+        let indices = block
+            .get(4..8)
+            .and_then(|bytes| bytes.try_into().ok())
+            .map_or(0, u32::from_le_bytes);
+        for (texel, value) in opacity.iter_mut().enumerate() {
+            if (indices >> (texel * 2)) & 0b11 == 3 {
+                *value = 0;
+            }
+        }
+    }
+    opacity
+}
+
+/// The opacity of a BC3 block: two endpoints and a 3-bit index per pixel.
+fn bc3_alpha(block: &[u8]) -> [u8; 16] {
+    let (first, second) = (
+        u16::from(block.first().copied().unwrap_or(255)),
+        u16::from(block.get(1).copied().unwrap_or(255)),
+    );
+    let palette: [u16; 8] = if first > second {
+        [
+            first,
+            second,
+            (6 * first + second) / 7,
+            (5 * first + 2 * second) / 7,
+            (4 * first + 3 * second) / 7,
+            (3 * first + 4 * second) / 7,
+            (2 * first + 5 * second) / 7,
+            (first + 6 * second) / 7,
+        ]
+    } else {
+        [
+            first,
+            second,
+            (4 * first + second) / 5,
+            (3 * first + 2 * second) / 5,
+            (2 * first + 3 * second) / 5,
+            (first + 4 * second) / 5,
+            0,
+            255,
+        ]
+    };
+    let mut bits = [0u8; 8];
+    if let Some(stored) = block.get(2..8) {
+        bits[..6].copy_from_slice(stored);
+    }
+    let indices = u64::from_le_bytes(bits);
+    let mut opacity = [255u8; 16];
+    for (texel, value) in opacity.iter_mut().enumerate() {
+        let index = ((indices >> (texel * 3)) & 0b111) as usize;
+        *value = palette
+            .get(index)
+            .and_then(|level| u8::try_from(*level).ok())
+            .unwrap_or(255);
+    }
+    opacity
 }
 
 /// Decodes mipmap level `level` of a whole texture file.
@@ -332,6 +421,29 @@ mod tests {
         assert_eq!(level.offset, HEADER_SIZE + 4 * 8);
         assert_eq!(level.length, 8);
         assert_eq!((level.width, level.height), (4, 4));
+    }
+
+    #[test]
+    fn alpha_is_kept() {
+        // BC3: endpoints 255 and 0, all pixels index 1: clear.
+        let mut block = vec![255u8, 0];
+        block.extend([
+            0b0100_1001,
+            0b1001_0010,
+            0b0010_0100,
+            0b0100_1001,
+            0b1001_0010,
+            0b0010_0100,
+        ]);
+        assert_eq!(bc3_alpha(&block), [0; 16]);
+        // BC1 in its three-colour mode: index 3 is clear.
+        let mut block = Vec::new();
+        block.extend(0u16.to_le_bytes());
+        block.extend(0xffffu16.to_le_bytes());
+        block.extend(0b11u32.to_le_bytes());
+        let opacity = bc1_alpha(&block);
+        assert_eq!(opacity[0], 0);
+        assert_eq!(opacity[1], 255);
     }
 
     #[test]

@@ -160,6 +160,21 @@ fn finding(
     // Loading the face plugin last makes record and face fit again. That is
     // only possible for a plain plugin of a mod that the winner does not
     // build on: masters and light masters load before every plugin.
+    // The head of the first character, to look at from all sides, and the
+    // face texture of the first few, as the setup has them.
+    let head = npcs.first().map(|npc| {
+        GamePath::new(&format!(
+            "data/meshes/actors/character/facegendata/facegeom/{}/{:08x}.nif",
+            npc.id.plugin, npc.id.local_id
+        ))
+    });
+    let finding = finding.with_previews(head);
+    let finding = finding.with_previews(npcs.iter().take(3).map(|npc| {
+        GamePath::new(&format!(
+            "data/textures/actors/character/facegendata/facetint/{}/{:08x}.dds",
+            npc.id.plugin, npc.id.local_id
+        ))
+    }));
     let movable = face_mod.is_some()
         && Path::new(&face.name)
             .extension()

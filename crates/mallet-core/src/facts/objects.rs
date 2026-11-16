@@ -12,8 +12,9 @@ use super::RecordId;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ObjectFacts {
     /// Objects placed by mods, in the version the game uses. Objects of the
-    /// game itself are not included, and neither are objects that the
-    /// winning version deletes or switches off.
+    /// game itself are included only where a mod moved, turned or resized
+    /// them. Objects that the winning version deletes or switches off are
+    /// not included.
     pub placed: Vec<PlacedObject>,
     /// The base objects the placed objects refer to, in the version the
     /// game uses.
@@ -63,6 +64,41 @@ pub struct PlacedObject {
     /// Whether the object is a large reference, which the worldspace's
     /// distant view is built around.
     pub large: bool,
+    /// For an object of the game itself that a mod moved, turned or
+    /// resized: by which plugin, and from where. The object then counts as
+    /// that plugin's. `None` for the objects mods add.
+    pub moved: Option<Moved>,
+}
+
+impl PlacedObject {
+    /// The plugin the object counts as, in lower case: the one that placed
+    /// it, or, for an object of the game, the one that moved it.
+    pub fn owner(&self) -> &str {
+        self.moved
+            .as_ref()
+            .map_or(&self.id.plugin, |moved| &moved.by)
+    }
+}
+
+/// How a mod changed where an object of the game stands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Moved {
+    /// The plugin that moved it, in lower case.
+    pub by: String,
+    /// Where the game has it, or `None` if the game switches it off and
+    /// the mod brings it in.
+    pub from: Option<Pose>,
+}
+
+/// Where and how an object stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pose {
+    /// The position, in game units.
+    pub position: [i32; 3],
+    /// The rotation about the x, y and z axes, in thousandths of a radian.
+    pub rotation: [i32; 3],
+    /// The size relative to the base object, in thousandths.
+    pub scale: i32,
 }
 
 /// The kinds of base objects whose placement is compared.
@@ -93,6 +129,11 @@ pub struct BaseObject {
     pub id: RecordId,
     /// Its internal name, if it has one.
     pub editor_id: Option<String>,
+    /// The name players see, if the plugin keeps it as text (localized
+    /// plugins keep it in separate string files, which are not read).
+    pub name: Option<String>,
+    /// Its model, below the data directory (`meshes/...`), lower case.
+    pub model: Option<String>,
     /// What kind of object it is.
     pub kind: BaseKind,
     /// Whether the object is something one can see and bump into. Markers,

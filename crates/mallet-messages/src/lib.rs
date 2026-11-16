@@ -10,6 +10,7 @@
 //! another one has, or if a kind declared in `mallet-core` has no texts.
 
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
+use mallet_core::duel::{ModDuel, SuggestionReason, Topic};
 use mallet_core::{
     Action, ActionOutcome, ActionStatus, ArgValue, Confidence, Finding, GameInfo, InstalledPatch,
     KindInfo, LocationOrigin, LocationRole, ModInfo, OptionToTick, ScanLocation, ScanReport,
@@ -158,6 +159,18 @@ pub struct RenderedLink {
     pub explanation: String,
 }
 
+/// A duel between two mods, in words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderedDuel {
+    /// The duel itself.
+    pub duel: ModDuel,
+    /// Each topic as a few words, such as "34 faces", in the duel's order.
+    pub topic_labels: Vec<String>,
+    /// Why the suggested side is suggested, if one is.
+    pub suggestion: Option<String>,
+}
+
 /// A program or file the setup needs, with its name and purpose in words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -242,6 +255,8 @@ pub struct RenderedReport {
     pub object_swapper: bool,
     /// Mod Mallet's patch as it is in the game now, if there is one.
     pub installed_patch: Option<InstalledPatch>,
+    /// What two mods disagree about, pair by pair.
+    pub duels: Vec<RenderedDuel>,
     /// The findings with their texts, most severe first.
     pub findings: Vec<RenderedFinding>,
 }
@@ -452,6 +467,61 @@ impl Messages {
         }
     }
 
+    /// Puts a duel between two mods into words.
+    pub fn render_duel(&self, duel: &ModDuel) -> RenderedDuel {
+        let topic_id = |topic: Topic| match topic {
+            Topic::Faces => "faces",
+            Topic::Textures => "textures",
+            Topic::Meshes => "meshes",
+            Topic::Objects => "objects",
+            Topic::Contained => "contained",
+        };
+        let topic_labels = duel
+            .topics
+            .iter()
+            .map(|topic| {
+                self.text(
+                    &format!("duel-topic-{}", topic_id(topic.topic)),
+                    &[("count", ArgValue::Number(i64::from(topic.count)))],
+                )
+            })
+            .collect();
+        let suggestion = duel.suggestion.as_ref().map(|suggestion| {
+            let [first, second] = &duel.sides;
+            let (winner, other) = if suggestion.side == 0 {
+                (first, second)
+            } else {
+                (second, first)
+            };
+            let names = [
+                ("winner", ArgValue::from(winner.name.as_str())),
+                ("other", ArgValue::from(other.name.as_str())),
+            ];
+            match suggestion.reason {
+                SuggestionReason::BuiltOn => self.text("duel-suggest-built-on", &names),
+                SuggestionReason::Specialist => {
+                    let subject = self.text(
+                        &format!(
+                            "duel-subject-{}",
+                            topic_id(suggestion.topic.unwrap_or(Topic::Objects))
+                        ),
+                        &[],
+                    );
+                    let [winner, other] = names;
+                    self.text(
+                        "duel-suggest-specialist",
+                        &[winner, other, ("subject", ArgValue::from(subject.as_str()))],
+                    )
+                }
+            }
+        });
+        RenderedDuel {
+            duel: duel.clone(),
+            topic_labels,
+            suggestion,
+        }
+    }
+
     /// Puts what the setup needs besides its mods into words.
     pub fn render_toolbox(&self, tools: &[Tool]) -> RenderedToolbox {
         let rendered: Vec<RenderedTool> = tools
@@ -546,6 +616,32 @@ impl Messages {
             map: report.map.clone(),
             object_swapper: report.object_swapper,
             installed_patch: report.installed_patch.clone(),
+            duels: {
+                // The mod manager knows the proper names; deployments only
+                // know folders.
+                let names: std::collections::HashMap<&str, &str> = report
+                    .mods
+                    .iter()
+                    .map(|info| (info.mod_ref.id.as_str(), info.mod_ref.name.as_str()))
+                    .collect();
+                report
+                    .duels
+                    .iter()
+                    .map(|duel| {
+                        let mut duel = duel.clone();
+                        for side in &mut duel.sides {
+                            if let Some(name) = side
+                                .mod_ref
+                                .as_ref()
+                                .and_then(|mod_ref| names.get(mod_ref.id.as_str()))
+                            {
+                                side.name = (*name).to_owned();
+                            }
+                        }
+                        self.render_duel(&duel)
+                    })
+                    .collect()
+            },
         }
     }
 
@@ -757,6 +853,7 @@ mod tests {
                 step: "Patches".to_owned(),
                 group: "Cities".to_owned(),
                 option: "City Overhaul".to_owned(),
+                index: 2,
                 description: String::new(),
             }],
         };

@@ -118,6 +118,22 @@ pub const PLUGINS_IDENTICAL_RECORDS: KindInfo = KindInfo {
     args: &["plugin", "count", "utility"],
 };
 
+/// LOOT warns about an active plugin in this setup, in its own words.
+pub const PLUGINS_LOOT_WARNING: KindInfo = KindInfo {
+    id: "plugins.loot-warning",
+    severity: Severity::Warning,
+    confidence: Confidence::Hint,
+    args: &["plugin", "count", "messages"],
+};
+
+/// LOOT has a note about an active plugin in this setup, in its own words.
+pub const PLUGINS_LOOT_NOTE: KindInfo = KindInfo {
+    id: "plugins.loot-note",
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
+    args: &["plugin", "count", "messages"],
+};
+
 /// Two mods place the same object at almost the same spot.
 pub const OBJECTS_DUPLICATED: KindInfo = KindInfo {
     id: "objects.duplicated",
@@ -216,6 +232,8 @@ pub const ALL: &[KindInfo] = &[
     PLUGINS_INCOMPATIBLE,
     PLUGINS_NEEDS_CLEANING,
     PLUGINS_IDENTICAL_RECORDS,
+    PLUGINS_LOOT_WARNING,
+    PLUGINS_LOOT_NOTE,
     NPCS_FACE_MISMATCH,
     INSTALLER_OPTIONS_NOW_RECOMMENDED,
     PLUGINS_CONTAINED,

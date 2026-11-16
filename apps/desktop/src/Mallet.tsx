@@ -1,12 +1,22 @@
-import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent, useEffect, useId, useRef, useState } from "react";
 
 /** How many clicks within {@link WINDOW_MS} break the frame. */
 const CLICKS = 5;
 const WINDOW_MS = 1000;
-/** How long the hammer lies at the bottom before everything mends. */
-const BROKEN_MS = 10_000;
-/** How long mending takes; matches the CSS animations. */
+/** How long the hammer may lie untouched before everything mends. */
+const IDLE_MS = 10_000;
+/** How long mending takes; matches the CSS animation of the shards. */
 const MEND_MS = 900;
+
+/** Pixels per second squared the hammer falls with. */
+const GRAVITY = 2400;
+/** How much speed is left after hitting the floor, and after a wall. */
+const FLOOR_BOUNCE = 0.45;
+const WALL_BOUNCE = 0.6;
+/** Below this speed the hammer counts as lying still. */
+const RESTING = 30;
+/** The fastest throw, in pixels per second. */
+const MAX_THROW = 3200;
 
 /** The frame's corners and edge points, clockwise; with the centre each pair makes a shard. */
 const RIM: [number, number][] = [
@@ -36,6 +46,17 @@ const SHARDS = RIM.map((point, index) => {
 
 type Phase = "whole" | "broken" | "mending";
 
+/** Where the logo is on the screen, where the hammer starts and returns to. */
+interface Origin {
+  left: number;
+  top: number;
+  size: number;
+}
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
 /** The hammer of the logo, in the logo's coordinates. */
 function Hammer({ clip }: { clip: string }) {
   return (
@@ -51,26 +72,184 @@ function Hammer({ clip }: { clip: string }) {
 }
 
 /**
+ * The hammer once it is loose: it falls, bounces off the edges of the
+ * window, can be grabbed and thrown, and asks to go home when it has been
+ * left alone long enough. Its position is written straight into the style,
+ * not through React, so that it moves at the screen's pace.
+ */
+function LooseHammer({
+  origin,
+  mending,
+  clip,
+  onIdle,
+}: {
+  origin: Origin;
+  mending: boolean;
+  clip: string;
+  onIdle: () => void;
+}) {
+  const element = useRef<SVGSVGElement>(null);
+  const state = useRef({
+    x: 0,
+    y: 0,
+    vx: 260,
+    vy: -380,
+    angle: 0,
+    spin: 540,
+    dragging: false,
+    grab: { x: 0, y: 0 },
+    trail: [] as { t: number; x: number; y: number }[],
+    lastActive: performance.now(),
+    mendFrom: null as { x: number; y: number; angle: number; at: number } | null,
+  });
+  const idle = useRef(onIdle);
+  idle.current = onIdle;
+
+  useEffect(() => {
+    let frame = 0;
+    let previous = performance.now();
+    const step = (now: number) => {
+      const s = state.current;
+      const dt = Math.min(0.05, (now - previous) / 1000);
+      previous = now;
+      if (mending) {
+        s.mendFrom ??= { x: s.x, y: s.y, angle: s.angle % 360, at: now };
+        const share = Math.min(1, (now - s.mendFrom.at) / MEND_MS);
+        const eased = 1 - (1 - share) ** 3;
+        s.x = s.mendFrom.x * (1 - eased);
+        s.y = s.mendFrom.y * (1 - eased);
+        s.angle = s.mendFrom.angle * (1 - eased);
+      } else if (!s.dragging) {
+        s.vy += GRAVITY * dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.angle += s.spin * dt;
+        // The window's edges, as offsets from where the logo is.
+        const minX = -origin.left;
+        const maxX = window.innerWidth - origin.left - origin.size;
+        const minY = -origin.top;
+        const maxY = window.innerHeight - origin.top - origin.size;
+        if (s.y > maxY) {
+          s.y = maxY;
+          s.vy = Math.abs(s.vy) < RESTING * 4 ? 0 : -s.vy * FLOOR_BOUNCE;
+          s.vx *= 0.8;
+          s.spin *= 0.6;
+        }
+        if (s.y < minY) {
+          s.y = minY;
+          s.vy = -s.vy * WALL_BOUNCE;
+        }
+        if (s.x < minX || s.x > maxX) {
+          s.x = Math.min(maxX, Math.max(minX, s.x));
+          s.vx = -s.vx * WALL_BOUNCE;
+          s.spin = -s.spin * 0.7;
+        }
+        if (s.y === maxY && s.vy === 0) {
+          // Lying on the floor: it slides to a stop.
+          const friction = 0.0015 ** dt;
+          s.vx *= friction;
+          s.spin *= friction;
+        }
+        if (Math.hypot(s.vx, s.vy) > RESTING) {
+          s.lastActive = now;
+        } else if (now - s.lastActive > IDLE_MS) {
+          idle.current();
+        }
+      }
+      if (element.current !== null) {
+        element.current.style.transform = `translate(${s.x}px, ${s.y}px) rotate(${s.angle}deg)`;
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [mending, origin]);
+
+  const grab = (event: PointerEvent<SVGSVGElement>) => {
+    if (mending) {
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const s = state.current;
+    s.dragging = true;
+    s.grab = { x: event.clientX - s.x, y: event.clientY - s.y };
+    s.trail = [{ t: performance.now(), x: s.x, y: s.y }];
+    s.lastActive = performance.now();
+  };
+  const move = (event: PointerEvent<SVGSVGElement>) => {
+    const s = state.current;
+    if (!s.dragging) {
+      return;
+    }
+    const now = performance.now();
+    s.x = event.clientX - s.grab.x;
+    s.y = event.clientY - s.grab.y;
+    s.trail = [...s.trail.filter((point) => now - point.t < 100), { t: now, x: s.x, y: s.y }];
+    s.lastActive = now;
+  };
+  const release = () => {
+    const s = state.current;
+    if (!s.dragging) {
+      return;
+    }
+    s.dragging = false;
+    const first = s.trail[0];
+    const last = s.trail[s.trail.length - 1];
+    if (first !== undefined && last !== undefined && last.t > first.t) {
+      const seconds = (last.t - first.t) / 1000;
+      const clamp = (value: number) => Math.max(-MAX_THROW, Math.min(MAX_THROW, value));
+      s.vx = clamp((last.x - first.x) / seconds);
+      s.vy = clamp((last.y - first.y) / seconds);
+      s.spin = s.vx * 0.6;
+    } else {
+      s.vx = 0;
+      s.vy = 0;
+    }
+    s.lastActive = performance.now();
+  };
+
+  return (
+    <svg
+      ref={element}
+      className="mallet-loose"
+      data-mending={mending}
+      style={{ left: origin.left, top: origin.top, width: origin.size, height: origin.size }}
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+      onPointerDown={grab}
+      onPointerMove={move}
+      onPointerUp={release}
+      onPointerCancel={release}
+    >
+      <Hammer clip={clip} />
+    </svg>
+  );
+}
+
+/**
  * The logo. Hit it five times within a second and the frame shatters and
- * the hammer drops to the bottom of the window; ten seconds later it all
- * mends. Nothing else depends on it.
+ * the hammer drops to the bottom of the window, where it can be picked up
+ * and thrown. Left alone for ten seconds, it all mends. Nothing else
+ * depends on it.
  */
 export function Mallet() {
   const id = useId().replace(/:/g, "");
   const clicks = useRef<number[]>([]);
   const button = useRef<HTMLButtonElement>(null);
   const [phase, setPhase] = useState<Phase>("whole");
-  const [fall, setFall] = useState<CSSProperties>({});
+  const [origin, setOrigin] = useState<Origin | null>(null);
+  const still = useRef(false);
 
   useEffect(() => {
-    if (phase === "whole") {
-      return;
+    if (phase === "mending") {
+      const timer = setTimeout(() => setPhase("whole"), MEND_MS);
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(
-      () => setPhase(phase === "broken" ? "mending" : "whole"),
-      phase === "broken" ? BROKEN_MS : MEND_MS,
-    );
-    return () => clearTimeout(timer);
+    // Without animations there is no loose hammer to leave alone.
+    if (phase === "broken" && still.current) {
+      const timer = setTimeout(() => setPhase("mending"), IDLE_MS);
+      return () => clearTimeout(timer);
+    }
   }, [phase]);
 
   const hit = () => {
@@ -85,15 +264,9 @@ export function Mallet() {
     clicks.current = [];
     const box = button.current?.getBoundingClientRect();
     if (box !== undefined) {
-      setFall({
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
-        "--fall": `${Math.max(0, window.innerHeight - box.bottom - 6)}px`,
-        "--drift": `${Math.round(window.innerWidth * 0.08 + 40)}px`,
-      } as CSSProperties);
+      setOrigin({ left: box.left, top: box.top, size: box.width });
     }
+    still.current = reducedMotion();
     setPhase("broken");
   };
 
@@ -143,16 +316,13 @@ export function Mallet() {
           </g>
         </svg>
       </button>
-      {phase !== "whole" && (
-        <svg
-          className="mallet-falling"
-          data-phase={phase}
-          style={fall}
-          viewBox="0 0 512 512"
-          aria-hidden="true"
-        >
-          <Hammer clip={clip} />
-        </svg>
+      {phase !== "whole" && origin !== null && !still.current && (
+        <LooseHammer
+          origin={origin}
+          mending={phase === "mending"}
+          clip={clip}
+          onIdle={() => setPhase((current) => (current === "broken" ? "mending" : current))}
+        />
       )}
     </>
   );

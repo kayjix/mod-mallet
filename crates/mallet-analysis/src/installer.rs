@@ -134,7 +134,7 @@ impl Setup<'_> {
                 ) {
                     continue;
                 }
-                for option in &group.options {
+                for (index, option) in (0..).zip(&group.options) {
                     if !is_chosen(&step.name, &group.name, option)
                         && self.is_ticked_because_of_the_setup(option, &flags)
                     {
@@ -144,6 +144,7 @@ impl Setup<'_> {
                             step: step.name.clone(),
                             group: group.name.clone(),
                             option: option.name.clone(),
+                            index,
                             description: option.description.clone(),
                         });
                     }

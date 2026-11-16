@@ -14,6 +14,8 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `plugins.incompatible` | Warning | likely | Two mods do not work together |
 | `plugins.needs-cleaning` | Warning | certain | A plugin deletes things the game and other mods rely on |
 | `plugins.identical-records` | Note | certain | A plugin contains unchanged copies of records |
+| `plugins.loot-warning` | Warning | hint | LOOT warns about a plugin |
+| `plugins.loot-note` | Note | hint | LOOT has a note about a plugin |
 | `npcs.face-mismatch` | Warning | likely | Characters with dark or mismatched faces |
 | `installer.options-now-recommended` | Warning | likely | Recommended installer options are not installed |
 | `plugins.contained` | Warning | likely | A mod is already part of another |
@@ -120,6 +122,30 @@ Some plugins delete objects of the game outright instead of switching them off, 
 A record that a plugin copies without changing it does nothing by itself. It matters only when another mod that loads earlier changes the same record: the unchanged copy then quietly puts the original back. That is usually harmless, but it can hide another mod's change. LOOT's list records which released versions of a plugin contain such copies; it recognises a version by the file's checksum.
 
 **What to do:** Usually nothing to do. If a change of another mod does not show in the game, clean this plugin with SSEEdit's "Quick Auto Clean" or let it load before that mod.
+
+## plugins.loot-warning
+
+**LOOT warns about a plugin**
+
+- Severity: Warning
+- Confidence: hint
+- Message arguments: `plugin`, `count`, `messages`
+
+LOOT, the tool that sorts plugins, keeps notes about thousands of plugins and shows them when they apply to a setup: a missing compatibility patch, a mod that should not be used together with another, a plugin that should be deleted because another mod already contains it. Mod managers such as Vortex show these notes in their plugin list as well. Mod Mallet quotes them as LOOT writes them, in English, and only those whose conditions hold for your setup.
+
+**What to do:** Read the message and follow it. A missing patch is usually on the page the message names, or offered by the installer of one of the two mods. If the message says to delete or disable a plugin, disable the mod it belongs to in your mod manager.
+
+## plugins.loot-note
+
+**LOOT has a note about a plugin**
+
+- Severity: Note
+- Confidence: hint
+- Message arguments: `plugin`, `count`, `messages`
+
+LOOT, the tool that sorts plugins, keeps notes about thousands of plugins and shows them when they apply to a setup: an update patch that fixes the mod, a patch collection for it, compatibility notes worth reading, or a hint that the mod needs a new save. Mod Mallet quotes them as LOOT writes them, in English, and only those whose conditions hold for your setup.
+
+**What to do:** Nothing has to be done. Look at the note when you change something about this mod, or when it does not behave as expected.
 
 ## npcs.face-mismatch
 

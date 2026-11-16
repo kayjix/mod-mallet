@@ -95,6 +95,36 @@ action-load-after = Let { $plugin } win
 action-disable-mod = Disable { $mod }
     .description = Vortex switches { $mod } off in the profile you use, and asks to deploy. Nothing is deleted; switch it on again in Vortex to undo it.
 
+## Duels: everything two mods disagree about.
+
+duel-topic-faces = { $count ->
+    [one] 1 face
+   *[other] { $count } faces
+}
+duel-topic-textures = { $count ->
+    [one] 1 texture
+   *[other] { $count } textures
+}
+duel-topic-meshes = { $count ->
+    [one] 1 mesh
+   *[other] { $count } meshes
+}
+duel-topic-objects = { $count ->
+    [one] 1 object
+   *[other] { $count } objects
+}
+duel-topic-contained = { $count ->
+    [one] 1 contained plugin
+   *[other] { $count } contained plugins
+}
+duel-subject-faces = faces
+duel-subject-textures = textures
+duel-subject-meshes = meshes
+duel-subject-objects = placed objects
+duel-subject-contained = plugins
+duel-suggest-built-on = { $winner } is built on { $other }: it was made to change it, so it should win.
+duel-suggest-specialist = { $winner } is about { $subject } above all, for { $other } they are a small part. The specialist usually does its own thing better.
+
 outcome-applied = Vortex has made the change. Deploy if Vortex asks for it; Mod Mallet scans again afterwards.
 outcome-installing = Vortex is installing the patch. Deploy if Vortex does not do it by itself; Mod Mallet scans again afterwards.
 outcome-started = Vortex has opened the installer. Continue there, and scan again when you are done.

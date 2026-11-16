@@ -82,6 +82,9 @@ impl<'a> AssetIndex<'a> {
 /// replacing the game's own files is what mods are for.
 pub struct ArchiveOverrides;
 
+/// How many textures of a finding are offered for looking at.
+const PREVIEW_LIMIT: usize = 40;
+
 /// How many files of one archive one other source replaces.
 #[derive(Default)]
 struct Tally<'a> {
@@ -93,6 +96,23 @@ impl<'a> Tally<'a> {
     fn add(&mut self, file: &'a GamePath) {
         self.count += 1;
         self.files.push(file);
+    }
+
+    /// The textures and meshes among the files, to look at, up to a limit.
+    fn textures(&self) -> Vec<GamePath> {
+        self.files
+            .iter()
+            .filter(|file| {
+                std::path::Path::new(file.as_str())
+                    .extension()
+                    .is_some_and(|extension| {
+                        extension.eq_ignore_ascii_case("dds")
+                            || extension.eq_ignore_ascii_case("nif")
+                    })
+            })
+            .take(PREVIEW_LIMIT)
+            .map(|file| (*file).clone())
+            .collect()
     }
 
     /// A few of the files, as paths inside the data directory.
@@ -200,6 +220,7 @@ fn loose_over_archive(
     .with_arg("winnerMod", name(provider))
     .with_arg("archive", archive.path.file_name())
     .with_arg("archiveMod", owner.name.as_str())
+    .with_previews(tally.textures())
 }
 
 fn archive_over_archive(
@@ -227,6 +248,7 @@ fn archive_over_archive(
     .with_arg("winnerMod", name(winner_owner))
     .with_arg("archive", archive.path.file_name())
     .with_arg("archiveMod", owner.name.as_str())
+    .with_previews(tally.textures())
 }
 
 #[cfg(test)]

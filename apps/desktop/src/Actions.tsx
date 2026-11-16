@@ -30,6 +30,16 @@ export interface Session {
   setPatchChoices: (choices: PatchChoices) => void;
   /** Switches to the patch view. */
   showPatch: () => void;
+  /** The side picked in each decided duel, by duel. */
+  decisions: Record<string, number>;
+  /** Remembers the side picked in a duel, or forgets it with null. */
+  decide: (id: string, side: number | null) => void;
+  /** The mods in the order the user prefers them, the favourite first. */
+  ranking: string[];
+  /** Keeps a new order of preference. */
+  setRanking: (ranking: string[]) => void;
+  /** Opens the comparison of two mods, at one duel if given. */
+  openCompare: (duel: string | null) => void;
 }
 
 export const SessionContext = createContext<Session | null>(null);

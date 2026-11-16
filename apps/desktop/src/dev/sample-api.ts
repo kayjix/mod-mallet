@@ -5,11 +5,14 @@
 // development and is not part of a release build.
 
 import type { Api } from "../api";
+import type { MeshView } from "../generated/mesh-view";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
   Finding,
   MapCell,
+  MapMarker,
   MapSpot,
+  MapTerrain,
   ModInfo,
   RenderedFinding,
   RenderedReport,
@@ -210,6 +213,13 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
       subject: { type: "setup" },
       args: sample.args ?? {},
       provider,
+      previews:
+        sample.kind === "npcs.face-mismatch"
+          ? [
+              "data/meshes/actors/character/facegendata/facegeom/skyrim.esm/00013ba1.nif",
+              "data/textures/actors/character/facegendata/facetint/skyrim.esm/00013ba1.dds",
+            ]
+          : [],
     },
     title: sample.title[lang],
     headline: sample.headline[lang],
@@ -341,6 +351,7 @@ function report(lang: Lang): RenderedReport {
     map: sampleMap(),
     objectSwapper: true,
     // Two of the three suggested objects, and one whose collision is gone.
+    duels: sampleDuels(lang),
     installedPatch: {
       objects: [
         { plugin: "Gone Mod.esp", localId: 0x10 },
@@ -371,7 +382,7 @@ const sampleMods: ModInfo[] = [
 ];
 
 /** Made-up land: hills around a lake, a sea in the north. */
-function sampleTerrain(): RenderedReport["map"]["worlds"][number]["terrain"] {
+function sampleTerrain(): MapTerrain {
   const [west, south, columns, rows, samples] = [-28, -23, 57, 47, 4];
   const width = columns * samples;
   const height = rows * samples;
@@ -422,15 +433,93 @@ function sampleMap(): RenderedReport["map"] {
       },
     ],
   });
+  const terrain = sampleTerrain();
+  const at = (x: number, y: number, dx = 0.5, dy = 0.5): [number, number, number] => [
+    Math.round((x + dx) * 4096),
+    Math.round((y + dy) * 4096),
+    sampleHeight(terrain, x + dx, y + dy),
+  ];
+  const placed = (
+    [x, y, dx, dy]: [number, number, number?, number?],
+    spotted: MapSpot,
+  ): MapSpot => ({ ...spotted, position: at(x, y, dx, dy) });
   return {
     owners: ["Old Town", "Texture Pack", "Water Mod"],
-    worlds: [{ name: "Tamriel", cells, terrain: sampleTerrain() }],
+    worlds: [{ name: "Tamriel", cells, terrain, markers: sampleMarkers(at) }],
     spots: [
-      spot(4, 2, "TownHouse / Tower"),
-      spot(5, 2, "Fence / Stall"),
-      spot(3, 3, "Tree / Roof"),
+      placed([4, 2, 0.3, 0.6], spot(4, 2, "TownHouse / Tower")),
+      placed([4, 2, 0.7, 0.4], spot(4, 2, "Well / Cart")),
+      placed([5, 2, 0.2, 0.2], spot(5, 2, "Fence / Stall")),
+      placed([3, 3, 0.8, 0.5], spot(3, 3, "Tree / Roof")),
     ],
   };
+}
+
+/** The height of the made-up land at a point, in game units. */
+function sampleHeight(terrain: MapTerrain, x: number, y: number) {
+  const binary = atob(terrain.heights);
+  const width = terrain.columns * terrain.samples;
+  const column = Math.floor((x - terrain.west) * terrain.samples);
+  const row = Math.floor((terrain.south + terrain.rows - y) * terrain.samples);
+  const value = binary.charCodeAt(row * width + column) || 2;
+  return value < 2
+    ? terrain.lowest
+    : Math.round(terrain.lowest + ((value - 2) / 253) * (terrain.highest - terrain.lowest));
+}
+
+/** Made-up places: the game's own, and some that mods add, change or remove. */
+function sampleMarkers(
+  at: (x: number, y: number, dx?: number, dy?: number) => [number, number, number],
+): MapMarker[] {
+  const place = (
+    name: string,
+    kind: MapMarker["kind"],
+    [x, y]: [number, number],
+    extra: Partial<MapMarker> = {},
+  ): MapMarker => ({
+    name,
+    kind,
+    position: at(x, y),
+    origin: "game",
+    console: `cow Tamriel ${x} ${y}`,
+    ...extra,
+  });
+  return [
+    place("Aldmoor", "city", [-14, 8]),
+    place("Brenwick", "city", [16, -10]),
+    place("Highmere", "city", [-6, -14]),
+    place("Kettleford", "town", [3, 1], {
+      origin: "changed",
+      owner: 0,
+      movedFrom: at(1, 0),
+    }),
+    place("Saltreach", "town", [20, 9]),
+    place("Dunwold", "settlement", [-20, -4]),
+    place("Greyhollow Cave", "cave", [8, 6]),
+    place("Frostfang Cave", "cave", [-10, 14]),
+    place("Ironvein Mine", "mine", [12, 3]),
+    place("Fort Tallow", "fort", [-2, 9]),
+    place("Fort Ember", "fort", [22, -3], {
+      origin: "removed",
+      owner: 2,
+    }),
+    place("Old Barrow", "nordic-ruin", [-17, -11]),
+    place("Brasswork Halls", "dwemer-ruin", [18, 14]),
+    place("Ashen Lair", "dragon-lair", [-24, 12]),
+    place("Moss Grove", "grove", [6, -8]),
+    place("The Watcher Stone", "doomstone", [-8, 2]),
+    place("Pinecrest Farm", "farm", [5, 4], { origin: "added", owner: 0 }),
+    place("Old Town Mill", "wood-mill", [6, 1], { origin: "added", owner: 0 }),
+    place("Kettleford Docks", "docks", [2, 4], {
+      origin: "changed",
+      owner: 0,
+      renamedFrom: "Kettle Pier",
+    }),
+    place("Lakeside Shrine", "shrine", [9, -1], { origin: "added", owner: 2 }),
+    place("Bandit Hideout", "camp", [-12, -2]),
+    place("Giants' Rest", "giant-camp", [14, -16]),
+    place("North Light", "lighthouse", [0, 18]),
+  ];
 }
 
 /** A made-up toolbox: most things in place, one library outdated. */
@@ -524,6 +613,150 @@ function toolbox(lang: Lang): RenderedToolbox {
   };
 }
 
+/** Two made-up duels: faces, and objects. */
+function sampleDuels(lang: Lang): RenderedReport["duels"] {
+  const de = lang === "de";
+  const side = (name: string, plugins: string[]) => ({
+    mod: { source: "vortex", id: name, name },
+    name,
+    plugins,
+  });
+  return [
+    {
+      duel: {
+        id: "duel:mod:vortex:Cut Content|mod:vortex:Face Overhaul",
+        sides: [
+          side("Cut Content", ["Cut Content.esp"]),
+          side("Face Overhaul", ["Face Overhaul.esp"]),
+        ],
+        topics: [{ topic: "faces", count: 34, winning: 0 }],
+        findings: ["npcs.face-mismatch:Cut Content.esp"],
+        files: [
+          {
+            path: "meshes/actors/character/facegendata/facegeom/cut content.esp/00012345.nif",
+            topic: "faces",
+            object: "Lydia",
+            objectKind: null,
+          },
+          {
+            path: "textures/actors/character/facegendata/facetint/cut content.esp/00012345.dds",
+            topic: "faces",
+            object: "Lydia",
+            objectKind: null,
+          },
+        ],
+        suggestion: { side: 1, reason: "specialist", topic: "faces" },
+        resolutions: [
+          {
+            side: 1,
+            finding: "npcs.face-mismatch:Cut Content.esp",
+            action: { type: "load-after", plugin: "Face Overhaul.esp", after: "Cut Content.esp" },
+          },
+        ],
+      },
+      topicLabels: [de ? "34 Gesichter" : "34 faces"],
+      suggestion: de
+        ? "Bei Face Overhaul dreht sich fast alles um Gesichter, bei Cut Content sind sie nur ein kleiner Teil. Der Spezialist kann sein Thema meist besser."
+        : "Face Overhaul is about faces above all, for Cut Content they are a small part. The specialist usually does its own thing better.",
+    },
+    {
+      duel: {
+        id: "duel:mod:vortex:Old Town|mod:vortex:Texture Pack",
+        sides: [side("Old Town", ["Old Town.esp"]), side("Texture Pack", ["Texture Pack.esp"])],
+        topics: [{ topic: "objects", count: 3, winning: null }],
+        findings: ["objects.overlapping:Old Town+Texture Pack"],
+        files: [
+          {
+            path: "meshes/clutter/barrel01.nif",
+            topic: "objects",
+            object: "Barrel",
+            objectKind: "container",
+          },
+          {
+            path: "meshes/architecture/whiterun/wrhouse01.nif",
+            topic: "objects",
+            object: "Breezehome",
+            objectKind: "static",
+          },
+          {
+            path: "textures/architecture/whiterun/wrwoodplank01.dds",
+            topic: "objects",
+            object: null,
+            objectKind: null,
+          },
+        ],
+        suggestion: null,
+        resolutions: [],
+      },
+      topicLabels: [de ? "3 Objekte" : "3 objects"],
+      suggestion: null,
+    },
+  ];
+}
+
+/** Bytes of numbers as Base64, as the backend sends meshes. */
+function base64Of(numbers: Float32Array | Uint32Array): string {
+  const bytes = new Uint8Array(numbers.buffer);
+  let text = "";
+  for (const byte of bytes) {
+    text += String.fromCharCode(byte);
+  }
+  return btoa(text);
+}
+
+/** A cube, standing in for a mesh. */
+function sampleCube(path: string): MeshView {
+  const corners = [
+    [-1, -1, -1],
+    [1, -1, -1],
+    [1, 1, -1],
+    [-1, 1, -1],
+    [-1, -1, 1],
+    [1, -1, 1],
+    [1, 1, 1],
+    [-1, 1, 1],
+  ];
+  const faces = [
+    [0, 1, 2, 3],
+    [4, 7, 6, 5],
+    [0, 4, 5, 1],
+    [1, 5, 6, 2],
+    [2, 6, 7, 3],
+    [3, 7, 4, 0],
+  ];
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (const face of faces) {
+    const start = positions.length / 3;
+    for (const [corner, uv] of face.map((corner, index) => [corner, index] as const)) {
+      positions.push(...(corners[corner] ?? [0, 0, 0]).map((value) => value * 30));
+      uvs.push(uv === 1 || uv === 2 ? 1 : 0, uv >= 2 ? 1 : 0);
+    }
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  }
+  return {
+    path,
+    archive: null,
+    tint: null,
+    shapes: [
+      {
+        positions: base64Of(new Float32Array(positions)),
+        uvs: base64Of(new Float32Array(uvs)),
+        indices: base64Of(new Uint32Array(indices)),
+        texture: samplePicture("#b07a4a"),
+        tinted: false,
+      },
+    ],
+  };
+}
+
+/** A small picture of one colour, standing in for a texture. */
+function samplePicture(colour: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="${colour}"/><circle cx="64" cy="56" r="30" fill="#00000022"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 /** Results arrive a little later, as they do from the real backend. */
 function later<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), 400));
@@ -534,6 +767,8 @@ function later<T>(value: T): Promise<T> {
 let confirmed = false;
 let linkInstalled = false;
 const ignoredIds = new Set<string>();
+let decided: Record<string, number> = {};
+let ranked: string[] = [];
 
 export const sampleApi: Api = {
   scan: (lang) => later(report(lang)),
@@ -598,7 +833,41 @@ export const sampleApi: Api = {
   restartManager: () => later(undefined),
   // The sample has no pictures; the page shows its placeholder.
   gameArt: () => later(null),
+  meshView: (path) => later(sampleCube(path)),
+  ranking: () => later([...ranked]),
+  setRanking: (next) => {
+    ranked = [...next];
+    return later([...ranked]);
+  },
+  decisions: () => later({ ...decided }),
+  setDecision: (id, side) => {
+    const next = { ...decided };
+    if (side === null) {
+      delete next[id];
+    } else {
+      next[id] = side;
+    }
+    decided = next;
+    return later({ ...decided });
+  },
   // The sample has no terrain textures; the map draws its height relief.
   mapImage: () => later(null),
+  // Two versions of every file: the game's, and a mod's that wins.
+  filePreview: (path) =>
+    later({
+      path,
+      versions: [
+        { archive: "Skyrim - Textures1.bsa", provider: null, image: samplePicture("#8a6f5a") },
+        {
+          archive: null,
+          provider: {
+            source: "vortex",
+            id: path.includes("whiterun") ? "Texture Pack" : "Face Overhaul",
+            name: path.includes("whiterun") ? "Texture Pack" : "Face Overhaul",
+          },
+          image: samplePicture("#c9a48c"),
+        },
+      ],
+    }),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
 };

@@ -53,9 +53,8 @@ each drew its own boxes with its own distances.
 
 - An action that changes the load order or switches a mod off still needs
   the user's click in Mod Mallet; Vortex may then ask to deploy.
-- Faces cannot be shown as pictures yet: the face textures of real setups
-  are BC7, which the texture reader does not decode, and a face texture
-  alone is the unwrapped skin, not a face. A real preview needs the head
-  mesh drawn in 3D, which ADR 0011 excludes; that is a decision of its own.
+- Face textures are shown in 2D since ADR 0028. A real preview of a face
+  needs the head mesh drawn in 3D, which ADR 0011 excludes; that is a
+  decision of its own.
 - LOD tiles inside archives are not read yet; a worldspace without loose
   LOD tiles keeps the height relief as its ground.

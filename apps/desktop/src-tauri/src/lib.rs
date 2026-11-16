@@ -93,10 +93,13 @@ fn confirm_places(
     named: BTreeMap<LocationRole, String>,
     lang: String,
 ) -> Result<RenderedPlaces, String> {
-    let ignored = settings()?.ignored;
+    // What else the user decided stays as it was.
+    let previous = settings()?;
     let settings = Settings {
         confirmed: true,
-        ignored,
+        ignored: previous.ignored,
+        decisions: previous.decisions,
+        ranking: previous.ranking,
         places: named
             .into_iter()
             .map(|(role, path)| (role, path.trim().to_owned()))
@@ -131,6 +134,48 @@ fn set_ignored(id: String, ignored: bool) -> Result<Vec<String>, String> {
         .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
     mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
     Ok(settings.ignored.into_iter().collect())
+}
+
+/// The sides the user picked in duels between mods, by duel.
+#[tauri::command(async)]
+fn decisions() -> Result<BTreeMap<String, u8>, String> {
+    Ok(settings()?.decisions)
+}
+
+/// Remembers the side picked in a duel, or forgets it with `None`, and
+/// returns all decisions afterwards. Only ever called because the user
+/// pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn set_decision(id: String, side: Option<u8>) -> Result<BTreeMap<String, u8>, String> {
+    let mut settings = settings()?;
+    match side {
+        Some(side) => settings.decisions.insert(id, side.min(1)),
+        None => settings.decisions.remove(&id),
+    };
+    let path = mallet_engine::default_settings_path()
+        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
+    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+    Ok(settings.decisions)
+}
+
+/// The mods in the order the user likes them, the favourite first.
+#[tauri::command(async)]
+fn ranking() -> Result<Vec<String>, String> {
+    Ok(settings()?.ranking)
+}
+
+/// Remembers the order the user likes the mods in. Only ever called
+/// because the user changed it.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn set_ranking(ranking: Vec<String>) -> Result<Vec<String>, String> {
+    let mut settings = settings()?;
+    settings.ranking = ranking;
+    let path = mallet_engine::default_settings_path()
+        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
+    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+    Ok(settings.ranking)
 }
 
 /// A short text that changes when a file the scan starts from changes.
@@ -242,6 +287,31 @@ fn map_image(world: String) -> Result<Option<mallet_core::MapImage>, String> {
     ))
 }
 
+/// Every version of a file of the setup, as pictures where it is a texture.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn file_preview(path: String) -> Result<Option<mallet_core::FilePreview>, String> {
+    Ok(mallet_engine::file_preview(
+        &settings()?.scan_options(),
+        &path,
+    ))
+}
+
+/// A version of a mesh of the setup, ready to draw: the one the game uses
+/// unless `version` names another.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn mesh_view(
+    path: String,
+    version: Option<usize>,
+) -> Result<Option<mallet_core::mesh::MeshView>, String> {
+    Ok(mallet_engine::mesh_view(
+        &settings()?.scan_options(),
+        &path,
+        version,
+    ))
+}
+
 /// The picture of a game, from the mod manager's installation.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -309,7 +379,13 @@ pub fn run() -> tauri::Result<()> {
             toolbox,
             restart_manager,
             game_art,
-            map_image
+            map_image,
+            file_preview,
+            decisions,
+            set_decision,
+            mesh_view,
+            ranking,
+            set_ranking
         ])
         .run(tauri::generate_context!())
 }

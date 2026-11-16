@@ -20,9 +20,11 @@
 //!   the plugins, and the meshes that exist both loose and in an archive.
 
 pub mod archives;
+pub mod files;
 pub mod ingest;
 pub mod locate;
 pub mod lod;
+pub mod markers;
 pub mod meshes;
 pub mod npc;
 pub mod objects;

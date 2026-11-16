@@ -5,6 +5,7 @@
 
 pub mod installer;
 pub mod knowledge;
+pub mod markers;
 pub mod objects;
 pub mod terrain;
 
@@ -12,6 +13,7 @@ use crate::GamePath;
 
 pub use installer::InstallerFacts;
 pub use knowledge::KnowledgeFacts;
+pub use markers::MarkerFacts;
 pub use objects::ObjectFacts;
 pub use terrain::TerrainFacts;
 
@@ -46,6 +48,8 @@ pub struct Facts {
     pub terrain: TerrainFacts,
     /// What community-maintained rules say about the active plugins.
     pub knowledge: KnowledgeFacts,
+    /// The places of the world map.
+    pub markers: MarkerFacts,
 }
 
 /// A loose mesh that replaces a mesh from an archive, with the textures

@@ -80,6 +80,10 @@ pub struct OptionToTick {
     pub group: String,
     /// The title of the option.
     pub option: String,
+    /// The position of the option in its group, counting from 0, in the
+    /// order the installer shows them.
+    #[serde(default)]
+    pub index: u32,
     /// What the installer says about the option, in the mod author's words.
     pub description: String,
 }

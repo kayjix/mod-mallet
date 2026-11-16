@@ -10,19 +10,20 @@
 //! [`SetupFacts::unreadable`], and the scan carries on with the rest
 //! (ADR 0013).
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use loadorder::{GameId, GameSettings};
 use mallet_core::facts::{
-    ArchiveFacts, MeshOverride, ObjectFacts, PluginFacts, TerrainFacts, UnreadableFile,
+    ArchiveFacts, MarkerFacts, MeshOverride, ObjectFacts, PluginFacts, TerrainFacts, UnreadableFile,
 };
 use mallet_core::{GamePath, TextCache};
 use mallet_formats_bethesda::{bsa, plugin};
 
 use crate::meshes::{self, LoadedArchive};
-use crate::{DATA_DIR, archives, npc, objects, terrain};
+use crate::{DATA_DIR, archives, markers, npc, objects, terrain};
 
 /// The largest archive file list that is read. Far above any real archive;
 /// it keeps a damaged header from asking for gigabytes of memory.
@@ -47,6 +48,8 @@ pub struct SetupFacts {
     pub objects: ObjectFacts,
     /// The shape of the land.
     pub terrain: TerrainFacts,
+    /// The places of the world map.
+    pub markers: MarkerFacts,
 }
 
 /// Why an installation could not be read at all.
@@ -113,26 +116,16 @@ pub fn read_setup(
 
     let mut placed = objects::Collector::default();
     let mut land = terrain::Collector::default();
+    let mut game_plugins = Vec::new();
+    let mut map_markers = MarkerReader::new(&loose, &loaded_archives, cache);
     for name in active_plugins {
         let path = data_path.join(&name);
         let file = data_dir.join(&name);
         let official = objects::is_official(&name);
-        // The land of the game's own plugins is large and does not change;
-        // it is read once and then taken from the cache.
-        let cached_land = official
-            .then(|| {
-                let fingerprint = fingerprint(&file)?;
-                let text = cache.get(LAND_CACHE, &name.to_lowercase(), &fingerprint)?;
-                terrain::Contribution::from_text(&text)
-            })
-            .flatten();
-        let reading = if !official {
-            Reading::Everything
-        } else if cached_land.is_some() {
-            Reading::Records
-        } else {
-            Reading::Land
-        };
+        if official {
+            game_plugins.push((name.clone(), file.clone()));
+        }
+        let (cached_land, reading) = cached_land(&name, &file, official, cache);
         match read_plugin(&file, reading) {
             Ok(plugin) => {
                 if plugin.damaged > 0 {
@@ -145,6 +138,7 @@ pub fn read_setup(
                     });
                 }
                 placed.add(&name, &plugin);
+                map_markers.add(&name, &file, official, &plugin);
                 if let Some(contribution) = cached_land {
                     land.merge(contribution);
                 } else {
@@ -169,10 +163,104 @@ pub fn read_setup(
             Err(reason) => facts.unreadable.push(UnreadableFile { path, reason }),
         }
     }
+    add_game_versions(
+        &mut placed,
+        &game_plugins,
+        &data_path,
+        &mut facts.unreadable,
+    );
     facts.objects = placed.finish();
     facts.terrain = land.finish();
+    facts.markers = map_markers.finish();
 
     Ok(facts)
+}
+
+/// Under which name the markers of a plugin are kept in the cache.
+const MARKER_CACHE: &str = "markers";
+
+/// Gathers the map markers of the plugins, with the files their names
+/// come from.
+struct MarkerReader<'a> {
+    /// The loose files, for string tables.
+    loose: &'a [(GamePath, PathBuf)],
+    /// The archives, for string tables.
+    archives: &'a [LoadedArchive],
+    /// Keeps the markers of the game's own plugins.
+    cache: &'a dyn TextCache,
+    collector: markers::Collector,
+}
+
+impl<'a> MarkerReader<'a> {
+    fn new(
+        loose: &'a [(GamePath, PathBuf)],
+        archives: &'a [LoadedArchive],
+        cache: &'a dyn TextCache,
+    ) -> Self {
+        Self {
+            loose,
+            archives,
+            cache,
+            collector: markers::Collector::default(),
+        }
+    }
+
+    /// Takes in the map markers of the plugin `name` at `file`, already
+    /// read as `plugin`. The game's own plugins were not read for their
+    /// places; their markers come from the cache or a reading of their own.
+    fn add(&mut self, name: &str, file: &Path, official: bool, plugin: &plugin::Plugin) {
+        let contribution = if official {
+            self.official(name, file).unwrap_or_default()
+        } else {
+            markers::Contribution::of(name, plugin, &self.names(name, plugin))
+        };
+        self.collector.merge(name, contribution);
+    }
+
+    /// The markers of all plugins taken in.
+    fn finish(self) -> MarkerFacts {
+        self.collector.finish()
+    }
+
+    /// The names of a localized plugin's strings; empty for any other.
+    fn names(&self, name: &str, plugin: &plugin::Plugin) -> HashMap<u32, String> {
+        if plugin.header.is_localized {
+            markers::string_table(name, self.loose, self.archives)
+        } else {
+            HashMap::new()
+        }
+    }
+
+    /// The map markers of one of the game's own plugins: from the cache, or
+    /// read from its persistent cells and then kept. `None` if the plugin
+    /// cannot be read; the main reading of it reports why.
+    fn official(&self, name: &str, file: &Path) -> Option<markers::Contribution> {
+        let fingerprint = fingerprint(file);
+        let key = name.to_lowercase();
+        if let Some(fingerprint) = &fingerprint
+            && let Some(text) = self.cache.get(MARKER_CACHE, &key, fingerprint)
+            && let Some(contribution) = markers::Contribution::from_text(&text)
+        {
+            return Some(contribution);
+        }
+        let reader = File::open(file).ok()?;
+        let plugin = plugin::read_request_where(
+            &mut BufReader::new(reader),
+            &plugin::Request {
+                flat: &[],
+                nested: &markers::MARKER_GROUP,
+                nested_records: &markers::MARKER_RECORDS,
+            },
+            &markers::may_hold_markers,
+        )
+        .ok()?;
+        let contribution = markers::Contribution::of(name, &plugin, &self.names(name, &plugin));
+        if let Some(fingerprint) = fingerprint {
+            self.cache
+                .put(MARKER_CACHE, &key, &fingerprint, &contribution.to_text());
+        }
+        Some(contribution)
+    }
 }
 
 /// The file names of the active plugins, in load order, and the file the
@@ -242,6 +330,20 @@ fn loose_files(directory: &Path, base: &GamePath) -> io::Result<Vec<(GamePath, P
     Ok(files)
 }
 
+/// The names of the active plugins in load order, as `plugins.txt` in
+/// `local_dir` (or its standard place) has them.
+pub(crate) fn active_plugin_names(
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+) -> Result<Vec<String>, IngestError> {
+    active_plugins(game_dir, local_dir).map(|(names, _)| names)
+}
+
+/// The directory of the archive at `path`.
+pub(crate) fn archive_directory(path: &Path) -> Result<bsa::Directory, String> {
+    read_archive_directory(path)
+}
+
 /// The directory of the archive at `path`.
 fn read_archive_directory(path: &Path) -> Result<bsa::Directory, String> {
     let read = || -> io::Result<Result<bsa::Directory, bsa::BsaError>> {
@@ -288,6 +390,65 @@ fn fingerprint(path: &Path) -> Option<String> {
         .ok()?
         .as_secs();
     Some(format!("{}:{modified}", metadata.len()))
+}
+
+/// The land of one of the game's own plugins from the cache, if it is
+/// there, and how much of the plugin then has to be read. The land of the
+/// game's plugins is large and does not change; it is read once and then
+/// taken from the cache.
+fn cached_land(
+    name: &str,
+    file: &Path,
+    official: bool,
+    cache: &dyn TextCache,
+) -> (Option<terrain::Contribution>, Reading) {
+    if !official {
+        return (None, Reading::Everything);
+    }
+    let cached = fingerprint(file)
+        .and_then(|fingerprint| cache.get(LAND_CACHE, &name.to_lowercase(), &fingerprint))
+        .and_then(|text| terrain::Contribution::from_text(&text));
+    let reading = if cached.is_some() {
+        Reading::Records
+    } else {
+        Reading::Land
+    };
+    (cached, reading)
+}
+
+/// Reads the game's own versions of the objects that mods change, so that
+/// mods that move objects of the game are told apart from mods that only
+/// change them. `game_plugins` are the game's plugins in load order, with
+/// the file each lies in.
+fn add_game_versions(
+    placed: &mut objects::Collector,
+    game_plugins: &[(String, PathBuf)],
+    data_path: &GamePath,
+    unreadable: &mut Vec<UnreadableFile>,
+) {
+    if !placed.wants_game_versions() {
+        return;
+    }
+    for (name, file) in game_plugins {
+        match read_references(file) {
+            Ok(plugin) => placed.add_game_versions(name, &plugin),
+            Err(reason) => unreadable.push(UnreadableFile {
+                path: data_path.join(name),
+                reason,
+            }),
+        }
+    }
+}
+
+/// Reads only the placed objects of a plugin.
+fn read_references(path: &Path) -> Result<plugin::Plugin, String> {
+    let file = File::open(path).map_err(|error| error.to_string())?;
+    let request = plugin::Request {
+        flat: &[],
+        nested: &objects::PLACE_GROUPS,
+        nested_records: &[*b"REFR"],
+    };
+    plugin::read_request(&mut BufReader::new(file), &request).map_err(|error| error.to_string())
 }
 
 /// Reads the characters and base objects of a plugin, and as much more as

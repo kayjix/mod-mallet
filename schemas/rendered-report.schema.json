@@ -10,6 +10,13 @@
       "format": "uint32",
       "minimum": 0
     },
+    "duels": {
+      "description": "What two mods disagree about, pair by pair.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RenderedDuel"
+      }
+    },
     "extenderPluginsChecked": {
       "description": "How many script extender plugins were examined.",
       "type": "integer",
@@ -102,6 +109,7 @@
     "mods",
     "map",
     "objectSwapper",
+    "duels",
     "findings"
   ],
   "$defs": {
@@ -231,6 +239,158 @@
         }
       ]
     },
+    "DuelFile": {
+      "description": "One file the two mods disagree about, to look at.",
+      "type": "object",
+      "properties": {
+        "object": {
+          "description": "The name of an object that uses it, if one is known: the name\nplayers see, or else the internal one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "objectKind": {
+          "description": "What kind of object that is, such as `static` or `container`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "The file, below the data directory (`meshes/...`, `textures/...`).",
+          "type": "string"
+        },
+        "topic": {
+          "description": "What the disagreement about it is.",
+          "$ref": "#/$defs/Topic"
+        }
+      },
+      "required": [
+        "path",
+        "topic"
+      ]
+    },
+    "DuelResolution": {
+      "description": "What makes one side win one finding of the duel.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "description": "The action to hand to the mod manager.",
+          "$ref": "#/$defs/Action"
+        },
+        "finding": {
+          "description": "The finding it settles.",
+          "$ref": "#/$defs/FindingId"
+        },
+        "side": {
+          "description": "The side it makes win, 0 or 1.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "side",
+        "finding",
+        "action"
+      ]
+    },
+    "DuelSide": {
+      "description": "One of the two mods of a duel.",
+      "type": "object",
+      "properties": {
+        "mod": {
+          "description": "The mod, if a mod manager knows it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "What to call this side: the mod's name, or the file's.",
+          "type": "string"
+        },
+        "plugins": {
+          "description": "The plugins of this side that the duel's findings name.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "DuelSuggestion": {
+      "description": "The side Mod Mallet would pick, and why.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "Why.",
+          "$ref": "#/$defs/SuggestionReason"
+        },
+        "side": {
+          "description": "The side, 0 or 1.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "topic": {
+          "description": "The topic the reason is about, where it is about one.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Topic"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "side",
+        "reason"
+      ]
+    },
+    "DuelTopic": {
+      "description": "How much two mods disagree about one topic, and who has it now.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "description": "How many things of it are disputed.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "topic": {
+          "description": "The topic.",
+          "$ref": "#/$defs/Topic"
+        },
+        "winning": {
+          "description": "Which side the game takes them from now, 0 or 1; `None` where\nneither wins, as with objects standing in each other.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "topic",
+        "count"
+      ]
+    },
     "Finding": {
       "description": "One problem found in a setup.\n\nA finding carries no prose. It names its [kind](crate::kinds) and the\narguments for that kind's message; the text is produced later, in the\nreader's language (ADR 0007).",
       "type": "object",
@@ -260,6 +420,13 @@
         "kind": {
           "description": "Identifier of the finding's kind, for example\n`extender.plugin-incompatible`.",
           "type": "string"
+        },
+        "previews": {
+          "description": "Files worth looking at to see what the finding is about, such as the\ntextures two mods disagree on. The window shows every version of\neach that the setup has.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GamePath"
+          }
         },
         "provider": {
           "description": "The mod the subject comes from, if a mod manager knows.",
@@ -474,6 +641,74 @@
         "owners"
       ]
     },
+    "MapMarker": {
+      "description": "A place of the world map, such as a town or a cave.",
+      "type": "object",
+      "properties": {
+        "console": {
+          "description": "The command of the game's console that takes the player there.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "What kind of place it is.",
+          "$ref": "#/$defs/PlaceKind"
+        },
+        "movedFrom": {
+          "description": "Where the game puts it, if a mod moved it.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "name": {
+          "description": "The name the game's map shows.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "Whose place it is.",
+          "$ref": "#/$defs/PlaceOrigin"
+        },
+        "owner": {
+          "description": "The mod that added, changed or removed it, as a position in\n[`WorldMap::owners`]. Absent for the game's own places.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "position": {
+          "description": "Where it is now, in game units: east, north and height.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "renamedFrom": {
+          "description": "What the game calls it, if a mod renamed it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "position",
+        "origin",
+        "console"
+      ]
+    },
     "MapSpot": {
       "description": "Where a collision of two mods' objects is.",
       "type": "object",
@@ -501,6 +736,19 @@
           "items": {
             "$ref": "#/$defs/SpotPart"
           }
+        },
+        "position": {
+          "description": "The point between the objects involved, in game units: east, north\nand height.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
         }
       },
       "required": [
@@ -579,6 +827,14 @@
             "$ref": "#/$defs/MapCell"
           }
         },
+        "markers": {
+          "description": "The places of the world map: the game's own and those mods add,\nchange or remove.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MapMarker"
+          }
+        },
         "name": {
           "description": "The worldspace's internal name, as the game's console knows it.",
           "type": "string"
@@ -598,6 +854,72 @@
       "required": [
         "name",
         "cells"
+      ]
+    },
+    "ModDuel": {
+      "description": "Everything two mods disagree about.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "description": "The files the findings name, to look at side by side.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DuelFile"
+          }
+        },
+        "findings": {
+          "description": "The findings it gathers.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FindingId"
+          }
+        },
+        "id": {
+          "description": "Stable identity: the two sides, in an order that does not depend on\nthe load order.",
+          "type": "string"
+        },
+        "resolutions": {
+          "description": "The actions that make one side or the other win. Objects are hidden\nthrough the patch, which the window handles.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DuelResolution"
+          }
+        },
+        "sides": {
+          "description": "The two mods, sorted by name.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DuelSide"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "suggestion": {
+          "description": "The side Mod Mallet would pick, if it has a reason to.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DuelSuggestion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "topics": {
+          "description": "What they disagree about, most first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DuelTopic"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "sides",
+        "topics",
+        "findings",
+        "resolutions"
       ]
     },
     "ModInfo": {
@@ -701,6 +1023,13 @@
           "description": "The title of the group of options on the page.",
           "type": "string"
         },
+        "index": {
+          "description": "The position of the option in its group, counting from 0, in the\norder the installer shows them.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
         "option": {
           "description": "The title of the option.",
           "type": "string"
@@ -790,6 +1119,216 @@
         }
       ]
     },
+    "PlaceKind": {
+      "description": "The kinds of places of the world map, grouped as the game's map shows\nthem.",
+      "oneOf": [
+        {
+          "description": "A city, the seat of a hold, or a hold's palace.",
+          "type": "string",
+          "const": "city"
+        },
+        {
+          "description": "A town.",
+          "type": "string",
+          "const": "town"
+        },
+        {
+          "description": "A small settlement.",
+          "type": "string",
+          "const": "settlement"
+        },
+        {
+          "description": "A castle, a hold's keep or another stronghold of a lord.",
+          "type": "string",
+          "const": "castle"
+        },
+        {
+          "description": "A cave.",
+          "type": "string",
+          "const": "cave"
+        },
+        {
+          "description": "A camp, often of bandits.",
+          "type": "string",
+          "const": "camp"
+        },
+        {
+          "description": "A fort.",
+          "type": "string",
+          "const": "fort"
+        },
+        {
+          "description": "A Nordic ruin or barrow.",
+          "type": "string",
+          "const": "nordic-ruin"
+        },
+        {
+          "description": "A Dwemer ruin.",
+          "type": "string",
+          "const": "dwemer-ruin"
+        },
+        {
+          "description": "A shipwreck.",
+          "type": "string",
+          "const": "shipwreck"
+        },
+        {
+          "description": "A grove.",
+          "type": "string",
+          "const": "grove"
+        },
+        {
+          "description": "A landmark, such as a standing stone or a temple.",
+          "type": "string",
+          "const": "landmark"
+        },
+        {
+          "description": "A dragon lair or a word wall on a peak.",
+          "type": "string",
+          "const": "dragon-lair"
+        },
+        {
+          "description": "A farm.",
+          "type": "string",
+          "const": "farm"
+        },
+        {
+          "description": "A wood mill.",
+          "type": "string",
+          "const": "wood-mill"
+        },
+        {
+          "description": "A mine.",
+          "type": "string",
+          "const": "mine"
+        },
+        {
+          "description": "A camp of the Imperial Legion.",
+          "type": "string",
+          "const": "imperial-camp"
+        },
+        {
+          "description": "A camp of the Stormcloaks.",
+          "type": "string",
+          "const": "stormcloak-camp"
+        },
+        {
+          "description": "A standing stone.",
+          "type": "string",
+          "const": "doomstone"
+        },
+        {
+          "description": "A wheat mill.",
+          "type": "string",
+          "const": "wheat-mill"
+        },
+        {
+          "description": "A smelter.",
+          "type": "string",
+          "const": "smelter"
+        },
+        {
+          "description": "A stable.",
+          "type": "string",
+          "const": "stable"
+        },
+        {
+          "description": "An Imperial watchtower.",
+          "type": "string",
+          "const": "imperial-tower"
+        },
+        {
+          "description": "A clearing.",
+          "type": "string",
+          "const": "clearing"
+        },
+        {
+          "description": "A mountain pass.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "An altar or shrine to the Divines.",
+          "type": "string",
+          "const": "shrine"
+        },
+        {
+          "description": "A lighthouse.",
+          "type": "string",
+          "const": "lighthouse"
+        },
+        {
+          "description": "An Orc stronghold.",
+          "type": "string",
+          "const": "orc-stronghold"
+        },
+        {
+          "description": "A giant camp.",
+          "type": "string",
+          "const": "giant-camp"
+        },
+        {
+          "description": "A shack.",
+          "type": "string",
+          "const": "shack"
+        },
+        {
+          "description": "A Nordic tower.",
+          "type": "string",
+          "const": "nordic-tower"
+        },
+        {
+          "description": "A Nordic dwelling.",
+          "type": "string",
+          "const": "nordic-dwelling"
+        },
+        {
+          "description": "Docks.",
+          "type": "string",
+          "const": "docks"
+        },
+        {
+          "description": "A shrine of a Daedric Prince.",
+          "type": "string",
+          "const": "daedric-shrine"
+        },
+        {
+          "description": "A passage to another land, such as the boat to Solstheim.",
+          "type": "string",
+          "const": "passage"
+        },
+        {
+          "description": "A marker without a kind of its own.",
+          "type": "string",
+          "const": "other"
+        }
+      ]
+    },
+    "PlaceOrigin": {
+      "description": "Whose a place of the world map is.",
+      "oneOf": [
+        {
+          "description": "The game's own, unchanged.",
+          "type": "string",
+          "const": "game"
+        },
+        {
+          "description": "Added by a mod.",
+          "type": "string",
+          "const": "added"
+        },
+        {
+          "description": "The game's own, moved, renamed or made another kind by a mod.",
+          "type": "string",
+          "const": "changed"
+        },
+        {
+          "description": "The game's own or another mod's, removed by a mod.",
+          "type": "string",
+          "const": "removed"
+        }
+      ]
+    },
     "RenderedAction": {
       "description": "An action together with its texts in one language.",
       "type": "object",
@@ -819,6 +1358,34 @@
         "label",
         "description",
         "guide"
+      ]
+    },
+    "RenderedDuel": {
+      "description": "A duel between two mods, in words.",
+      "type": "object",
+      "properties": {
+        "duel": {
+          "description": "The duel itself.",
+          "$ref": "#/$defs/ModDuel"
+        },
+        "suggestion": {
+          "description": "Why the suggested side is suggested, if one is.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topicLabels": {
+          "description": "Each topic as a few words, such as \"34 faces\", in the duel's order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "duel",
+        "topicLabels"
       ]
     },
     "RenderedFinding": {
@@ -1149,6 +1716,51 @@
           "required": [
             "type"
           ]
+        }
+      ]
+    },
+    "SuggestionReason": {
+      "description": "Why one side is suggested.",
+      "oneOf": [
+        {
+          "description": "One side's plugin is built on the other's: made to change it.",
+          "type": "string",
+          "const": "built-on"
+        },
+        {
+          "description": "Most of what one side disagrees about with any mod is this topic;\nfor the other side it is a small part. The specialist wins.",
+          "type": "string",
+          "const": "specialist"
+        }
+      ]
+    },
+    "Topic": {
+      "description": "What two mods disagree about.",
+      "oneOf": [
+        {
+          "description": "The faces of characters.",
+          "type": "string",
+          "const": "faces"
+        },
+        {
+          "description": "Textures, from loose files or archives.",
+          "type": "string",
+          "const": "textures"
+        },
+        {
+          "description": "Meshes and the textures they use.",
+          "type": "string",
+          "const": "meshes"
+        },
+        {
+          "description": "Objects placed in the world.",
+          "type": "string",
+          "const": "objects"
+        },
+        {
+          "description": "One mod's plugin contained in the other.",
+          "type": "string",
+          "const": "contained"
         }
       ]
     },

@@ -41,7 +41,14 @@
   - [0025 Patches hide objects through Base Object Swapper](adr/0025-patches-through-base-object-swapper.md)
   - [0026 The app has a toolbox, a log, and can restart Vortex](adr/0026-toolbox-log-and-restarting-vortex.md)
   - [0027 Findings offer decisions; the window has a home and themes](adr/0027-findings-offer-decisions.md)
+  - [0028 Findings show the textures they are about](adr/0028-pictures-of-textures.md)
+  - [0029 Mods are decided pair by pair; single things are shown in 3D](adr/0029-duels-and-a-3d-view-of-single-things.md)
   - [0030 Rules from the LOOT masterlist, evaluated by libloot](adr/0030-rules-from-the-loot-masterlist.md)
+  - [0031 The map shows the places of the game and of mods, also as a 3D relief](adr/0031-places-on-the-map-and-a-3d-relief.md)
+  - [0032 Objects of the game that mods move count as the mod's](adr/0032-objects-of-the-game-that-mods-move.md)
+  - [0033 Mods are compared on a stage and decided by a ranking](adr/0033-comparison-stage-and-ranking.md)
+  - [0034 Missing installer options are ticked in advance](adr/0034-installer-options-ticked-in-advance.md)
+  - [0035 LOOT's messages are quoted](adr/0035-loots-messages-are-quoted.md)
   - [Template](adr/template.md)
 
 # Reference

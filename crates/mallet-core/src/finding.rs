@@ -221,6 +221,11 @@ pub struct Finding {
     /// describe the problem.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<Action>,
+    /// Files worth looking at to see what the finding is about, such as the
+    /// textures two mods disagree on. The window shows every version of
+    /// each that the setup has.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub previews: Vec<GamePath>,
 }
 
 impl Finding {
@@ -235,7 +240,15 @@ impl Finding {
             args: BTreeMap::new(),
             provider: None,
             actions: Vec::new(),
+            previews: Vec::new(),
         }
+    }
+
+    /// Names files worth looking at for this finding.
+    #[must_use]
+    pub fn with_previews(mut self, paths: impl IntoIterator<Item = GamePath>) -> Self {
+        self.previews.extend(paths);
+        self
     }
 
     /// Adds a value for the placeholder `name` of the kind's message.

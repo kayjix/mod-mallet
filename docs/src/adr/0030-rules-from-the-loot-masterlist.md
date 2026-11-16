@@ -48,7 +48,8 @@ runs; LOOT keeps one in its local data folder.
    them.
 5. **Messages, tags, groups and load-after rules are not used yet.** LOOT's
    messages are English prose and would break the rule that findings carry
-   no prose; sorting stays with the mod manager.
+   no prose; sorting stays with the mod manager. (Since [ADR 0035](0035-loots-messages-are-quoted.md),
+   the messages are quoted.)
 
 ## Consequences
 

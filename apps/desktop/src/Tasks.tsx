@@ -18,6 +18,7 @@ import {
 } from "./arrange";
 import type { MapSpot, RenderedAction, RenderedFinding } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { Previews } from "./Preview";
 import { pairFor } from "./patch";
 
 /** A group with more findings than this starts folded. */
@@ -48,9 +49,22 @@ function sectionTexts(id: Section["id"], t: Texts): { title: string; hint: strin
  * each, with the button that does something about it where there is one.
  * Everything else about a finding is behind its line.
  */
-export function TaskList({ findings, filter }: { findings: RenderedFinding[]; filter: Filter }) {
+export function TaskList({
+  findings,
+  filter,
+  exclude,
+}: {
+  findings: RenderedFinding[];
+  filter: Filter;
+  /** Findings shown elsewhere, such as in a duel. */
+  exclude?: Set<string>;
+}) {
   const { t, ignored } = useSession();
-  const sections = sectionsFor(findings, filter, ignored);
+  const shown =
+    exclude === undefined
+      ? findings
+      : findings.filter((rendered) => !exclude.has(rendered.finding.id));
+  const sections = sectionsFor(shown, filter, ignored);
 
   if (sections.length === 0) {
     return <p className="empty">{t.nothingHere}</p>;
@@ -167,6 +181,7 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
             <>
               <p className="summary">{rendered.summary}</p>
               <Choices rendered={rendered} action={action} />
+              {(finding.previews?.length ?? 0) > 0 && <Previews paths={finding.previews ?? []} />}
               {rendered.actions.map((available) => (
                 <Guide key={available.label} action={available} />
               ))}

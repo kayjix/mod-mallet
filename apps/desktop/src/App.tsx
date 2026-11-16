@@ -1,8 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { type Session, SessionContext } from "./Actions";
+import { type Session, SessionContext, useSession } from "./Actions";
 import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, type Filter, modsByName } from "./arrange";
+import { CompareView } from "./Compare";
+import { Duels } from "./Duels";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
@@ -34,6 +36,7 @@ type ViewName =
   | "mods"
   | "toolbox"
   | "settings"
+  | "compare"
   | "places";
 
 /** How often the window looks whether the setup changed, in milliseconds. */
@@ -58,6 +61,42 @@ export default function App({ api, startLang }: AppProps) {
   // The patch's choice starts from the patch in the game, once; later scans
   // keep what the user chose since.
   const [patchChoices, setPatchChoices] = useState<PatchChoices | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, number>>({});
+  useEffect(() => {
+    api
+      .decisions()
+      .then(setDecisions)
+      .catch(() => {});
+  }, [api]);
+  const decide = useCallback(
+    (id: string, side: number | null) => {
+      api
+        .setDecision(id, side)
+        .then(setDecisions)
+        .catch((error: unknown) => setFailure(String(error)));
+    },
+    [api],
+  );
+  const [ranking, setRankingList] = useState<string[]>([]);
+  useEffect(() => {
+    api
+      .ranking()
+      .then(setRankingList)
+      .catch(() => {});
+  }, [api]);
+  const setRanking = useCallback(
+    (next: string[]) => {
+      setRankingList(next);
+      api
+        .setRanking(next)
+        .then(setRankingList)
+        .catch((error: unknown) => setFailure(String(error)));
+    },
+    [api],
+  );
+  // The comparison opens over the view it was opened from and goes back to it.
+  const [compareAt, setCompareAt] = useState<string | null>(null);
+  const [compareFrom, setCompareFrom] = useState<ViewName>("tasks");
   useEffect(() => {
     if (patchChoices === null && report !== null) {
       setPatchChoices(choicesOf(pairsOf(report, ignored), installedKeys(report)));
@@ -208,6 +247,17 @@ export default function App({ api, startLang }: AppProps) {
     setView("patch");
   }, []);
 
+  const openCompare = useCallback(
+    (duel: string | null) => {
+      setCompareAt(duel);
+      if (view !== "compare") {
+        setCompareFrom(view);
+      }
+      setView("compare");
+    },
+    [view],
+  );
+
   const showOnMap = useCallback((spot: MapSpot) => {
     setFocus(spot);
     setView("map");
@@ -228,6 +278,11 @@ export default function App({ api, startLang }: AppProps) {
       patchChoices: patchChoices ?? {},
       setPatchChoices,
       showPatch,
+      decisions,
+      decide,
+      ranking,
+      setRanking,
+      openCompare,
     }),
     [
       api,
@@ -241,6 +296,11 @@ export default function App({ api, startLang }: AppProps) {
       showOnMap,
       patchChoices,
       showPatch,
+      decisions,
+      decide,
+      ranking,
+      setRanking,
+      openCompare,
     ],
   );
   const counts = useMemo(
@@ -260,6 +320,7 @@ export default function App({ api, startLang }: AppProps) {
     mods: t.viewMods,
     toolbox: t.viewToolbox,
     settings: t.viewSettings,
+    compare: t.viewCompare,
     places: askFirst ? t.placesTitleFirst : t.placesTitle,
   };
 
@@ -279,7 +340,7 @@ export default function App({ api, startLang }: AppProps) {
           toolbox={toolbox}
           t={t}
         />
-        <main className="content">
+        <main className="content" data-view={current}>
           <header className="pagehead">
             <h1>{titles[current]}</h1>
             {report !== null && !askFirst && (
@@ -352,8 +413,17 @@ export default function App({ api, startLang }: AppProps) {
                 </button>
               </section>
             )
+          ) : current === "compare" ? (
+            <CompareView report={report} start={compareAt} onBack={() => setView(compareFrom)} />
           ) : current === "collisions" ? (
-            <TaskList findings={report.findings} filter="collisions" />
+            <>
+              <Duels
+                duels={report.duels}
+                findings={report.findings}
+                topics={["objects", "contained"]}
+              />
+              <TaskList findings={report.findings} filter="collisions" exclude={inDuels(report)} />
+            </>
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (
@@ -367,6 +437,11 @@ export default function App({ api, startLang }: AppProps) {
       </div>
     </SessionContext>
   );
+}
+
+/** The findings that a duel between two mods takes care of. */
+function inDuels(report: RenderedReport): Set<string> {
+  return new Set(report.duels.flatMap((rendered) => rendered.duel.findings));
 }
 
 function spotsByFinding(report: RenderedReport | null): Map<string, MapSpot[]> {
@@ -569,6 +644,21 @@ interface ReportProps {
 function Report({ report, counts, lang, t }: ReportProps) {
   const open = counts.errors + counts.warnings;
   const [filter, setFilter] = useState<Filter>(open > 0 ? "open" : "info");
+  const { openCompare } = useSession();
+  const [arrange, setArrange] = useState<"category" | "pairs">(() => {
+    try {
+      return localStorage.getItem("mallet.arrange") === "pairs" ? "pairs" : "category";
+    } catch {
+      return "category";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("mallet.arrange", arrange);
+    } catch {
+      // Only a convenience.
+    }
+  }, [arrange]);
 
   return (
     <section aria-live="polite">
@@ -580,7 +670,39 @@ function Report({ report, counts, lang, t }: ReportProps) {
         lang={lang}
         t={t}
       />
-      <TaskList findings={report.findings} filter={filter} />
+      <div className="arrange-bar">
+        <fieldset className="segmented" aria-label={t.arrangeLabel}>
+          <button
+            type="button"
+            aria-pressed={arrange === "category"}
+            onClick={() => setArrange("category")}
+          >
+            {t.arrangeCategory}
+          </button>
+          <button
+            type="button"
+            aria-pressed={arrange === "pairs"}
+            onClick={() => setArrange("pairs")}
+          >
+            {t.arrangePairs} <span className="count">{report.duels.length}</span>
+          </button>
+        </fieldset>
+        {report.duels.length > 0 && (
+          <button type="button" className="quiet" onClick={() => openCompare(null)}>
+            {t.compareOpen}
+          </button>
+        )}
+      </div>
+      {arrange === "pairs" ? (
+        <Duels duels={report.duels} findings={report.findings} />
+      ) : (
+        <>
+          {report.duels.length > 0 && (
+            <p className="arrange-note aside">{t.arrangeDuelsAside(report.duels.length)}</p>
+          )}
+          <TaskList findings={report.findings} filter={filter} exclude={inDuels(report)} />
+        </>
+      )}
 
       <details className="sources">
         <summary className="more">{t.whatWasRead}</summary>

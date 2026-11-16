@@ -56,7 +56,8 @@ its model, a mesh file in an archive.
 - Mods that move or change the game's own objects are not compared. A mod
   that moves a house of the game into the way of another mod's house is
   not found yet; that needs the game's own placements, which are many
-  times more than all mods together.
+  times more than all mods together. (Since [ADR 0032](0032-objects-of-the-game-that-mods-move.md),
+  objects of the game that a mod moves are compared.)
 - Compatibility patches that resolve a clash by other means than switching
   objects off (for example by a script) are not recognised, but they make
   the pair "known" and therefore silent.

@@ -30,6 +30,12 @@ pub struct Settings {
     /// The findings the user has set aside, by their identity. They stay
     /// in the report and are shown apart.
     pub ignored: BTreeSet<String>,
+    /// Which side the user picked in a duel between two mods, by the
+    /// duel's identity: 0 or 1.
+    pub decisions: BTreeMap<String, u8>,
+    /// The mods in the order the user likes them, the favourite first, by
+    /// the mod manager's identity. Duels are decided by it.
+    pub ranking: Vec<String>,
 }
 
 impl Settings {
@@ -283,6 +289,8 @@ mod tests {
                 (LocationRole::Unpacker, PathBuf::from("tools/7z.exe")),
             ]),
             ignored: BTreeSet::from(["objects.overlapping:pair:a+b".to_owned()]),
+            decisions: BTreeMap::from([("duel:a|b".to_owned(), 1)]),
+            ranking: vec!["faces".to_owned(), "patch".to_owned()],
         };
 
         save_settings(&path, &settings).unwrap();
@@ -327,6 +335,8 @@ mod tests {
         let settings = Settings {
             confirmed: true,
             ignored: BTreeSet::new(),
+            decisions: BTreeMap::new(),
+            ranking: Vec::new(),
             places: BTreeMap::from([
                 (LocationRole::GameDir, PathBuf::from("games/skyrim")),
                 (

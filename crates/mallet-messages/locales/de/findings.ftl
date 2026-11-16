@@ -75,6 +75,22 @@ plugins-identical-records = Ein Plugin enthält unveränderte Kopien von Einträ
     .explanation = Ein Eintrag, den ein Plugin unverändert kopiert, bewirkt für sich nichts. Er zählt erst, wenn eine andere Mod, die früher lädt, denselben Eintrag ändert: Die unveränderte Kopie stellt dann still das Original wieder her. Das ist meist harmlos, kann aber die Änderung einer anderen Mod verdecken. LOOTs Liste hält fest, welche veröffentlichten Fassungen eines Plugins solche Kopien enthalten; sie erkennt eine Fassung an der Prüfsumme der Datei.
     .remedy = Meist ist nichts zu tun. Zeigt sich die Änderung einer anderen Mod nicht im Spiel, bereinige dieses Plugin mit „Quick Auto Clean“ von SSEEdit oder lass es vor dieser Mod laden.
 
+plugins-loot-warning = LOOT warnt vor einem Plugin
+    .headline = LOOT warnt vor { $plugin }
+    .summary = LOOT sagt zu { $plugin }, in eigenen Worten (auf Englisch): { $messages }
+    .explanation = LOOT, das Werkzeug, das Plugins sortiert, führt Hinweise zu Tausenden Plugins und zeigt sie, wenn sie auf ein Setup zutreffen: ein fehlender Kompatibilitätspatch, eine Mod, die nicht zusammen mit einer anderen benutzt werden sollte, ein Plugin, das gelöscht werden sollte, weil eine andere Mod es schon enthält. Mod-Manager wie Vortex zeigen diese Hinweise ebenfalls in ihrer Plugin-Liste. Mod Mallet zitiert sie so, wie LOOT sie schreibt, auf Englisch, und nur die, deren Bedingungen für dein Setup gelten.
+    .remedy = Lies die Meldung und folge ihr. Ein fehlender Patch liegt meist auf der Seite, die die Meldung nennt, oder wird vom Installer einer der beiden Mods angeboten. Sagt die Meldung, ein Plugin solle gelöscht oder abgeschaltet werden, deaktiviere die Mod, zu der es gehört, in deinem Mod-Manager.
+
+plugins-loot-note = LOOT hat einen Hinweis zu einem Plugin
+    .headline =
+        LOOT hat { $count ->
+            [one] einen Hinweis
+           *[other] { $count } Hinweise
+        } zu { $plugin }
+    .summary = LOOT sagt zu { $plugin }, in eigenen Worten (auf Englisch): { $messages }
+    .explanation = LOOT, das Werkzeug, das Plugins sortiert, führt Hinweise zu Tausenden Plugins und zeigt sie, wenn sie auf ein Setup zutreffen: ein Update-Patch, der die Mod korrigiert, eine Patch-Sammlung für sie, lesenswerte Kompatibilitätshinweise oder dass die Mod einen neuen Spielstand braucht. Mod Mallet zitiert sie so, wie LOOT sie schreibt, auf Englisch, und nur die, deren Bedingungen für dein Setup gelten.
+    .remedy = Es ist nichts zu tun. Sieh dir den Hinweis an, wenn du an dieser Mod etwas änderst oder sie sich nicht wie erwartet verhält.
+
 
 npcs-face-mismatch = Charaktere mit dunklen oder unpassenden Gesichtern
     .headline =

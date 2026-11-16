@@ -17,11 +17,14 @@
 //!
 //! [`fixture`] builds small files in these formats for tests.
 
+pub mod bc7;
 pub mod bsa;
 pub mod dds;
 pub mod fixture;
 pub mod nif;
+pub mod nif_geometry;
 pub mod plugin;
+pub mod strings;
 
 /// A cursor over bytes that fails instead of reading past the end.
 struct Bytes<'a> {
@@ -59,6 +62,12 @@ impl<'a> Bytes<'a> {
 
     fn u32(&mut self) -> Option<u32> {
         Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+    }
+
+    fn f32(&mut self) -> Option<f32> {
+        let value = f32::from_le_bytes(self.take(4)?.try_into().ok()?);
+        // Damaged numbers count as zero rather than spreading.
+        Some(if value.is_finite() { value } else { 0.0 })
     }
 
     fn signature(&mut self) -> Option<[u8; 4]> {

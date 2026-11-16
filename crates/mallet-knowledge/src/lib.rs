@@ -13,9 +13,11 @@
 
 use std::path::{Path, PathBuf};
 
-use libloot::metadata::{File, PluginCleaningData};
+use libloot::metadata::{File, Message, MessageType, PluginCleaningData, select_message_content};
 use libloot::{EvalMode, Game, GameType, MergeMode};
-use mallet_core::facts::knowledge::{Cleaning, KnownFile, PluginKnowledge};
+use mallet_core::facts::knowledge::{
+    Cleaning, KnownFile, KnownMessage, MessageLevel, PluginKnowledge,
+};
 use mallet_core::facts::{KnowledgeFacts, PluginFacts};
 
 /// Why the rules could not be read.
@@ -154,15 +156,61 @@ pub fn read(
             requirements: known(metadata.requirements()),
             incompatibilities: known(metadata.incompatibilities()),
             dirty: metadata.dirty_info().iter().map(cleaning).collect(),
+            messages: metadata.messages().iter().filter_map(message).collect(),
         };
         if !(entry.requirements.is_empty()
             && entry.incompatibilities.is_empty()
-            && entry.dirty.is_empty())
+            && entry.dirty.is_empty()
+            && entry.messages.is_empty())
         {
             knowledge.plugins.push(entry);
         }
     }
     Ok(knowledge)
+}
+
+/// A message of LOOT as plain English text, or `None` if it has none.
+fn message(message: &Message) -> Option<KnownMessage> {
+    let level = match message.message_type() {
+        MessageType::Error => MessageLevel::Error,
+        MessageType::Warn => MessageLevel::Warning,
+        MessageType::Say => MessageLevel::Note,
+    };
+    let text = plain_text(select_message_content(message.content(), "en")?.text());
+    (!text.is_empty()).then_some(KnownMessage { level, text })
+}
+
+/// Markdown as LOOT's messages use it, as plain text: emphasis marks are
+/// dropped, and a link `[text](address)` becomes `text (address)`.
+fn plain_text(markdown: &str) -> String {
+    let mut text = String::with_capacity(markdown.len());
+    let mut rest = markdown;
+    while let Some(start) = rest.find('[') {
+        let (before, from_bracket) = rest.split_at(start);
+        text.push_str(before);
+        let link = from_bracket
+            .get(1..)
+            .and_then(|inner| inner.split_once("]("))
+            .and_then(|(label, after)| {
+                let (address, after) = after.split_once(')')?;
+                Some((label, address, after))
+            });
+        match link {
+            Some((label, address, after)) if !label.contains('[') => {
+                text.push_str(label);
+                text.push_str(" (");
+                text.push_str(address.trim());
+                text.push(')');
+                rest = after;
+            }
+            _ => {
+                text.push('[');
+                rest = from_bracket.get(1..).unwrap_or_default();
+            }
+        }
+    }
+    text.push_str(rest);
+    text.replace("**", "").replace("__", "").trim().to_owned()
 }
 
 /// Evaluates a LOOT condition, or `None` if it cannot be: a rule that
@@ -406,6 +454,60 @@ plugins:
     }
 
     #[test]
+    fn messages_that_apply_are_read_as_plain_text_with_their_level() {
+        let setup = Setup::new(&["City.esp"], &[]);
+        let masterlist = setup.masterlist(
+            r#"
+plugins:
+  - name: 'City.esp'
+    msg:
+      - type: error
+        content: 'You use **Town**, but not the [City - Town Patch](https://example.org/patch).'
+      - type: say
+        content:
+          - lang: en
+            text: 'Requires a new save.'
+          - lang: de
+            text: 'Braucht einen neuen Spielstand.'
+      - type: warn
+        content: 'Only with Dungeons.'
+        condition: 'active("Dungeons.esp")'
+"#,
+        );
+        let knowledge = setup.read(&masterlist, &["City.esp"]);
+
+        let [city] = knowledge.plugins.as_slice() else {
+            panic!("expected rules for one plugin, got {knowledge:?}");
+        };
+        assert_eq!(
+            city.messages,
+            [
+                KnownMessage {
+                    level: MessageLevel::Error,
+                    text:
+                        "You use Town, but not the City - Town Patch (https://example.org/patch)."
+                            .to_owned(),
+                },
+                KnownMessage {
+                    level: MessageLevel::Note,
+                    text: "Requires a new save.".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn markdown_becomes_plain_text() {
+        assert_eq!(
+            plain_text("**bold** and [a](b) [c](d)"),
+            "bold and a (b) c (d)"
+        );
+        assert_eq!(plain_text("no [link here"), "no [link here");
+        assert_eq!(plain_text("[[nested](x)"), "[nested (x)");
+        assert_eq!(plain_text("  "), "");
+    }
+
+    #[test]
     fn links_are_split_into_text_and_address() {
         assert_eq!(
             split_link("[Helper](https://example.org/a)"),
@@ -439,6 +541,11 @@ plugins:
         #[test]
         fn splitting_a_link_never_panics(display in ".*") {
             let _ = split_link(&display);
+        }
+
+        #[test]
+        fn plain_text_never_panics(markdown in ".*") {
+            let _ = plain_text(&markdown);
         }
     }
 }

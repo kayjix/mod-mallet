@@ -129,6 +129,32 @@ pub struct ScanReport {
     /// there is one.
     #[serde(default)]
     pub installed_patch: Option<InstalledPatch>,
+    /// The findings about two mods, gathered pair by pair.
+    #[serde(default)]
+    pub duels: Vec<crate::duel::ModDuel>,
+}
+
+/// Every version of one file that the setup has, as pictures for the
+/// window: the copies in archives first, the one the game uses last.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePreview {
+    /// The file, below the data directory.
+    pub path: String,
+    /// Its versions, the one the game uses last.
+    pub versions: Vec<PreviewVersion>,
+}
+
+/// One version of a file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewVersion {
+    /// The archive it is in, or `None` for a loose file.
+    pub archive: Option<String>,
+    /// The mod it comes from, if the mod manager knows.
+    pub provider: Option<ModRef>,
+    /// The picture, a PNG as a `data:` address, if the file could be shown.
+    pub image: Option<String>,
 }
 
 /// A picture of a worldspace from above, made from the terrain textures in
@@ -210,6 +236,129 @@ pub struct MapWorld {
     /// The shape of the land, where it is known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<MapTerrain>,
+    /// The places of the world map: the game's own and those mods add,
+    /// change or remove.
+    #[serde(default)]
+    pub markers: Vec<MapMarker>,
+}
+
+/// A place of the world map, such as a town or a cave.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMarker {
+    /// The name the game's map shows.
+    pub name: String,
+    /// What kind of place it is.
+    pub kind: PlaceKind,
+    /// Where it is now, in game units: east, north and height.
+    pub position: [i32; 3],
+    /// Whose place it is.
+    pub origin: PlaceOrigin,
+    /// The mod that added, changed or removed it, as a position in
+    /// [`WorldMap::owners`]. Absent for the game's own places.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<u32>,
+    /// Where the game puts it, if a mod moved it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved_from: Option<[i32; 3]>,
+    /// What the game calls it, if a mod renamed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub renamed_from: Option<String>,
+    /// The command of the game's console that takes the player there.
+    pub console: String,
+}
+
+/// Whose a place of the world map is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum PlaceOrigin {
+    /// The game's own, unchanged.
+    Game,
+    /// Added by a mod.
+    Added,
+    /// The game's own, moved, renamed or made another kind by a mod.
+    Changed,
+    /// The game's own or another mod's, removed by a mod.
+    Removed,
+}
+
+/// The kinds of places of the world map, grouped as the game's map shows
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum PlaceKind {
+    /// A city, the seat of a hold, or a hold's palace.
+    City,
+    /// A town.
+    Town,
+    /// A small settlement.
+    Settlement,
+    /// A castle, a hold's keep or another stronghold of a lord.
+    Castle,
+    /// A cave.
+    Cave,
+    /// A camp, often of bandits.
+    Camp,
+    /// A fort.
+    Fort,
+    /// A Nordic ruin or barrow.
+    NordicRuin,
+    /// A Dwemer ruin.
+    DwemerRuin,
+    /// A shipwreck.
+    Shipwreck,
+    /// A grove.
+    Grove,
+    /// A landmark, such as a standing stone or a temple.
+    Landmark,
+    /// A dragon lair or a word wall on a peak.
+    DragonLair,
+    /// A farm.
+    Farm,
+    /// A wood mill.
+    WoodMill,
+    /// A mine.
+    Mine,
+    /// A camp of the Imperial Legion.
+    ImperialCamp,
+    /// A camp of the Stormcloaks.
+    StormcloakCamp,
+    /// A standing stone.
+    Doomstone,
+    /// A wheat mill.
+    WheatMill,
+    /// A smelter.
+    Smelter,
+    /// A stable.
+    Stable,
+    /// An Imperial watchtower.
+    ImperialTower,
+    /// A clearing.
+    Clearing,
+    /// A mountain pass.
+    Pass,
+    /// An altar or shrine to the Divines.
+    Shrine,
+    /// A lighthouse.
+    Lighthouse,
+    /// An Orc stronghold.
+    OrcStronghold,
+    /// A giant camp.
+    GiantCamp,
+    /// A shack.
+    Shack,
+    /// A Nordic tower.
+    NordicTower,
+    /// A Nordic dwelling.
+    NordicDwelling,
+    /// Docks.
+    Docks,
+    /// A shrine of a Daedric Prince.
+    DaedricShrine,
+    /// A passage to another land, such as the boat to Solstheim.
+    Passage,
+    /// A marker without a kind of its own.
+    Other,
 }
 
 /// The shape of the land of a worldspace, as a small height image.
@@ -266,6 +415,10 @@ pub struct MapSpot {
     pub parts: Vec<SpotPart>,
     /// The command of the game's console that takes the player there.
     pub console: String,
+    /// The point between the objects involved, in game units: east, north
+    /// and height.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position: Option<[i32; 3]>,
 }
 
 /// One object of a collision.

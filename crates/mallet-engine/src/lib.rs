@@ -18,8 +18,10 @@ mod actions;
 mod installers;
 mod knowledge;
 mod logging;
+mod mesh;
 mod patch;
 mod png;
+mod preview;
 mod settings;
 mod toolbox;
 
@@ -41,6 +43,8 @@ pub use actions::{
     patch_file, run_action,
 };
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
+pub use mesh::mesh_view;
+pub use preview::file_preview;
 pub use settings::{
     Settings, default_settings_path, load_settings, planned_locations, save_settings,
     setup_fingerprint,
@@ -194,6 +198,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
     let context = Context::new(&facts, mods.as_ref());
     let findings = mallet_analysis::run_all(&context);
     let map = mallet_analysis::map::world_map(&context);
+    let duels = mallet_analysis::duels::duels(&findings, &context);
     tracing::info!(
         findings = findings.len(),
         elapsed_ms = started.elapsed().as_millis(),
@@ -225,6 +230,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
             .join(mallet_game_skyrimse::swap::SWAPPER_PLUGIN)
             .is_file(),
         installed_patch,
+        duels,
     })
 }
 
@@ -375,6 +381,7 @@ fn gather_facts(
             facts.mesh_overrides = setup.mesh_overrides;
             facts.objects = setup.objects;
             facts.terrain = setup.terrain;
+            facts.markers = setup.markers;
             tracing::info!(
                 placed = facts.objects.placed.len(),
                 bases = facts.objects.bases.len(),

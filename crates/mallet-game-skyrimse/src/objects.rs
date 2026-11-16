@@ -14,13 +14,16 @@
 //! [`Collector`] goes through the plugins in load order, keeps the version
 //! of each reference and base object that the game will use, and leaves
 //! out the objects of the game itself: what the game places as shipped is
-//! not a mod's doing.
+//! not a mod's doing. An object of the game that a mod moves, turns or
+//! resizes is the exception: it then stands where the mod put it, and
+//! counts as that mod's. To tell, the game's own versions of those objects
+//! are read afterwards ([`Collector::add_game_versions`]).
 
 use std::collections::{HashMap, HashSet};
 
 use mallet_core::facts::RecordId;
 use mallet_core::facts::objects::{
-    BaseKind, BaseObject, Bounds, ObjectFacts, Place, PlaceName, PlacedObject,
+    BaseKind, BaseObject, Bounds, Moved, ObjectFacts, Place, PlaceName, PlacedObject, Pose,
 };
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
@@ -69,6 +72,20 @@ const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
 /// Record flag of references: the object is persistent.
 const FLAG_PERSISTENT: u32 = 0x0000_0400;
 
+/// An object of the game counts as moved by a mod if the mod puts it at
+/// least this far, in game units, from where the game has it.
+const MOVED_DISTANCE: i64 = 32;
+
+/// ... or turns it by at least this much about one axis, in thousandths of
+/// a radian (about six degrees) ...
+const MOVED_TURN: i32 = 100;
+
+/// ... or changes its size by at least this much, in thousandths.
+const MOVED_SCALE: i32 = 100;
+
+/// A full turn, in thousandths of a radian.
+const FULL_TURN: i32 = 6283;
+
 /// Positions farther out than this are not real places. The world is a
 /// few hundred thousand units wide.
 const MAX_COORDINATE: f32 = 1.0e7;
@@ -96,6 +113,11 @@ pub struct Collector {
     names: HashMap<RecordId, String>,
     /// The large references the worldspaces list.
     large: HashSet<RecordId>,
+    /// Objects of the game that mods change, in the version the game uses;
+    /// `None` where it deletes or switches them off.
+    game_objects: HashMap<RecordId, Option<PlacedObject>>,
+    /// The game's own versions of those objects.
+    game_versions: HashMap<RecordId, Option<PlacedObject>>,
 }
 
 impl Collector {
@@ -112,6 +134,11 @@ impl Collector {
                         BaseObject {
                             id: id(),
                             editor_id: editor_id(record),
+                            name: (!plugin.header.is_localized)
+                                .then(|| record.first(b"FULL").map(plugin::zstring))
+                                .flatten()
+                                .filter(|name| !name.is_empty()),
+                            model: model_path(record),
                             kind,
                             solid: is_solid(record),
                             natural: is_natural(record),
@@ -124,10 +151,12 @@ impl Collector {
             match &record.signature {
                 b"REFR" if !official => {
                     let id = id();
-                    // Changes to the game's own objects are left out: the
-                    // comparison is between what mods add.
-                    if !is_official(&id.plugin) {
-                        let placed = placed(plugin_name, masters, record, id.clone());
+                    let placed = placed(plugin_name, masters, record, id.clone());
+                    // Changes to the game's own objects are kept apart:
+                    // they count only if they move the object.
+                    if is_official(&id.plugin) {
+                        self.game_objects.insert(id, placed);
+                    } else {
                         self.placed.insert(id, placed);
                     }
                 }
@@ -154,13 +183,61 @@ impl Collector {
         }
     }
 
+    /// Whether mods change objects of the game, so that the game's own
+    /// versions of them have to be read with [`Self::add_game_versions`].
+    pub fn wants_game_versions(&self) -> bool {
+        !self.game_objects.is_empty()
+    }
+
+    /// Takes in the game's own versions of the objects that mods change,
+    /// from one of the game's plugins. The game's plugins have to be added
+    /// in load order, after all plugins went through [`Self::add`], and
+    /// with their placed objects read.
+    pub fn add_game_versions(&mut self, plugin_name: &str, plugin: &Plugin) {
+        let masters = &plugin.header.masters;
+        for record in plugin
+            .records
+            .iter()
+            .filter(|record| &record.signature == b"REFR")
+        {
+            let id = record_id(record.form_id, masters, plugin_name);
+            if self.game_objects.contains_key(&id) {
+                let placed = placed(plugin_name, masters, record, id.clone());
+                self.game_versions.insert(id, placed);
+            }
+        }
+    }
+
     /// The objects as the game will show them, with the base objects and
     /// places they refer to.
     pub fn finish(self) -> ObjectFacts {
+        let moved: Vec<PlacedObject> = self
+            .game_objects
+            .into_iter()
+            .filter_map(|(id, object)| {
+                let mut object = object?;
+                let from = match self.game_versions.get(&id)? {
+                    Some(original) if moves(original, &object) => Some(Pose {
+                        position: original.position,
+                        rotation: original.rotation,
+                        scale: original.scale,
+                    }),
+                    Some(_) => return None,
+                    // The game switches it off; the mod brings it in.
+                    None => None,
+                };
+                object.moved = Some(Moved {
+                    by: object.plugin.to_lowercase(),
+                    from,
+                });
+                Some(object)
+            })
+            .collect();
         let mut placed: Vec<PlacedObject> = self
             .placed
             .into_values()
             .flatten()
+            .chain(moved)
             .filter(|object| self.bases.contains_key(&object.base))
             .map(|mut object| {
                 object.large = self.large.contains(&object.id);
@@ -192,6 +269,29 @@ impl Collector {
     }
 }
 
+/// Whether `changed` stands noticeably elsewhere than `original`: moved,
+/// turned or resized.
+fn moves(original: &PlacedObject, changed: &PlacedObject) -> bool {
+    let distance_squared: i64 = original
+        .position
+        .iter()
+        .zip(changed.position)
+        .map(|(a, b)| (i64::from(*a) - i64::from(b)).pow(2))
+        .sum();
+    let turned = original
+        .rotation
+        .iter()
+        .zip(changed.rotation)
+        .any(|(a, b)| {
+            let difference = (a - b).rem_euclid(FULL_TURN);
+            difference.min(FULL_TURN - difference) >= MOVED_TURN
+        });
+    distance_squared >= MOVED_DISTANCE * MOVED_DISTANCE
+        || turned
+        || (original.scale - changed.scale).abs() >= MOVED_SCALE
+        || original.place != changed.place
+}
+
 fn base_kind(signature: Signature) -> Option<BaseKind> {
     BASE_TYPES
         .iter()
@@ -212,6 +312,20 @@ fn editor_id(record: &Record) -> Option<String> {
         .first(b"EDID")
         .map(plugin::zstring)
         .filter(|name| !name.is_empty())
+}
+
+/// The model of a record, as a path below the data directory.
+fn model_path(record: &Record) -> Option<String> {
+    let model = record.first(b"MODL").map(plugin::zstring)?;
+    let model = model.replace('\\', "/").to_ascii_lowercase();
+    if model.is_empty() {
+        return None;
+    }
+    Some(if model.starts_with("meshes/") {
+        model
+    } else {
+        format!("meshes/{model}")
+    })
 }
 
 /// Whether the model of a base object is one that can be seen and bumped
@@ -298,6 +412,7 @@ fn placed(
                 .iter()
                 .any(|group| group.group_type == group_type::CELL_PERSISTENT_CHILDREN),
         large: false,
+        moved: None,
     })
 }
 
@@ -516,8 +631,10 @@ mod tests {
         assert_eq!(ids, [0x21]);
     }
 
-    #[test]
-    fn objects_of_the_game_itself_are_left_out() {
+    /// The game with a house in a room, and a mod that puts the house at
+    /// `position`, turned by `rotation`. With `game_versions`, the game's
+    /// own version is read afterwards, as the ingest does.
+    fn game_and_mover(position: [f32; 3], rotation: [f32; 3], game_versions: bool) -> Collector {
         let game = fixture::plugin_with_raw_groups(
             &[],
             1,
@@ -529,19 +646,78 @@ mod tests {
                 )]),
             ],
         );
-        // A mod that moves the game's object.
         let a_mod = fixture::plugin_with_raw_groups(
             &["Skyrim.esm"],
             0,
             &[fixture::interior_cells(&[(
                 RecordSpec::new(*b"CELL", 0x10),
-                vec![fixture::reference(0x20, HOUSE, [500.0; 3], [0.0; 3], None)],
+                vec![fixture::reference(0x20, HOUSE, position, rotation, None)],
             )])],
         );
         let mut collector = Collector::default();
         collector.add("Skyrim.esm", &read(&game));
         collector.add("Mover.esp", &read(&a_mod));
-        assert_eq!(collector.finish().placed, Vec::new());
+        if game_versions {
+            assert!(collector.wants_game_versions());
+            collector.add_game_versions("Skyrim.esm", &read(&game));
+        }
+        collector
+    }
+
+    #[test]
+    fn an_object_of_the_game_that_a_mod_moves_counts_as_the_mods() {
+        let placed = game_and_mover([500.0; 3], [0.0; 3], true).finish().placed;
+
+        let [object] = placed.as_slice() else {
+            panic!("expected one object, got {placed:?}");
+        };
+        assert_eq!(object.id, id("skyrim.esm", 0x20));
+        assert_eq!(object.position, [500; 3]);
+        let moved = object.moved.as_ref().unwrap();
+        assert_eq!(moved.by, "mover.esp");
+        assert_eq!(moved.from.map(|pose| pose.position), Some([0; 3]));
+        assert_eq!(object.owner(), "mover.esp");
+    }
+
+    #[test]
+    fn an_object_of_the_game_that_a_mod_turns_counts_as_the_mods() {
+        let turned = [0.0, 0.0, std::f32::consts::FRAC_PI_2];
+        let placed = game_and_mover([0.0; 3], turned, true).finish().placed;
+        assert_eq!(placed.len(), 1);
+    }
+
+    #[test]
+    fn an_object_of_the_game_that_a_mod_only_nudges_is_left_out() {
+        let placed = game_and_mover([10.0, -10.0, 5.0], [0.0, 0.0, 0.05], true)
+            .finish()
+            .placed;
+        assert_eq!(placed, Vec::new());
+    }
+
+    #[test]
+    fn without_the_games_own_versions_changes_to_its_objects_are_left_out() {
+        let placed = game_and_mover([500.0; 3], [0.0; 3], false).finish().placed;
+        assert_eq!(placed, Vec::new());
+    }
+
+    #[test]
+    fn a_full_turn_is_no_turn() {
+        let object = |rotation| PlacedObject {
+            id: id("skyrim.esm", 1),
+            plugin: "Skyrim.esm".to_owned(),
+            base: id("skyrim.esm", HOUSE),
+            place: Place::Interior {
+                cell: id("skyrim.esm", 0x10),
+            },
+            position: [0; 3],
+            rotation,
+            scale: 1000,
+            persistent: false,
+            large: false,
+            moved: None,
+        };
+        assert!(!moves(&object([0, 0, 10]), &object([0, 0, 6280])));
+        assert!(moves(&object([0, 0, 0]), &object([0, 0, 3141])));
     }
 
     #[test]

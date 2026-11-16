@@ -5,9 +5,31 @@ use std::io::Write;
 /// The file signature every PNG starts with.
 const SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 
+/// An RGB image with an opacity per pixel, as PNG.
+pub(crate) fn encode_rgba(
+    width: u32,
+    height: u32,
+    rgb: &[u8],
+    alpha: &[u8],
+) -> std::io::Result<Vec<u8>> {
+    let rgba: Vec<u8> = rgb
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(alpha)
+        .flat_map(|(colour, opacity)| colour.iter().copied().chain([*opacity]))
+        .collect();
+    encode(width, height, &rgba, 4)
+}
+
 /// An RGB image of `width × height` pixels, rows top to bottom, as PNG.
 pub(crate) fn encode_rgb(width: u32, height: u32, rgb: &[u8]) -> std::io::Result<Vec<u8>> {
-    let row = (width as usize).saturating_mul(3);
+    encode(width, height, rgb, 3)
+}
+
+/// Pixels of `channels` bytes each (3 for RGB, 4 for RGBA) as PNG.
+fn encode(width: u32, height: u32, rgb: &[u8], channels: usize) -> std::io::Result<Vec<u8>> {
+    let row = (width as usize).saturating_mul(channels);
     if row == 0 || rgb.len() != row.saturating_mul(height as usize) {
         return Err(std::io::Error::other("the pixels do not match the size"));
     }
@@ -26,7 +48,7 @@ pub(crate) fn encode_rgb(width: u32, height: u32, rgb: &[u8]) -> std::io::Result
     header.extend(height.to_be_bytes());
     // 8 bits per channel, colour type RGB, standard compression and
     // filtering, no interlacing.
-    header.extend([8, 2, 0, 0, 0]);
+    header.extend([8, if channels == 4 { 6 } else { 2 }, 0, 0, 0]);
 
     let mut png = SIGNATURE.to_vec();
     chunk(&mut png, *b"IHDR", &header)?;

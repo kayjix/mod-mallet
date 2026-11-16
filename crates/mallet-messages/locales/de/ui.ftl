@@ -95,6 +95,36 @@ action-load-after = { $plugin } gewinnen lassen
 action-disable-mod = { $mod } deaktivieren
     .description = Vortex schaltet { $mod } im verwendeten Profil ab und bittet ums Bereitstellen. Gelöscht wird nichts; schalte die Mod in Vortex wieder ein, um es rückgängig zu machen.
 
+## Duelle: alles, worin zwei Mods sich uneins sind.
+
+duel-topic-faces = { $count ->
+    [one] 1 Gesicht
+   *[other] { $count } Gesichter
+}
+duel-topic-textures = { $count ->
+    [one] 1 Textur
+   *[other] { $count } Texturen
+}
+duel-topic-meshes = { $count ->
+    [one] 1 Mesh
+   *[other] { $count } Meshes
+}
+duel-topic-objects = { $count ->
+    [one] 1 Objekt
+   *[other] { $count } Objekte
+}
+duel-topic-contained = { $count ->
+    [one] 1 enthaltenes Plugin
+   *[other] { $count } enthaltene Plugins
+}
+duel-subject-faces = Gesichter
+duel-subject-textures = Texturen
+duel-subject-meshes = Meshes
+duel-subject-objects = platzierte Objekte
+duel-subject-contained = Plugins
+duel-suggest-built-on = { $winner } baut auf { $other } auf: Es wurde gemacht, um es zu ändern, und sollte gewinnen.
+duel-suggest-specialist = Bei { $winner } dreht sich fast alles um { $subject }, bei { $other } sind sie nur ein kleiner Teil. Der Spezialist kann sein Thema meist besser.
+
 outcome-applied = Vortex hat die Änderung vorgenommen. Stelle bereit, falls Vortex darum bittet; Mod Mallet scannt danach erneut.
 outcome-installing = Vortex installiert den Patch. Stelle bereit, falls Vortex das nicht von selbst tut; Mod Mallet scannt danach erneut.
 outcome-started = Vortex hat den Installer geöffnet. Mach dort weiter und scanne danach erneut.

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use mallet_core::ObjectRef;
-use mallet_core::action::{Action, ActionOutcome, ActionStatus};
+use mallet_core::action::{Action, ActionOutcome, ActionStatus, OptionToTick};
 use mallet_source_vortex::SOURCE_ID;
 use mallet_source_vortex::link::{self, Link, LinkError};
 
@@ -109,8 +109,8 @@ pub fn install_manager_link(options: &ManagerOptions) -> Result<PathBuf, EngineE
 /// it.
 pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
     match action {
-        Action::ReinstallMod { mod_ref, .. } if mod_ref.source == SOURCE_ID => {
-            reinstall_in_vortex(&mod_ref.id, options)
+        Action::ReinstallMod { mod_ref, tick } if mod_ref.source == SOURCE_ID => {
+            reinstall_in_vortex(&mod_ref.id, tick, options)
         }
         Action::HideObjects { objects } => hide_objects(objects, options),
         Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
@@ -235,7 +235,11 @@ fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcom
     outcome_of(Link::new(link_dir).install_archive(VORTEX_GAME, &created.path, timeout))
 }
 
-fn reinstall_in_vortex(mod_id: &str, options: &ManagerOptions) -> ActionOutcome {
+fn reinstall_in_vortex(
+    mod_id: &str,
+    tick: &[OptionToTick],
+    options: &ManagerOptions,
+) -> ActionOutcome {
     let state = manager_link(options);
     if !state.installed {
         return ActionOutcome::new(ActionStatus::LinkMissing);
@@ -244,8 +248,12 @@ fn reinstall_in_vortex(mod_id: &str, options: &ManagerOptions) -> ActionOutcome 
         return ActionOutcome::new(ActionStatus::ManagerNotRunning);
     };
     let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
-    tracing::info!(mod_id, "asking Vortex to reinstall a mod");
-    outcome_of(Link::new(link_dir).reinstall_mod(VORTEX_GAME, mod_id, timeout))
+    tracing::info!(
+        mod_id,
+        options = tick.len(),
+        "asking Vortex to reinstall a mod"
+    );
+    outcome_of(Link::new(link_dir).reinstall_mod(VORTEX_GAME, mod_id, tick, timeout))
 }
 
 /// What a reply of the extension means.

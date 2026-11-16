@@ -204,6 +204,80 @@ fn parse_layout(data: &[u8]) -> Result<Layout, NifError> {
     })
 }
 
+/// One block of a mesh: its type and where its bytes lie in the file.
+pub(crate) struct BlockInfo {
+    /// The block type, such as `BSTriShape`.
+    pub(crate) kind: String,
+    /// Where the block starts.
+    pub(crate) start: usize,
+    /// How many bytes it has.
+    pub(crate) size: usize,
+}
+
+/// The Bethesda version of the mesh in `data` (83 for Skyrim, 100 for
+/// Skyrim Special Edition) and all its blocks.
+pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>), NifError> {
+    let mut bytes = Bytes::new(data);
+    let damaged = || NifError::Damaged;
+    let line_len = data
+        .iter()
+        .take(64)
+        .position(|&byte| byte == b'\n')
+        .ok_or(NifError::NotAMesh)?;
+    let line = bytes.take(line_len + 1).ok_or(NifError::NotAMesh)?;
+    if !line.starts_with(MAGIC) {
+        return Err(NifError::NotAMesh);
+    }
+    let version = bytes.u32().ok_or_else(damaged)?;
+    let little_endian = bytes.u8().ok_or_else(damaged)? == 1;
+    let _user_version = bytes.u32().ok_or_else(damaged)?;
+    let block_count = bytes.u32().ok_or_else(damaged)?;
+    let bethesda_version = bytes.u32().ok_or_else(damaged)?;
+    if version != VERSION_20_2_0_7 || !little_endian || bethesda_version > NEWEST_BETHESDA_VERSION {
+        return Err(NifError::UnsupportedVersion);
+    }
+    for _ in 0..3 {
+        let len = usize::from(bytes.u8().ok_or_else(damaged)?);
+        bytes.skip(len).ok_or_else(damaged)?;
+    }
+    let type_count = bytes.u16().ok_or_else(damaged)?;
+    let mut type_names = Vec::new();
+    for _ in 0..type_count {
+        type_names.push(decode_text(sized_string(&mut bytes).ok_or_else(damaged)?));
+    }
+    let mut types = Vec::new();
+    for _ in 0..block_count {
+        types.push(bytes.u16().ok_or_else(damaged)?);
+    }
+    let mut sizes = Vec::new();
+    for _ in 0..block_count {
+        sizes.push(usize::try_from(bytes.u32().ok_or_else(damaged)?).map_err(|_| damaged())?);
+    }
+    let string_count = bytes.u32().ok_or_else(damaged)?;
+    let _longest_string = bytes.u32().ok_or_else(damaged)?;
+    for _ in 0..string_count {
+        sized_string(&mut bytes).ok_or_else(damaged)?;
+    }
+    let group_count = bytes.u32().ok_or_else(damaged)?;
+    for _ in 0..group_count {
+        bytes.u32().ok_or_else(damaged)?;
+    }
+    let mut start = data.len() - bytes.remaining();
+    let mut found = Vec::new();
+    for (kind, size) in types.into_iter().zip(sizes) {
+        found.push(BlockInfo {
+            kind: type_names
+                .get(usize::from(kind))
+                .cloned()
+                .unwrap_or_default(),
+            start,
+            size,
+        });
+        start = start.checked_add(size).ok_or_else(damaged)?;
+    }
+    Ok((bethesda_version, found))
+}
+
 /// Adds the paths of one texture set block to `paths`.
 fn add_texture_set(block: &[u8], paths: &mut Vec<String>) -> Result<(), NifError> {
     let mut block = Bytes::new(block);
