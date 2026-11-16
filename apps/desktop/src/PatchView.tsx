@@ -1,84 +1,10 @@
 import { useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
-import { isCollision } from "./arrange";
-import type { MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
+import type { RenderedReport } from "./generated/rendered-report";
+import { choicesOf, keyOf, objectsOf, type Pair, pairsOf, signatureOf } from "./patch";
 
 /** Base Object Swapper's page, for when it is missing. */
 const SWAPPER_PAGE = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
-
-/** One collision finding with what can be hidden of it, side by side. */
-interface Pair {
-  id: string;
-  headline: string;
-  /** The two plugins, each with the objects of it that can be hidden. */
-  sides: { plugin: string; objects: ObjectRef[] }[];
-  /** The plugin suggested for hiding, if any. */
-  suggested: string | null;
-}
-
-function pairsOf(report: RenderedReport, ignored: Set<string>): Pair[] {
-  const spots = new Map<string, MapSpot[]>();
-  for (const spot of report.map.spots) {
-    spots.set(spot.finding, [...(spots.get(spot.finding) ?? []), spot]);
-  }
-  return report.findings
-    .filter((rendered) => isCollision(rendered) && !ignored.has(rendered.finding.id))
-    .flatMap((rendered) => {
-      const found = spots.get(rendered.finding.id) ?? [];
-      const sides = new Map<string, ObjectRef[]>();
-      const votes = new Map<string, number>();
-      for (const part of found.flatMap((spot) => spot.parts ?? [])) {
-        const { plugin } = part.object;
-        sides.set(plugin, [...(sides.get(plugin) ?? []), ...(part.hideable ? [part.object] : [])]);
-        if (part.suggested) {
-          votes.set(plugin, (votes.get(plugin) ?? 0) + 1);
-        }
-      }
-      if (sides.size === 0) {
-        return [];
-      }
-      const suggested = [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-      return [
-        {
-          id: rendered.finding.id,
-          headline: rendered.headline,
-          sides: [...sides.entries()].map(([plugin, objects]) => ({ plugin, objects })),
-          suggested,
-        },
-      ];
-    });
-}
-
-/** One object as a text, for comparing. */
-function keyOf(object: ObjectRef): string {
-  return `${object.plugin}:${object.localId}`;
-}
-
-/** A text that is the same for the same choice of objects, in any order. */
-function signatureOf(objects: ObjectRef[]): string {
-  return [...new Set(objects.map(keyOf))].sort().join(",");
-}
-
-/**
- * The choices the installed patch stands for: per collision, the side of
- * which it hides the most objects.
- */
-function choicesOf(pairs: Pair[], installed: Set<string>): Record<string, string | null> {
-  const choices: Record<string, string | null> = {};
-  for (const pair of pairs) {
-    let best: { plugin: string; hidden: number } | null = null;
-    for (const side of pair.sides) {
-      const hidden = side.objects.filter((object) => installed.has(keyOf(object))).length;
-      if (hidden > 0 && (best === null || hidden > best.hidden)) {
-        best = { plugin: side.plugin, hidden };
-      }
-    }
-    if (best !== null) {
-      choices[pair.id] = best.plugin;
-    }
-  }
-  return choices;
-}
 
 /**
  * A patch made for this setup: for each collision, the user picks which
@@ -86,7 +12,7 @@ function choicesOf(pairs: Pair[], installed: Set<string>): Record<string, string
  * a small mod. Nothing is chosen until the user chooses it.
  */
 export function PatchView({ report }: { report: RenderedReport }) {
-  const { t, api, ignored } = useSession();
+  const { t, api, ignored, patchChoices: choices, setPatchChoices: setChoices } = useSession();
   const pairs = useMemo(() => pairsOf(report, ignored), [report, ignored]);
   const installedObjects = report.installedPatch?.objects ?? null;
   const installed = useMemo(() => new Set((installedObjects ?? []).map(keyOf)), [installedObjects]);
@@ -98,20 +24,13 @@ export function PatchView({ report }: { report: RenderedReport }) {
     );
     return [...installed].filter((key) => !inCollisions.has(key)).length;
   }, [report, installed]);
-  // What is installed is the starting point; nothing else is chosen for the
-  // user.
-  const [choices, setChoices] = useState<Record<string, string | null>>(() =>
-    choicesOf(pairs, installed),
-  );
   const [created, setCreated] = useState<{ path: string; signature: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const action = useAction();
 
   const choice = (pair: Pair) => choices[pair.id] ?? null;
-  const objects = pairs.flatMap(
-    (pair) => pair.sides.find((side) => side.plugin === choice(pair))?.objects ?? [],
-  );
+  const objects = objectsOf(pairs, choices);
   const signature = signatureOf(objects);
   const upToDate = created !== null && created.signature === signature;
   const chosen = new Set(objects.map(keyOf));

@@ -55,7 +55,7 @@ fn finding_for(
                 .with_arg("reason", reason.as_str())
         }
     };
-    Some(finding.with_provider(provider))
+    Some(crate::offer_disabling(finding.with_provider(provider)))
 }
 
 #[cfg(test)]

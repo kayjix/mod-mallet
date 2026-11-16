@@ -17,6 +17,7 @@
 
 pub mod action;
 pub mod cache;
+pub mod encoding;
 pub mod facts;
 pub mod finding;
 pub mod kinds;
@@ -33,7 +34,7 @@ pub use kinds::KindInfo;
 pub use mods::{ModRef, ModSource, NoModSource};
 pub use path::GamePath;
 pub use report::{
-    GameInfo, InstalledPatch, LocationOrigin, LocationRole, MapCell, MapSpot, MapTerrain, MapWorld,
-    ModInfo, ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
+    GameInfo, InstalledPatch, LocationOrigin, LocationRole, MapCell, MapImage, MapSpot, MapTerrain,
+    MapWorld, ModInfo, ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};

@@ -5,6 +5,7 @@
 // that the other does not follow fails the type check.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { MapImage } from "./generated/map-image";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
@@ -48,6 +49,10 @@ export interface Api {
   toolbox(lang: Lang): Promise<RenderedToolbox>;
   /** Closes Vortex and starts it again. */
   restartManager(): Promise<void>;
+  /** The picture of a game as a data address, if the mod manager has one. */
+  gameArt(game: string): Promise<string | null>;
+  /** A picture of a worldspace from the game's terrain textures, if it has them. */
+  mapImage(world: string): Promise<MapImage | null>;
 }
 
 const tauriApi: Api = {
@@ -67,6 +72,8 @@ const tauriApi: Api = {
   logFile: () => invoke<string | null>("log_file"),
   toolbox: (lang) => invoke<RenderedToolbox>("toolbox", { lang }),
   restartManager: () => invoke<void>("restart_manager"),
+  gameArt: (game) => invoke<string | null>("game_art", { game }),
+  mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
 };
 
 function runsInsideTauri(): boolean {

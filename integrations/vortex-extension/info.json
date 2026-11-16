@@ -1,6 +1,6 @@
 {
   "name": "Mod Mallet link",
   "author": "The Mod Mallet contributors",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Lets Mod Mallet ask Vortex to reinstall a mod, so that its installer can offer patches that were missing."
 }

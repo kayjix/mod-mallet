@@ -39,7 +39,7 @@ never sees half a file. `<id>` consists of hexadecimal digits and `-`.
 ## status.json
 
 ```json
-{ "protocol": 1, "extensionVersion": "0.4.2", "startedAt": 1794700000000, "heartbeatAt": 1794700005000 }
+{ "protocol": 1, "extensionVersion": "0.5.0", "startedAt": 1794700000000, "heartbeatAt": 1794700005000 }
 ```
 
 Times are milliseconds since 1970-01-01 UTC. Mod Mallet takes the extension
@@ -105,9 +105,11 @@ newer of the two. The file stays when Vortex is closed.
 |---|---|
 | `protocol` | Version of this format. The extension refuses other versions. |
 | `id` | The name of the file without `.json`. |
-| `action` | `reinstall-mod` or `install-archive`. |
+| `action` | `reinstall-mod`, `install-archive`, `load-after` or `set-mod-enabled`. |
 | `game` | Vortex's identifier of the game. The request is refused if Vortex is managing another game. |
-| `modId` | For `reinstall-mod`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
+| `modId` | For `reinstall-mod` and `set-mod-enabled`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
+| `plugin`, `after` | For `load-after`: two plugin file names (`.esp`, `.esm`, `.esl`). |
+| `enabled` | For `set-mod-enabled`: `true` or `false`. |
 | `path` | For `install-archive`: a zip archive in `%LOCALAPPDATA%\mod-mallet\patches`. Archives anywhere else are refused (`not-allowed`). |
 | `createdAt` | When the request was written. A request older than a minute is refused. |
 
@@ -141,6 +143,20 @@ to every other program. Mod Mallet started from inside such an app would
 otherwise write its patch where Vortex cannot see it, and the extension
 would answer `not-allowed` with `missing: …`.
 
+### load-after
+
+The extension adds a rule to Vortex's plugin list, as the user would there:
+`plugin` loads after `after` (Vortex's `ADD_USERLIST_RULE`). A rule that
+exists already is not added twice. Then it asks Vortex to sort the plugins
+(`autosort-plugins`) and answers `applied`. The rule is visible in Vortex's
+plugin list and can be removed there.
+
+### set-mod-enabled
+
+The extension switches the mod on or off in the profile in use, as the
+switch in Vortex's mod list does (`SET_MOD_ENABLED`, then `mods-enabled`),
+and answers `applied`. Vortex then deploys, or asks to.
+
 ## A result
 
 ```json
@@ -156,6 +172,7 @@ would answer `not-allowed` with `missing: …`.
 | `unsupported` | Another protocol version or an unknown action. |
 | `expired` | The request was older than a minute. |
 | `installing` | Vortex was handed the archive (`install-archive`). |
+| `applied` | Vortex made the change (`load-after`, `set-mod-enabled`). |
 | `not-allowed` | The archive is not a zip in the patches folder, or not there; `detail` says which. |
 | `failed` | Something else; `detail` says what. |
 

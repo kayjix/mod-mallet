@@ -53,3 +53,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0024](0024-views-map-and-live-scans.md) | The desktop app has views, a map, and scans again by itself | accepted |
 | [0025](0025-patches-through-base-object-swapper.md) | Patches hide objects through Base Object Swapper | accepted |
 | [0026](0026-toolbox-log-and-restarting-vortex.md) | The app has a toolbox, a log, and can restart Vortex | accepted |
+| [0027](0027-findings-offer-decisions.md) | Findings offer decisions; the window has a home and themes | accepted |

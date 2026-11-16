@@ -1,8 +1,24 @@
 import { useId, useState } from "react";
-import { ActionResult, CopyButton, ModCard, useAction, useSession } from "./Actions";
-import { type Filter, type Group, isDirect, modsOf, type Section, sectionsFor } from "./arrange";
+import {
+  ActionResult,
+  type ActionState,
+  CopyButton,
+  ModCard,
+  useAction,
+  useSession,
+} from "./Actions";
+import {
+  type Filter,
+  type Group,
+  isCollision,
+  isDirect,
+  modsOf,
+  type Section,
+  sectionsFor,
+} from "./arrange";
 import type { MapSpot, RenderedAction, RenderedFinding } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { pairFor } from "./patch";
 
 /** A group with more findings than this starts folded. */
 const OPEN_GROUP_LIMIT = 4;
@@ -101,7 +117,7 @@ function GroupRow({ group }: { group: Group }) {
 
 /** One finding: a line, and behind it what it means and what to do. */
 function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; nested?: boolean }) {
-  const { t, ignored, setIgnored, mods, spots } = useSession();
+  const { t, mods, spots } = useSession();
   const [open, setOpen] = useState(false);
   const action = useAction();
   const bodyId = useId();
@@ -113,7 +129,6 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
     return info === undefined ? [] : [info];
   });
   const where = spots.get(finding.id) ?? [];
-  const aside = ignored.has(finding.id);
   // The mod a finding is about, on its line, unless the line names it.
   const provider = finding.provider?.name;
   const showProvider = provider != null && !rendered.headline.includes(provider);
@@ -150,12 +165,11 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
           <ActionResult state={action} />
           {open && (
             <>
-              <p>{rendered.summary}</p>
+              <p className="summary">{rendered.summary}</p>
+              <Choices rendered={rendered} action={action} />
               {rendered.actions.map((available) => (
                 <Guide key={available.label} action={available} />
               ))}
-              <h3>{t.whatToDo}</h3>
-              <p>{rendered.remedy}</p>
               {known.length > 0 && (
                 <div className="mod-cards">
                   {known.map((info) => (
@@ -165,10 +179,11 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
               )}
               {where.length > 0 && <Spots spots={where} />}
               <details>
-                <summary className="more">{t.whatItMeans}</summary>
+                <summary className="more">{t.moreAbout}</summary>
+                <h3>{t.whatToDo}</h3>
+                <p>{rendered.remedy}</p>
+                <h3>{t.whatItMeans}</h3>
                 <p>{rendered.explanation}</p>
-              </details>
-              <div className="meta-row">
                 <p className="meta">
                   {rendered.severityLabel} · {rendered.confidenceLabel}
                   {finding.subject.type === "file" && (
@@ -178,19 +193,103 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
                     </>
                   )}
                 </p>
-                <button
-                  type="button"
-                  className="small quiet"
-                  onClick={() => setIgnored(finding.id, !aside)}
-                >
-                  {aside ? t.unignore : t.ignore}
-                </button>
-              </div>
+              </details>
             </>
           )}
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * What the user can do about a finding, side by side: what Mod Mallet can
+ * hand to the mod manager, what goes into the patch, what is left to do by
+ * hand, and leaving it as it is. Each with what it does, and one button.
+ */
+function Choices({ rendered, action }: { rendered: RenderedFinding; action: ActionState }) {
+  const { t, ignored, setIgnored, spots, patchChoices, setPatchChoices, showPatch } = useSession();
+  const { finding } = rendered;
+  const aside = ignored.has(finding.id);
+  const pair = isCollision(rendered)
+    ? pairFor(finding.id, rendered.headline, spots.get(finding.id) ?? [])
+    : null;
+  const chosen = pair === null ? null : (patchChoices[pair.id] ?? null);
+  const choose = (plugin: string | null) => {
+    if (pair !== null) {
+      setPatchChoices({ ...patchChoices, [pair.id]: plugin });
+    }
+  };
+
+  return (
+    <div className="choices">
+      <h3>{t.choicesTitle}</h3>
+      <div className="choice-list">
+        {rendered.actions.map((available) => (
+          <div className="choice" key={available.label}>
+            <div className="choice-text">
+              <strong>{available.label}</strong>
+              <p className="choice-note">{available.description}</p>
+            </div>
+            <button
+              type="button"
+              className="primary"
+              disabled={action.busy}
+              onClick={() => action.run(available.action)}
+            >
+              {t.choiceRun}
+            </button>
+          </div>
+        ))}
+        {pair !== null && (
+          <div className="choice">
+            <div className="choice-text">
+              <strong>{t.choiceHide}</strong>
+              <p className="choice-note">{t.choiceHideNote(chosen)}</p>
+              <fieldset className="segmented" aria-label={t.choiceHide}>
+                {pair.sides.map((side) => (
+                  <button
+                    type="button"
+                    key={side.plugin}
+                    aria-pressed={chosen === side.plugin}
+                    disabled={side.objects.length === 0}
+                    onClick={() => choose(side.plugin)}
+                  >
+                    {t.patchHide(side.plugin, side.objects.length)}
+                    {pair.suggested === side.plugin && (
+                      <span className="suggested-mark">{t.patchSuggested}</span>
+                    )}
+                  </button>
+                ))}
+                <button type="button" aria-pressed={chosen === null} onClick={() => choose(null)}>
+                  {t.patchKeepBoth}
+                </button>
+              </fieldset>
+            </div>
+            <button type="button" onClick={showPatch}>
+              {t.choiceToPatch}
+            </button>
+          </div>
+        )}
+        {rendered.actions.length === 0 && pair === null && (
+          <div className="choice">
+            <div className="choice-text">
+              <strong>{t.choiceByHand}</strong>
+              <p className="choice-note">{rendered.remedy}</p>
+            </div>
+          </div>
+        )}
+        <div className="choice quiet">
+          <div className="choice-text">
+            <strong>{aside ? t.unignore : t.choiceLeave}</strong>
+            <p className="choice-note">{aside ? t.choiceBringBackNote : t.choiceLeaveNote}</p>
+          </div>
+          <button type="button" onClick={() => setIgnored(finding.id, !aside)}>
+            {aside ? t.unignore : t.ignore}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

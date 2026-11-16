@@ -25,7 +25,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const PROTOCOL = 1;
-const VERSION = "0.4.2";
+const VERSION = "0.5.0";
 
 /** How often status.json is refreshed. */
 const HEARTBEAT_MS = 5000;
@@ -54,7 +54,10 @@ function patchesDir(env) {
 const PATCH_FILE = /^[^\\/:*?"<>|]{1,120}\.zip$/i;
 
 /** The actions this version of the extension carries out. */
-const ACTIONS = ["reinstall-mod", "install-archive"];
+const ACTIONS = ["reinstall-mod", "install-archive", "load-after", "set-mod-enabled"];
+
+/** A plugin's file name, as a rule in the plugin list may name it. */
+const PLUGIN_FILE = /^[^\\/:*?"<>|]{1,200}\.(esp|esm|esl)$/i;
 
 /** The profile Vortex is currently using. */
 function activeProfile(state) {
@@ -101,9 +104,22 @@ function plan(state, request, now, env = process.env) {
   if (request.action === "install-archive") {
     return planArchive(request.path, env);
   }
+  if (request.action === "load-after") {
+    return planLoadAfter(state, request);
+  }
   const modId = findModId(state, game, request.modId);
   if (modId === undefined) {
     return { code: "unknown-mod" };
+  }
+  if (request.action === "set-mod-enabled") {
+    const profileId = state?.settings?.profiles?.activeProfileId;
+    if (typeof request.enabled !== "boolean" || profileId === undefined) {
+      return { code: "failed", detail: "no profile, or enabled is not true or false" };
+    }
+    return {
+      code: "applied",
+      enable: { profileId, modId, game, enabled: request.enabled },
+    };
   }
   const mod = state.persistent.mods[game][modId];
   const archiveId = mod.archiveId;
@@ -122,6 +138,27 @@ function plan(state, request, now, env = process.env) {
     attributes.customFileName || attributes.logicalFileName || attributes.name || request.modId;
   const wasEnabled = activeProfile(state)?.modState?.[modId]?.enabled === true;
   return { code: "started", install: { archiveId, options, modId, game, wasEnabled }, modName };
+}
+
+/**
+ * A rule for the plugin list: `plugin` loads after `after`. Only plugin
+ * file names are accepted; a rule that exists already is not added again.
+ */
+function planLoadAfter(state, request) {
+  const { plugin, after } = request;
+  if (typeof plugin !== "string" || typeof after !== "string") {
+    return { code: "failed", detail: "plugin or after missing" };
+  }
+  if (!PLUGIN_FILE.test(plugin) || !PLUGIN_FILE.test(after)) {
+    return { code: "failed", detail: `not plugin names: ${plugin}, ${after}` };
+  }
+  const pluginId = plugin.toLowerCase();
+  const reference = after.toLowerCase();
+  const existing = (state?.userlist?.plugins ?? []).find((entry) => entry?.name === pluginId);
+  const known = (existing?.after ?? []).some(
+    (entry) => (typeof entry === "string" ? entry : entry?.name)?.toLowerCase() === reference,
+  );
+  return { code: "applied", rule: known ? undefined : { pluginId, reference } };
 }
 
 /**
@@ -219,6 +256,29 @@ function handle(
       displayMS: 5000,
     });
   }
+  if (planned.rule !== undefined) {
+    // What Vortex's plugin list does when the user adds a rule there.
+    api.store?.dispatch({
+      type: "ADD_USERLIST_RULE",
+      payload: {
+        pluginId: planned.rule.pluginId,
+        reference: planned.rule.reference,
+        type: "after",
+      },
+    });
+  }
+  if (request?.action === "load-after" && planned.code === "applied") {
+    api.events.emit("autosort-plugins", true);
+  }
+  if (planned.enable !== undefined) {
+    const { profileId, modId, game, enabled } = planned.enable;
+    // What Vortex's own switch in the mod list does.
+    api.store?.dispatch({
+      type: "SET_MOD_ENABLED",
+      payload: { profileId, modId, enable: enabled },
+    });
+    api.events.emit("mods-enabled", [modId], enabled, game);
+  }
   if (planned.install !== undefined) {
     api.events.emit(
       "start-install-download",
@@ -255,7 +315,7 @@ function handle(
   }
   return {
     id: request?.id,
-    ok: planned.code === "started" || planned.code === "installing",
+    ok: planned.code === "started" || planned.code === "installing" || planned.code === "applied",
     code: planned.code,
     detail: planned.detail,
   };

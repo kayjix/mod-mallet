@@ -88,6 +88,13 @@ action-hide-objects = Patch in Vortex installieren
        *[other] { $count } Objekte
     } durch einen unsichtbaren Marker ersetzt, und Vortex installiert sie. Dafür braucht es Base Object Swapper. Entfernst du die Mod in Vortex, sind die Objekte wieder da.
 
+action-load-after = { $plugin } gewinnen lassen
+    .description = Vortex bekommt eine Regel, { $plugin } nach { $after } zu laden, und sortiert deine Plugins neu. Was beide ändern, kommt dann aus { $plugin }; was nur { $after } ändert, bleibt. Die Regel findest du in Vortex' Plugin-Liste und kannst sie dort wieder entfernen.
+
+action-disable-mod = { $mod } deaktivieren
+    .description = Vortex schaltet { $mod } im verwendeten Profil ab und bittet ums Bereitstellen. Gelöscht wird nichts; schalte die Mod in Vortex wieder ein, um es rückgängig zu machen.
+
+outcome-applied = Vortex hat die Änderung vorgenommen. Stelle bereit, falls Vortex darum bittet; Mod Mallet scannt danach erneut.
 outcome-installing = Vortex installiert den Patch. Stelle bereit, falls Vortex das nicht von selbst tut; Mod Mallet scannt danach erneut.
 outcome-started = Vortex hat den Installer geöffnet. Mach dort weiter und scanne danach erneut.
 outcome-link-missing = Dafür braucht es eine kleine Erweiterung in Vortex, die noch nicht installiert ist.

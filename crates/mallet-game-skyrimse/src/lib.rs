@@ -22,6 +22,7 @@
 pub mod archives;
 pub mod ingest;
 pub mod locate;
+pub mod lod;
 pub mod meshes;
 pub mod npc;
 pub mod objects;

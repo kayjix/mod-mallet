@@ -231,32 +231,43 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
       hint: de ? "Vermutung" : "a guess",
     }[sample.confidence],
     actions:
-      sample.direct && provider !== undefined
+      sample.kind === "npcs.face-mismatch"
         ? [
             {
-              action: { type: "reinstall-mod", mod: provider },
-              label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+              action: { type: "load-after", plugin: "Face Overhaul.esp", after: sample.key },
+              label: de ? "Face Overhaul.esp gewinnen lassen" : "Let Face Overhaul.esp win",
               description: de
-                ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
-                : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
-              guide: [
-                {
-                  tick: {
-                    page: 5,
-                    pages: 7,
-                    step: "Additional Patches A-M",
-                    group: "Towns",
-                    option: "City Overhaul",
-                    description: de
-                      ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
-                      : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
-                  },
-                  pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
-                },
-              ],
+                ? `Vortex bekommt eine Regel, Face Overhaul.esp nach ${sample.key} zu laden, und sortiert deine Plugins neu.`
+                : `Vortex gets a rule to load Face Overhaul.esp after ${sample.key} and sorts your plugins again.`,
+              guide: [],
             },
           ]
-        : [],
+        : sample.direct && provider !== undefined
+          ? [
+              {
+                action: { type: "reinstall-mod", mod: provider },
+                label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+                description: de
+                  ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
+                  : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
+                guide: [
+                  {
+                    tick: {
+                      page: 5,
+                      pages: 7,
+                      step: "Additional Patches A-M",
+                      group: "Towns",
+                      option: "City Overhaul",
+                      description: de
+                        ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
+                        : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
+                    },
+                    pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
+                  },
+                ],
+              },
+            ]
+          : [],
   };
 }
 
@@ -585,5 +596,9 @@ export const sampleApi: Api = {
   openFolder: async () => {},
   toolbox: (lang) => later(toolbox(lang)),
   restartManager: () => later(undefined),
+  // The sample has no pictures; the page shows its placeholder.
+  gameArt: () => later(null),
+  // The sample has no terrain textures; the map draws its height relief.
+  mapImage: () => later(null),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
 };

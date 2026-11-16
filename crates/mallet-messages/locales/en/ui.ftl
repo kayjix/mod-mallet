@@ -88,6 +88,13 @@ action-hide-objects = Install the patch in Vortex
        *[other] { $count } objects
     } while the game runs, and Vortex installs it. It needs Base Object Swapper. Remove the mod in Vortex to bring the objects back.
 
+action-load-after = Let { $plugin } win
+    .description = Vortex gets a rule to load { $plugin } after { $after } and sorts your plugins again. What both change then comes from { $plugin }; whatever only { $after } changes stays. You find the rule, and can remove it, in Vortex's plugin list.
+
+action-disable-mod = Disable { $mod }
+    .description = Vortex switches { $mod } off in the profile you use, and asks to deploy. Nothing is deleted; switch it on again in Vortex to undo it.
+
+outcome-applied = Vortex has made the change. Deploy if Vortex asks for it; Mod Mallet scans again afterwards.
 outcome-installing = Vortex is installing the patch. Deploy if Vortex does not do it by itself; Mod Mallet scans again afterwards.
 outcome-started = Vortex has opened the installer. Continue there, and scan again when you are done.
 outcome-link-missing = This needs a small extension in Vortex, which is not installed yet.

@@ -232,6 +232,23 @@ fn toolbox(lang: String) -> Result<RenderedToolbox, String> {
     Ok(messages(&lang).render_toolbox(&tools))
 }
 
+/// A picture of a worldspace from above, from the game's terrain textures.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn map_image(world: String) -> Result<Option<mallet_core::MapImage>, String> {
+    Ok(mallet_engine::map_image(
+        &settings()?.scan_options(),
+        &world,
+    ))
+}
+
+/// The picture of a game, from the mod manager's installation.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn game_art(game: String) -> Option<String> {
+    mallet_engine::game_art(&game)
+}
+
 /// Closes Vortex and starts it again. Only ever called because the user
 /// pressed a button.
 #[tauri::command(async)]
@@ -290,7 +307,9 @@ pub fn run() -> tauri::Result<()> {
             open_folder,
             log_file,
             toolbox,
-            restart_manager
+            restart_manager,
+            game_art,
+            map_image
         ])
         .run(tauri::generate_context!())
 }

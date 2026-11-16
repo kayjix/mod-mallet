@@ -112,12 +112,37 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
         Action::ReinstallMod { mod_ref, .. } if mod_ref.source == SOURCE_ID => {
             reinstall_in_vortex(&mod_ref.id, options)
         }
-        Action::ReinstallMod { mod_ref, .. } => ActionOutcome {
+        Action::HideObjects { objects } => hide_objects(objects, options),
+        Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
+            tracing::info!(plugin, after, "asking Vortex for a plugin rule");
+            link.load_after(VORTEX_GAME, plugin, after, timeout)
+        }),
+        Action::DisableMod { mod_ref } if mod_ref.source == SOURCE_ID => {
+            in_vortex(options, |link, timeout| {
+                tracing::info!(mod_id = mod_ref.id, "asking Vortex to disable a mod");
+                link.set_mod_enabled(VORTEX_GAME, &mod_ref.id, false, timeout)
+            })
+        }
+        Action::ReinstallMod { mod_ref, .. } | Action::DisableMod { mod_ref } => ActionOutcome {
             status: ActionStatus::Unsupported,
             detail: Some(format!("no link to the mod manager `{}`", mod_ref.source)),
         },
-        Action::HideObjects { objects } => hide_objects(objects, options),
     }
+}
+
+/// Hands a request to Vortex through the link, if the link is there.
+fn in_vortex(
+    options: &ManagerOptions,
+    request: impl FnOnce(&Link, Duration) -> Result<link::Reply, LinkError>,
+) -> ActionOutcome {
+    if !manager_link(options).installed {
+        return ActionOutcome::new(ActionStatus::LinkMissing);
+    }
+    let Some(link_dir) = options.link_dir() else {
+        return ActionOutcome::new(ActionStatus::ManagerNotRunning);
+    };
+    let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+    outcome_of(request(&Link::new(link_dir), timeout))
 }
 
 /// The name of the archive of the patch that hides objects. Vortex names
@@ -238,6 +263,7 @@ fn outcome_of(reply: Result<link::Reply, LinkError>) -> ActionOutcome {
             status: match reply.code.as_str() {
                 "started" => ActionStatus::Started,
                 "installing" => ActionStatus::Installing,
+                "applied" => ActionStatus::Applied,
                 "unknown-mod" => ActionStatus::UnknownMod,
                 "archive-missing" => ActionStatus::ArchiveMissing,
                 "wrong-game" => ActionStatus::WrongGame,

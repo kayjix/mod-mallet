@@ -1,5 +1,6 @@
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CopyButton, useSession } from "./Actions";
+import type { MapImage } from "./generated/map-image";
 import type { MapCell, MapSpot, MapTerrain, WorldMap } from "./generated/rendered-report";
 
 interface MapViewProps {
@@ -29,7 +30,7 @@ const key = (x: number, y: number) => `${x},${y}`;
  * the spots where objects of two mods collide marked.
  */
 export function MapView({ map, headlines, focus }: MapViewProps) {
-  const { t } = useSession();
+  const { t, api } = useSession();
   const focusWorld =
     focus?.location.type === "exterior"
       ? map.worlds.findIndex((world) => world.name === (focus.location as { world: string }).world)
@@ -37,6 +38,35 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   const [worldIndex, setWorldIndex] = useState(Math.max(focusWorld, 0));
   const [owner, setOwner] = useState(-1);
   const world = map.worlds[worldIndex];
+
+  // The game's own picture of the land, when its terrain textures are there.
+  const [picture, setPicture] = useState<Picture | null>(null);
+  const worldName = world?.name;
+  useEffect(() => {
+    setPicture(null);
+    if (worldName === undefined) {
+      return;
+    }
+    let outdated = false;
+    api
+      .mapImage(worldName)
+      .then((meta) => {
+        if (meta === null || outdated) {
+          return;
+        }
+        const image = new Image();
+        image.onload = () => {
+          if (!outdated) {
+            setPicture({ meta, image });
+          }
+        };
+        image.src = meta.image;
+      })
+      .catch(() => {});
+    return () => {
+      outdated = true;
+    };
+  }, [api, worldName]);
 
   if (world === undefined) {
     return <p className="empty">{t.mapEmpty}</p>;
@@ -74,6 +104,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
         key={world.name}
         cells={world.cells}
         terrain={world.terrain ?? null}
+        picture={picture?.meta.world === world.name ? picture : null}
         world={world.name}
         owners={map.owners}
         owner={owner}
@@ -91,10 +122,17 @@ function Legend() {
     <div className="legend">
       <span className="swatch" data-level="1" /> {t.mapLegendOne}
       <span className="swatch" data-level="2" /> {t.mapLegendTwo}
-      <span className="swatch" data-level="3" /> {t.mapLegendMany}
+      <span className="swatch" data-level="3" /> {t.mapLegendThree}
+      <span className="swatch" data-level="4" /> {t.mapLegendMany}
       <span className="swatch swatch-spot" /> {t.mapLegendSpot}
     </div>
   );
+}
+
+/** The game's picture of a worldspace, loaded. */
+interface Picture {
+  meta: MapImage;
+  image: HTMLImageElement;
 }
 
 /** Colours read from the stylesheet, so that the map follows the theme. */
@@ -118,7 +156,7 @@ function palette(element: Element): Palette {
   const style = getComputedStyle(element);
   const colour = (name: string) => style.getPropertyValue(name).trim();
   return {
-    levels: [colour("--map-1"), colour("--map-2"), colour("--map-3")],
+    levels: [colour("--heat-1"), colour("--heat-2"), colour("--heat-3"), colour("--heat-4")],
     dim: colour("--map-dim"),
     spot: colour("--accent"),
     line: colour("--text"),
@@ -188,6 +226,7 @@ function relief(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | null
 interface GridProps {
   cells: MapCell[];
   terrain: MapTerrain | null;
+  picture: Picture | null;
   world: string;
   owners: string[];
   owner: number;
@@ -196,7 +235,17 @@ interface GridProps {
   focus: MapSpot | null;
 }
 
-function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }: GridProps) {
+function Grid({
+  cells,
+  terrain,
+  picture,
+  world,
+  owners,
+  owner,
+  spots,
+  headlines,
+  focus,
+}: GridProps) {
   const { t } = useSession();
   const canvas = useRef<HTMLCanvasElement>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -214,16 +263,24 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
     }
     return found;
   }, [spots, world]);
+  // Every cell of the land is on the map, not only those with objects of mods.
   const bounds = useMemo(() => {
     const xs = cells.map((cell) => cell.x);
     const ys = cells.map((cell) => cell.y);
+    if (picture !== null) {
+      xs.push(picture.meta.west, picture.meta.west + picture.meta.columns - 1);
+      ys.push(picture.meta.south, picture.meta.south + picture.meta.rows - 1);
+    } else if (terrain !== null) {
+      xs.push(terrain.west, terrain.west + terrain.columns - 1);
+      ys.push(terrain.south, terrain.south + terrain.rows - 1);
+    }
     return {
       minX: Math.min(...xs),
       maxX: Math.max(...xs),
       minY: Math.min(...ys),
       maxY: Math.max(...ys),
     };
-  }, [cells]);
+  }, [cells, picture, terrain]);
 
   // The land is drawn once per worldspace and then scaled with the view.
   const [land, setLand] = useState<HTMLCanvasElement | null>(null);
@@ -303,8 +360,10 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
     }
     const column = Math.floor((clientX - rect.left - view.x) / view.size);
     const row = Math.floor((clientY - rect.top - view.y) / view.size);
-    const at = key(bounds.minX + column, bounds.maxY - row);
-    return byCell.has(at) ? at : null;
+    const x = bounds.minX + column;
+    const y = bounds.maxY - row;
+    const inside = x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+    return inside ? key(x, y) : null;
   };
 
   // Drawing.
@@ -321,7 +380,17 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
     const colours = palette(element);
 
     context.clearRect(0, 0, width, height);
-    if (land !== null && terrain !== null) {
+    const ground = picture !== null || land !== null;
+    if (picture !== null) {
+      context.imageSmoothingEnabled = view.size < 8;
+      context.drawImage(
+        picture.image,
+        view.x + (picture.meta.west - bounds.minX) * view.size,
+        view.y + (bounds.maxY - (picture.meta.south + picture.meta.rows - 1)) * view.size,
+        picture.meta.columns * view.size,
+        picture.meta.rows * view.size,
+      );
+    } else if (land !== null && terrain !== null) {
       context.imageSmoothingEnabled = true;
       context.drawImage(
         land,
@@ -331,8 +400,32 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
         terrain.rows * view.size,
       );
     }
+    // The grid of cells, once they are large enough to tell apart.
+    if (view.size >= 6) {
+      context.strokeStyle = "rgb(255 255 255 / 14%)";
+      context.lineWidth = 1;
+      context.beginPath();
+      for (let x = bounds.minX; x <= bounds.maxX + 1; x++) {
+        const px = Math.round(view.x + (x - bounds.minX) * view.size) + 0.5;
+        if (px >= 0 && px <= width) {
+          context.moveTo(px, Math.max(0, view.y));
+          context.lineTo(
+            px,
+            Math.min(height, view.y + (bounds.maxY - bounds.minY + 1) * view.size),
+          );
+        }
+      }
+      for (let y = bounds.minY; y <= bounds.maxY + 1; y++) {
+        const py = Math.round(view.y + (bounds.maxY + 1 - y) * view.size) + 0.5;
+        if (py >= 0 && py <= height) {
+          context.moveTo(Math.max(0, view.x), py);
+          context.lineTo(Math.min(width, view.x + (bounds.maxX - bounds.minX + 1) * view.size), py);
+        }
+      }
+      context.stroke();
+    }
     const gap = view.size >= 8 ? 1 : 0;
-    context.globalAlpha = land === null ? 1 : 0.62;
+    context.globalAlpha = ground ? 0.55 : 1;
     for (const cell of cells) {
       const px = view.x + (cell.x - bounds.minX) * view.size;
       const py = view.y + (bounds.maxY - cell.y) * view.size;
@@ -340,21 +433,21 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
         continue;
       }
       const relevant = owner < 0 || cell.owners.includes(owner);
-      if (!relevant && land !== null) {
+      if (!relevant && ground) {
         continue;
       }
-      const level = Math.min(cell.owners.length, 3) - 1;
+      const level = Math.min(cell.owners.length, 4) - 1;
       context.fillStyle = relevant ? (colours.levels[level] ?? colours.dim) : colours.dim;
       context.fillRect(px, py, view.size - gap, view.size - gap);
     }
     context.globalAlpha = 1;
     for (const [at, found] of spotsByCell) {
-      const cell = byCell.get(at);
-      if (cell === undefined || found.length === 0) {
+      const [x, y] = at.split(",").map(Number) as [number, number];
+      if (found.length === 0) {
         continue;
       }
-      const px = view.x + (cell.x - bounds.minX + 0.5) * view.size;
-      const py = view.y + (bounds.maxY - cell.y + 0.5) * view.size;
+      const px = view.x + (x - bounds.minX + 0.5) * view.size;
+      const py = view.y + (bounds.maxY - y + 0.5) * view.size;
       context.beginPath();
       context.arc(px, py, Math.max(3, view.size * 0.3), 0, Math.PI * 2);
       context.fillStyle = colours.spot;
@@ -367,13 +460,13 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
       [hover, 1],
       [picked, 2.5],
     ] as const) {
-      const cell = at === null ? undefined : byCell.get(at);
-      if (cell !== undefined) {
-        context.strokeStyle = colours.line;
+      if (at !== null) {
+        const [x, y] = at.split(",").map(Number) as [number, number];
+        context.strokeStyle = ground ? "#ffffff" : colours.line;
         context.lineWidth = lineWidth;
         context.strokeRect(
-          view.x + (cell.x - bounds.minX) * view.size,
-          view.y + (bounds.maxY - cell.y) * view.size,
+          view.x + (x - bounds.minX) * view.size,
+          view.y + (bounds.maxY - y) * view.size,
           view.size,
           view.size,
         );
@@ -383,13 +476,13 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
     cells,
     terrain,
     land,
+    picture,
     owner,
     view,
     width,
     height,
     bounds,
     spotsByCell,
-    byCell,
     hover,
     picked,
   ]);
@@ -449,6 +542,8 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
 
   const shown = picked ?? hover;
   const cell = shown === null ? undefined : byCell.get(shown);
+  const [shownX, shownY] =
+    shown === null ? [0, 0] : (shown.split(",").map(Number) as [number, number]);
   const here = shown === null ? [] : (spotsByCell.get(shown) ?? []);
   const collisions = [...spotsByCell.values()].reduce((sum, found) => sum + found.length, 0);
 
@@ -489,7 +584,18 @@ function Grid({ cells, terrain, world, owners, owner, spots, headlines, focus }:
         </div>
       </div>
       <aside className="map-detail">
-        {cell === undefined ? (
+        {shown !== null && cell === undefined ? (
+          <>
+            <h3>{t.mapCell(shownX, shownY)}</h3>
+            <p className="aside">{t.mapNoMods}</p>
+            <div className="console">
+              <code className="command" title={t.consoleHint}>
+                {`cow ${world} ${shownX} ${shownY}`}
+              </code>
+              <CopyButton text={`cow ${world} ${shownX} ${shownY}`} />
+            </div>
+          </>
+        ) : cell === undefined ? (
           <>
             <h3>{world}</h3>
             <dl className="facts">

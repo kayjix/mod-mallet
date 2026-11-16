@@ -3,6 +3,7 @@ import type { Api } from "./api";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
 import type { Lang, Texts } from "./i18n";
+import type { PatchChoices } from "./patch";
 
 /** What the components of a report need from the window around them. */
 export interface Session {
@@ -23,6 +24,12 @@ export interface Session {
   spots: Map<string, MapSpot[]>;
   /** Switches to the map and shows a spot there. */
   showOnMap: (spot: MapSpot) => void;
+  /** What the patch is to hide, per collision; shared by all views. */
+  patchChoices: PatchChoices;
+  /** Replaces the patch's choice. */
+  setPatchChoices: (choices: PatchChoices) => void;
+  /** Switches to the patch view. */
+  showPatch: () => void;
 }
 
 export const SessionContext = createContext<Session | null>(null);

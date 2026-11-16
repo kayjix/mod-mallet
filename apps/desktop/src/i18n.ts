@@ -69,7 +69,27 @@ export interface Texts {
   managerLinkMissing: string;
   gameLabel: string;
   /** The games of the game menu; only the first can be chosen so far. */
-  games: { name: string; quip?: string }[];
+  games: { id: string; name: string; quip?: string }[];
+  viewHome: string;
+  homeGames: string;
+  homeActive: string;
+  homeNoArt: string;
+  homeOpenTasks: string;
+  homeCollisions: string;
+  homeMods: string;
+  homePatch: string;
+  homePatchNone: string;
+  homeToTasks: string;
+  settingsTabGeneral: string;
+  settingsTabPlaces: string;
+  settingsTabAbout: string;
+  settingsLanguageNote: string;
+  settingsTheme: string;
+  settingsThemeNote: string;
+  themeSystem: string;
+  themeLight: string;
+  themeDark: string;
+  aboutText: string;
   soon: string;
   viewToolbox: string;
   viewSettings: string;
@@ -118,6 +138,16 @@ export interface Texts {
 
   // One finding, opened.
   whatToDo: string;
+  choicesTitle: string;
+  choiceRun: string;
+  choiceLeave: string;
+  choiceLeaveNote: string;
+  choiceBringBackNote: string;
+  choiceHide: string;
+  choiceHideNote: (chosen: string | null) => string;
+  choiceToPatch: string;
+  choiceByHand: string;
+  moreAbout: string;
   whatItMeans: string;
   file: string;
   mod: string;
@@ -150,7 +180,9 @@ export interface Texts {
   mapAllMods: string;
   mapLegendOne: string;
   mapLegendTwo: string;
+  mapLegendThree: string;
   mapLegendMany: string;
+  mapNoMods: string;
   mapLegendSpot: string;
   mapCell: (x: number, y: number) => string;
   mapObjects: (count: number) => string;
@@ -242,19 +274,40 @@ export const texts: Record<Lang, Texts> = {
     managerLinkMissing: "Link not installed",
     gameLabel: "Game",
     games: [
-      { name: "Skyrim Special Edition" },
-      { name: "Skyrim (2011)", quip: "the mallet is still warming up" },
-      { name: "Skyrim VR", quip: "the mallet needs both hands" },
-      { name: "Fallout 4", quip: "still in the forge" },
-      { name: "Fallout: New Vegas", quip: "still in the forge, too" },
-      { name: "Oblivion", quip: "closing a few gates first" },
-      { name: "Morrowind", quip: "waiting for a silt strider" },
-      { name: "Starfield", quip: "the mallet needs a space suit" },
-      { name: "The Elder Scrolls VI", quip: "as soon as it exists" },
-      { name: "Baldur's Gate 3", quip: "rolling for initiative" },
-      { name: "Cyberpunk 2077", quip: "waiting for a patch (yes, we know)" },
+      { id: "skyrimse", name: "Skyrim Special Edition" },
+      { id: "skyrim", name: "Skyrim (2011)", quip: "the mallet is still warming up" },
+      { id: "skyrimvr", name: "Skyrim VR", quip: "the mallet needs both hands" },
+      { id: "fallout4", name: "Fallout 4", quip: "still in the forge" },
+      { id: "falloutnv", name: "Fallout: New Vegas", quip: "still in the forge, too" },
+      { id: "oblivion", name: "Oblivion", quip: "closing a few gates first" },
+      { id: "morrowind", name: "Morrowind", quip: "waiting for a silt strider" },
+      { id: "starfield", name: "Starfield", quip: "the mallet needs a space suit" },
+      { id: "tes6", name: "The Elder Scrolls VI", quip: "as soon as it exists" },
+      { id: "baldursgate3", name: "Baldur's Gate 3", quip: "rolling for initiative" },
+      { id: "cyberpunk2077", name: "Cyberpunk 2077", quip: "waiting for a patch (yes, we know)" },
     ],
     soon: "soon",
+    viewHome: "Home",
+    homeGames: "Games",
+    homeActive: "Active",
+    homeNoArt: "Vortex brings a picture of this game along; it is not installed here.",
+    homeOpenTasks: "open tasks",
+    homeCollisions: "collisions",
+    homeMods: "mods",
+    homePatch: "objects hidden by the patch",
+    homePatchNone: "no patch installed",
+    homeToTasks: "To the tasks",
+    settingsTabGeneral: "General",
+    settingsTabPlaces: "Places",
+    settingsTabAbout: "About",
+    settingsLanguageNote: "The language of the window and of every finding.",
+    settingsTheme: "Appearance",
+    settingsThemeNote: "Light or dark, or like Windows.",
+    themeSystem: "Like Windows",
+    themeLight: "Light",
+    themeDark: "Dark",
+    aboutText:
+      "Mod Mallet looks at a modded game, explains what is wrong in plain words and lets the mod manager carry out the fixes. It changes nothing by itself.",
     viewToolbox: "Toolbox",
     viewSettings: "Settings",
     toolboxReady: "All set",
@@ -309,6 +362,20 @@ export const texts: Record<Lang, Texts> = {
     nothingHere: "Nothing here.",
 
     whatToDo: "What to do",
+    choicesTitle: "Your options",
+    choiceRun: "Do it",
+    choiceLeave: "Leave it as it is",
+    choiceLeaveNote:
+      "If it does not bother you in the game. Mod Mallet sets it aside and stops counting it; you find it again under “Set aside”.",
+    choiceBringBackNote: "You set this aside. Bring it back to decide about it again.",
+    choiceHide: "Hide one of the two",
+    choiceHideNote: (chosen) =>
+      chosen === null
+        ? "Pick whose objects disappear. That goes into Mod Mallet's patch; nothing changes until you install it on the patch page."
+        : `The objects of ${chosen} go into Mod Mallet's patch. Install the patch on the patch page to apply it.`,
+    choiceToPatch: "To the patch",
+    choiceByHand: "By hand",
+    moreAbout: "More about it",
     whatItMeans: "What this means",
     file: "File",
     mod: "Mod",
@@ -340,7 +407,9 @@ export const texts: Record<Lang, Texts> = {
     mapAllMods: "All mods",
     mapLegendOne: "1 mod",
     mapLegendTwo: "2 mods",
-    mapLegendMany: "3 or more",
+    mapLegendThree: "3 mods",
+    mapLegendMany: "4 or more",
+    mapNoMods: "No mod places objects here.",
     mapLegendSpot: "collision",
     mapCell: (x, y) => `Cell ${x}, ${y}`,
     mapObjects: (count) => `${count} ${plural(count, "object", "objects")} placed by mods`,
@@ -428,19 +497,44 @@ export const texts: Record<Lang, Texts> = {
     managerLinkMissing: "Verbindung nicht installiert",
     gameLabel: "Spiel",
     games: [
-      { name: "Skyrim Special Edition" },
-      { name: "Skyrim (2011)", quip: "der Hammer wärmt sich noch auf" },
-      { name: "Skyrim VR", quip: "der Hammer braucht beide Hände" },
-      { name: "Fallout 4", quip: "liegt noch in der Schmiede" },
-      { name: "Fallout: New Vegas", quip: "liegt auch noch in der Schmiede" },
-      { name: "Oblivion", quip: "schließt erst noch ein paar Tore" },
-      { name: "Morrowind", quip: "wartet noch auf einen Schlickschreiter" },
-      { name: "Starfield", quip: "der Hammer braucht noch einen Raumanzug" },
-      { name: "The Elder Scrolls VI", quip: "sobald es das gibt" },
-      { name: "Baldur's Gate 3", quip: "würfelt noch auf Initiative" },
-      { name: "Cyberpunk 2077", quip: "wartet auf einen Patch (ja, wissen wir)" },
+      { id: "skyrimse", name: "Skyrim Special Edition" },
+      { id: "skyrim", name: "Skyrim (2011)", quip: "der Hammer wärmt sich noch auf" },
+      { id: "skyrimvr", name: "Skyrim VR", quip: "der Hammer braucht beide Hände" },
+      { id: "fallout4", name: "Fallout 4", quip: "liegt noch in der Schmiede" },
+      { id: "falloutnv", name: "Fallout: New Vegas", quip: "liegt auch noch in der Schmiede" },
+      { id: "oblivion", name: "Oblivion", quip: "schließt erst noch ein paar Tore" },
+      { id: "morrowind", name: "Morrowind", quip: "wartet noch auf einen Schlickschreiter" },
+      { id: "starfield", name: "Starfield", quip: "der Hammer braucht noch einen Raumanzug" },
+      { id: "tes6", name: "The Elder Scrolls VI", quip: "sobald es das gibt" },
+      { id: "baldursgate3", name: "Baldur's Gate 3", quip: "würfelt noch auf Initiative" },
+      {
+        id: "cyberpunk2077",
+        name: "Cyberpunk 2077",
+        quip: "wartet auf einen Patch (ja, wissen wir)",
+      },
     ],
     soon: "bald",
+    viewHome: "Start",
+    homeGames: "Spiele",
+    homeActive: "Aktiv",
+    homeNoArt: "Vortex bringt ein Bild dieses Spiels mit; hier ist es nicht installiert.",
+    homeOpenTasks: "offene Aufgaben",
+    homeCollisions: "Kollisionen",
+    homeMods: "Mods",
+    homePatch: "Objekte vom Patch ausgeblendet",
+    homePatchNone: "kein Patch installiert",
+    homeToTasks: "Zu den Aufgaben",
+    settingsTabGeneral: "Allgemein",
+    settingsTabPlaces: "Orte",
+    settingsTabAbout: "Über",
+    settingsLanguageNote: "Die Sprache des Fensters und aller Befunde.",
+    settingsTheme: "Darstellung",
+    settingsThemeNote: "Hell oder dunkel, oder wie Windows.",
+    themeSystem: "Wie Windows",
+    themeLight: "Hell",
+    themeDark: "Dunkel",
+    aboutText:
+      "Mod Mallet schaut sich ein gemoddetes Spiel an, erklärt verständlich, was nicht stimmt, und lässt den Mod-Manager die Korrekturen ausführen. Selbst ändert es nichts.",
     viewToolbox: "Werkzeugkasten",
     viewSettings: "Einstellungen",
     toolboxReady: "Alles bereit",
@@ -487,23 +581,37 @@ export const texts: Record<Lang, Texts> = {
     filterCheck: "Zu prüfen",
     filterDirect: "Direkt behebbar",
     filterNotes: "Gut zu wissen",
-    filterIgnored: "Ausgeblendet",
+    filterIgnored: "Beiseitegelegt",
     fixHint: "Etwas funktioniert nicht, bis das behoben ist.",
     checkHint: "Wahrscheinlich ein Problem. Sieh es dir an.",
     directSectionHint: "Ein Klick übergibt das an Vortex. Dort schließt du es ab.",
     notesHint: "Nichts zu tun. Hier steht nur, welche Mod wo gewinnt.",
-    ignoredHint: "Diese hast du ausgeblendet. Sie werden oben nicht mitgezählt.",
+    ignoredHint: "Diese hast du beiseitegelegt. Sie werden oben nicht mitgezählt.",
     nothingHere: "Hier ist nichts.",
 
     whatToDo: "Was tun",
+    choicesTitle: "Deine Möglichkeiten",
+    choiceRun: "Ausführen",
+    choiceLeave: "So lassen",
+    choiceLeaveNote:
+      "Wenn es dich im Spiel nicht stört. Mod Mallet legt den Befund beiseite und zählt ihn nicht mehr mit; du findest ihn unter „Beiseitegelegt“ wieder.",
+    choiceBringBackNote: "Du hast das beiseitegelegt. Hol es zurück, um neu zu entscheiden.",
+    choiceHide: "Eines der beiden ausblenden",
+    choiceHideNote: (chosen) =>
+      chosen === null
+        ? "Wähle, wessen Objekte verschwinden. Das kommt in den Patch von Mod Mallet; es ändert sich nichts, bis du ihn auf der Patch-Seite installierst."
+        : `Die Objekte aus ${chosen} kommen in den Patch von Mod Mallet. Installiere den Patch auf der Patch-Seite, damit es wirkt.`,
+    choiceToPatch: "Zum Patch",
+    choiceByHand: "Von Hand",
+    moreAbout: "Mehr dazu",
     whatItMeans: "Was das bedeutet",
     file: "Datei",
     mod: "Mod",
     rescan: "Erneut scannen",
     installLink: "Vortex-Erweiterung installieren",
     guideTitle: "Im Installer ankreuzen",
-    ignore: "Ausblenden",
-    unignore: "Wieder einblenden",
+    ignore: "Beiseitelegen",
+    unignore: "Zurückholen",
     spotsTitle: (shown, total) =>
       shown === total ? `Wo (${total})` : `Wo (${shown} von ${total})`,
     consoleHint:
@@ -527,7 +635,9 @@ export const texts: Record<Lang, Texts> = {
     mapAllMods: "Alle Mods",
     mapLegendOne: "1 Mod",
     mapLegendTwo: "2 Mods",
-    mapLegendMany: "3 oder mehr",
+    mapLegendThree: "3 Mods",
+    mapLegendMany: "4 oder mehr",
+    mapNoMods: "Hier platziert keine Mod Objekte.",
     mapLegendSpot: "Zusammenstoß",
     mapCell: (x, y) => `Zelle ${x}, ${y}`,
     mapObjects: (count) => `${count} ${plural(count, "Objekt", "Objekte")} von Mods aufgestellt`,
@@ -580,6 +690,37 @@ export function initialLang(): Lang {
 }
 
 const LIVE_KEY = "mod-mallet.live";
+const THEME_KEY = "mod-mallet.theme";
+
+/** Light, dark, or whatever Windows uses. */
+export type Theme = "system" | "light" | "dark";
+
+/** The theme chosen last time; like Windows unless chosen otherwise. */
+export function initialTheme(): Theme {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch {
+    // Storage can be unavailable; following Windows is a fine default.
+  }
+  return "system";
+}
+
+/** Shows the window in `theme` and remembers it. */
+export function applyTheme(theme: Theme): void {
+  if (theme === "system") {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = theme;
+  }
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Not being able to remember the choice is not worth an error.
+  }
+}
 
 /** Whether the app scans again by itself; on unless switched off. */
 export function initialLive(): boolean {

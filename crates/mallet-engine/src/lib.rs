@@ -18,6 +18,7 @@ mod actions;
 mod installers;
 mod logging;
 mod patch;
+mod png;
 mod settings;
 mod toolbox;
 
@@ -43,7 +44,7 @@ pub use settings::{
     Settings, default_settings_path, load_settings, planned_locations, save_settings,
     setup_fingerprint,
 };
-pub use toolbox::{restart_manager, toolbox};
+pub use toolbox::{game_art, restart_manager, toolbox};
 
 /// Where to look. Every field that is `None` is detected automatically.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -235,6 +236,41 @@ fn installed_patch(game_dir: &Path, mods: &dyn ModSource) -> Option<InstalledPat
     Some(InstalledPatch {
         objects,
         provider: mods.provider_of(&GamePath::new(&format!("data/{file}"))),
+    })
+}
+
+/// Pixels per cell of the map's picture.
+const MAP_PIXELS_PER_CELL: u32 = 8;
+
+/// A picture of `world` from above, from the terrain LOD textures in the
+/// game's data directory, or `None` if the worldspace has none there.
+/// Only reads.
+pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapImage> {
+    let game_dir = options.game_dir.clone().or_else(locate::game_dir)?;
+    let started = Instant::now();
+    let image =
+        mallet_game_skyrimse::lod::world_image(&game_dir.join("Data"), world, MAP_PIXELS_PER_CELL)?;
+    let png = png::encode_rgb(image.width(), image.height(), &image.rgb)
+        .map_err(|error| tracing::warn!(%error, "map picture not encoded"))
+        .ok()?;
+    tracing::info!(
+        world,
+        width = image.width(),
+        height = image.height(),
+        bytes = png.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "drew the map's picture"
+    );
+    Some(mallet_core::MapImage {
+        world: world.to_owned(),
+        west: image.west,
+        south: image.south,
+        columns: image.columns,
+        rows: image.rows,
+        image: format!(
+            "data:image/png;base64,{}",
+            mallet_core::encoding::base64(&png)
+        ),
     })
 }
 

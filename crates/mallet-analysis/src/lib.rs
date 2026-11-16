@@ -9,6 +9,16 @@
 //! To add an analysis: implement [`Analysis`] in a new module and list it in
 //! [`all`].
 
+/// The finding with the action of switching its mod off, if the mod is
+/// known: what the user can do when a mod breaks the game and no fixed
+/// version is at hand.
+pub(crate) fn offer_disabling(finding: mallet_core::Finding) -> mallet_core::Finding {
+    match finding.provider.clone() {
+        Some(mod_ref) => finding.with_action(mallet_core::Action::DisableMod { mod_ref }),
+        None => finding,
+    }
+}
+
 pub mod assets;
 pub mod extender;
 pub mod faces;

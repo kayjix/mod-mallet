@@ -18,7 +18,7 @@ use crate::tools;
 
 /// The contracts of the desktop app: for each, the schema and the file its
 /// TypeScript types are written to.
-const DESKTOP_CONTRACTS: [(&str, &str); 5] = [
+const DESKTOP_CONTRACTS: [(&str, &str); 6] = [
     (
         "schemas/rendered-report.schema.json",
         "apps/desktop/src/generated/rendered-report.ts",
@@ -38,6 +38,10 @@ const DESKTOP_CONTRACTS: [(&str, &str); 5] = [
     (
         "schemas/rendered-toolbox.schema.json",
         "apps/desktop/src/generated/rendered-toolbox.ts",
+    ),
+    (
+        "schemas/map-image.schema.json",
+        "apps/desktop/src/generated/map-image.ts",
     ),
 ];
 
@@ -73,6 +77,10 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         Generated {
             path: "schemas/rendered-toolbox.schema.json",
             content: schema(&schemars::schema_for!(RenderedToolbox))?,
+        },
+        Generated {
+            path: "schemas/map-image.schema.json",
+            content: schema(&schemars::schema_for!(mallet_core::MapImage))?,
         },
         Generated {
             path: "docs/src/reference/findings.md",

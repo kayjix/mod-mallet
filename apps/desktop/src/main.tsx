@@ -2,7 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { loadApi } from "./api";
-import { initialLang } from "./i18n";
+import { applyTheme, initialLang, initialTheme } from "./i18n";
+
+// Before the first paint, so the window does not flash in the other theme.
+applyTheme(initialTheme());
 
 const root = document.getElementById("root");
 if (root === null) {

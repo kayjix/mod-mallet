@@ -394,3 +394,63 @@ test("the version matches info.json and package.json", () => {
   assert.equal(read("info.json").version, link.VERSION);
   assert.equal(read("package.json").version, link.VERSION);
 });
+
+test("a plugin rule is planned for plugin names only, and not twice", () => {
+  const ask = (current, plugin, after) =>
+    link.plan(current, { ...request(), action: "load-after", plugin, after }, NOW);
+  const planned = ask(state(), "Faces.esp", "College.esp");
+  assert.equal(planned.code, "applied");
+  assert.deepEqual(planned.rule, { pluginId: "faces.esp", reference: "college.esp" });
+
+  assert.equal(ask(state(), "Faces.esp", "..evil.dll").code, "failed");
+  assert.equal(ask(state(), "Faces.esp", undefined).code, "failed");
+
+  const withRule = {
+    ...state(),
+    userlist: { plugins: [{ name: "faces.esp", after: ["College.esp"] }] },
+  };
+  const again = ask(withRule, "Faces.esp", "College.esp");
+  assert.equal(again.code, "applied");
+  assert.equal(again.rule, undefined);
+});
+
+test("a plugin rule is dispatched as Vortex's own and the plugins are sorted", () => {
+  const api = fakeApi();
+  const dispatched = [];
+  api.store = { dispatch: (action) => dispatched.push(action) };
+  const result = link.handle(
+    api,
+    { ...request(), action: "load-after", plugin: "Faces.esp", after: "College.esp" },
+    NOW,
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(dispatched, [
+    {
+      type: "ADD_USERLIST_RULE",
+      payload: { pluginId: "faces.esp", reference: "college.esp", type: "after" },
+    },
+  ]);
+  assert.deepEqual(api.emitted, [["autosort-plugins", true]]);
+});
+
+test("a mod is switched off in the active profile as Vortex's mod list does it", () => {
+  const api = fakeApi();
+  const dispatched = [];
+  api.store = { dispatch: (action) => dispatched.push(action) };
+  const result = link.handle(
+    api,
+    { ...request(), action: "set-mod-enabled", modId: "Patch Hub 1.0", enabled: false },
+    NOW,
+  );
+  assert.equal(result.code, "applied");
+  assert.deepEqual(dispatched, [
+    { type: "SET_MOD_ENABLED", payload: { profileId: "p1", modId: "patch-hub", enable: false } },
+  ]);
+  assert.deepEqual(api.emitted, [["mods-enabled", ["patch-hub"], false, "skyrimse"]]);
+  const unclear = link.plan(
+    state(),
+    { ...request(), action: "set-mod-enabled", modId: "Patch Hub 1.0" },
+    NOW,
+  );
+  assert.equal(unclear.code, "failed");
+});

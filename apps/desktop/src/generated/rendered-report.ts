@@ -20,6 +20,21 @@ export type Action =
        */
       objects: ObjectRef[];
       type: "hide-objects";
+    }
+  | {
+      /**
+       * The plugin it is to load after.
+       */
+      after: string;
+      /**
+       * The plugin that is to win.
+       */
+      plugin: string;
+      type: "load-after";
+    }
+  | {
+      mod: ModRef1;
+      type: "disable-mod";
     };
 /**
  * A value substituted into the text of a finding.
@@ -148,6 +163,21 @@ export interface RenderedAction {
          */
         objects: ObjectRef[];
         type: "hide-objects";
+      }
+    | {
+        /**
+         * The plugin it is to load after.
+         */
+        after: string;
+        /**
+         * The plugin that is to win.
+         */
+        plugin: string;
+        type: "load-after";
+      }
+    | {
+        mod: ModRef1;
+        type: "disable-mod";
       };
   /**
    * What will happen, in a sentence or two.
@@ -225,6 +255,23 @@ export interface ObjectRef {
   plugin: string;
 }
 /**
+ * The mod to switch off.
+ */
+export interface ModRef1 {
+  /**
+   * The manager's own identifier of the mod.
+   */
+  id: string;
+  /**
+   * The name to show to people.
+   */
+  name: string;
+  /**
+   * The manager that knows this mod, for example `vortex`.
+   */
+  source: string;
+}
+/**
  * An option to tick in an installer, with its page in words.
  */
 export interface RenderedTick {
@@ -295,7 +342,7 @@ export interface Finding {
   /**
    * The mod the subject comes from, if a mod manager knows.
    */
-  provider?: ModRef1 | null;
+  provider?: ModRef2 | null;
   /**
    * How much the finding matters.
    */
@@ -435,7 +482,7 @@ export interface Finding {
 /**
  * A mod as a mod manager knows it.
  */
-export interface ModRef1 {
+export interface ModRef2 {
   /**
    * The manager's own identifier of the mod.
    */
@@ -482,7 +529,7 @@ export interface InstalledPatch {
   /**
    * The mod the file belongs to, if the mod manager knows it.
    */
-  provider?: ModRef1 | null;
+  provider?: ModRef2 | null;
 }
 /**
  * A place the scan looked at, with its role and origin in words.
@@ -711,7 +758,7 @@ export interface ModInfo {
    * Whether the mod is enabled in the profile in use.
    */
   enabled: boolean;
-  mod: ModRef2;
+  mod: ModRef3;
   /**
    * The newest version the mod manager knows of, if it is another one.
    */
@@ -728,7 +775,7 @@ export interface ModInfo {
 /**
  * A mod as a mod manager knows it.
  */
-export interface ModRef2 {
+export interface ModRef3 {
   /**
    * The manager's own identifier of the mod.
    */

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MapImage",
+  "description": "A picture of a worldspace from above, made from the terrain textures in\nthe user's own game, for drawing the map on.",
+  "type": "object",
+  "properties": {
+    "columns": {
+      "description": "How many cell columns it shows.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "image": {
+      "description": "The picture, a PNG as a `data:` address. Its top row is the north.",
+      "type": "string"
+    },
+    "rows": {
+      "description": "How many cell rows it shows.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "south": {
+      "description": "The southmost cell row it shows.",
+      "type": "integer",
+      "format": "int32"
+    },
+    "west": {
+      "description": "The westmost cell column it shows.",
+      "type": "integer",
+      "format": "int32"
+    },
+    "world": {
+      "description": "The worldspace.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "world",
+    "west",
+    "south",
+    "columns",
+    "rows",
+    "image"
+  ]
+}

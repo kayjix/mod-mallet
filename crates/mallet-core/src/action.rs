@@ -33,6 +33,22 @@ pub enum Action {
         /// The objects to hide.
         objects: Vec<ObjectRef>,
     },
+    /// Load a plugin after another one, through a rule in the mod
+    /// manager's plugin list, so that its version of what both change wins.
+    /// The rule can be removed there again.
+    LoadAfter {
+        /// The plugin that is to win.
+        plugin: String,
+        /// The plugin it is to load after.
+        after: String,
+    },
+    /// Switch a mod off in the mod manager's profile in use. Switching it on
+    /// again there undoes it.
+    DisableMod {
+        /// The mod to switch off.
+        #[serde(rename = "mod")]
+        mod_ref: ModRef,
+    },
 }
 
 /// A placed object, by the plugin that placed it first and its number in
@@ -80,6 +96,8 @@ pub enum ActionStatus {
     Started,
     /// The mod manager is installing the patch Mod Mallet wrote.
     Installing,
+    /// The mod manager has made the change; it may still ask to deploy.
+    Applied,
     /// The link between Mod Mallet and the mod manager is not installed.
     LinkMissing,
     /// The mod manager is not running, or the link in it is not answering.

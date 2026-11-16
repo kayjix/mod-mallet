@@ -52,6 +52,11 @@
           "const": "installing"
         },
         {
+          "description": "The mod manager has made the change; it may still ask to deploy.",
+          "type": "string",
+          "const": "applied"
+        },
+        {
           "description": "The link between Mod Mallet and the mod manager is not installed.",
           "type": "string",
           "const": "link-missing"

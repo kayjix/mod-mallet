@@ -24,6 +24,7 @@ export interface ActionOutcome {
   status:
     | "started"
     | "installing"
+    | "applied"
     | "link-missing"
     | "manager-not-running"
     | "no-answer"

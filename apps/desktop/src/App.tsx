@@ -7,12 +7,14 @@ import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
+import { Home } from "./Home";
 import { initialLive, type Lang, rememberLang, rememberLive, type Texts, texts } from "./i18n";
 import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
+import { choicesOf, installedKeys, type PatchChoices, pairsOf } from "./patch";
 import { SettingsView } from "./Settings";
 import { TaskList } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
@@ -24,6 +26,7 @@ interface AppProps {
 
 /** The views of the sidebar. */
 type ViewName =
+  | "home"
   | "tasks"
   | "collisions"
   | "patch"
@@ -41,7 +44,7 @@ const TOOLBOX_EVERY = 15000;
 
 export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
-  const [view, setView] = useState<ViewName>("tasks");
+  const [view, setView] = useState<ViewName>("home");
   const [places, setPlaces] = useState<RenderedPlaces | null>(null);
   const [report, setReport] = useState<RenderedReport | null>(null);
   const [link, setLink] = useState<RenderedLink | null>(null);
@@ -52,6 +55,14 @@ export default function App({ api, startLang }: AppProps) {
   const [focus, setFocus] = useState<MapSpot | null>(null);
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
+  // The patch's choice starts from the patch in the game, once; later scans
+  // keep what the user chose since.
+  const [patchChoices, setPatchChoices] = useState<PatchChoices | null>(null);
+  useEffect(() => {
+    if (patchChoices === null && report !== null) {
+      setPatchChoices(choicesOf(pairsOf(report, ignored), installedKeys(report)));
+    }
+  }, [patchChoices, report, ignored]);
   const t = texts[lang];
 
   const refreshToolbox = useCallback(() => {
@@ -192,6 +203,11 @@ export default function App({ api, startLang }: AppProps) {
     [api],
   );
 
+  const showPatch = useCallback(() => {
+    setFocus(null);
+    setView("patch");
+  }, []);
+
   const showOnMap = useCallback((spot: MapSpot) => {
     setFocus(spot);
     setView("map");
@@ -209,8 +225,23 @@ export default function App({ api, startLang }: AppProps) {
       mods: modsByName(report?.mods ?? []),
       spots: spotsByFinding(report),
       showOnMap,
+      patchChoices: patchChoices ?? {},
+      setPatchChoices,
+      showPatch,
     }),
-    [api, lang, t, scan, refreshLink, ignored, setIgnored, report, showOnMap],
+    [
+      api,
+      lang,
+      t,
+      scan,
+      refreshLink,
+      ignored,
+      setIgnored,
+      report,
+      showOnMap,
+      patchChoices,
+      showPatch,
+    ],
   );
   const counts = useMemo(
     () => (report === null ? null : countFindings(report.findings, ignored)),
@@ -221,6 +252,7 @@ export default function App({ api, startLang }: AppProps) {
   const askFirst = places !== null && !places.confirmed;
   const current: ViewName = askFirst ? "places" : view;
   const titles: Record<ViewName, string> = {
+    home: t.viewHome,
     tasks: t.viewTasks,
     collisions: t.viewCollisions,
     patch: t.viewPatch,
@@ -288,6 +320,17 @@ export default function App({ api, startLang }: AppProps) {
               onConfirm={confirmPlaces}
               onCancel={askFirst ? undefined : () => setView("tasks")}
             />
+          ) : current === "home" ? (
+            <Home
+              report={report}
+              counts={counts}
+              scanning={scanning}
+              onScan={scan}
+              onOpen={(next) => {
+                setFocus(null);
+                setView(next);
+              }}
+            />
           ) : current === "toolbox" ? (
             <ToolboxView toolbox={toolbox} refresh={refreshToolbox} />
           ) : current === "settings" ? (
@@ -353,6 +396,7 @@ function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: S
   const open = counts === null ? null : counts.errors + counts.warnings;
   const collisions = counts === null ? null : counts.collisions;
   const items: { name: ViewName; label: string; icon: ReactNode; badge?: number | null }[] = [
+    { name: "home", label: t.viewHome, icon: <IconHome /> },
     { name: "tasks", label: t.viewTasks, icon: <IconTasks />, badge: open },
     {
       name: "collisions",
@@ -364,8 +408,26 @@ function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: S
     { name: "map", label: t.viewMap, icon: <IconMap /> },
     { name: "mods", label: t.viewMods, icon: <IconMods /> },
     { name: "toolbox", label: t.viewToolbox, icon: <IconToolbox /> },
-    { name: "settings", label: t.viewSettings, icon: <IconSettings /> },
   ];
+  const navButton = (item: {
+    name: ViewName;
+    label: string;
+    icon: ReactNode;
+    badge?: number | null;
+  }) => (
+    <button
+      type="button"
+      key={item.name}
+      className="nav-item"
+      aria-current={view === item.name ? "page" : undefined}
+      disabled={disabled && item.name !== "settings"}
+      onClick={() => onView(item.name)}
+    >
+      {item.icon}
+      <span className="nav-label">{item.label}</span>
+      {item.badge != null && item.badge > 0 && <span className="badge">{item.badge}</span>}
+    </button>
+  );
   const game = report?.game;
   const attention = toolbox?.attention ?? 0;
   const status =
@@ -378,21 +440,9 @@ function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: S
         <span className="brand-name">Mod Mallet</span>
       </div>
       <GamePicker t={t} />
-      <nav>
-        {items.map((item) => (
-          <button
-            type="button"
-            key={item.name}
-            className="nav-item"
-            aria-current={view === item.name ? "page" : undefined}
-            disabled={disabled && item.name !== "settings"}
-            onClick={() => onView(item.name)}
-          >
-            {item.icon}
-            <span className="nav-label">{item.label}</span>
-            {item.badge != null && item.badge > 0 && <span className="badge">{item.badge}</span>}
-          </button>
-        ))}
+      <nav>{items.map(navButton)}</nav>
+      <nav className="nav-bottom">
+        {navButton({ name: "settings", label: t.viewSettings, icon: <IconSettings /> })}
       </nav>
       <div className="sidebar-foot">
         <ManagerStatus
@@ -672,6 +722,14 @@ function IconMods() {
     <Icon>
       <path d="M12 3l8 4-8 4-8-4z" />
       <path d="M4 12l8 4 8-4M4 17l8 4 8-4" />
+    </Icon>
+  );
+}
+
+function IconHome() {
+  return (
+    <Icon>
+      <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
     </Icon>
   );
 }

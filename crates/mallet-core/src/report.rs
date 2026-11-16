@@ -128,6 +128,25 @@ pub struct ScanReport {
     pub installed_patch: Option<InstalledPatch>,
 }
 
+/// A picture of a worldspace from above, made from the terrain textures in
+/// the user's own game, for drawing the map on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MapImage {
+    /// The worldspace.
+    pub world: String,
+    /// The westmost cell column it shows.
+    pub west: i32,
+    /// The southmost cell row it shows.
+    pub south: i32,
+    /// How many cell columns it shows.
+    pub columns: u32,
+    /// How many cell rows it shows.
+    pub rows: u32,
+    /// The picture, a PNG as a `data:` address. Its top row is the north.
+    pub image: String,
+}
+
 /// A patch of Mod Mallet that is in the game: the objects it hides, and
 /// which mod brought it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

@@ -38,6 +38,27 @@ pub fn executable() -> Option<PathBuf> {
         .filter(|path| path.is_file())
 }
 
+/// The picture Vortex shows for a game, read from Vortex's own
+/// installation: `game_id` is Vortex's identifier, such as `skyrimse`.
+/// Mod Mallet ships no pictures of games; without Vortex there are none.
+pub fn game_art(game_id: &str) -> Option<Vec<u8>> {
+    let plain = !game_id.is_empty()
+        && game_id
+            .chars()
+            .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit());
+    if !plain {
+        return None;
+    }
+    let file = executable()?
+        .parent()?
+        .join("resources")
+        .join("app.asar.unpacked")
+        .join("bundledPlugins")
+        .join(format!("game-{game_id}"))
+        .join("gameart.jpg");
+    std::fs::read(file).ok()
+}
+
 /// Whether Vortex runs right now.
 pub fn is_running() -> bool {
     quiet(Command::new("tasklist").args([

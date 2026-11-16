@@ -18,6 +18,7 @@
 //! [`fixture`] builds small files in these formats for tests.
 
 pub mod bsa;
+pub mod dds;
 pub mod fixture;
 pub mod nif;
 pub mod plugin;

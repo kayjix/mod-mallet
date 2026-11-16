@@ -51,7 +51,7 @@ impl Analysis for MissingMasters {
                 if missing.is_empty() {
                     return None;
                 }
-                Some(
+                Some(crate::offer_disabling(
                     Finding::new(
                         &kinds::PLUGINS_MASTER_MISSING,
                         Subject::File {
@@ -62,7 +62,7 @@ impl Analysis for MissingMasters {
                     .with_arg("count", i64::try_from(missing.len()).unwrap_or(i64::MAX))
                     .with_arg("masters", examples(missing, EXAMPLE_LIMIT))
                     .with_provider(context.mods.provider_of(&plugin.path)),
-                )
+                ))
             })
             .collect()
     }

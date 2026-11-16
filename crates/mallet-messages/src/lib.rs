@@ -362,15 +362,28 @@ impl Messages {
         let (id, args, ticks) = match action {
             Action::ReinstallMod { mod_ref, tick } => (
                 "action-reinstall-mod",
-                [("mod", ArgValue::from(mod_ref.name.as_str()))],
+                vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 tick,
             ),
             Action::HideObjects { objects } => (
                 "action-hide-objects",
-                [(
+                vec![(
                     "count",
                     ArgValue::Number(i64::try_from(objects.len()).unwrap_or(i64::MAX)),
                 )],
+                &no_ticks,
+            ),
+            Action::LoadAfter { plugin, after } => (
+                "action-load-after",
+                vec![
+                    ("plugin", ArgValue::from(plugin.as_str())),
+                    ("after", ArgValue::from(after.as_str())),
+                ],
+                &no_ticks,
+            ),
+            Action::DisableMod { mod_ref } => (
+                "action-disable-mod",
+                vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 &no_ticks,
             ),
         };
@@ -400,6 +413,7 @@ impl Messages {
         let id = match outcome.status {
             ActionStatus::Started => "outcome-started",
             ActionStatus::Installing => "outcome-installing",
+            ActionStatus::Applied => "outcome-applied",
             ActionStatus::LinkMissing => "outcome-link-missing",
             ActionStatus::ManagerNotRunning => "outcome-manager-not-running",
             ActionStatus::NoAnswer => "outcome-no-answer",

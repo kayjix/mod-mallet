@@ -189,7 +189,7 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
         columns: u32::try_from(columns).ok()?,
         rows: u32::try_from(rows).ok()?,
         samples: u32::try_from(samples).ok()?,
-        heights: base64(&image),
+        heights: mallet_core::encoding::base64(&image),
         lowest,
         highest,
     })
@@ -200,27 +200,6 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
 fn level(share: f64) -> u8 {
     // Clamped to the range of the result first.
     (2.0 + share.clamp(0.0, 1.0) * 253.0).round() as u8
-}
-
-/// Bytes in Base64, the standard alphabet with padding.
-fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let symbol =
-        |value: u32| char::from(ALPHABET.get((value & 63) as usize).copied().unwrap_or(b'='));
-    let mut text = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let [a, b, c] = [0, 1, 2].map(|index| u32::from(chunk.get(index).copied().unwrap_or(0)));
-        let group = (a << 16) | (b << 8) | c;
-        text.push(symbol(group >> 18));
-        text.push(symbol(group >> 12));
-        text.push(if chunk.len() > 1 {
-            symbol(group >> 6)
-        } else {
-            '='
-        });
-        text.push(if chunk.len() > 2 { symbol(group) } else { '=' });
-    }
-    text
 }
 
 #[cfg(test)]
@@ -260,15 +239,6 @@ mod tests {
     }
 
     #[test]
-    fn base64_is_the_standard_one() {
-        assert_eq!(base64(b""), "");
-        assert_eq!(base64(b"M"), "TQ==");
-        assert_eq!(base64(b"Ma"), "TWE=");
-        assert_eq!(base64(b"Man"), "TWFu");
-        assert_eq!(base64(&[0xFF, 0xEF]), "/+8=");
-    }
-
-    #[test]
     fn land_becomes_a_height_image_with_water_apart() {
         use mallet_core::facts::terrain::TerrainCell;
         let flat = |x: i32, height: i32, water: Option<i32>| TerrainCell {
@@ -299,7 +269,7 @@ mod tests {
             .collect();
         let row: Vec<u8> = expected.iter().copied().cycle().take(16).collect();
         let image: Vec<u8> = row.iter().copied().cycle().take(64).collect();
-        assert_eq!(terrain.heights, base64(&image));
+        assert_eq!(terrain.heights, mallet_core::encoding::base64(&image));
     }
 
     #[test]

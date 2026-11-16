@@ -97,6 +97,16 @@ fn vortex(options: &ManagerOptions) -> Vec<Tool> {
     vec![vortex, link]
 }
 
+/// The picture of a game as a `data:` address for the window, taken from
+/// the mod manager's installation, or `None` if it has none.
+pub fn game_art(game_id: &str) -> Option<String> {
+    let bytes = app::game_art(game_id)?;
+    Some(format!(
+        "data:image/jpeg;base64,{}",
+        mallet_core::encoding::base64(&bytes)
+    ))
+}
+
 /// Closes Vortex and starts it again, for example so that it loads a new
 /// version of the link. Only to be called because the user asked for it.
 ///

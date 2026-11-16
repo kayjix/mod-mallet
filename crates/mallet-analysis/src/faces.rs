@@ -20,9 +20,10 @@
 //! record in ways that look different on paper and the same in the game.
 
 use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 
 use mallet_core::facts::{NpcFacts, PluginFacts, RecordId};
-use mallet_core::{Finding, GamePath, ModRef, Party, Subject, kinds};
+use mallet_core::{Action, Finding, GamePath, ModRef, Party, Subject, kinds};
 
 use crate::{Analysis, AssetSource, Context, examples};
 
@@ -133,7 +134,7 @@ fn finding(
     npcs: &[&NpcFacts],
 ) -> Finding {
     let names = npcs.iter().filter_map(|npc| npc.editor_id.as_deref());
-    Finding::new(
+    let finding = Finding::new(
         &kinds::NPCS_FACE_MISMATCH,
         Subject::Override {
             winner: Party::File {
@@ -155,7 +156,26 @@ fn finding(
     .with_arg(
         "faceMod",
         face_mod.map_or("", |face_mod| face_mod.name.as_str()),
-    )
+    );
+    // Loading the face plugin last makes record and face fit again. That is
+    // only possible for a plain plugin of a mod that the winner does not
+    // build on: masters and light masters load before every plugin.
+    let movable = face_mod.is_some()
+        && Path::new(&face.name)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("esp"))
+        && !winner
+            .masters
+            .iter()
+            .any(|master| master.eq_ignore_ascii_case(&face.name));
+    if movable {
+        finding.with_action(Action::LoadAfter {
+            plugin: face.name.clone(),
+            after: winner.name.clone(),
+        })
+    } else {
+        finding
+    }
 }
 
 #[cfg(test)]

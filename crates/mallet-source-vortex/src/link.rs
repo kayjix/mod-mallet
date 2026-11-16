@@ -88,7 +88,23 @@ struct Request<'a> {
     mod_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plugin: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    after: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    enabled: Option<bool>,
     created_at: u64,
+}
+
+/// What a request names besides its action and game.
+#[derive(Default)]
+struct Subject<'a> {
+    mod_id: Option<&'a str>,
+    path: Option<&'a str>,
+    plugin: Option<&'a str>,
+    after: Option<&'a str>,
+    enabled: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -133,7 +149,11 @@ impl Link {
         mod_id: &str,
         timeout: Duration,
     ) -> Result<Reply, LinkError> {
-        self.ask("reinstall-mod", game, Some(mod_id), None, timeout)
+        let subject = Subject {
+            mod_id: Some(mod_id),
+            ..Subject::default()
+        };
+        self.ask("reinstall-mod", game, &subject, timeout)
     }
 
     /// The folder in which Mod Mallet puts the archives it asks Vortex to
@@ -154,15 +174,53 @@ impl Link {
         timeout: Duration,
     ) -> Result<Reply, LinkError> {
         let path = path.to_string_lossy();
-        self.ask("install-archive", game, None, Some(&path), timeout)
+        let subject = Subject {
+            path: Some(&path),
+            ..Subject::default()
+        };
+        self.ask("install-archive", game, &subject, timeout)
+    }
+
+    /// Asks Vortex to load `plugin` after `after`, through a rule in its
+    /// plugin list, and to sort the plugins again. The rule stays visible
+    /// and removable in Vortex.
+    pub fn load_after(
+        &self,
+        game: &str,
+        plugin: &str,
+        after: &str,
+        timeout: Duration,
+    ) -> Result<Reply, LinkError> {
+        let subject = Subject {
+            plugin: Some(plugin),
+            after: Some(after),
+            ..Subject::default()
+        };
+        self.ask("load-after", game, &subject, timeout)
+    }
+
+    /// Asks Vortex to switch the mod `mod_id` on or off in the profile in
+    /// use.
+    pub fn set_mod_enabled(
+        &self,
+        game: &str,
+        mod_id: &str,
+        enabled: bool,
+        timeout: Duration,
+    ) -> Result<Reply, LinkError> {
+        let subject = Subject {
+            mod_id: Some(mod_id),
+            enabled: Some(enabled),
+            ..Subject::default()
+        };
+        self.ask("set-mod-enabled", game, &subject, timeout)
     }
 
     fn ask(
         &self,
         action: &str,
         game: &str,
-        mod_id: Option<&str>,
-        path: Option<&str>,
+        subject: &Subject<'_>,
         timeout: Duration,
     ) -> Result<Reply, LinkError> {
         if self.running_extension().is_none() {
@@ -178,8 +236,11 @@ impl Link {
             id: &id,
             action,
             game,
-            mod_id,
-            path,
+            mod_id: subject.mod_id,
+            path: subject.path,
+            plugin: subject.plugin,
+            after: subject.after,
+            enabled: subject.enabled,
             created_at: now_ms(),
         };
 
