@@ -1,0 +1,13 @@
+# Keep line endings identical on every platform so formatters and snapshot
+# tests give the same result on Windows and Linux.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.dds binary
+*.esp binary
+*.esm binary
+*.esl binary
+*.bsa binary
+*.nif binary

@@ -1,0 +1,49 @@
+name: CI
+
+# Everything CI checks is one command, `cargo xtask ci`, so that a
+# contributor can run exactly the same thing before pushing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: All checks (Windows)
+    # Windows is the primary platform: it is where the games run.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # rustup installs the toolchain pinned in rust-toolchain.toml on the
+      # first cargo call.
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,mdbook,mdbook-mermaid
+      - run: npm ci
+      - run: cargo xtask ci --require-tools
+
+  linux:
+    name: Engine and command line (Linux)
+    # Keeps the engine portable. The desktop app is left out because it
+    # needs system libraries that the engine does not.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask ci --skip-desktop

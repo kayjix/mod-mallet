@@ -1,0 +1,8 @@
+# The robustness lints in Cargo.toml (`unwrap_used`, `panic`, ...) protect
+# production code that reads untrusted mod files. Tests may fail loudly.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-dbg-in-tests = true
+allow-print-in-tests = true

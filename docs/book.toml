@@ -1,0 +1,19 @@
+[book]
+title = "Mod Mallet"
+description = "How Mod Mallet works, why it is built the way it is, and how to contribute."
+authors = ["The Mod Mallet contributors"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+# A link to a page that does not exist is an error, not a new empty page.
+create-missing = false
+
+# Renders ```mermaid code blocks as diagrams. `cargo xtask docs` puts the
+# two script files in place; they are not committed.
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]

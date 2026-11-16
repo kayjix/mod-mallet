@@ -1,0 +1,1006 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScanReport",
+  "description": "Everything one scan found.\n\nThis is the contract between the engine and whatever shows the result.\nIts JSON form is described by `schemas/scan-report.schema.json`, which is\ngenerated from this type.",
+  "type": "object",
+  "properties": {
+    "archivesChecked": {
+      "description": "How many archives were read.",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
+    "extenderPluginsChecked": {
+      "description": "How many script extender plugins were examined.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "findings": {
+      "description": "The findings, most severe first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Finding"
+      }
+    },
+    "game": {
+      "description": "The game that was scanned.",
+      "$ref": "#/$defs/GameInfo"
+    },
+    "installedPatch": {
+      "description": "The patch Mod Mallet wrote earlier, as it is in the game now, if\nthere is one.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InstalledPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "installersChecked": {
+      "description": "How many mod installers were read.",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
+    "locations": {
+      "description": "The places the scan looked at. Mod Mallet does not search the disk:\nit reads these places and what lies below the game directory.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ScanLocation"
+      }
+    },
+    "map": {
+      "description": "Where mods place objects, and where they collide.",
+      "$ref": "#/$defs/WorldMap",
+      "default": {
+        "owners": [],
+        "spots": [],
+        "worlds": []
+      }
+    },
+    "meshesChecked": {
+      "description": "How many replacement meshes were compared with the mesh they\nreplace.",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
+    "mods": {
+      "description": "What the mod manager knows about the installed mods.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ModInfo"
+      }
+    },
+    "objectSwapper": {
+      "description": "Whether Base Object Swapper is installed, the script extender plugin\nthat hides objects for Mod Mallet.",
+      "type": "boolean",
+      "default": false
+    },
+    "pluginsChecked": {
+      "description": "How many active plugins were read.",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
+    "scannedAt": {
+      "description": "When the scan ran, in seconds since 1970-01-01 UTC.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "schemaVersion": {
+      "description": "Version of this contract, see [`SCHEMA_VERSION`].",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "scannedAt",
+    "game",
+    "extenderPluginsChecked",
+    "findings"
+  ],
+  "$defs": {
+    "Action": {
+      "description": "Something that can be done about a finding.",
+      "oneOf": [
+        {
+          "description": "Run a mod's installer again in the mod manager, so that the user can\nchoose options that were not offered or not chosen before.",
+          "type": "object",
+          "properties": {
+            "mod": {
+              "description": "The mod to reinstall.",
+              "$ref": "#/$defs/ModRef"
+            },
+            "tick": {
+              "description": "The options to tick in the installer, in the order the installer\nshows them. Empty if the reinstall is not about particular\noptions.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OptionToTick"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "reinstall-mod"
+            }
+          },
+          "required": [
+            "type",
+            "mod"
+          ]
+        },
+        {
+          "description": "Hide placed objects in the game, through a small mod that the mod\nmanager installs: each object is swapped for an invisible marker\nwhile the game runs. Removing that mod brings them back.",
+          "type": "object",
+          "properties": {
+            "objects": {
+              "description": "The objects to hide.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectRef"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "hide-objects"
+            }
+          },
+          "required": [
+            "type",
+            "objects"
+          ]
+        }
+      ]
+    },
+    "ArgValue": {
+      "description": "A value substituted into the text of a finding.",
+      "anyOf": [
+        {
+          "description": "A piece of text such as a file name.",
+          "type": "string"
+        },
+        {
+          "description": "A whole number such as a count.",
+          "type": "integer",
+          "format": "int64"
+        }
+      ]
+    },
+    "Confidence": {
+      "description": "How sure Mod Mallet is that a finding describes a real problem\n(ADR 0007).\n\nOnly [`Confidence::Certain`] findings may ever be fixed without asking.",
+      "oneOf": [
+        {
+          "description": "A fact read from the setup, such as a DLL the game refused to load.",
+          "type": "string",
+          "const": "certain"
+        },
+        {
+          "description": "A heuristic that is usually right, such as two overlapping buildings.",
+          "type": "string",
+          "const": "likely"
+        },
+        {
+          "description": "Knowledge from a rule or a text that may not apply to this setup.",
+          "type": "string",
+          "const": "hint"
+        }
+      ]
+    },
+    "Finding": {
+      "description": "One problem found in a setup.\n\nA finding carries no prose. It names its [kind](crate::kinds) and the\narguments for that kind's message; the text is produced later, in the\nreader's language (ADR 0007).",
+      "type": "object",
+      "properties": {
+        "actions": {
+          "description": "What can be done about the finding. Empty if Mod Mallet can only\ndescribe the problem.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Action"
+          }
+        },
+        "args": {
+          "description": "Values for the placeholders of the kind's message.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ArgValue"
+          }
+        },
+        "confidence": {
+          "description": "How sure Mod Mallet is.",
+          "$ref": "#/$defs/Confidence"
+        },
+        "id": {
+          "description": "Stable identity of this finding.",
+          "$ref": "#/$defs/FindingId"
+        },
+        "kind": {
+          "description": "Identifier of the finding's kind, for example\n`extender.plugin-incompatible`.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "The mod the subject comes from, if a mod manager knows.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "description": "How much the finding matters.",
+          "$ref": "#/$defs/Severity"
+        },
+        "subject": {
+          "description": "What the finding is about.",
+          "$ref": "#/$defs/Subject"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "severity",
+        "confidence",
+        "subject",
+        "args"
+      ]
+    },
+    "FindingId": {
+      "description": "The identity of a finding across scans.\n\nIt is derived from the kind and the subject only, so a decision such as\n\"ignore this\" still applies after the load order changed or the mods were\nre-deployed (ADR 0007).",
+      "type": "string"
+    },
+    "GameInfo": {
+      "description": "The game a scan looked at.",
+      "type": "object",
+      "properties": {
+        "extenderVersion": {
+          "description": "The script extender's version, if one is installed and has run.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Identifier of the game adapter, for example `skyrimse`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The game's name.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The game's version, if it could be determined.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "GamePath": {
+      "description": "A file location relative to the game's installation directory.\n\nThe games Mod Mallet targets treat paths case-insensitively, and mods mix\n`/` and `\\` freely. `GamePath` normalizes both, so two spellings of the\nsame file compare equal and hash alike:\n\n```\nuse mallet_core::GamePath;\n\nassert_eq!(\n    GamePath::new(r\"Data\\SKSE\\Plugins\\Example.dll\"),\n    GamePath::new(\"data/skse/plugins/example.dll\"),\n);\n```",
+      "type": "string"
+    },
+    "InstalledPatch": {
+      "description": "A patch of Mod Mallet that is in the game: the objects it hides, and\nwhich mod brought it.",
+      "type": "object",
+      "properties": {
+        "objects": {
+          "description": "The objects it hides.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectRef"
+          }
+        },
+        "provider": {
+          "description": "The mod the file belongs to, if the mod manager knows it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "objects"
+      ]
+    },
+    "LocationOrigin": {
+      "description": "How Mod Mallet came to look at a place.",
+      "oneOf": [
+        {
+          "description": "The user named it.",
+          "type": "string",
+          "const": "given"
+        },
+        {
+          "description": "It was read from the entry the game's launcher writes into the\nWindows registry.",
+          "type": "string",
+          "const": "registry"
+        },
+        {
+          "description": "It is the place where the game or the mod manager always puts this\nfile.",
+          "type": "string",
+          "const": "standard"
+        }
+      ]
+    },
+    "LocationRole": {
+      "description": "What a place the scan looked at is for.",
+      "oneOf": [
+        {
+          "description": "The directory the game is installed in.",
+          "type": "string",
+          "const": "game-dir"
+        },
+        {
+          "description": "The game's list of active plugins.",
+          "type": "string",
+          "const": "plugin-list"
+        },
+        {
+          "description": "The log of the script extender.",
+          "type": "string",
+          "const": "extender-log"
+        },
+        {
+          "description": "The mod manager's saved state: installed mods and installer choices.",
+          "type": "string",
+          "const": "manager-state"
+        },
+        {
+          "description": "The directory the mod manager keeps downloaded mod archives in.",
+          "type": "string",
+          "const": "downloads"
+        },
+        {
+          "description": "The program used to look into mod archives.",
+          "type": "string",
+          "const": "unpacker"
+        },
+        {
+          "description": "The mod manager's record of the files it deployed.",
+          "type": "string",
+          "const": "deployment-manifest"
+        }
+      ]
+    },
+    "MapCell": {
+      "description": "One cell of a worldspace: 4096 game units, about 58 metres, square.",
+      "type": "object",
+      "properties": {
+        "objects": {
+          "description": "How many objects mods place in the cell.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "owners": {
+          "description": "Which mods place them, as positions in [`WorldMap::owners`].",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "x": {
+          "description": "The cell's column; east is larger.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "description": "The cell's row; north is larger.",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "objects",
+        "owners"
+      ]
+    },
+    "MapSpot": {
+      "description": "Where a collision of two mods' objects is.",
+      "type": "object",
+      "properties": {
+        "console": {
+          "description": "The command of the game's console that takes the player there.",
+          "type": "string"
+        },
+        "finding": {
+          "description": "The finding that reports the collision.",
+          "$ref": "#/$defs/FindingId"
+        },
+        "location": {
+          "description": "Where it is.",
+          "$ref": "#/$defs/SpotLocation"
+        },
+        "objects": {
+          "description": "The objects involved, by their internal names.",
+          "type": "string"
+        },
+        "parts": {
+          "description": "The objects involved, one by one.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SpotPart"
+          }
+        }
+      },
+      "required": [
+        "finding",
+        "location",
+        "objects",
+        "console"
+      ]
+    },
+    "MapTerrain": {
+      "description": "The shape of the land of a worldspace, as a small height image.",
+      "type": "object",
+      "properties": {
+        "columns": {
+          "description": "How many cells wide the image is.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "heights": {
+          "description": "One byte per sample, written in Base64: rows from north to south,\nsamples from west to east. 0 means no land is known there, 1 water,\nand 2 to 255 land from [`MapTerrain::lowest`] to\n[`MapTerrain::highest`].",
+          "type": "string"
+        },
+        "highest": {
+          "description": "The height of the highest land, in game units.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "lowest": {
+          "description": "The height of the lowest land, in game units.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "rows": {
+          "description": "How many cells high the image is.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "samples": {
+          "description": "How many samples each cell has along each side.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "south": {
+          "description": "The southmost cell row the image covers.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "west": {
+          "description": "The westmost cell column the image covers.",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "west",
+        "south",
+        "columns",
+        "rows",
+        "samples",
+        "heights",
+        "lowest",
+        "highest"
+      ]
+    },
+    "MapWorld": {
+      "description": "One worldspace on the map.",
+      "type": "object",
+      "properties": {
+        "cells": {
+          "description": "The cells in which mods place objects.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MapCell"
+          }
+        },
+        "name": {
+          "description": "The worldspace's internal name, as the game's console knows it.",
+          "type": "string"
+        },
+        "terrain": {
+          "description": "The shape of the land, where it is known.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapTerrain"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "cells"
+      ]
+    },
+    "ModInfo": {
+      "description": "What a mod manager knows about one installed mod.",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made the mod.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "description": "Whether the mod is enabled in the profile in use.",
+          "type": "boolean"
+        },
+        "mod": {
+          "description": "The mod.",
+          "$ref": "#/$defs/ModRef"
+        },
+        "newerVersion": {
+          "description": "The newest version the mod manager knows of, if it is another one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "page": {
+          "description": "The page the mod was downloaded from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "The installed version, as the mod's author numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mod",
+        "enabled"
+      ]
+    },
+    "ModRef": {
+      "description": "A mod as a mod manager knows it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The manager's own identifier of the mod.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name to show to people.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The manager that knows this mod, for example `vortex`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "name"
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "OptionToTick": {
+      "description": "An option of a mod's installer, with where to find it.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "What the installer says about the option, in the mod author's words.",
+          "type": "string"
+        },
+        "group": {
+          "description": "The title of the group of options on the page.",
+          "type": "string"
+        },
+        "option": {
+          "description": "The title of the option.",
+          "type": "string"
+        },
+        "page": {
+          "description": "The page of the installer the option is on, counting from 1, among\nthe pages the installer shows with the choices made so far.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "pages": {
+          "description": "How many pages the installer shows.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "step": {
+          "description": "The title of the page.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "pages",
+        "step",
+        "group",
+        "option",
+        "description"
+      ]
+    },
+    "Party": {
+      "description": "One side of a [`Subject::Override`] or a [`Subject::Pair`].",
+      "oneOf": [
+        {
+          "description": "A file inside the game installation, such as a plugin or an archive.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "Where the file lies.",
+              "$ref": "#/$defs/GamePath"
+            },
+            "type": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ]
+        },
+        {
+          "description": "The files a mod manager deployed for one mod.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The manager's own identifier of the mod.",
+              "type": "string"
+            },
+            "source": {
+              "description": "The manager that knows the mod, for example `vortex`.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "mod"
+            }
+          },
+          "required": [
+            "type",
+            "source",
+            "id"
+          ]
+        },
+        {
+          "description": "Files in the game that no known mod manager put there: the game's\nown files and anything installed by hand.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "unmanaged"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "ScanLocation": {
+      "description": "A place the scan looked at, so that nobody has to wonder what was read.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "description": "Whether something was there to read.",
+          "type": "boolean"
+        },
+        "origin": {
+          "description": "How Mod Mallet came to look there.",
+          "$ref": "#/$defs/LocationOrigin"
+        },
+        "path": {
+          "description": "The path on this machine.",
+          "type": "string"
+        },
+        "role": {
+          "description": "What the place is for.",
+          "$ref": "#/$defs/LocationRole"
+        }
+      },
+      "required": [
+        "role",
+        "path",
+        "origin",
+        "found"
+      ]
+    },
+    "Severity": {
+      "description": "How much a finding matters to a working game.\n\nThe order is from most to least important, so sorting by severity puts\nerrors first.",
+      "oneOf": [
+        {
+          "description": "Something does not work.",
+          "type": "string",
+          "const": "error"
+        },
+        {
+          "description": "Something probably looks or behaves wrong.",
+          "type": "string",
+          "const": "warning"
+        },
+        {
+          "description": "Worth knowing, nothing to fix.",
+          "type": "string",
+          "const": "info"
+        }
+      ]
+    },
+    "SpotLocation": {
+      "description": "Where a spot is: outside in a worldspace, or in a closed space.",
+      "oneOf": [
+        {
+          "description": "Outside.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "exterior"
+            },
+            "world": {
+              "description": "The worldspace's internal name.",
+              "type": "string"
+            },
+            "x": {
+              "description": "The cell's column.",
+              "type": "integer",
+              "format": "int32"
+            },
+            "y": {
+              "description": "The cell's row.",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "required": [
+            "type",
+            "world",
+            "x",
+            "y"
+          ]
+        },
+        {
+          "description": "In a closed space such as a house or a cave.",
+          "type": "object",
+          "properties": {
+            "cell": {
+              "description": "The cell's internal name.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "interior"
+            }
+          },
+          "required": [
+            "type",
+            "cell"
+          ]
+        }
+      ]
+    },
+    "SpotPart": {
+      "description": "One object of a collision.",
+      "type": "object",
+      "properties": {
+        "hideable": {
+          "description": "Whether it can be hidden without harm: nothing refers to it from\nelsewhere, and the distant view is not built around it.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The internal name of what it is.",
+          "type": "string"
+        },
+        "object": {
+          "description": "The object.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "suggested": {
+          "description": "Whether hiding this one rather than the other is suggested: of two\ncopies, the one from the plugin that places fewer objects.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "object",
+        "name",
+        "hideable",
+        "suggested"
+      ]
+    },
+    "Subject": {
+      "description": "What a finding is about.",
+      "oneOf": [
+        {
+          "description": "A file inside the game installation.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "Where the file lies.",
+              "$ref": "#/$defs/GamePath"
+            },
+            "type": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ]
+        },
+        {
+          "description": "A mod as a whole, as a mod manager knows it.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The manager's own identifier of the mod.",
+              "type": "string"
+            },
+            "source": {
+              "description": "The manager that knows the mod, for example `vortex`.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "mod"
+            }
+          },
+          "required": [
+            "type",
+            "source",
+            "id"
+          ]
+        },
+        {
+          "description": "One thing taking precedence over another, for example the loose\nfiles of a mod over the archive of a second mod.",
+          "type": "object",
+          "properties": {
+            "loser": {
+              "description": "What is replaced.",
+              "$ref": "#/$defs/Party"
+            },
+            "type": {
+              "type": "string",
+              "const": "override"
+            },
+            "winner": {
+              "description": "What the game ends up using.",
+              "$ref": "#/$defs/Party"
+            }
+          },
+          "required": [
+            "type",
+            "winner",
+            "loser"
+          ]
+        },
+        {
+          "description": "Two things that clash, neither of which takes precedence, such as\ntwo mods that place objects in the same spot. The two are in a fixed\norder that does not depend on the load order.",
+          "type": "object",
+          "properties": {
+            "first": {
+              "description": "The first of the two.",
+              "$ref": "#/$defs/Party"
+            },
+            "second": {
+              "description": "The second of the two.",
+              "$ref": "#/$defs/Party"
+            },
+            "type": {
+              "type": "string",
+              "const": "pair"
+            }
+          },
+          "required": [
+            "type",
+            "first",
+            "second"
+          ]
+        },
+        {
+          "description": "The setup as a whole.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "setup"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "WorldMap": {
+      "description": "Where mods place objects in the world, cell by cell, and where objects\nof two mods collide.",
+      "type": "object",
+      "properties": {
+        "owners": {
+          "description": "The mods (or plugins, where no mod is known) that place objects.\nCells refer to them by their position in this list.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spots": {
+          "description": "Every collision that a finding reports.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MapSpot"
+          }
+        },
+        "worlds": {
+          "description": "The worldspaces in which mods place objects outside: first the one\nwith the most cells where several mods meet, then by objects.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MapWorld"
+          }
+        }
+      },
+      "required": [
+        "owners",
+        "worlds",
+        "spots"
+      ]
+    }
+  }
+}

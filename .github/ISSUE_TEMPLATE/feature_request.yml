@@ -1,0 +1,26 @@
+name: Idea
+description: Something Mod Mallet should check, explain or help fix.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read the non-goals in docs/src/product/vision.md first. Mod
+        Mallet diagnoses, explains and recommends; it is not a mod manager,
+        a plugin editor or a renderer.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem did you run into?
+      description: Describe what went wrong in your game or setup, not the feature you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: how-found
+    attributes:
+      label: How did you find the cause?
+      description: Which tools or steps did it take? This shows what Mod Mallet would have to look at.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should Mod Mallet do about it?

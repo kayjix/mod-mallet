@@ -1,0 +1,259 @@
+//! Carries out actions by handing them to the tool that owns the change.
+//!
+//! Today there is one such tool, Vortex, reached through the link in
+//! `mallet-source-vortex`. An action never fails with an error: whatever
+//! happens is an [`ActionOutcome`] that can be put into words for the
+//! user.
+
+use std::path::PathBuf;
+use std::time::Duration;
+
+use mallet_core::ObjectRef;
+use mallet_core::action::{Action, ActionOutcome, ActionStatus};
+use mallet_source_vortex::SOURCE_ID;
+use mallet_source_vortex::link::{self, Link, LinkError};
+
+use crate::EngineError;
+
+/// Vortex's identifier of the game this engine works on.
+const VORTEX_GAME: &str = "skyrimse";
+
+/// How long Vortex is given to answer. The extension looks for requests
+/// once a second.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Where the mod manager is. Every field that is `None` is the standard
+/// place.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ManagerOptions {
+    /// The directory in which Vortex keeps its data.
+    pub vortex_data_dir: Option<PathBuf>,
+    /// The folder shared with the Vortex extension.
+    pub link_dir: Option<PathBuf>,
+    /// How long to wait for the mod manager's answer.
+    pub timeout: Option<Duration>,
+}
+
+impl ManagerOptions {
+    pub(crate) fn vortex_data_dir(&self) -> Option<PathBuf> {
+        self.vortex_data_dir
+            .clone()
+            .or_else(|| Some(dirs::config_dir()?.join("Vortex")))
+    }
+
+    pub(crate) fn link_dir(&self) -> Option<PathBuf> {
+        self.link_dir.clone().or_else(default_link_dir)
+    }
+}
+
+/// The folder shared with the Vortex extension, in its standard place.
+pub(crate) fn default_link_dir() -> Option<PathBuf> {
+    Some(
+        dirs::data_local_dir()?
+            .join("mod-mallet")
+            .join("vortex-bridge"),
+    )
+}
+
+/// How things stand between Mod Mallet and the mod manager.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ManagerLink {
+    /// Whether the link is installed in the mod manager in the version
+    /// this Mod Mallet needs.
+    pub installed: bool,
+    /// Whether the link is answering right now.
+    pub running: bool,
+    /// Whether the mod manager is still running an older version of the
+    /// link than the one installed, and has to be restarted to load it.
+    pub restart_needed: bool,
+}
+
+/// Looks at whether actions can be handed to the mod manager.
+pub fn manager_link(options: &ManagerOptions) -> ManagerLink {
+    let installed = options
+        .vortex_data_dir()
+        .is_some_and(|dir| link::extension_is_current(&dir));
+    let running = options
+        .link_dir()
+        .and_then(|dir| Link::new(dir).running_extension());
+    ManagerLink {
+        installed,
+        restart_needed: installed
+            && running
+                .as_ref()
+                .is_some_and(|version| Some(version) != link::extension_version().as_ref()),
+        running: running.is_some(),
+    }
+}
+
+/// Installs the link into the mod manager, replacing an older version, and
+/// returns the folder it was put in. The mod manager loads it the next time
+/// it starts.
+///
+/// This writes two files into Vortex's plugin folder. It must only be
+/// called when the user asked for it.
+pub fn install_manager_link(options: &ManagerOptions) -> Result<PathBuf, EngineError> {
+    let vortex_data_dir = options
+        .vortex_data_dir()
+        .ok_or(EngineError::ManagerNotFound)?;
+    if !vortex_data_dir.is_dir() {
+        return Err(EngineError::ManagerNotFound);
+    }
+    link::install_extension(&vortex_data_dir).map_err(|source| EngineError::Read {
+        path: link::extension_dir(&vortex_data_dir),
+        source,
+    })
+}
+
+/// Hands `action` to the tool that carries it out and says what became of
+/// it.
+pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
+    match action {
+        Action::ReinstallMod { mod_ref, .. } if mod_ref.source == SOURCE_ID => {
+            reinstall_in_vortex(&mod_ref.id, options)
+        }
+        Action::ReinstallMod { mod_ref, .. } => ActionOutcome {
+            status: ActionStatus::Unsupported,
+            detail: Some(format!("no link to the mod manager `{}`", mod_ref.source)),
+        },
+        Action::HideObjects { objects } => hide_objects(objects, options),
+    }
+}
+
+/// The name of the archive of the patch that hides objects. Vortex names
+/// the mod after it.
+const HIDE_PATCH: &str = "Mod Mallet Patch.zip";
+
+/// Where the patch that hides objects is written, in its standard place.
+pub fn patch_file(options: &ManagerOptions) -> Option<PathBuf> {
+    Some(
+        Link::new(options.link_dir()?)
+            .patches_dir()
+            .join(HIDE_PATCH),
+    )
+}
+
+/// A patch that has been written and can now be installed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreatedPatch {
+    /// The archive.
+    pub path: PathBuf,
+    /// How many objects it hides.
+    pub objects: usize,
+}
+
+/// Writes the patch that hides `objects` into Mod Mallet's own folder,
+/// replacing the one written before. Nothing is installed: that is
+/// [`Action::HideObjects`].
+///
+/// # Errors
+///
+/// If there is nothing to hide, or the archive cannot be written.
+pub fn create_patch(
+    objects: &[ObjectRef],
+    options: &ManagerOptions,
+) -> Result<CreatedPatch, EngineError> {
+    let path = patch_file(options).ok_or(EngineError::ManagerNotFound)?;
+    if objects.is_empty() {
+        return Err(EngineError::NothingToHide);
+    }
+    let text = mallet_game_skyrimse::swap::swap_ini(objects);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+    }
+    crate::patch::write_zip(
+        &path,
+        mallet_game_skyrimse::swap::SWAP_FILE,
+        text.as_bytes(),
+    )
+    .map_err(|source| EngineError::Write {
+        path: path.clone(),
+        source,
+    })?;
+    tracing::info!(path = %path.display(), objects = objects.len(), "patch written");
+    Ok(CreatedPatch {
+        path,
+        objects: objects.len(),
+    })
+}
+
+/// Writes the patch that hides `objects` and asks Vortex to install it.
+fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcome {
+    if objects.is_empty() {
+        return ActionOutcome {
+            status: ActionStatus::Failed,
+            detail: Some(EngineError::NothingToHide.to_string()),
+        };
+    }
+    let state = manager_link(options);
+    if !state.installed {
+        return ActionOutcome::new(ActionStatus::LinkMissing);
+    }
+    let Some(link_dir) = options.link_dir() else {
+        return ActionOutcome::new(ActionStatus::ManagerNotRunning);
+    };
+    let created = match create_patch(objects, options) {
+        Ok(created) => created,
+        Err(error) => {
+            tracing::warn!(%error, "patch not written");
+            return ActionOutcome {
+                status: ActionStatus::Failed,
+                detail: Some(error.to_string()),
+            };
+        }
+    };
+    let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+    tracing::info!(archive = %created.path.display(), "asking Vortex to install the patch");
+    outcome_of(Link::new(link_dir).install_archive(VORTEX_GAME, &created.path, timeout))
+}
+
+fn reinstall_in_vortex(mod_id: &str, options: &ManagerOptions) -> ActionOutcome {
+    let state = manager_link(options);
+    if !state.installed {
+        return ActionOutcome::new(ActionStatus::LinkMissing);
+    }
+    let Some(link_dir) = options.link_dir() else {
+        return ActionOutcome::new(ActionStatus::ManagerNotRunning);
+    };
+    let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+    tracing::info!(mod_id, "asking Vortex to reinstall a mod");
+    outcome_of(Link::new(link_dir).reinstall_mod(VORTEX_GAME, mod_id, timeout))
+}
+
+/// What a reply of the extension means.
+fn outcome_of(reply: Result<link::Reply, LinkError>) -> ActionOutcome {
+    match &reply {
+        Ok(reply) => tracing::info!(
+            code = %reply.code,
+            detail = reply.detail.as_deref().unwrap_or(""),
+            "Vortex answered"
+        ),
+        Err(error) => tracing::warn!(%error, "Vortex did not answer"),
+    }
+    match reply {
+        Ok(reply) => ActionOutcome {
+            status: match reply.code.as_str() {
+                "started" => ActionStatus::Started,
+                "installing" => ActionStatus::Installing,
+                "unknown-mod" => ActionStatus::UnknownMod,
+                "archive-missing" => ActionStatus::ArchiveMissing,
+                "wrong-game" => ActionStatus::WrongGame,
+                "unsupported" => ActionStatus::Unsupported,
+                // The extension only calls a request expired that this
+                // side has already given up on.
+                "expired" => ActionStatus::NoAnswer,
+                _ => ActionStatus::Failed,
+            },
+            detail: reply.detail,
+        },
+        Err(LinkError::NotRunning) => ActionOutcome::new(ActionStatus::ManagerNotRunning),
+        Err(LinkError::NoAnswer) => ActionOutcome::new(ActionStatus::NoAnswer),
+        Err(error) => ActionOutcome {
+            status: ActionStatus::Failed,
+            detail: Some(error.to_string()),
+        },
+    }
+}

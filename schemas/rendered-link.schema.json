@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderedLink",
+  "description": "How things stand between Mod Mallet and the mod manager, in words.",
+  "type": "object",
+  "properties": {
+    "explanation": {
+      "description": "Why the link exists and what it does, for asking the user before\ninstalling it.",
+      "type": "string"
+    },
+    "installed": {
+      "description": "Whether the link is installed in the mod manager.",
+      "type": "boolean"
+    },
+    "message": {
+      "description": "The state in a sentence.",
+      "type": "string"
+    },
+    "restartNeeded": {
+      "description": "Whether the mod manager has to be restarted to load the installed\nversion of the link.",
+      "type": "boolean"
+    },
+    "running": {
+      "description": "Whether the mod manager is answering through it.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "installed",
+    "running",
+    "restartNeeded",
+    "message",
+    "explanation"
+  ]
+}

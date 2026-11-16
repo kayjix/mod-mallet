@@ -1,0 +1,26 @@
+[package]
+name = "mallet-game-skyrimse"
+description = "Mod Mallet's adapter for The Elder Scrolls V: Skyrim Special Edition."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+dirs.workspace = true
+libloadorder.workspace = true
+mallet-core.workspace = true
+mallet-formats-bethesda.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

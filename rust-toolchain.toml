@@ -1,0 +1,6 @@
+# Everyone, including CI, builds with exactly this compiler. Raise the version
+# deliberately in its own commit and keep `rust-version` in Cargo.toml in sync.
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

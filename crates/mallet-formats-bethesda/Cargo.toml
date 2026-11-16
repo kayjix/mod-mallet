@@ -1,0 +1,20 @@
+[package]
+name = "mallet-formats-bethesda"
+description = "Readers for the file formats shared by Bethesda's games: plugins and archives."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+flate2.workspace = true
+lz4_flex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

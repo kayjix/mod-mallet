@@ -1,0 +1,113 @@
+//! Mod Mallet's analyses.
+//!
+//! An analysis looks at the [`Facts`] of a setup and reports [`Finding`]s.
+//! Analyses are pure: they depend on `mallet-core` only and never read a
+//! file, start a process or use the network (ADR 0004). That keeps them easy
+//! to test with hand-written facts, and it is why this crate may not depend
+//! on any game or mod manager adapter.
+//!
+//! To add an analysis: implement [`Analysis`] in a new module and list it in
+//! [`all`].
+
+pub mod assets;
+pub mod extender;
+pub mod faces;
+pub mod installer;
+pub mod map;
+pub mod masters;
+pub mod meshes;
+pub mod objects;
+pub mod setup;
+
+use std::cell::OnceCell;
+
+use mallet_core::{Facts, Finding, ModSource};
+
+pub use assets::{AssetIndex, AssetSource};
+
+/// What an analysis may look at.
+pub struct Context<'a> {
+    /// The facts gathered about the setup.
+    pub facts: &'a Facts,
+    /// The mod manager, for attributing files to mods.
+    pub mods: &'a dyn ModSource,
+    /// Which loose file or archive the game takes each asset from.
+    pub assets: AssetIndex<'a>,
+    /// The comparison of placed objects, made when first asked for.
+    collisions: OnceCell<objects::Collisions>,
+}
+
+impl<'a> Context<'a> {
+    /// Prepares the context for a set of facts.
+    pub fn new(facts: &'a Facts, mods: &'a dyn ModSource) -> Self {
+        Self {
+            facts,
+            mods,
+            assets: AssetIndex::new(facts),
+            collisions: OnceCell::new(),
+        }
+    }
+
+    /// Where objects of different mods collide. The comparison takes a
+    /// moment, so it is made once and shared by the analysis that reports
+    /// it and the map that shows it.
+    pub fn collisions(&self) -> &objects::Collisions {
+        self.collisions.get_or_init(|| objects::compute(self))
+    }
+}
+
+/// One self-contained check of a setup.
+pub trait Analysis {
+    /// A short stable name, used in logs.
+    fn id(&self) -> &'static str;
+
+    /// Reports every problem this analysis sees. An analysis that lacks the
+    /// facts it needs reports nothing.
+    fn run(&self, context: &Context<'_>) -> Vec<Finding>;
+}
+
+/// Every analysis Mod Mallet runs.
+pub fn all() -> Vec<Box<dyn Analysis>> {
+    vec![
+        Box::new(setup::SetupProblems),
+        Box::new(extender::ExtenderPlugins),
+        Box::new(masters::MissingMasters),
+        Box::new(faces::NpcFaces),
+        Box::new(installer::InstallerOptions),
+        Box::new(meshes::BypassedRetextures),
+        Box::new(objects::PlacedObjects),
+        Box::new(assets::ArchiveOverrides),
+    ]
+}
+
+/// Runs every analysis and returns the findings in report order: most
+/// severe first, then by identity so the order is the same on every run.
+pub fn run_all(context: &Context<'_>) -> Vec<Finding> {
+    let mut findings: Vec<Finding> = all()
+        .iter()
+        .flat_map(|analysis| analysis.run(context))
+        .collect();
+    findings
+        .sort_by(|a, b| (a.severity, a.confidence, &a.id).cmp(&(b.severity, b.confidence, &b.id)));
+    findings
+}
+
+/// Up to `limit` items joined for display, in a stable order.
+fn examples<'a>(items: impl IntoIterator<Item = &'a str>, limit: usize) -> String {
+    let mut items: Vec<&str> = items.into_iter().collect();
+    items.sort_unstable();
+    items.dedup();
+    items.truncate(limit);
+    items.join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn examples_are_sorted_unique_and_limited() {
+        assert_eq!(examples(["c", "a", "b", "a"], 2), "a, b");
+        assert_eq!(examples([], 3), "");
+    }
+}

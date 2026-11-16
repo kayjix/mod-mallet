@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "tauri-apps.tauri-vscode",
+    "biomejs.biome",
+    "macabeus.vscode-fluent"
+  ]
+}

@@ -1,0 +1,294 @@
+//! Mod Mallet's adapter for the Vortex mod manager.
+//!
+//! Vortex keeps each mod in its own folder and links the files of all
+//! enabled mods into the game. It records what it linked in a deployment
+//! manifest, `vortex.deployment.json`, inside the directory it deployed to.
+//! [`VortexDeployment`] reads that manifest and answers which mod a file in
+//! the game came from.
+//!
+//! [`VortexState`] reads Vortex's saved state: the installed mods, the
+//! names Vortex shows for them, and what was chosen in their installers.
+//!
+//! [`link`] asks a running Vortex to act, through a small Vortex extension.
+//!
+//! Reading needs neither Vortex running nor the extension. Changes are
+//! never made to Vortex's data directly; they are requested from Vortex
+//! (ADR 0005, ADR 0009, ADR 0020).
+
+pub mod app;
+pub mod link;
+pub mod state;
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use mallet_core::{GamePath, ModRef, ModSource};
+use serde::Deserialize;
+
+pub use state::{VortexMod, VortexState};
+
+/// The value of [`ModRef::source`] for mods managed by Vortex.
+pub const SOURCE_ID: &str = "vortex";
+
+/// The name of the manifest Vortex writes into a directory it deployed to.
+pub const MANIFEST_FILE: &str = "vortex.deployment.json";
+
+/// The manifest of the game's `Data` directory, where almost all mod files
+/// of a Bethesda game end up.
+pub fn data_manifest_path(game_dir: &Path) -> PathBuf {
+    game_dir.join("Data").join(MANIFEST_FILE)
+}
+
+/// Why a deployment manifest could not be used.
+#[derive(Debug, thiserror::Error)]
+pub enum VortexError {
+    /// The file is not a deployment manifest Mod Mallet understands.
+    #[error("the Vortex deployment manifest could not be read: {0}")]
+    InvalidManifest(#[from] serde_json::Error),
+    /// The manifest describes a deployment into a different installation.
+    #[error(
+        "the Vortex deployment targets `{target}`, which is not inside the game directory `{game}`"
+    )]
+    TargetOutsideGame {
+        /// The directory the manifest says Vortex deployed to.
+        target: String,
+        /// The game directory that was scanned.
+        game: String,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawManifest {
+    target_path: String,
+    #[serde(default)]
+    files: Vec<RawFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawFile {
+    rel_path: String,
+    source: String,
+}
+
+/// The files Vortex deployed into a game, and the mod each one came from.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct VortexDeployment {
+    /// Folder names of the mods, as Vortex names them in its staging folder.
+    mods: Vec<String>,
+    /// Index into `mods` for every deployed file.
+    by_path: HashMap<GamePath, usize>,
+    /// The name Vortex shows for a mod, by folder name.
+    names: HashMap<String, String>,
+}
+
+impl VortexDeployment {
+    /// Reads the text of a deployment manifest.
+    ///
+    /// `game_dir` is the installation the manifest was found in. It is needed
+    /// because the manifest names files relative to the directory Vortex
+    /// deployed to, while Mod Mallet names them relative to the game
+    /// directory.
+    pub fn parse(manifest_json: &str, game_dir: &str) -> Result<Self, VortexError> {
+        let raw: RawManifest = serde_json::from_str(manifest_json)?;
+
+        let target = GamePath::new(&raw.target_path);
+        let game = GamePath::new(game_dir);
+        let base = if target == game {
+            GamePath::new("")
+        } else {
+            target
+                .strip_base(&game)
+                .ok_or_else(|| VortexError::TargetOutsideGame {
+                    target: raw.target_path.clone(),
+                    game: game_dir.to_owned(),
+                })?
+        };
+
+        let mut deployment = Self::default();
+        let mut mod_index: HashMap<String, usize> = HashMap::new();
+        for file in raw.files {
+            let index = if let Some(index) = mod_index.get(&file.source) {
+                *index
+            } else {
+                let index = deployment.mods.len();
+                deployment.mods.push(file.source.clone());
+                mod_index.insert(file.source, index);
+                index
+            };
+            deployment.by_path.insert(base.join(&file.rel_path), index);
+        }
+        Ok(deployment)
+    }
+
+    /// Uses the names Vortex shows for the mods instead of their folder
+    /// names. `names` maps a staging folder to the name; see
+    /// [`VortexState::names`].
+    #[must_use]
+    pub fn with_names(mut self, names: HashMap<String, String>) -> Self {
+        self.names = names;
+        self
+    }
+
+    /// The mod that lives in the staging folder `folder`.
+    pub fn mod_ref(&self, folder: &str) -> ModRef {
+        ModRef {
+            source: SOURCE_ID.to_owned(),
+            id: folder.to_owned(),
+            name: self
+                .names
+                .get(folder)
+                .cloned()
+                .unwrap_or_else(|| folder.to_owned()),
+        }
+    }
+
+    /// Whether the deployment contains files of the mod in the staging
+    /// folder `folder`.
+    pub fn has_mod(&self, folder: &str) -> bool {
+        self.mods.iter().any(|deployed| deployed == folder)
+    }
+
+    /// How many files the deployment covers.
+    pub fn file_count(&self) -> usize {
+        self.by_path.len()
+    }
+
+    /// How many mods contributed at least one file.
+    pub fn mod_count(&self) -> usize {
+        self.mods.len()
+    }
+}
+
+impl ModSource for VortexDeployment {
+    fn provider_of(&self, path: &GamePath) -> Option<ModRef> {
+        let folder = self.mods.get(*self.by_path.get(path)?)?;
+        Some(self.mod_ref(folder))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    const GAME_DIR: &str = r"C:\Games\Skyrim Special Edition";
+
+    const MANIFEST: &str = r#"{
+        "instance": "00000000-0000-0000-0000-000000000000",
+        "version": 1,
+        "deploymentMethod": "hardlink_activator",
+        "gameId": "skyrimse",
+        "deploymentTime": 1794695581306,
+        "stagingPath": "D:\\Vortex Mods\\skyrimse",
+        "targetPath": "C:\\Games\\Skyrim Special Edition\\Data",
+        "files": [
+            { "relPath": "SKSE\\Plugins\\Old.dll", "source": "Old Mod 123 1.0", "target": "", "time": 1 },
+            { "relPath": "SKSE\\Plugins\\Old.ini", "source": "Old Mod 123 1.0", "target": "", "time": 1 },
+            { "relPath": "textures\\sky.dds", "source": "Sky Textures 456 2.0", "target": "", "time": 1 }
+        ]
+    }"#;
+
+    #[test]
+    fn maps_deployed_files_to_their_mod() {
+        let deployment = VortexDeployment::parse(MANIFEST, GAME_DIR).unwrap();
+        assert_eq!(deployment.file_count(), 3);
+        assert_eq!(deployment.mod_count(), 2);
+
+        let provider = deployment
+            .provider_of(&GamePath::new("Data/SKSE/Plugins/old.dll"))
+            .unwrap();
+        assert_eq!(provider.source, "vortex");
+        assert_eq!(provider.id, "Old Mod 123 1.0");
+        assert_eq!(provider.name, "Old Mod 123 1.0");
+    }
+
+    #[test]
+    fn mods_are_shown_under_the_name_vortex_gives_them() {
+        let names = HashMap::from([("Old Mod 123 1.0".to_owned(), "Old Mod".to_owned())]);
+        let deployment = VortexDeployment::parse(MANIFEST, GAME_DIR)
+            .unwrap()
+            .with_names(names);
+
+        let known = deployment
+            .provider_of(&GamePath::new("data/skse/plugins/old.dll"))
+            .unwrap();
+        assert_eq!(known.id, "Old Mod 123 1.0");
+        assert_eq!(known.name, "Old Mod");
+
+        // A mod the state does not know keeps its folder name.
+        let unnamed = deployment
+            .provider_of(&GamePath::new("data/textures/sky.dds"))
+            .unwrap();
+        assert_eq!(unnamed.name, "Sky Textures 456 2.0");
+    }
+
+    #[test]
+    fn files_vortex_did_not_deploy_have_no_provider() {
+        let deployment = VortexDeployment::parse(MANIFEST, GAME_DIR).unwrap();
+        assert_eq!(
+            deployment.provider_of(&GamePath::new("data/skyrim.esm")),
+            None
+        );
+        // Paths are relative to the game directory, not to `Data`.
+        assert_eq!(
+            deployment.provider_of(&GamePath::new("skse/plugins/old.dll")),
+            None
+        );
+    }
+
+    #[test]
+    fn game_directory_spelling_does_not_matter() {
+        let deployment =
+            VortexDeployment::parse(MANIFEST, "c:/games/SKYRIM SPECIAL EDITION/").unwrap();
+        assert!(
+            deployment
+                .provider_of(&GamePath::new("data/textures/sky.dds"))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn a_deployment_into_the_game_directory_itself_is_accepted() {
+        let manifest = r#"{ "targetPath": "C:\\Games\\Skyrim Special Edition",
+            "files": [ { "relPath": "d3d11.dll", "source": "Shader Loader" } ] }"#;
+        let deployment = VortexDeployment::parse(manifest, GAME_DIR).unwrap();
+        assert!(
+            deployment
+                .provider_of(&GamePath::new("d3d11.dll"))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn a_manifest_for_another_installation_is_rejected() {
+        let error = VortexDeployment::parse(MANIFEST, r"D:\Other Game").unwrap_err();
+        assert!(matches!(error, VortexError::TargetOutsideGame { .. }));
+    }
+
+    #[test]
+    fn broken_json_is_an_error_not_a_crash() {
+        let error = VortexDeployment::parse("{ not json", GAME_DIR).unwrap_err();
+        assert!(matches!(error, VortexError::InvalidManifest(_)));
+    }
+
+    #[test]
+    fn data_manifest_lies_in_the_data_directory() {
+        let path = data_manifest_path(Path::new("game"));
+        assert_eq!(
+            path,
+            Path::new("game")
+                .join("Data")
+                .join("vortex.deployment.json")
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn never_panics_on_arbitrary_input(manifest in ".*", game_dir in ".*") {
+            let _ = VortexDeployment::parse(&manifest, &game_dir);
+        }
+    }
+}

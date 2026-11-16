@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderedPlaces",
+  "description": "The places a scan reads, in words, for showing them before anything is\nread and for changing them later.",
+  "type": "object",
+  "properties": {
+    "confirmed": {
+      "description": "Whether the user has agreed to these places before.",
+      "type": "boolean"
+    },
+    "places": {
+      "description": "The places, each with its role and origin in words. A place with an\nempty path could not be found and has to be named by the user.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RenderedLocation"
+      }
+    }
+  },
+  "required": [
+    "confirmed",
+    "places"
+  ],
+  "$defs": {
+    "LocationOrigin": {
+      "description": "How Mod Mallet came to look at a place.",
+      "oneOf": [
+        {
+          "description": "The user named it.",
+          "type": "string",
+          "const": "given"
+        },
+        {
+          "description": "It was read from the entry the game's launcher writes into the\nWindows registry.",
+          "type": "string",
+          "const": "registry"
+        },
+        {
+          "description": "It is the place where the game or the mod manager always puts this\nfile.",
+          "type": "string",
+          "const": "standard"
+        }
+      ]
+    },
+    "LocationRole": {
+      "description": "What a place the scan looked at is for.",
+      "oneOf": [
+        {
+          "description": "The directory the game is installed in.",
+          "type": "string",
+          "const": "game-dir"
+        },
+        {
+          "description": "The game's list of active plugins.",
+          "type": "string",
+          "const": "plugin-list"
+        },
+        {
+          "description": "The log of the script extender.",
+          "type": "string",
+          "const": "extender-log"
+        },
+        {
+          "description": "The mod manager's saved state: installed mods and installer choices.",
+          "type": "string",
+          "const": "manager-state"
+        },
+        {
+          "description": "The directory the mod manager keeps downloaded mod archives in.",
+          "type": "string",
+          "const": "downloads"
+        },
+        {
+          "description": "The program used to look into mod archives.",
+          "type": "string",
+          "const": "unpacker"
+        },
+        {
+          "description": "The mod manager's record of the files it deployed.",
+          "type": "string",
+          "const": "deployment-manifest"
+        }
+      ]
+    },
+    "RenderedLocation": {
+      "description": "A place the scan looked at, with its role and origin in words.",
+      "type": "object",
+      "properties": {
+        "location": {
+          "description": "The place itself.",
+          "$ref": "#/$defs/ScanLocation"
+        },
+        "originLabel": {
+          "description": "How Mod Mallet came to look there.",
+          "type": "string"
+        },
+        "roleLabel": {
+          "description": "What the place is for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "location",
+        "roleLabel",
+        "originLabel"
+      ]
+    },
+    "ScanLocation": {
+      "description": "A place the scan looked at, so that nobody has to wonder what was read.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "description": "Whether something was there to read.",
+          "type": "boolean"
+        },
+        "origin": {
+          "description": "How Mod Mallet came to look there.",
+          "$ref": "#/$defs/LocationOrigin"
+        },
+        "path": {
+          "description": "The path on this machine.",
+          "type": "string"
+        },
+        "role": {
+          "description": "What the place is for.",
+          "$ref": "#/$defs/LocationRole"
+        }
+      },
+      "required": [
+        "role",
+        "path",
+        "origin",
+        "found"
+      ]
+    }
+  }
+}

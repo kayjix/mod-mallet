@@ -1,0 +1,18 @@
+---
+source: crates/mallet-cli/tests/cli.rs
+expression: output
+---
+Skyrim Special Edition 1.7.104, Script Extender 2.3.1
+3 Script-Extender-Plugins geprüft
+0 Plugins und 0 Archive gelesen
+
+Fehler (sicher): Script-Extender-Plugin passt nicht zur Spielversion
+  Old.dll wurde abgeschaltet, weil es nicht für die Spielversion 1.7.104 gebaut ist.
+  Datei: data/skse/plugins/old.dll
+  Mod: Old Mod 123 1.0
+  Was tun: Sieh auf der Seite der Mod nach, ob es eine Version für deine Spielversion gibt, und installiere sie. Gibt es noch keine, deaktiviere die Mod, bis sie aktualisiert wurde.
+  [extender.plugin-incompatible]
+
+1 Fehler, 0 Warnungen, 1 Hinweis
+Hinweise sind nicht aufgelistet. Mit --notes werden sie angezeigt.
+Mehr zu einem Befund: mallet explain <Art>

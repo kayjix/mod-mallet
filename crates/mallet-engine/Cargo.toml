@@ -1,0 +1,33 @@
+[package]
+name = "mallet-engine"
+description = "Runs a Mod Mallet scan: wires adapters, analyses and the cache together."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+dirs.workspace = true
+flate2.workspace = true
+mallet-analysis.workspace = true
+mallet-core.workspace = true
+mallet-format-fomod.workspace = true
+mallet-game-skyrimse.workspace = true
+mallet-source-vortex.workspace = true
+mallet-store.workspace = true
+mallet-unpack.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+mallet-formats-bethesda.workspace = true
+mallet-unpack.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

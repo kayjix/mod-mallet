@@ -1,0 +1,13 @@
+---
+source: crates/mallet-cli/tests/cli.rs
+expression: output
+---
+Script extender plugin does not support this game version
+
+Kind: extender.plugin-incompatible
+Severity: Error
+Confidence: certain
+
+The script extender loads native plugins (DLL files) that mods use for features the game cannot provide on its own. Each plugin states which game versions it supports. This one does not support yours, so the script extender refused to load it. The game still starts, but everything the plugin provides is missing, and other mods that rely on it may misbehave.
+
+What to do: Look on the mod's page for a version built for your game version and install it. If there is none yet, disable the mod until it has been updated.

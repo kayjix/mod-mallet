@@ -1,0 +1,136 @@
+### Texte, die nicht zu einer einzelnen Befundart gehören: Beschriftungen und
+### Berichtszeilen für Kommandozeile und Desktop-App.
+
+severity-error = Fehler
+severity-warning = Warnung
+severity-info = Hinweis
+
+confidence-certain = sicher
+confidence-likely = wahrscheinlich
+confidence-hint = Vermutung
+
+label-file = Datei
+label-mod = Mod
+label-remedy = Was tun
+label-kind = Art
+label-severity = Schwere
+label-confidence = Sicherheit
+
+location-game-dir = Spielordner
+location-plugin-list = Liste der aktiven Plugins
+location-extender-log = Protokoll des Script Extenders
+location-deployment-manifest = Vortex' Liste der bereitgestellten Dateien
+location-manager-state = Vortex' gespeicherter Zustand
+location-downloads = Vortex' heruntergeladene Mod-Archive
+location-unpacker = Programm zum Hineinsehen in Mod-Archive
+origin-given = von dir angegeben
+origin-registry = aus dem Eintrag, den der Launcher des Spiels in die Windows-Registry schreibt
+origin-standard = am üblichen Ort
+location-not-found = nicht gefunden
+
+report-game = { $name } { $version }
+report-game-unknown-version = { $name } (Version unbekannt)
+report-extender = Script Extender { $version }
+report-plugins-checked =
+    { $count ->
+        [one] 1 Script-Extender-Plugin geprüft
+       *[other] { $count } Script-Extender-Plugins geprüft
+    }
+report-files-read =
+    { $plugins ->
+        [one] 1 Plugin
+       *[other] { $plugins } Plugins
+    } und { $archives ->
+        [one] 1 Archiv
+       *[other] { $archives } Archive
+    } gelesen
+report-installers-read =
+    { $count ->
+        [one] 1 Mod-Installer gelesen
+       *[other] { $count } Mod-Installer gelesen
+    }
+report-meshes-compared =
+    { $count ->
+        [one] 1 Ersatz-Modell mit dem Original verglichen
+       *[other] { $count } Ersatz-Modelle mit dem Original verglichen
+    }
+report-no-extender-log = Der Script Extender hat kein Protokoll geschrieben, seine Plugins wurden deshalb nicht geprüft.
+report-no-findings = Keine Probleme gefunden.
+report-totals =
+    { $errors ->
+        [one] 1 Fehler
+       *[other] { $errors } Fehler
+    }, { $warnings ->
+        [one] 1 Warnung
+       *[other] { $warnings } Warnungen
+    }, { $notes ->
+        [one] 1 Hinweis
+       *[other] { $notes } Hinweise
+    }
+report-notes-hidden = Hinweise sind nicht aufgelistet. Mit --notes werden sie angezeigt.
+report-explain-hint = Mehr zu einem Befund: mallet explain <Art>
+report-no-scan = Es ist noch kein Scan gespeichert. Starte zuerst "mallet scan".
+
+explain-unknown-kind = Eine Befundart namens "{ $kind }" gibt es nicht. "mallet kinds" listet alle auf.
+
+## Aktionen: was sich gegen einen Befund tun lässt und was daraus wurde.
+
+label-action = Von hier beheben
+
+action-reinstall-mod = In Vortex neu installieren
+    .description = Vortex öffnet den Installer von { $mod } erneut, mit deiner früheren Auswahl vorbelegt. Geh ihn Seite für Seite durch und kreuze die hier aufgeführten Optionen an; das passiert nicht von selbst. Es ändert sich nichts, bis du den Installer dort abschließt.
+
+guide-page = Seite { $page } von { $pages }
+
+action-hide-objects = Patch in Vortex installieren
+    .description = Mod Mallet schreibt eine kleine Mod, die im Spiel { $count ->
+        [one] 1 Objekt
+       *[other] { $count } Objekte
+    } durch einen unsichtbaren Marker ersetzt, und Vortex installiert sie. Dafür braucht es Base Object Swapper. Entfernst du die Mod in Vortex, sind die Objekte wieder da.
+
+outcome-installing = Vortex installiert den Patch. Stelle bereit, falls Vortex das nicht von selbst tut; Mod Mallet scannt danach erneut.
+outcome-started = Vortex hat den Installer geöffnet. Mach dort weiter und scanne danach erneut.
+outcome-link-missing = Dafür braucht es eine kleine Erweiterung in Vortex, die noch nicht installiert ist.
+outcome-manager-not-running = Vortex antwortet nicht. Starte Vortex, oder starte es neu, falls die Erweiterung gerade erst installiert wurde, und versuche es noch einmal.
+outcome-no-answer = Vortex hat nicht rechtzeitig geantwortet. Prüfe, ob Vortex geöffnet ist und nicht in einem Dialog wartet, und versuche es noch einmal.
+outcome-wrong-game = Vortex verwaltet gerade ein anderes Spiel. Stelle Vortex auf dieses Spiel um und versuche es noch einmal.
+outcome-unknown-mod = Vortex kennt diese Mod nicht mehr. Scanne erneut.
+outcome-archive-missing = Vortex hat das Archiv nicht mehr, aus dem diese Mod installiert wurde. Lade die Mod zuerst in Vortex erneut herunter.
+outcome-unsupported = Die Erweiterung in Vortex kennt diese Anfrage nicht. Installiere die Erweiterung neu und starte Vortex neu.
+outcome-failed = Das hat nicht geklappt: { $detail }
+
+link-ready = Die Vortex-Erweiterung ist installiert und Vortex antwortet.
+link-not-running = Die Vortex-Erweiterung ist installiert, aber Vortex antwortet nicht. Starte Vortex, oder starte es neu, falls die Erweiterung gerade erst installiert wurde.
+link-restart-needed = In Vortex läuft noch eine ältere Fassung der Erweiterung. Starte Vortex neu, damit die neue geladen wird.
+link-missing = Die Vortex-Erweiterung ist nicht installiert.
+link-explanation = Mod Mallet verändert deine Mods nicht selbst. Damit Vortex das übernehmen kann, legt Mod Mallet eine kleine Erweiterung in Vortex' Plugin-Ordner. Die Erweiterung handelt nur, wenn du in Mod Mallet einen Knopf drückst, und tut dann dasselbe wie Vortex' eigener Menüeintrag.
+link-installed = Die Erweiterung wurde nach { $path } installiert. Starte Vortex neu, damit sie geladen wird.
+
+## Der Werkzeugkasten: was das Setup neben den Mods braucht.
+
+tool-vortex-name = Vortex
+tool-vortex-purpose = Der Mod-Manager. Mod Mallet liest, welche Mod welche Datei mitgebracht hat, und überlässt jede Änderung Vortex.
+tool-mallet-link-name = Mod-Mallet-Verbindung in Vortex
+tool-mallet-link-purpose = Eine kleine Vortex-Erweiterung. Über sie können die Knöpfe in Mod Mallet Vortex bitten, eine Mod neu zu installieren oder einen Patch zu installieren.
+tool-skse-name = Skyrim Script Extender (SKSE)
+tool-skse-purpose = Erlaubt Mods, dem Spiel Programmcode hinzuzufügen. Braucht eine Fassung genau für deine Spielversion; Steam-Updates legen ihn lahm, bis SKSE nachzieht.
+tool-address-library-name = Address Library for SKSE Plugins
+tool-address-library-purpose = Sagt SKSE-Plugins, wo in deiner Spielversion was liegt, damit sie kleine Spielupdates überstehen. Die meisten SKSE-Plugins brauchen sie.
+tool-vc-runtime-name = Microsoft Visual C++ Redistributable
+tool-vc-runtime-purpose = Ein Windows-Baustein, mit dem fast jedes SKSE-Plugin gebaut ist. Ohne ihn laden diese Plugins nicht.
+tool-base-object-swapper-name = Base Object Swapper
+tool-base-object-swapper-purpose = Ein SKSE-Plugin, das Objekte austauscht, während das Spiel läuft. Die Patches von Mod Mallet blenden damit kollidierende Objekte aus.
+tool-creation-kit-name = Creation Kit
+tool-creation-kit-purpose = Bethesdas Editor, um Mods zu bauen und hineinzuschauen. Zum Spielen nicht nötig.
+tool-loot-name = LOOT
+tool-loot-purpose = Sortiert Plugins und zeigt Hinweise zu ihnen. Vortex sortiert schon selbst nach LOOTs Regeln; das eigene Programm zeigt zusätzlich seine Hinweise zu jedem Plugin.
+tool-seven-zip-name = 7-Zip
+tool-seven-zip-purpose = Öffnet Mod-Archive. Mod Mallet liest damit die Installer deiner Mods; Vortex bringt eines mit.
+
+tool-state-ready = Bereit
+tool-state-missing = Fehlt
+tool-state-outdated = Braucht ein Update
+tool-state-stopped = Läuft nicht
+tool-need-required = Nötig
+tool-need-recommended = Empfohlen
+tool-need-optional = Optional

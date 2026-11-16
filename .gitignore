@@ -1,0 +1,38 @@
+# Rust
+/target/
+
+# Node
+node_modules/
+dist/
+
+# Tauri's generated capability schemas
+/apps/desktop/src-tauri/gen/
+
+# Generated documentation site (sources live in docs/src) and the diagram
+# scripts that `cargo xtask docs` installs
+/docs/book/
+/docs/mermaid*.js
+
+# Local caches and user data never belong in the repository
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+/.mallet/
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Snapshot files awaiting review
+*.snap.new

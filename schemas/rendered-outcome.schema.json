@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderedOutcome",
+  "description": "What became of an action, in words.",
+  "type": "object",
+  "properties": {
+    "message": {
+      "description": "What happened and what to do next.",
+      "type": "string"
+    },
+    "outcome": {
+      "description": "The outcome itself.",
+      "$ref": "#/$defs/ActionOutcome"
+    }
+  },
+  "required": [
+    "outcome",
+    "message"
+  ],
+  "$defs": {
+    "ActionOutcome": {
+      "description": "The result of asking for an action.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "Technical detail for a failure, in the words of whatever failed.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "description": "What became of the action.",
+          "$ref": "#/$defs/ActionStatus"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "ActionStatus": {
+      "description": "What became of an action.\n\nAn action that was *started* is in the hands of the mod manager from\nthen on: the user may still have to go through a dialog there, and may\ncancel it. Mod Mallet learns the result from the next scan.",
+      "oneOf": [
+        {
+          "description": "The mod manager took the request and has begun.",
+          "type": "string",
+          "const": "started"
+        },
+        {
+          "description": "The mod manager is installing the patch Mod Mallet wrote.",
+          "type": "string",
+          "const": "installing"
+        },
+        {
+          "description": "The link between Mod Mallet and the mod manager is not installed.",
+          "type": "string",
+          "const": "link-missing"
+        },
+        {
+          "description": "The mod manager is not running, or the link in it is not answering.",
+          "type": "string",
+          "const": "manager-not-running"
+        },
+        {
+          "description": "The mod manager took too long to answer.",
+          "type": "string",
+          "const": "no-answer"
+        },
+        {
+          "description": "The mod manager is managing a different game at the moment.",
+          "type": "string",
+          "const": "wrong-game"
+        },
+        {
+          "description": "The mod manager does not know the mod.",
+          "type": "string",
+          "const": "unknown-mod"
+        },
+        {
+          "description": "The archive the mod was installed from is no longer there.",
+          "type": "string",
+          "const": "archive-missing"
+        },
+        {
+          "description": "The mod manager's link is of a version that does not know this\nrequest.",
+          "type": "string",
+          "const": "unsupported"
+        },
+        {
+          "description": "Something else went wrong; see [`ActionOutcome::detail`].",
+          "type": "string",
+          "const": "failed"
+        }
+      ]
+    }
+  }
+}

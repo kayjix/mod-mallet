@@ -1,0 +1,11 @@
+{
+  "name": "@mod-mallet/vortex-extension",
+  "description": "The Vortex extension through which Mod Mallet asks Vortex to act.",
+  "private": true,
+  "version": "0.4.2",
+  "license": "GPL-3.0-or-later",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  }
+}

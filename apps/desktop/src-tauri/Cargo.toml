@@ -1,0 +1,36 @@
+[package]
+name = "mallet-desktop"
+description = "The Mod Mallet desktop app: a Tauri shell around the engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lib]
+# The library needs a name of its own: on Windows a library and a binary of
+# the same name collide, see https://github.com/rust-lang/cargo/issues/8519
+name = "mallet_desktop_lib"
+
+[features]
+# With this feature the app carries its web frontend inside the executable.
+# Without it, it loads the frontend from the development server, which is
+# only right for `npm run desktop -- dev` (the Tauri CLI switches default
+# features off for that). It is on by default so that every other way of
+# building the crate yields an app that runs on its own.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+mallet-core.workspace = true
+mallet-engine.workspace = true
+mallet-messages.workspace = true
+tauri.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

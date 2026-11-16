@@ -1,0 +1,187 @@
+import { createContext, useContext, useState } from "react";
+import type { Api } from "./api";
+import type { RenderedOutcome } from "./generated/rendered-outcome";
+import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
+import type { Lang, Texts } from "./i18n";
+
+/** What the components of a report need from the window around them. */
+export interface Session {
+  api: Api;
+  lang: Lang;
+  t: Texts;
+  /** Scans again, for after an action was finished in the mod manager. */
+  rescan: () => void;
+  /** Tells the window that the state of the link may have changed. */
+  linkChanged: () => void;
+  /** The findings the user has set aside, by identity. */
+  ignored: Set<string>;
+  /** Sets a finding aside or brings it back. */
+  setIgnored: (id: string, ignored: boolean) => void;
+  /** The mods of the report, by the name findings use for them. */
+  mods: Map<string, ModInfo>;
+  /** The spots of each finding about placed objects, by finding. */
+  spots: Map<string, MapSpot[]>;
+  /** Switches to the map and shows a spot there. */
+  showOnMap: (spot: MapSpot) => void;
+}
+
+export const SessionContext = createContext<Session | null>(null);
+
+export function useSession(): Session {
+  const session = useContext(SessionContext);
+  if (session === null) {
+    throw new Error("no session: the component is used outside the app");
+  }
+  return session;
+}
+
+/** An action as one finding sees it: how to start it and what became of it. */
+export interface ActionState {
+  busy: boolean;
+  /** Whether anything happened that the user should read. */
+  touched: boolean;
+  outcome: RenderedOutcome | null;
+  /** Why the link is needed, when the action failed for lack of it. */
+  linkExplanation: string | null;
+  /** What installing the link did. */
+  linkNote: string | null;
+  run: (action: Action) => Promise<void>;
+  installLink: () => Promise<void>;
+}
+
+/**
+ * Hands actions to the mod manager and keeps what became of them.
+ *
+ * Mod Mallet changes nothing itself. If the link to the mod manager is
+ * missing, the user is told what it is and can install it from here.
+ * Nothing is installed without that click.
+ */
+export function useAction(): ActionState {
+  const { api, lang, linkChanged } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<RenderedOutcome | null>(null);
+  const [linkExplanation, setLinkExplanation] = useState<string | null>(null);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
+
+  const run = async (action: Action) => {
+    setBusy(true);
+    setLinkNote(null);
+    setLinkExplanation(null);
+    try {
+      const result = await api.runAction(action, lang);
+      setOutcome(result);
+      if (result.outcome.status === "link-missing") {
+        setLinkExplanation((await api.managerLink(lang)).explanation);
+      }
+    } catch (error: unknown) {
+      setOutcome({ outcome: { status: "failed" }, message: String(error) });
+    } finally {
+      setBusy(false);
+      linkChanged();
+    }
+  };
+
+  const installLink = async () => {
+    setBusy(true);
+    try {
+      setLinkNote(await api.installManagerLink(lang));
+      setOutcome(null);
+      setLinkExplanation(null);
+    } catch (error: unknown) {
+      setLinkNote(String(error));
+    } finally {
+      setBusy(false);
+      linkChanged();
+    }
+  };
+
+  return {
+    busy,
+    touched: outcome !== null || linkExplanation !== null || linkNote !== null,
+    outcome,
+    linkExplanation,
+    linkNote,
+    run,
+    installLink,
+  };
+}
+
+/** What became of an action, below the finding it belongs to. */
+export function ActionResult({ state }: { state: ActionState }) {
+  const { t, rescan } = useSession();
+  const { outcome, linkExplanation, linkNote, busy, installLink } = state;
+
+  return (
+    <>
+      {outcome !== null && (
+        <div className="outcome" data-status={outcome.outcome.status} role="status">
+          <p className="outcome-text">{outcome.message}</p>
+          {outcome.outcome.status === "started" && (
+            <button type="button" onClick={rescan}>
+              {t.rescan}
+            </button>
+          )}
+        </div>
+      )}
+      {linkExplanation !== null && (
+        <div className="outcome">
+          <p className="outcome-text">{linkExplanation}</p>
+          <button type="button" onClick={installLink} disabled={busy}>
+            {t.installLink}
+          </button>
+        </div>
+      )}
+      {linkNote !== null && (
+        <div className="outcome" role="status">
+          <p className="outcome-text">{linkNote}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** A button that puts a text on the clipboard and says so. */
+export function CopyButton({ text }: { text: string }) {
+  const { t } = useSession();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Without a clipboard the command can still be selected by hand.
+    }
+  };
+  return (
+    <button type="button" className="small" onClick={copy}>
+      {copied ? t.copied : t.copy}
+    </button>
+  );
+}
+
+/** What is known about a mod, with the way to its page. */
+export function ModCard({ info }: { info: ModInfo }) {
+  const { api, t } = useSession();
+  const page = info.page;
+  return (
+    <div className="mod-card">
+      <div>
+        <strong>{info.mod.name}</strong>
+        {!info.enabled && <span className="tag">{t.disabled}</span>}
+        <p className="aside">
+          {info.version != null && `${t.version} ${info.version}`}
+          {info.author != null && ` · ${t.author}: ${info.author}`}
+          {info.newerVersion != null && (
+            <span className="newer"> · {t.newerVersion(info.newerVersion)}</span>
+          )}
+        </p>
+      </div>
+      {page?.startsWith("https://www.nexusmods.com/") && (
+        <button type="button" className="small" onClick={() => page && api.openPage(page)}>
+          {t.openPage}
+        </button>
+      )}
+    </div>
+  );
+}

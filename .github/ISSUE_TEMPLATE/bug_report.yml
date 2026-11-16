@@ -1,0 +1,45 @@
+name: Bug or wrong finding
+description: Mod Mallet crashed, reported something that is not a problem, or missed one.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Please check anything you paste for
+        information you do not want to share: scan output contains file
+        names from your game directory and the names of your mods.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What happened?
+      options:
+        - Mod Mallet crashed or showed an error
+        - A finding is wrong or misleading
+        - A problem in my setup was not found
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What did you do, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The output of `mallet scan --format json`, or the error message.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: Mod Mallet version
+      description: The output of `mallet --version`, or the commit you built.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Game, game version and mod manager
+      placeholder: Skyrim Special Edition 1.6.1170, Vortex 1.13

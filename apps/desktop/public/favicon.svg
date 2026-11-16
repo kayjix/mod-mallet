@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Gummihammer</title>
+  <defs>
+    <clipPath id="kopf"><path d="M -122,-56 H 122 A 170 170 0 0 1 122,56 H -122 A 170 170 0 0 1 -122,-56 Z"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0B7285"/>
+  <g transform="translate(307.2 204.8) scale(0.9341) rotate(45)">
+    <path fill="#2EC4B6" d="M -17,80 L 17,80 L 24.99,321.17 A 25 25 0 1 1 -24.99,321.17 Z"/>
+    <path fill="#FF7A18" d="M -122,-56 H 122 A 170 170 0 0 1 122,56 H -122 A 170 170 0 0 1 -122,-56 Z"/>
+    <circle clip-path="url(#kopf)" cx="0" cy="-606" r="600" fill="#FFA62B"/>
+  </g>
+</svg>

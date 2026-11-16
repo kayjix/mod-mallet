@@ -1,0 +1,23 @@
+# Git hooks, installed by `npm install`. They run the fast checks before a
+# commit and everything CI runs before a push, so CI rarely has news.
+# See CONTRIBUTING.md.
+
+pre-commit:
+  parallel: true
+  commands:
+    rust-format:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+    biome:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc,css}"
+      run: npx --no-install biome check --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: cargo xtask commit-msg {1}
+
+pre-push:
+  commands:
+    ci:
+      run: cargo xtask ci

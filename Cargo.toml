@@ -1,0 +1,94 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask", "apps/desktop/src-tauri"]
+# Plain `cargo build` and `cargo test` leave the desktop app out: compiling
+# it needs the built web frontend. `cargo xtask ci` covers it.
+default-members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "GPL-3.0-or-later"
+authors = ["The Mod Mallet contributors"]
+publish = false
+
+# One place for every third-party version. A dependency is added here only
+# when a milestone needs it (ADR 0016) and must pass `cargo deny check`.
+[workspace.dependencies]
+# Internal crates
+mallet-analysis = { path = "crates/mallet-analysis" }
+mallet-cli = { path = "crates/mallet-cli" }
+mallet-core = { path = "crates/mallet-core" }
+mallet-engine = { path = "crates/mallet-engine" }
+mallet-format-fomod = { path = "crates/mallet-format-fomod" }
+mallet-formats-bethesda = { path = "crates/mallet-formats-bethesda" }
+mallet-game-skyrimse = { path = "crates/mallet-game-skyrimse" }
+mallet-messages = { path = "crates/mallet-messages" }
+mallet-source-vortex = { path = "crates/mallet-source-vortex" }
+mallet-store = { path = "crates/mallet-store" }
+mallet-unpack = { path = "crates/mallet-unpack" }
+
+# Third party
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+dirs = "7.0.0"
+flate2 = "1.1.11"
+fluent-bundle = "0.16.0"
+libloadorder = "18.8.2"
+lz4_flex = "0.14.2"
+roxmltree = "0.21.2"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+schemars = "1.2.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = "2"
+tauri-build = "2"
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+unic-langid = "0.9.6"
+winreg = "0.56.0"
+
+# Test only
+insta = "1.49.0"
+proptest = "1.12.0"
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+# `deny`, not `forbid`: a single reviewed exception stays possible (ADR 0013).
+unsafe_code = "deny"
+missing_docs = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# Mod files are untrusted input. Code that reads them reports an error or a
+# finding; it never brings the tool down (ADR 0013).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+
+# Pedantic lints that cost more than they give in this code base.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+
+# Size-oriented settings recommended for Tauri apps:
+# https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+# Snapshot and property tests run much faster with optimized dependencies.
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

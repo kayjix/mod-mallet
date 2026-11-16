@@ -1,0 +1,190 @@
+### Texts for every kind of finding declared in `mallet-core/src/kinds.rs`.
+###
+### The message id is the kind id with `.` replaced by `-`. Every message
+### needs a value (the title) and the attributes `.summary`, `.explanation`
+### and `.remedy`. Only `.summary` may use the kind's arguments; the other
+### texts must read on their own because the reference documentation shows
+### them without a concrete finding.
+###
+### Write for someone who installs mods but has never opened a modding tool:
+### say what happened, why it matters in the game, and what to do.
+
+extender-plugin-incompatible = Script extender plugin does not support this game version
+    .headline = { $file } does not support game version { $gameVersion }
+    .summary = { $file } was switched off because it was not built for game version { $gameVersion }.
+    .explanation = The script extender loads native plugins (DLL files) that mods use for features the game cannot provide on its own. Each plugin states which game versions it supports. This one does not support yours, so the script extender refused to load it. The game still starts, but everything the plugin provides is missing, and other mods that rely on it may misbehave.
+    .remedy = Look on the mod's page for a version built for your game version and install it. If there is none yet, disable the mod until it has been updated.
+
+extender-plugin-not-loaded = Script extender plugin was not loaded
+    .headline = { $file } was not loaded
+    .summary = { $file } was not loaded. The script extender reported: { $reason }
+    .explanation = The script extender tried to load this native plugin (a DLL file) and gave up. The game still starts, but everything the plugin provides is missing. The reason is quoted from the script extender's own log. Common causes are a plugin built for a different game version, a missing requirement such as Address Library, or a damaged download.
+    .remedy = Check that the mod's requirements are installed and that the mod matches your game version, then reinstall it. If that does not help, disable the mod and report the quoted reason to its author.
+
+extender-plugin-no-version-data = File in the plugin folder is not a script extender plugin
+    .headline = { $file } is not a script extender plugin
+    .summary = { $file } lies in the script extender's plugin folder but does not identify itself as a plugin, so it was skipped.
+    .explanation = Some mods ship support libraries next to their plugin. The script extender examines every DLL in its plugin folder and skips those that carry no plugin information, which is harmless. It only points to a problem if you expected this file to be a plugin: then it is damaged or was built for a different game.
+    .remedy = Nothing to do if the file is a support library of one of your mods. If it should be a plugin, reinstall the mod it belongs to.
+
+plugins-master-missing = A plugin builds on a plugin that is not installed
+    .headline =
+        { $plugin }: { $count ->
+            [one] 1 plugin it needs is
+           *[other] { $count } plugins it needs are
+        } missing
+    .summary =
+        { $plugin } builds on { $count ->
+            [one] a plugin that is
+           *[other] { $count } plugins that are
+        } not installed: { $masters }.
+    .explanation = A plugin can build on other plugins, its masters, and names them in its file. The game loads the masters first. If one of them is not there, the game closes without a message while it starts, usually right after the logo. This typically happens when a patch for two mods is installed and one of the two is not, or when a mod was removed and its patches stayed behind.
+    .remedy = Install the mod that contains the missing plugin, or disable the mod this plugin belongs to. If the plugin is a patch that an installer offered, run that installer again and untick the patch.
+
+
+npcs-face-mismatch = Characters with dark or mismatched faces
+    .headline =
+        { $winnerPlugin } changes { $count ->
+            [one] 1 face
+           *[other] { $count } faces
+        } made for { $facePlugin }
+    .summary =
+        { $winnerPlugin } is loaded after { $facePlugin } and describes { $count ->
+            [one] a different face for 1 character
+           *[other] different faces for { $count } characters
+        } than the face files in use, which come from { $faceOrigin ->
+            [game] the game itself
+           *[mod] { $faceMod }
+        }. For example: { $examples }.
+    .explanation = The game does not build a character's face while playing. It loads a face mesh that was generated in advance from the character's record. When the record that wins in the load order describes a different face than that mesh was generated from, the game draws the head in the wrong colours, usually much darker than the body. This happens when one mod provides the face files and a plugin of another mod, loaded later, changes the same characters. The check compares the records as written, so it can report a plugin whose change does not show in the game.
+    .remedy = If you want the looks of the face files, load their plugin after the other one, or look for a compatibility patch for the two mods. If you want the other plugin's version of the characters, its mod has to provide matching face files.
+
+installer-options-now-recommended = Recommended installer options are not installed
+    .headline =
+        { $mod }: { $count ->
+            [one] 1 recommended option is
+           *[other] { $count } recommended options are
+        } not installed
+    .summary =
+        The installer of { $mod } would now tick { $count ->
+            [one] 1 option that was not chosen
+           *[other] { $count } options that were not chosen
+        } when the mod was installed: { $examples }. Each is given as step › group › option.
+    .explanation = Many mods come with an installer that offers patches for other mods and ticks the ones that fit what is installed at that moment. The dialog is shown once. If a mod that needs such a patch is installed afterwards, nobody offers the patch again, and the two mods run together unpatched: objects overlap, changes of one mod are lost, or lighting and textures do not match. Mod Mallet replays the installer's own rules against the current setup and reports the options it would tick now. An option you left out on purpose is reported as well.
+    .remedy = Reinstall the mod in your mod manager, go through its installer again and tick the options named above. In Vortex, select the mod and choose Reinstall. Deploy and sort the plugins afterwards.
+
+plugins-contained = A mod is already part of another
+    .headline = { $plugin } is already part of { $container }
+    .summary =
+        { $container } places { $count } of the { $total } objects of { $plugin } in the same spots, so { $plugin } is already part of it and the game shows these objects twice. { $dependentCount ->
+            [0] No other plugin builds on { $pluginFile }.
+           *[other] These plugins build on { $pluginFile }: { $dependents }.
+        }
+    .explanation = Collections ("all in one") often contain mods that are also offered on their own. With both installed, their objects stand in the same spot twice: surfaces flicker, and doors and containers can exist twice. Often a patch needs the single mod as a master. Then the single mod cannot simply be switched off: the game would close while starting.
+    .remedy = If no other plugin builds on the contained mod, disable it in your mod manager. If a patch builds on it, look on the patch's page for a version made for the collection; many patches come in one version for the single mod and one for the collection. If there is none, keep both and live with the doubled objects for now.
+
+objects-duplicated = Two mods place the same object twice
+    .headline =
+        { $first } and { $second } place { $count ->
+            [one] 1 object
+           *[other] { $count } objects
+        } twice
+    .summary =
+        { $first } and { $second } place the same { $count ->
+            [one] object
+           *[other] { $count } objects
+        } at almost the same spot, so the game shows { $count ->
+            [one] it
+           *[other] them
+        } twice. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
+    .explanation = Mods that change the same town or the same stretch of land often add the same things, such as a fence, a market stall or a house that the game itself lacks. Each mod places its own copy. The game shows both copies in the same spot, which flickers where the surfaces meet and can make doors or containers appear twice. Mod managers do not show this, because the two mods change different records.
+    .remedy = Look on the pages of both mods for a compatibility patch; for well-known combinations there usually is one. Install it with both mods and scan again. If there is none, decide which of the two mods you want to keep for this place, or live with the doubled objects.
+
+objects-overlapping = Objects of two mods stand inside each other
+    .headline =
+        { $first } and { $second }: { $count ->
+            [one] 1 object stands
+           *[other] { $count } objects stand
+        } inside another
+    .summary =
+        { $first } and { $second } each place objects of similar size in the same spot, so that they stand largely inside each other in { $count ->
+            [one] 1 place
+           *[other] { $count } places
+        }. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
+    .explanation = Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Mod Mallet compares the box around each object's model, not the model itself, so an object with a lot of empty space, such as an arch, can be reported although nothing visibly collides.
+    .remedy = Look on the pages of both mods for a compatibility patch. If there is none, look at the places named above in the game. If something is in the way, decide which of the two mods you want to keep for this place.
+
+meshes-retexture-bypassed = A texture mod does not reach replaced meshes
+    .headline =
+        { $textureMod } does not reach { $count ->
+            [one] 1 mesh
+           *[other] { $count } meshes
+        } { $meshOrigin ->
+            [unmanaged] installed without a mod manager
+           *[mod] of { $meshMod }
+        }
+    .summary =
+        { $textureMod } replaces textures that are no longer used by { $count ->
+            [one] 1 mesh
+           *[other] { $count } meshes
+        } { $meshOrigin ->
+            [unmanaged] that no mod manager installed
+           *[mod] of { $meshMod }
+        }. { $count ->
+            [one] The new mesh points
+           *[other] The new meshes point
+        } at other textures instead. For example: { $examples }.
+    .explanation = A mesh names the textures it uses by path. A texture mod works by providing new files under the paths the original meshes name. When another mod replaces a mesh and its version names other paths, usually textures in that mod's own folder, the texture mod no longer reaches the object. The object keeps one look while everything around it gets the new one: a bright wall next to dark ones, a sharp roof next to blurry ones. How much it shows depends on how different the two sets of textures are.
+    .remedy = Check whether the texture mod offers an option or a patch for the mesh mod; many do. Otherwise decide which look you prefer: remove the listed meshes of the mesh mod, so that the original meshes and the texture mod apply, or keep them and accept the difference.
+
+assets-loose-over-archive = Loose files cover files in another mod's archive
+    .headline =
+        { $winnerOrigin ->
+            [unmanaged] Files installed without a mod manager cover
+           *[mod] { $winnerMod } covers
+        } { $count ->
+            [one] 1 file
+           *[other] { $count } files
+        } of { $archiveMod }
+    .summary =
+        { $winnerOrigin ->
+            [unmanaged] Files that no mod manager installed
+           *[mod] Loose files of { $winnerMod }
+        } replace { $count ->
+            [one] 1 file
+           *[other] { $count } files
+        } in { $archive } of { $archiveMod }. For example: { $examples }.
+    .explanation = A mod can ship its files packed into an archive or as loose files. The game always prefers a loose file over the same file in an archive, whatever the order of the mods. Mod managers show conflicts between loose files but not this kind, because one side is hidden inside the archive. Often it is intended, for example a texture pack over an older mod. It becomes a problem when only some of the files that belong together are replaced, such as a mesh without its texture: the result can be purple or misplaced objects.
+    .remedy = Nothing to do if you want the loose files to win. If the mod in the archive looks broken in the game, disable the mod that provides the loose files, or check on its page whether the two are compatible.
+
+assets-archive-over-archive = An archive covers files in another mod's archive
+    .headline =
+        { $winnerOrigin ->
+            [unmanaged] { $winnerArchive }
+           *[mod] { $winnerMod }
+        } covers { $count ->
+            [one] 1 file
+           *[other] { $count } files
+        } of { $archiveMod }
+    .summary =
+        { $winnerOrigin ->
+            [unmanaged] { $winnerArchive }
+           *[mod] { $winnerArchive } of { $winnerMod }
+        } is loaded later and replaces { $count ->
+            [one] 1 file
+           *[other] { $count } files
+        } in { $archive } of { $archiveMod }. For example: { $examples }.
+    .explanation = Archives are loaded in the order of the plugins they belong to. When two archives contain the same file, the game uses the one loaded later. Mod managers do not show this, because both sides are hidden inside archives. It is harmless when the later mod is meant to build on the earlier one. It is a problem when the later archive carries older copies of files that it shares with the earlier mod.
+    .remedy = Nothing to do if the later mod is meant to win. Otherwise change the load order of the two plugins so that the archive you want is loaded last.
+
+setup-file-unreadable = A file of the setup could not be read
+    .headline = { $file } could not be read
+    .summary = { $file } could not be read: { $reason }
+    .explanation = Mod Mallet skipped this file, so problems that involve it are not reported. If the file is damaged, the game may have trouble with it as well. A damaged download is the usual cause.
+    .remedy = Reinstall the mod the file belongs to. If the game works with the file and Mod Mallet does not, please report it.
+
+setup-load-order-unknown = The load order could not be read
+    .headline = The load order could not be read
+    .summary = Plugins and archives were not checked: { $reason }
+    .explanation = Mod Mallet needs to know which plugins are active and in which order the game loads them. Without that it cannot tell which files and records win, so those checks did not run. The other checks are not affected.
+    .remedy = Start the game or your mod manager once so that the list of plugins is written, then scan again. If the game is installed in an unusual place, tell Mod Mallet where it is.

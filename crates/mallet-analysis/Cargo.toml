@@ -1,0 +1,15 @@
+[package]
+name = "mallet-analysis"
+description = "Mod Mallet's analyses: pure functions that turn facts about a setup into findings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+mallet-core.workspace = true
+
+[lints]
+workspace = true
