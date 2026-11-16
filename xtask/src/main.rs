@@ -54,8 +54,9 @@ enum Task {
     },
     /// Check that a commit message follows the Conventional Commits format.
     CommitMsg {
-        /// The file git wrote the message to.
-        file: PathBuf,
+        /// The file git wrote the message to. Asked from git if omitted,
+        /// which the hook relies on: lefthook splits a path with spaces.
+        file: Option<PathBuf>,
     },
     /// Build the documentation site into `docs/book`.
     Docs {
@@ -74,7 +75,7 @@ fn main() -> ExitCode {
             require_tools,
         } => ci::run(&root, skip_desktop, require_tools),
         Task::App { release, no_run } => app::run(&root, release, !no_run),
-        Task::CommitMsg { file } => commit_msg::run(&file),
+        Task::CommitMsg { file } => commit_msg::run(file),
         Task::Docs { open } => tools::build_docs(&root, open),
     };
     match result {

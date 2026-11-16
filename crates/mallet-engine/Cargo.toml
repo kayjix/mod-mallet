@@ -15,6 +15,7 @@ mallet-analysis.workspace = true
 mallet-core.workspace = true
 mallet-format-fomod.workspace = true
 mallet-game-skyrimse.workspace = true
+mallet-knowledge.workspace = true
 mallet-source-vortex.workspace = true
 mallet-store.workspace = true
 mallet-unpack.workspace = true

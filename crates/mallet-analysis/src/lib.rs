@@ -23,6 +23,7 @@ pub mod assets;
 pub mod extender;
 pub mod faces;
 pub mod installer;
+pub mod knowledge;
 pub mod map;
 pub mod masters;
 pub mod meshes;
@@ -82,6 +83,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(setup::SetupProblems),
         Box::new(extender::ExtenderPlugins),
         Box::new(masters::MissingMasters),
+        Box::new(knowledge::KnownRules),
         Box::new(faces::NpcFaces),
         Box::new(installer::InstallerOptions),
         Box::new(meshes::BypassedRetextures),

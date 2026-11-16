@@ -47,6 +47,9 @@ pub enum LocationRole {
     Unpacker,
     /// The mod manager's record of the files it deployed.
     DeploymentManifest,
+    /// The list of community-maintained rules about plugins, the LOOT
+    /// masterlist.
+    Masterlist,
 }
 
 /// How Mod Mallet came to look at a place.

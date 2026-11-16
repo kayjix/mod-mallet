@@ -10,6 +10,10 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `extender.plugin-not-loaded` | Error | certain | Script extender plugin was not loaded |
 | `extender.plugin-no-version-data` | Note | certain | File in the plugin folder is not a script extender plugin |
 | `plugins.master-missing` | Error | certain | A plugin builds on a plugin that is not installed |
+| `plugins.requirement-missing` | Warning | likely | A plugin needs a file that is not in the game |
+| `plugins.incompatible` | Warning | likely | Two mods do not work together |
+| `plugins.needs-cleaning` | Warning | certain | A plugin deletes things the game and other mods rely on |
+| `plugins.identical-records` | Note | certain | A plugin contains unchanged copies of records |
 | `npcs.face-mismatch` | Warning | likely | Characters with dark or mismatched faces |
 | `installer.options-now-recommended` | Warning | likely | Recommended installer options are not installed |
 | `plugins.contained` | Warning | likely | A mod is already part of another |
@@ -68,6 +72,54 @@ Some mods ship support libraries next to their plugin. The script extender exami
 A plugin can build on other plugins, its masters, and names them in its file. The game loads the masters first. If one of them is not there, the game closes without a message while it starts, usually right after the logo. This typically happens when a patch for two mods is installed and one of the two is not, or when a mod was removed and its patches stayed behind.
 
 **What to do:** Install the mod that contains the missing plugin, or disable the mod this plugin belongs to. If the plugin is a patch that an installer offered, run that installer again and untick the patch.
+
+## plugins.requirement-missing
+
+**A plugin needs a file that is not in the game**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `plugin`, `count`, `files`
+
+LOOT, the tool that sorts plugins, keeps a list of what thousands of plugins need and what they do not work with. Mod managers such as Vortex download this list on their own. Many mods only work together with another mod, often a script extender plugin or a library such as PapyrusUtil. Without it, parts of the mod do nothing, its scripts fail, or the game closes as soon as it needs the missing piece.
+
+**What to do:** Install the mod that brings the missing file; the mod's page lists what it needs. If the missing file is a plugin that is installed, switch it on in your mod manager. If you do not want the other mod, disable the mod this plugin belongs to.
+
+## plugins.incompatible
+
+**Two mods do not work together**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `plugin`, `other`
+
+Some mods change the same thing in ways that exclude each other: two versions of the same fix, two overhauls of the same part of the game, or an old mod whose work a newer one already contains. LOOT's list names such pairs. With both installed, one undoes the other, features break, or the game becomes unstable.
+
+**What to do:** Decide which of the two you want and disable the other in your mod manager. If one replaces the other, keep the newer one. The mods' pages often say which to choose.
+
+## plugins.needs-cleaning
+
+**A plugin deletes things the game and other mods rely on**
+
+- Severity: Warning
+- Confidence: certain
+- Message arguments: `plugin`, `identical`, `deleted`, `navmeshes`, `utility`
+
+Some plugins delete objects of the game outright instead of switching them off, a leftover of how they were made. When another mod or one of the game's scripts refers to a deleted object, the game can crash. Deleted navigation meshes, the paths characters walk on, are the most serious: they can crash the game and cannot be repaired automatically. LOOT's list records which released versions of a plugin contain such deletions. It recognises a version by the file's checksum, so this is about exactly your file.
+
+**What to do:** Install a newer version of the mod if there is one. Otherwise the plugin can be cleaned with SSEEdit's "Quick Auto Clean", which switches deleted objects off instead; LOOT's and SSEEdit's guides explain the steps. Keep a copy of the plugin first. With Vortex, clean the file in the mod's folder in Vortex's staging folder, so that the cleaned file stays. Deleted navigation meshes cannot be cleaned automatically: if there are any, look on the mod's page for a fixed version or a patch.
+
+## plugins.identical-records
+
+**A plugin contains unchanged copies of records**
+
+- Severity: Note
+- Confidence: certain
+- Message arguments: `plugin`, `count`, `utility`
+
+A record that a plugin copies without changing it does nothing by itself. It matters only when another mod that loads earlier changes the same record: the unchanged copy then quietly puts the original back. That is usually harmless, but it can hide another mod's change. LOOT's list records which released versions of a plugin contain such copies; it recognises a version by the file's checksum.
+
+**What to do:** Usually nothing to do. If a change of another mod does not show in the game, clean this plugin with SSEEdit's "Quick Auto Clean" or let it load before that mod.
 
 ## npcs.face-mismatch
 

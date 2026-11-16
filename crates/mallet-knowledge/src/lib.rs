@@ -1,0 +1,444 @@
+//! Community-maintained rules about plugins, from the LOOT masterlist.
+//!
+//! LOOT's masterlist says, for thousands of plugins, which files they need,
+//! which they cannot be used with, and which released versions contain
+//! records that should be cleaned out (ADR 0008). Mod managers download it
+//! and keep it on the machine, so reading it needs no network (ADR 0014).
+//!
+//! The rules carry conditions, such as "only if this other mod is active"
+//! or "only for this version of the file". They are evaluated with LOOT's
+//! own library, `libloot`, against the game as it is, so the facts handed
+//! on hold only the rules that apply to this setup. Evaluating them only
+//! reads: files are looked up and checksums computed, nothing is written.
+
+use std::path::{Path, PathBuf};
+
+use libloot::metadata::{File, PluginCleaningData};
+use libloot::{EvalMode, Game, GameType, MergeMode};
+use mallet_core::facts::knowledge::{Cleaning, KnownFile, PluginKnowledge};
+use mallet_core::facts::{KnowledgeFacts, PluginFacts};
+
+/// Why the rules could not be read.
+#[derive(Debug, thiserror::Error)]
+pub enum KnowledgeError {
+    /// The game could not be opened for evaluating the rules.
+    #[error("the game could not be opened for checking LOOT's rules: {0}")]
+    Game(String),
+    /// The masterlist could not be read.
+    #[error("the LOOT masterlist `{}` could not be read: {reason}", .path.display())]
+    Masterlist {
+        /// The masterlist.
+        path: PathBuf,
+        /// What went wrong, in the words of the reader.
+        reason: String,
+    },
+}
+
+/// The places a mod manager or LOOT itself keeps the masterlist for
+/// Skyrim Special Edition on this machine, whether or not a file is there.
+///
+/// Vortex keeps its copy in its own data folder and updates it while it
+/// runs; LOOT keeps one per game in its local data folder.
+pub fn standard_places() -> Vec<PathBuf> {
+    let mut places = Vec::new();
+    if let Some(roaming) = dirs::config_dir() {
+        places.push(
+            roaming
+                .join("Vortex")
+                .join("skyrimse")
+                .join("masterlist")
+                .join("masterlist.yaml"),
+        );
+    }
+    if let Some(local) = dirs::data_local_dir() {
+        places.push(
+            local
+                .join("LOOT")
+                .join("games")
+                .join("Skyrim Special Edition")
+                .join("masterlist.yaml"),
+        );
+    }
+    places
+}
+
+/// The masterlist to read: the most recently updated of those in
+/// [`standard_places`], or `None` if there is none.
+pub fn find_masterlist() -> Option<PathBuf> {
+    standard_places()
+        .into_iter()
+        .filter_map(|path| {
+            let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
+            Some((modified, path))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path)
+}
+
+/// Reads what the masterlist at `masterlist` says about the active
+/// `plugins` of the game in `game_dir`.
+///
+/// `local_dir` is the directory of the list of active plugins, if it is not
+/// the standard one. `shipped` names, in lower case, the plugins that come
+/// with the game. A plugin whose rules cannot be evaluated is left out and
+/// logged; the others are still reported.
+pub fn read(
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    masterlist: &Path,
+    plugins: &[PluginFacts],
+    shipped: &[String],
+) -> Result<KnowledgeFacts, KnowledgeError> {
+    let mut game = match local_dir {
+        Some(local_dir) => Game::with_local_path(GameType::SkyrimSE, game_dir, local_dir),
+        None => Game::new(GameType::SkyrimSE, game_dir),
+    }
+    .map_err(|error| KnowledgeError::Game(error.to_string()))?;
+    game.load_current_load_order_state()
+        .map_err(|error| KnowledgeError::Game(error.to_string()))?;
+
+    let database = game.database();
+    let mut database = database
+        .write()
+        .map_err(|error| KnowledgeError::Masterlist {
+            path: masterlist.to_path_buf(),
+            reason: error.to_string(),
+        })?;
+    database
+        .load_masterlist(masterlist)
+        .map_err(|error| KnowledgeError::Masterlist {
+            path: masterlist.to_path_buf(),
+            reason: error.to_string(),
+        })?;
+
+    let present = |file: &File| -> Option<bool> {
+        let exists = evaluate(&database, &file_condition(file.name().as_str()))?;
+        match file.constraint() {
+            Some(constraint) if exists => evaluate(&database, constraint),
+            _ => Some(exists),
+        }
+    };
+    let known = |files: &[File]| -> Vec<KnownFile> {
+        files
+            .iter()
+            .filter_map(|file| {
+                let (display, page) = file.display_name().map_or((None, None), split_link);
+                Some(KnownFile {
+                    name: file.name().as_str().to_owned(),
+                    display,
+                    page,
+                    present: present(file)?,
+                })
+            })
+            .collect()
+    };
+
+    let mut knowledge = KnowledgeFacts::default();
+    for plugin in plugins {
+        let metadata = match database.plugin_metadata(
+            &plugin.name,
+            MergeMode::WithoutUserMetadata,
+            EvalMode::Evaluate,
+        ) {
+            Ok(Some(metadata)) => metadata,
+            Ok(None) => continue,
+            Err(error) => {
+                tracing::warn!(plugin = %plugin.name, %error, "LOOT's rules for this plugin could not be evaluated");
+                continue;
+            }
+        };
+        let entry = PluginKnowledge {
+            plugin: plugin.name.clone(),
+            path: plugin.path.clone(),
+            shipped_with_game: shipped.contains(&plugin.name.to_lowercase()),
+            requirements: known(metadata.requirements()),
+            incompatibilities: known(metadata.incompatibilities()),
+            dirty: metadata.dirty_info().iter().map(cleaning).collect(),
+        };
+        if !(entry.requirements.is_empty()
+            && entry.incompatibilities.is_empty()
+            && entry.dirty.is_empty())
+        {
+            knowledge.plugins.push(entry);
+        }
+    }
+    Ok(knowledge)
+}
+
+/// Evaluates a LOOT condition, or `None` if it cannot be: a rule that
+/// cannot be judged is not reported.
+fn evaluate(database: &libloot::Database, condition: &str) -> Option<bool> {
+    database
+        .evaluate(condition)
+        .map_err(|error| tracing::debug!(condition, %error, "LOOT condition not evaluated"))
+        .ok()
+}
+
+/// The LOOT condition that holds when the file named by a rule is there,
+/// with LOOT's own rules for plugins that are switched off by renaming.
+fn file_condition(name: &str) -> String {
+    format!("file(\"{}\")", name.replace('"', ""))
+}
+
+/// The counts of a cleaning report.
+fn cleaning(data: &PluginCleaningData) -> Cleaning {
+    Cleaning {
+        identical_records: data.itm_count(),
+        deleted_references: data.deleted_reference_count(),
+        deleted_navmeshes: data.deleted_navmesh_count(),
+        utility: split_link(data.cleaning_utility()).0.unwrap_or_default(),
+    }
+}
+
+/// The text and the address of a name the masterlist writes as a Markdown
+/// link, `[text](address)`. A name without a link is all text.
+fn split_link(display: &str) -> (Option<String>, Option<String>) {
+    let display = display.trim();
+    let link = display
+        .strip_prefix('[')
+        .and_then(|rest| rest.split_once("]("))
+        .and_then(|(text, rest)| Some((text, rest.strip_suffix(')')?)));
+    match link {
+        Some((text, address)) => (
+            Some(text.trim().to_owned()).filter(|text| !text.is_empty()),
+            Some(address.trim().to_owned()).filter(|address| address.starts_with("https://")),
+        ),
+        None => (
+            Some(display.to_owned()).filter(|text| !text.is_empty()),
+            None,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use mallet_core::GamePath;
+    use proptest::prelude::*;
+
+    use super::*;
+
+    /// A game folder with the given plugins in `Data` and a plugin list
+    /// that activates them, and a local folder holding that list.
+    struct Setup {
+        root: tempfile::TempDir,
+    }
+
+    impl Setup {
+        fn new(plugins: &[&str], other_files: &[&str]) -> Self {
+            let root = tempfile::tempdir().unwrap();
+            let data = root.path().join("game").join("Data");
+            fs::create_dir_all(&data).unwrap();
+            fs::create_dir_all(root.path().join("local")).unwrap();
+            for name in plugins {
+                fs::write(data.join(name), plugin_bytes()).unwrap();
+            }
+            for name in other_files {
+                let path = data.join(name);
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                fs::write(path, b"x").unwrap();
+            }
+            let list = plugins
+                .iter()
+                .map(|name| format!("*{name}"))
+                .collect::<Vec<_>>()
+                .join(
+                    "
+",
+                );
+            fs::write(root.path().join("local").join("plugins.txt"), list).unwrap();
+            Self { root }
+        }
+
+        fn masterlist(&self, yaml: &str) -> PathBuf {
+            let path = self.root.path().join("masterlist.yaml");
+            fs::write(&path, yaml).unwrap();
+            path
+        }
+
+        fn read(&self, masterlist: &Path, active: &[&str]) -> KnowledgeFacts {
+            let plugins: Vec<PluginFacts> = active
+                .iter()
+                .map(|name| PluginFacts {
+                    name: (*name).to_owned(),
+                    path: GamePath::new("data").join(name),
+                    masters: Vec::new(),
+                    npcs: Vec::new(),
+                })
+                .collect();
+            read(
+                &self.root.path().join("game"),
+                Some(&self.root.path().join("local")),
+                masterlist,
+                &plugins,
+                &["skyrim.esm".to_owned()],
+            )
+            .unwrap()
+        }
+    }
+
+    /// The smallest valid Skyrim SE plugin: a header record with nothing
+    /// in it.
+    fn plugin_bytes() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"TES4");
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // data size
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // flags
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // form id
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // version control
+        bytes.extend_from_slice(&44_u16.to_le_bytes()); // form version
+        bytes.extend_from_slice(&0_u16.to_le_bytes());
+        bytes
+    }
+
+    #[test]
+    fn requirements_and_incompatibilities_say_whether_their_file_is_there() {
+        let setup = Setup::new(
+            &["City.esp", "Other City.esp"],
+            &["SKSE/Plugins/Helper.dll"],
+        );
+        let masterlist = setup.masterlist(
+            r"
+plugins:
+  - name: 'City.esp'
+    req:
+      - name: 'SKSE/Plugins/Helper.dll'
+        display: '[Helper](https://www.nexusmods.com/skyrimspecialedition/mods/1/)'
+      - 'Missing.esp'
+    inc: [ 'Other City.esp', 'Gone.esp' ]
+",
+        );
+        let knowledge = setup.read(&masterlist, &["City.esp", "Other City.esp"]);
+
+        let [city] = knowledge.plugins.as_slice() else {
+            panic!("expected rules for one plugin, got {knowledge:?}");
+        };
+        assert_eq!(city.plugin, "City.esp");
+        let requirements: Vec<(&str, bool)> = city
+            .requirements
+            .iter()
+            .map(|file| (file.label(), file.present))
+            .collect();
+        assert_eq!(requirements, [("Helper", true), ("Missing.esp", false)]);
+        assert_eq!(
+            city.requirements[0].page.as_deref(),
+            Some("https://www.nexusmods.com/skyrimspecialedition/mods/1/")
+        );
+        let incompatible: Vec<(&str, bool)> = city
+            .incompatibilities
+            .iter()
+            .map(|file| (file.label(), file.present))
+            .collect();
+        assert_eq!(
+            incompatible,
+            [("Other City.esp", true), ("Gone.esp", false)]
+        );
+    }
+
+    #[test]
+    fn rules_whose_condition_fails_are_left_out() {
+        let setup = Setup::new(&["City.esp"], &[]);
+        let masterlist = setup.masterlist(
+            r#"
+plugins:
+  - name: 'City.esp'
+    req:
+      - name: 'Patch.esp'
+        condition: 'active("Dungeons.esp")'
+"#,
+        );
+        let knowledge = setup.read(&masterlist, &["City.esp"]);
+        assert_eq!(knowledge.plugins, []);
+    }
+
+    #[test]
+    fn a_dirty_version_counts_only_if_the_checksum_matches() {
+        let setup = Setup::new(&["City.esp", "Town.esp"], &[]);
+        let crc = crc32(&plugin_bytes());
+        let masterlist = setup.masterlist(&format!(
+            r"
+plugins:
+  - name: 'City.esp'
+    dirty:
+      - crc: 0x{crc:08X}
+        util: '[SSEEdit v4.1.5](https://www.nexusmods.com/skyrimspecialedition/mods/164/)'
+        itm: 3
+        udr: 2
+        nav: 1
+  - name: 'Town.esp'
+    dirty:
+      - crc: 0x{other:08X}
+        util: 'SSEEdit'
+        itm: 9
+",
+            other = crc ^ 1
+        ));
+        let knowledge = setup.read(&masterlist, &["City.esp", "Town.esp"]);
+
+        let [city] = knowledge.plugins.as_slice() else {
+            panic!("expected rules for one plugin, got {knowledge:?}");
+        };
+        assert_eq!(
+            city.dirty,
+            [Cleaning {
+                identical_records: 3,
+                deleted_references: 2,
+                deleted_navmeshes: 1,
+                utility: "SSEEdit v4.1.5".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_masterlist_that_is_not_yaml_is_an_error() {
+        let setup = Setup::new(&["City.esp"], &[]);
+        let masterlist = setup.masterlist("plugins: [ unclosed");
+        let plugins = Vec::new();
+        let result = read(
+            &setup.root.path().join("game"),
+            Some(&setup.root.path().join("local")),
+            &masterlist,
+            &plugins,
+            &[],
+        );
+        assert!(matches!(result, Err(KnowledgeError::Masterlist { .. })));
+    }
+
+    #[test]
+    fn links_are_split_into_text_and_address() {
+        assert_eq!(
+            split_link("[Helper](https://example.org/a)"),
+            (
+                Some("Helper".to_owned()),
+                Some("https://example.org/a".to_owned())
+            )
+        );
+        assert_eq!(split_link("Helper"), (Some("Helper".to_owned()), None));
+        assert_eq!(
+            split_link("[Helper](javascript:x)"),
+            (Some("Helper".to_owned()), None)
+        );
+        assert_eq!(split_link(""), (None, None));
+    }
+
+    fn crc32(bytes: &[u8]) -> u32 {
+        // The CRC-32 LOOT uses (IEEE 802.3), computed bit by bit.
+        let mut crc = !0_u32;
+        for byte in bytes {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                let mask = (crc & 1).wrapping_neg();
+                crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+            }
+        }
+        !crc
+    }
+
+    proptest! {
+        #[test]
+        fn splitting_a_link_never_panics(display in ".*") {
+            let _ = split_link(&display);
+        }
+    }
+}

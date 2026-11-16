@@ -4,9 +4,12 @@
 //! notes are later generated from these messages, so the type has to be one
 //! of a fixed set.
 
-use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+
+use crate::tools;
 
 const TYPES: &[&str] = &[
     "feat", "fix", "docs", "refactor", "test", "perf", "build", "ci", "chore", "revert",
@@ -14,10 +17,25 @@ const TYPES: &[&str] = &[
 
 const MAX_SUBJECT_LINE: usize = 100;
 
-pub(crate) fn run(file: &Path) -> Result<()> {
-    let message = std::fs::read_to_string(file)
+/// Checks the message in `file`, or, without one, the message of the
+/// commit being made.
+pub(crate) fn run(file: Option<PathBuf>) -> Result<()> {
+    let file = match file {
+        Some(file) => file,
+        None => being_committed()?,
+    };
+    let message = std::fs::read_to_string(&file)
         .with_context(|| format!("could not read `{}`", file.display()))?;
     check(&message)
+}
+
+/// The file git writes the message of the commit being made to, in this
+/// checkout or worktree.
+fn being_committed() -> Result<PathBuf> {
+    let mut git = Command::new("git");
+    git.args(["rev-parse", "--git-path", "COMMIT_EDITMSG"]);
+    let path = tools::capture(git, "git rev-parse")?;
+    Ok(PathBuf::from(path.trim()))
 }
 
 fn check(message: &str) -> Result<()> {

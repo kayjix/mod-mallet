@@ -1,0 +1,23 @@
+[package]
+name = "mallet-knowledge"
+description = "Mod Mallet's reader for community-maintained rules about plugins: the LOOT masterlist."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+dirs.workspace = true
+libloot.workspace = true
+mallet-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

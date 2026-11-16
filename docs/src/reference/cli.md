@@ -74,6 +74,9 @@ Options:
       --unpacker <FILE>
           The 7-Zip program used to look into mod archives. Detected if omitted
 
+      --masterlist <FILE>
+          The LOOT masterlist, whose rules about plugins are checked. Detected if omitted and `--manager-state` is omitted, too
+
       --no-cache
           Do not use the cache: read everything again, and do not remember the result for `mallet report`
 

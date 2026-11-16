@@ -123,6 +123,11 @@ struct ScanArgs {
     #[arg(long, value_name = "FILE")]
     unpacker: Option<PathBuf>,
 
+    /// The LOOT masterlist, whose rules about plugins are checked. Detected
+    /// if omitted and `--manager-state` is omitted, too.
+    #[arg(long, value_name = "FILE")]
+    masterlist: Option<PathBuf>,
+
     /// Do not use the cache: read everything again, and do not remember the
     /// result for `mallet report`.
     #[arg(long)]
@@ -211,6 +216,7 @@ where
                 manager_live_state: None,
                 downloads_dir: args.downloads_dir,
                 unpacker: args.unpacker,
+                masterlist: args.masterlist,
             };
             let report = if args.no_cache {
                 mallet_engine::scan(&options)?

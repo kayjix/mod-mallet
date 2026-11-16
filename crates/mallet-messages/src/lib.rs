@@ -496,6 +496,7 @@ impl Messages {
             LocationRole::Downloads => "location-downloads",
             LocationRole::Unpacker => "location-unpacker",
             LocationRole::DeploymentManifest => "location-deployment-manifest",
+            LocationRole::Masterlist => "location-masterlist",
         };
         let origin = match location.origin {
             LocationOrigin::Given => "origin-given",

@@ -35,6 +35,46 @@ plugins-master-missing = Ein Plugin baut auf einem Plugin auf, das nicht install
     .explanation = Ein Plugin kann auf anderen Plugins aufbauen, seinen Mastern, und nennt sie in seiner Datei. Das Spiel lädt die Master zuerst. Fehlt einer davon, schließt sich das Spiel beim Start ohne Meldung, meist direkt nach dem Logo. Das passiert typischerweise, wenn ein Patch für zwei Mods installiert ist, eine der beiden aber nicht, oder wenn eine Mod entfernt wurde und ihre Patches geblieben sind.
     .remedy = Installiere die Mod, die das fehlende Plugin enthält, oder deaktiviere die Mod, zu der dieses Plugin gehört. Ist das Plugin ein Patch, den ein Installer angeboten hat, gehe diesen Installer noch einmal durch und wähle den Patch ab.
 
+plugins-requirement-missing = Ein Plugin braucht eine Datei, die im Spiel fehlt
+    .headline =
+        { $plugin }: { $count ->
+            [one] 1 benötigte Datei fehlt
+           *[other] { $count } benötigte Dateien fehlen
+        }
+    .summary =
+        Laut LOOT braucht { $plugin } { $count ->
+            [one] eine Datei, die in deinem Spiel fehlt oder nicht eingeschaltet ist
+           *[other] { $count } Dateien, die in deinem Spiel fehlen oder nicht eingeschaltet sind
+        }: { $files }.
+    .explanation = LOOT, das Werkzeug, das Plugins sortiert, führt eine Liste darüber, was Tausende Plugins brauchen und womit sie nicht zusammen funktionieren. Mod-Manager wie Vortex laden diese Liste von selbst herunter. Viele Mods funktionieren nur zusammen mit einer anderen Mod, oft einem Script-Extender-Plugin oder einer Bibliothek wie PapyrusUtil. Fehlt sie, tun Teile der Mod nichts, ihre Skripte schlagen fehl, oder das Spiel schließt sich, sobald es das fehlende Stück braucht.
+    .remedy = Installiere die Mod, die die fehlende Datei mitbringt; auf der Seite der Mod steht, was sie braucht. Ist die fehlende Datei ein installiertes Plugin, schalte es in deinem Mod-Manager ein. Willst du die andere Mod nicht, deaktiviere die Mod, zu der dieses Plugin gehört.
+
+plugins-incompatible = Zwei Mods funktionieren nicht zusammen
+    .headline = { $plugin } funktioniert nicht zusammen mit { $other }
+    .summary = Laut LOOT kann { $plugin } nicht zusammen mit { $other } benutzt werden, und beide sind in deinem Spiel.
+    .explanation = Manche Mods ändern dasselbe auf eine Art, die sich gegenseitig ausschließt: zwei Fassungen derselben Fehlerkorrektur, zwei Überarbeitungen desselben Teils des Spiels oder eine alte Mod, deren Arbeit eine neuere schon enthält. LOOTs Liste nennt solche Paare. Sind beide installiert, macht die eine die andere rückgängig, Funktionen gehen kaputt oder das Spiel wird instabil.
+    .remedy = Entscheide, welche der beiden du willst, und deaktiviere die andere in deinem Mod-Manager. Ersetzt die eine die andere, behalte die neuere. Auf den Seiten der Mods steht oft, welche du wählen solltest.
+
+plugins-needs-cleaning = Ein Plugin löscht Dinge, auf die das Spiel und andere Mods angewiesen sind
+    .headline = { $plugin } sollte bereinigt werden
+    .summary = LOOT kennt genau diese Fassung von { $plugin }. Mit { $utility } gezählt: gelöschte Objekte: { $deleted }, gelöschte Navigationsnetze: { $navmeshes }, unveränderte Kopien von Einträgen: { $identical }.
+    .explanation = Manche Plugins löschen Objekte des Spiels, statt sie auszuschalten, ein Überbleibsel davon, wie sie gebaut wurden. Verweist eine andere Mod oder ein Skript des Spiels auf ein gelöschtes Objekt, kann das Spiel abstürzen. Am schwersten wiegen gelöschte Navigationsnetze, die Wege, auf denen Figuren laufen: Sie können das Spiel abstürzen lassen und lassen sich nicht automatisch reparieren. LOOTs Liste hält fest, welche veröffentlichten Fassungen eines Plugins solche Löschungen enthalten. Sie erkennt eine Fassung an der Prüfsumme der Datei, es geht also genau um deine Datei.
+    .remedy = Installiere eine neuere Fassung der Mod, wenn es eine gibt. Sonst lässt sich das Plugin mit „Quick Auto Clean“ von SSEEdit bereinigen, das gelöschte Objekte stattdessen ausschaltet; die Anleitungen von LOOT und SSEEdit erklären die Schritte. Lege vorher eine Kopie des Plugins an. Mit Vortex bereinigst du die Datei im Ordner der Mod in Vortex' Staging-Ordner, damit die bereinigte Datei bleibt. Gelöschte Navigationsnetze lassen sich nicht automatisch entfernen: Gibt es welche, such auf der Seite der Mod nach einer korrigierten Fassung oder einem Patch.
+
+plugins-identical-records = Ein Plugin enthält unveränderte Kopien von Einträgen
+    .headline =
+        { $plugin } enthält { $count ->
+            [one] 1 unveränderte Kopie
+           *[other] { $count } unveränderte Kopien
+        } von Einträgen des Spiels
+    .summary =
+        LOOT kennt genau diese Fassung von { $plugin }: Mit { $utility } gezählt enthält sie { $count ->
+            [one] 1 Eintrag
+           *[other] { $count } Einträge
+        }, unverändert kopiert aus einem Plugin, auf dem sie aufbaut.
+    .explanation = Ein Eintrag, den ein Plugin unverändert kopiert, bewirkt für sich nichts. Er zählt erst, wenn eine andere Mod, die früher lädt, denselben Eintrag ändert: Die unveränderte Kopie stellt dann still das Original wieder her. Das ist meist harmlos, kann aber die Änderung einer anderen Mod verdecken. LOOTs Liste hält fest, welche veröffentlichten Fassungen eines Plugins solche Kopien enthalten; sie erkennt eine Fassung an der Prüfsumme der Datei.
+    .remedy = Meist ist nichts zu tun. Zeigt sich die Änderung einer anderen Mod nicht im Spiel, bereinige dieses Plugin mit „Quick Auto Clean“ von SSEEdit oder lass es vor dieser Mod laden.
+
 
 npcs-face-mismatch = Charaktere mit dunklen oder unpassenden Gesichtern
     .headline =

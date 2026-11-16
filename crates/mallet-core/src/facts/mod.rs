@@ -4,12 +4,14 @@
 //! read them and never touch the disk themselves (ADR 0004).
 
 pub mod installer;
+pub mod knowledge;
 pub mod objects;
 pub mod terrain;
 
 use crate::GamePath;
 
 pub use installer::InstallerFacts;
+pub use knowledge::KnowledgeFacts;
 pub use objects::ObjectFacts;
 pub use terrain::TerrainFacts;
 
@@ -42,6 +44,8 @@ pub struct Facts {
     pub objects: ObjectFacts,
     /// The shape of the land.
     pub terrain: TerrainFacts,
+    /// What community-maintained rules say about the active plugins.
+    pub knowledge: KnowledgeFacts,
 }
 
 /// A loose mesh that replaces a mesh from an archive, with the textures

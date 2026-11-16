@@ -32,6 +32,7 @@ const RULES: &[(&str, &[&str])] = &[
         &["mallet-core", "mallet-formats-bethesda"],
     ),
     ("mallet-source-vortex", &["mallet-core"]),
+    ("mallet-knowledge", &["mallet-core"]),
 ];
 
 /// Crates that may depend on anything in the workspace.

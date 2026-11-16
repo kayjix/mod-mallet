@@ -24,6 +24,7 @@ mallet-engine = { path = "crates/mallet-engine" }
 mallet-format-fomod = { path = "crates/mallet-format-fomod" }
 mallet-formats-bethesda = { path = "crates/mallet-formats-bethesda" }
 mallet-game-skyrimse = { path = "crates/mallet-game-skyrimse" }
+mallet-knowledge = { path = "crates/mallet-knowledge" }
 mallet-messages = { path = "crates/mallet-messages" }
 mallet-source-vortex = { path = "crates/mallet-source-vortex" }
 mallet-store = { path = "crates/mallet-store" }
@@ -35,6 +36,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 dirs = "7.0.0"
 flate2 = "1.1.11"
 fluent-bundle = "0.16.0"
+libloot = "0.29.7"
 libloadorder = "18.8.2"
 lz4_flex = "0.14.2"
 roxmltree = "0.21.2"

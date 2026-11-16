@@ -145,6 +145,7 @@ impl Setup {
             manager_live_state: None,
             downloads_dir: Some(self.downloads_dir()),
             unpacker: None,
+            masterlist: None,
         }
     }
 
@@ -947,4 +948,54 @@ fn the_patch_in_the_game_is_reported_with_its_mod() {
 fn without_a_patch_none_is_reported() {
     let report = scan(&Setup::new().options()).unwrap();
     assert_eq!(report.installed_patch, None);
+}
+
+#[test]
+fn rules_of_the_loot_masterlist_are_checked_against_the_setup() {
+    let setup = Setup::new();
+    setup.write_data("City.esp", &empty_plugin());
+    setup.write_data("Old City.esp", &empty_plugin());
+    setup.activate(&["City.esp", "Old City.esp"]);
+    let masterlist = setup.root.path().join("masterlist.yaml");
+    fs::write(
+        &masterlist,
+        r"
+plugins:
+  - name: 'City.esp'
+    req:
+      - name: 'SKSE/Plugins/Needed.dll'
+        display: '[Needed Library](https://www.nexusmods.com/skyrimspecialedition/mods/1/)'
+      - 'SKSE/Plugins/Fixes.dll'
+    inc: [ 'Old City.esp' ]
+",
+    )
+    .unwrap();
+    let options = ScanOptions {
+        masterlist: Some(masterlist.clone()),
+        ..setup.options()
+    };
+
+    let report = scan(&options).unwrap();
+
+    let missing = only(&report, "plugins.requirement-missing");
+    assert_eq!(missing.args["files"], ArgValue::from("Needed Library"));
+    let clash = only(&report, "plugins.incompatible");
+    assert_eq!(clash.args["other"], ArgValue::from("Old City.esp"));
+    assert!(report.locations.iter().any(|location| {
+        location.role == mallet_core::LocationRole::Masterlist
+            && location.path == masterlist.display().to_string()
+            && location.found
+    }));
+}
+
+#[test]
+fn without_a_named_masterlist_a_scan_of_named_files_reads_none() {
+    let setup = Setup::new();
+    let report = scan(&setup.options()).unwrap();
+    assert!(
+        report
+            .locations
+            .iter()
+            .all(|location| location.role != mallet_core::LocationRole::Masterlist)
+    );
 }

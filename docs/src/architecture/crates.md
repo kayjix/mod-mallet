@@ -19,6 +19,7 @@ flowchart TD
     engine --> store
     engine --> fomod
     engine --> unpack
+    engine --> knowledge
 
     analysis[mallet-analysis] --> core
     game[mallet-game-skyrimse] --> core
@@ -26,6 +27,7 @@ flowchart TD
     fomod[mallet-format-fomod] --> core
     unpack[mallet-unpack]
     vortex[mallet-source-vortex] --> core
+    knowledge[mallet-knowledge] --> core
     store[mallet-store] --> core
     messages[mallet-messages] --> core
 
@@ -43,6 +45,7 @@ flowchart TD
 | `mallet-format-fomod` | Reads FOMOD installer descriptions into the installer model of `mallet-core`. | `mallet-core` |
 | `mallet-unpack` | Reads single files out of mod archives by running a 7-Zip that is on the machine. | nothing |
 | `mallet-source-vortex` | Reads Vortex's deployment manifest and saved state; implements `ModSource`; asks a running Vortex to act, through the extension in `integrations/vortex-extension`. | `mallet-core` |
+| `mallet-knowledge` | Reads community-maintained rules about plugins, the LOOT masterlist, and evaluates their conditions with LOOT's own library (ADR 0030). | `mallet-core` |
 | `mallet-engine` | Runs a scan, hands actions to the mod manager and keeps the user's settings. The only crate that connects adapters, analyses and the store. | all of the above except `mallet-messages` |
 | `mallet-cli` | The `mallet` command. | `mallet-engine`, `mallet-messages`, `mallet-core` |
 | `mallet-desktop` | The Tauri app (`apps/desktop/src-tauri`). | `mallet-engine`, `mallet-messages`, `mallet-core` |
@@ -68,6 +71,4 @@ to be added to the table in `xtask/src/architecture.rs` to pass.
 Crates are created when the first code for them is written, not before. An
 empty crate proves nothing and goes stale. Expected next:
 
-- `mallet-knowledge` for the LOOT masterlist and community rules, with
-  milestone 8.
 - `mallet-source-mo2` for Mod Organizer 2.

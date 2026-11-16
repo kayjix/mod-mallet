@@ -421,6 +421,11 @@
           "description": "The mod manager's record of the files it deployed.",
           "type": "string",
           "const": "deployment-manifest"
+        },
+        {
+          "description": "The list of community-maintained rules about plugins, the LOOT\nmasterlist.",
+          "type": "string",
+          "const": "masterlist"
         }
       ]
     },

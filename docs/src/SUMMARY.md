@@ -41,6 +41,7 @@
   - [0025 Patches hide objects through Base Object Swapper](adr/0025-patches-through-base-object-swapper.md)
   - [0026 The app has a toolbox, a log, and can restart Vortex](adr/0026-toolbox-log-and-restarting-vortex.md)
   - [0027 Findings offer decisions; the window has a home and themes](adr/0027-findings-offer-decisions.md)
+  - [0030 Rules from the LOOT masterlist, evaluated by libloot](adr/0030-rules-from-the-loot-masterlist.md)
   - [Template](adr/template.md)
 
 # Reference

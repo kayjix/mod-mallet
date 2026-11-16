@@ -49,5 +49,12 @@ export interface ScanLocation {
    * What the place is for.
    */
   role:
-    "game-dir" | "plugin-list" | "extender-log" | "manager-state" | "downloads" | "unpacker" | "deployment-manifest";
+    | "game-dir"
+    | "plugin-list"
+    | "extender-log"
+    | "manager-state"
+    | "downloads"
+    | "unpacker"
+    | "deployment-manifest"
+    | "masterlist";
 }

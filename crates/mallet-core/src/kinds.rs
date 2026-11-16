@@ -82,6 +82,42 @@ pub const PLUGINS_MASTER_MISSING: KindInfo = KindInfo {
     args: &["plugin", "count", "masters"],
 };
 
+/// The LOOT masterlist says an active plugin needs a file that is not in
+/// the game.
+pub const PLUGINS_REQUIREMENT_MISSING: KindInfo = KindInfo {
+    id: "plugins.requirement-missing",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["plugin", "count", "files"],
+};
+
+/// The LOOT masterlist says an active plugin cannot be used together with
+/// a file that is in the game.
+pub const PLUGINS_INCOMPATIBLE: KindInfo = KindInfo {
+    id: "plugins.incompatible",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["plugin", "other"],
+};
+
+/// The LOOT masterlist knows this exact version of a plugin to delete
+/// objects or navigation meshes of the game that a cleaning tool restores.
+pub const PLUGINS_NEEDS_CLEANING: KindInfo = KindInfo {
+    id: "plugins.needs-cleaning",
+    severity: Severity::Warning,
+    confidence: Confidence::Certain,
+    args: &["plugin", "identical", "deleted", "navmeshes", "utility"],
+};
+
+/// The LOOT masterlist knows this exact version of a plugin to contain
+/// unchanged copies of records, and nothing worse.
+pub const PLUGINS_IDENTICAL_RECORDS: KindInfo = KindInfo {
+    id: "plugins.identical-records",
+    severity: Severity::Info,
+    confidence: Confidence::Certain,
+    args: &["plugin", "count", "utility"],
+};
+
 /// Two mods place the same object at almost the same spot.
 pub const OBJECTS_DUPLICATED: KindInfo = KindInfo {
     id: "objects.duplicated",
@@ -176,6 +212,10 @@ pub const ALL: &[KindInfo] = &[
     EXTENDER_PLUGIN_NOT_LOADED,
     EXTENDER_PLUGIN_NO_VERSION_DATA,
     PLUGINS_MASTER_MISSING,
+    PLUGINS_REQUIREMENT_MISSING,
+    PLUGINS_INCOMPATIBLE,
+    PLUGINS_NEEDS_CLEANING,
+    PLUGINS_IDENTICAL_RECORDS,
     NPCS_FACE_MISMATCH,
     INSTALLER_OPTIONS_NOW_RECOMMENDED,
     PLUGINS_CONTAINED,

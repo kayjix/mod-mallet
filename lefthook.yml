@@ -15,7 +15,8 @@ pre-commit:
 commit-msg:
   commands:
     conventional-commit:
-      run: cargo xtask commit-msg {1}
+      # No `{1}`: lefthook splits a path with spaces, so the task asks git.
+      run: cargo xtask commit-msg
 
 pre-push:
   commands:

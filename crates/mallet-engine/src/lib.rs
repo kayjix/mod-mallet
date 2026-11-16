@@ -16,6 +16,7 @@
 
 mod actions;
 mod installers;
+mod knowledge;
 mod logging;
 mod patch;
 mod png;
@@ -69,6 +70,9 @@ pub struct ScanOptions {
     pub downloads_dir: Option<PathBuf>,
     /// The 7-Zip program used to look into mod archives.
     pub unpacker: Option<PathBuf>,
+    /// The LOOT masterlist, whose rules about plugins are checked.
+    /// Detected automatically only if `manager_state` is, too.
+    pub masterlist: Option<PathBuf>,
 }
 
 /// Why a scan could not be completed.
@@ -174,6 +178,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         }
         None => gather_facts(options, &game_dir, &NoCache, &mut locations)?,
     };
+    facts.knowledge = knowledge::read(options, &game_dir, &facts.plugins, &mut locations);
     let (mods, installers, mod_infos) = load_mod_source(options, &game_dir, store, &mut locations)?;
     facts.installers = installers;
     tracing::info!(

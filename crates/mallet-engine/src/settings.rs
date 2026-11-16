@@ -45,6 +45,7 @@ impl Settings {
             manager_live_state: None,
             downloads_dir: place(LocationRole::Downloads),
             unpacker: place(LocationRole::Unpacker),
+            masterlist: place(LocationRole::Masterlist),
         }
     }
 }
@@ -164,6 +165,15 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
             downloads,
             LocationOrigin::Given,
             downloads.is_dir(),
+        ));
+    }
+
+    if let Some((masterlist, origin)) = crate::knowledge::planned_masterlist(options) {
+        locations.push(planned(
+            LocationRole::Masterlist,
+            &masterlist,
+            origin,
+            masterlist.is_file(),
         ));
     }
 

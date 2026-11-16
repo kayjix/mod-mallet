@@ -54,3 +54,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0025](0025-patches-through-base-object-swapper.md) | Patches hide objects through Base Object Swapper | accepted |
 | [0026](0026-toolbox-log-and-restarting-vortex.md) | The app has a toolbox, a log, and can restart Vortex | accepted |
 | [0027](0027-findings-offer-decisions.md) | Findings offer decisions; the window has a home and themes | accepted |
+| [0030](0030-rules-from-the-loot-masterlist.md) | Rules from the LOOT masterlist, evaluated by libloot | accepted |
