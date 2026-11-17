@@ -803,9 +803,15 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                 } else {
                     bound.unwrap_or_else(|| local.within(&parent))
                 };
+                let texture = texture_of(raw.shader);
+                if texture.as_deref().is_some_and(is_normal_map) {
+                    // Heat haze over torches and the like: a normal map that
+                    // bends what lies behind it, not a surface.
+                    continue;
+                }
                 if let Some(shape) = finish(&raw.positions, raw.uvs, &raw.indices, transform) {
                     shapes.push(Shape {
-                        texture: texture_of(raw.shader),
+                        texture,
                         material: material_of(raw.shader),
                         alpha: raw.alpha,
                         ..shape
@@ -826,9 +832,13 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                 else {
                     continue;
                 };
+                let texture = texture_of(shader);
+                if texture.as_deref().is_some_and(is_normal_map) {
+                    continue;
+                }
                 if let Some(shape) = finish(&positions, uvs, &indices, local.within(&parent)) {
                     shapes.push(Shape {
-                        texture: texture_of(shader),
+                        texture,
                         material: material_of(shader),
                         alpha,
                         ..shape
@@ -876,6 +886,13 @@ fn apply_skin<'a>(
     let bones = bone_places(skin, block, world);
     raw.positions = skin_points(&raw.positions, &partition.influences, &bones);
     true
+}
+
+/// Whether a texture is a normal map, by the game's naming: `_n` or
+/// `_msn` before the extension.
+fn is_normal_map(texture: &str) -> bool {
+    let lower = texture.to_ascii_lowercase();
+    lower.ends_with("_n.dds") || lower.ends_with("_msn.dds")
 }
 
 /// Where each bone of a skin instance takes the points stored for it: its

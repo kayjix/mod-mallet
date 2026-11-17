@@ -22,6 +22,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `plugins.contained` | Warning | likely | A mod is already part of another |
 | `objects.duplicated` | Warning | likely | Two mods place the same object twice |
 | `objects.overlapping` | Warning | hint | Objects of two mods stand inside each other |
+| `objects.touching` | Note | hint | Objects of two mods cut into each other |
 | `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
 | `meshes.retexture-bypassed` | Warning | likely | A texture mod does not reach replaced meshes |
@@ -218,9 +219,21 @@ Mods that change the same town or the same stretch of land often add the same th
 - Confidence: hint
 - Message arguments: `first`, `second`, `count`, `examples`
 
-Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Mod Mallet compares the box around each object's model, not the model itself, so an object with a lot of empty space, such as an arch, can be reported although nothing visibly collides.
+Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Where the models of both objects can be read, Mod Mallet compares their shapes; otherwise only the box around each model, so an object with a lot of empty space, such as an arch, can then be reported although nothing visibly collides.
 
 **What to do:** Look on the pages of both mods for a compatibility patch. If there is none, look at the places named above in the game. If something is in the way, decide which of the two mods you want to keep for this place.
+
+## objects.touching
+
+**Objects of two mods cut into each other**
+
+- Severity: Note
+- Confidence: hint
+- Message arguments: `first`, `second`, `count`, `examples`
+
+Two mods that place things in the same area did not know of each other, so a fence may run into a wall, a cart may stand half in a market stall, or a lamp post may grow out of a roof. Mod Mallet compared the shapes of both models, not just the boxes around them. Within one mod such contacts are usually wanted, so they are only reported between mods that do not know each other.
+
+**What to do:** Look at the places named above in the game or on the map. Often it does not show; where it does, decide which object you want to keep, or look for a compatibility patch of both mods.
 
 ## navmeshes.door-cut-off
 

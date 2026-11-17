@@ -2382,6 +2382,42 @@ button.quiet {
   color: var(--muted);
 }
 
+.relief-object {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  max-width: min(360px, calc(100% - 20px));
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+.relief-object-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.relief-object dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+
+.relief-object dt {
+  color: var(--muted);
+}
+
+.relief-object dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .relief-value {
   min-width: 12em;
   color: var(--muted);

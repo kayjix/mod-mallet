@@ -18,19 +18,30 @@ game's own are not a mod's doing and would cost memory for nothing.
 ## Decision
 
 1. **When the camera comes close** (a few cells) and rests, the window asks
-   for everything placed within one and a half cells of the point it looks
-   at. The objects are read anew for that area, from every plugin in load
-   order: only the blocks of cells around the point are unpacked, the
-   rest of the worldspace is skipped. The models of the base objects are
+   for everything placed around the point it looks at: one and a half to
+   three cells in each direction, more the higher the camera is, so that
+   what fills the window is detailed. A dashed square on the ground shows
+   the area, and the window counts the models still to come; the closest
+   come first. The camera can come down to a few metres. The objects are
+   read anew for that area, from every plugin in load order: only the
+   blocks of cells around the point are unpacked, the rest of the
+   worldspace is skipped. The models of the base objects are
    read once and kept. About half a second for an area of Whiterun's
    outskirts with nearly two thousand objects.
 2. **Each object is drawn with its own mesh**, placed, turned and sized as
    the game places it. Meshes and textures are found through one index of
    the setup's files, made once, and fetched once per model.
-3. **The parts of collisions are tinted and named.** The reduced objects
-   of the level of detail are left out where the objects themselves are
-   drawn.
-4. Only reading, as everywhere.
+3. **The parts of collisions are tinted and named.** The level of detail
+   stays drawn under the objects, pushed back a little so that the objects
+   win where both are: some places, such as Whiterun inside its walls, are
+   only in the level of detail of this worldspace.
+4. **An object is picked by clicking it**, exactly where it is drawn (each
+   object is drawn once more in a colour of its own, and the colour under
+   the pointer tells which): its name, the plugin whose version the game
+   uses, the plugin that placed it, its number there and its model.
+5. Each model is drawn once for all its objects (instancing), which keeps
+   a few thousand objects fluid.
+6. Only reading, as everywhere.
 
 ## Consequences
 

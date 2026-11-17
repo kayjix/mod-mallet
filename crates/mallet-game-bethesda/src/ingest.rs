@@ -463,6 +463,10 @@ fn read_plugin(path: &Path, reading: Reading) -> Result<plugin::Plugin, String> 
     let flat: Vec<plugin::Signature> = std::iter::once(npc::NPC)
         .chain(objects::wanted_base_types())
         .collect();
+    let places: Vec<plugin::Signature> = objects::PLACE_RECORDS
+        .into_iter()
+        .chain(navmeshes::RECORDS)
+        .collect();
     let request = plugin::Request {
         flat: &flat,
         nested: match reading {
@@ -471,15 +475,11 @@ fn read_plugin(path: &Path, reading: Reading) -> Result<plugin::Plugin, String> 
             Reading::Records => &[],
         },
         nested_records: if reading == Reading::Everything {
-            &objects::PLACE_RECORDS
+            &places
         } else {
             &objects::LAND_RECORDS
         },
-        nested_overrides: if reading == Reading::Everything {
-            &navmeshes::OVERRIDES
-        } else {
-            &[]
-        },
+        nested_overrides: &[],
     };
     plugin::read_request(&mut BufReader::new(file), &request).map_err(|error| error.to_string())
 }

@@ -177,8 +177,22 @@ objects-overlapping = Objects of two mods stand inside each other
             [one] 1 place
            *[other] { $count } places
         }. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
-    .explanation = Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Mod Mallet compares the box around each object's model, not the model itself, so an object with a lot of empty space, such as an arch, can be reported although nothing visibly collides.
+    .explanation = Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Where the models of both objects can be read, Mod Mallet compares their shapes; otherwise only the box around each model, so an object with a lot of empty space, such as an arch, can then be reported although nothing visibly collides.
     .remedy = Look on the pages of both mods for a compatibility patch. If there is none, look at the places named above in the game. If something is in the way, decide which of the two mods you want to keep for this place.
+
+objects-touching = Objects of two mods cut into each other
+    .headline =
+        { $first } and { $second }: { $count ->
+            [one] 1 object cuts
+           *[other] { $count } objects cut
+        } into another
+    .summary =
+        Objects of { $first } and of { $second } touch or reach a little into each other in { $count ->
+            [one] 1 place
+           *[other] { $count } places
+        }: their models cross, but neither stands largely inside the other. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
+    .explanation = Two mods that place things in the same area did not know of each other, so a fence may run into a wall, a cart may stand half in a market stall, or a lamp post may grow out of a roof. Mod Mallet compared the shapes of both models, not just the boxes around them. Within one mod such contacts are usually wanted, so they are only reported between mods that do not know each other.
+    .remedy = Look at the places named above in the game or on the map. Often it does not show; where it does, decide which object you want to keep, or look for a compatibility patch of both mods.
 
 navmeshes-door-cut-off = Characters can no longer walk through doors of a mod
     .headline =

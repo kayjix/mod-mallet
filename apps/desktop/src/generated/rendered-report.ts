@@ -899,6 +899,11 @@ export interface MapSpot {
    */
   console: string;
   /**
+   * How far the two models reach into each other, in game units, where
+   * their meshes were compared; `None` where only their boxes were.
+   */
+  depth?: number | null;
+  /**
    * The identity of a finding across scans.
    *
    * It is derived from the kind and the subject only, so a decision such as
@@ -906,6 +911,10 @@ export interface MapSpot {
    * re-deployed (ADR 0007).
    */
   finding: string;
+  /**
+   * What kind of collision it is.
+   */
+  kind?: "duplicate" | "overlap" | "touch";
   /**
    * Where it is.
    */

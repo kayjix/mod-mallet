@@ -239,7 +239,12 @@ fn read_models(plugins: &[(String, PathBuf)]) -> HashMap<RecordId, BaseModel> {
         let masters = &read.header.masters;
         for record in &read.records {
             let id = record_id(record.form_id, masters, name);
-            match model_path(record).filter(|model| !model.contains("marker")) {
+            match model_path(record).filter(|model| {
+                Path::new(model)
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("nif"))
+                    && !model.contains("marker")
+            }) {
                 Some(model) => {
                     let shown = (!read.header.is_localized)
                         .then(|| record.first(b"FULL").map(plugin::zstring))

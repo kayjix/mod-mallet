@@ -12,8 +12,8 @@ use super::RecordId;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NavmeshFacts {
     /// What each plugin that is not the game's own changes, in load order.
-    /// Plugins that change no navigation mesh of another plugin are left
-    /// out.
+    /// Plugins that neither change a navigation mesh of another plugin nor
+    /// connect a door in one of their own are left out.
     pub changes: Vec<NavmeshChanges>,
 }
 
@@ -24,6 +24,8 @@ pub struct NavmeshChanges {
     pub plugin: String,
     /// The navigation meshes it changes.
     pub navmeshes: Vec<NavmeshChange>,
+    /// The doors its own navigation meshes let characters walk through.
+    pub connected: Vec<RecordId>,
 }
 
 /// One navigation mesh a plugin changes.

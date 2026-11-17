@@ -44,7 +44,8 @@ pub struct LodLibrary {
     data_dir: PathBuf,
     world: String,
     archives: Vec<(PathBuf, Directory)>,
-    files: HashMap<String, Source>,
+    /// Every place each file is found, lowest precedence first.
+    files: HashMap<String, Vec<Source>>,
 }
 
 impl LodLibrary {
@@ -101,7 +102,9 @@ impl LodLibrary {
                 if wanted(&normalized) {
                     library
                         .files
-                        .insert(normalized, Source::Archive { archive, index });
+                        .entry(normalized)
+                        .or_default()
+                        .push(Source::Archive { archive, index });
                     used = true;
                 }
             }
@@ -111,7 +114,7 @@ impl LodLibrary {
         }
         for prefix in prefixes {
             for file in loose_files(&data_dir, prefix) {
-                library.files.insert(file, Source::Loose);
+                library.files.entry(file).or_default().push(Source::Loose);
             }
         }
         library
@@ -153,17 +156,27 @@ impl LodLibrary {
 
     /// The file at `path` below the data directory, if this library has
     /// it: a file below its folders.
+    /// The version the game uses comes first; where it cannot be read, the
+    /// one it would use without it.
     pub fn read(&self, path: &str) -> Option<Vec<u8>> {
         let path = files::normalize(path);
-        match *self.files.get(&path)? {
+        self.files
+            .get(&path)?
+            .iter()
+            .rev()
+            .find_map(|source| self.read_from(&path, *source))
+    }
+
+    fn read_from(&self, path: &str, source: Source) -> Option<Vec<u8>> {
+        match source {
             Source::Loose => {
-                let file = self.data_dir.join(&path);
+                let file = self.data_dir.join(path);
                 let small = std::fs::metadata(&file).is_ok_and(|meta| meta.len() <= MAX_LOOSE);
                 small.then(|| std::fs::read(&file).ok()).flatten()
             }
             Source::Archive { archive, index } => {
-                let (path, directory) = self.archives.get(archive)?;
-                let mut file = File::open(path).ok()?;
+                let (archive, directory) = self.archives.get(archive)?;
+                let mut file = File::open(archive).ok()?;
                 directory.read(&mut file, index)
             }
         }

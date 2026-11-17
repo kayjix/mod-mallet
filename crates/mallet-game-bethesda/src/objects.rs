@@ -336,19 +336,20 @@ fn is_solid(record: &Record) -> bool {
         || model.starts_with("markers\\")
         || model.contains("effects\\")
         || model.contains("plants\\")
+        // Water planes can be walked and seen through.
+        || model.contains("water\\")
         || file.contains("marker"))
 }
 
-/// Whether the model of a base object is a piece of landscape.
+/// Whether the model of a base object is a piece of landscape, or snow
+/// laid over other objects: things that are set into others on purpose.
 fn is_natural(record: &Record) -> bool {
     record
         .first(b"MODL")
         .map(plugin::zstring)
         .is_some_and(|model| {
-            model
-                .to_ascii_lowercase()
-                .replace('/', "\\")
-                .contains("landscape\\")
+            let model = model.to_ascii_lowercase().replace('/', "\\");
+            model.contains("landscape\\") || model.contains("snow")
         })
 }
 

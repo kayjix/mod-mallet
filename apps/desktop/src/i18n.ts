@@ -298,6 +298,11 @@ export interface Texts {
   mapNearFar: string;
   mapNearLoading: string;
   mapNearCount: (count: number) => string;
+  mapNearProgress: (count: number, done: number, total: number) => string;
+  mapObjectFrom: string;
+  mapObjectPlacedBy: string;
+  mapObjectId: string;
+  mapObjectModel: string;
   mapModCells: string;
   mapTopView: string;
   mapPlaces: string;
@@ -676,6 +681,11 @@ export const texts: Record<Lang, Texts> = {
     mapNearFar: "come closer to see them",
     mapNearLoading: "loading…",
     mapNearCount: (count) => (count === 1 ? "1 object" : `${count} objects`),
+    mapNearProgress: (count, done, total) => `${count} objects · models ${done} of ${total}`,
+    mapObjectFrom: "Version from",
+    mapObjectPlacedBy: "Placed by",
+    mapObjectId: "Number in that plugin",
+    mapObjectModel: "Model",
     mapHeightValue: (times) =>
       times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
     mapModCells: "Cells of mods",
@@ -1110,6 +1120,11 @@ export const texts: Record<Lang, Texts> = {
     mapNearFar: "zum Sehen näher heran",
     mapNearLoading: "wird geladen …",
     mapNearCount: (count) => (count === 1 ? "1 Objekt" : `${count} Objekte`),
+    mapNearProgress: (count, done, total) => `${count} Objekte · Modelle ${done} von ${total}`,
+    mapObjectFrom: "Version aus",
+    mapObjectPlacedBy: "Aufgestellt von",
+    mapObjectId: "Nummer in diesem Plugin",
+    mapObjectModel: "Modell",
     mapHeightValue: (times) =>
       times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
     mapModCells: "Zellen von Mods",

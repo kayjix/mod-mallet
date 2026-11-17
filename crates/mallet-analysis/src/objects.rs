@@ -22,14 +22,17 @@
 //! their authors knew of each other, and a patch has had the chance to
 //! sort out what stands where.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+use mallet_core::facts::models::{ModelFacts, ModelMesh};
 use mallet_core::facts::objects::{BaseObject, Place, PlacedObject};
 use mallet_core::facts::{PluginFacts, RecordId};
 use mallet_core::{
-    Finding, GamePath, MapSpot, ModRef, ObjectRef, Party, SpotLocation, SpotPart, Subject, kinds,
+    Finding, GamePath, MapSpot, ModRef, ObjectRef, Party, SpotKind, SpotLocation, SpotPart,
+    Subject, kinds,
 };
 
+use crate::contact::{self, Placed};
 use crate::{Analysis, Context, examples};
 
 /// How many examples a finding names.
@@ -53,6 +56,11 @@ const MIN_SHARE_OF_LARGER: f64 = 0.1;
 /// Points sampled along each side of the smaller box to measure how much
 /// of it lies inside the larger one.
 const SAMPLES: u32 = 5;
+
+/// Where the models of two objects are known, their surfaces have to cross
+/// over at least this many game units (about 25 cm) for a touch to count:
+/// less is a seam the eye does not notice.
+const MIN_TOUCH: f64 = 16.0;
 
 /// Side of the squares the world is divided into for finding neighbours,
 /// in game units: a quarter of a cell.
@@ -104,6 +112,11 @@ struct Found {
     parts: [(String, SpotPart); 2],
     /// The point between the two objects.
     position: [i32; 3],
+    /// What kind of collision it is.
+    kind: SpotKind,
+    /// How long the stretch is along which the models cross, where they
+    /// were compared.
+    depth: Option<u32>,
 }
 
 /// Compares the placed objects. Called once per scan through
@@ -115,18 +128,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
     }
     let bases: HashMap<&RecordId, &BaseObject> =
         objects.bases.iter().map(|base| (&base.id, base)).collect();
-    let solids: Vec<Solid<'_>> = objects
-        .placed
-        .iter()
-        .filter_map(|object| {
-            let base = bases.get(&object.base).copied()?;
-            if base.solid {
-                Solid::new(object, base)
-            } else {
-                None
-            }
-        })
-        .collect();
+    let solids = solids_of(context, &bases);
     let mut totals: HashMap<&str, u64> = HashMap::new();
     for solid in &solids {
         *totals.entry(solid.owner()).or_default() += 1;
@@ -139,17 +141,19 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
     let mut owners = Owners::new(context);
     let mut pairs: BTreeMap<(String, String, Clash), Vec<Found>> = BTreeMap::new();
 
-    for (first, second) in neighbours(&solids) {
-        let (Some(a), Some(b)) = (solids.get(first), solids.get(second)) else {
-            continue;
+    for (a, b, clash) in candidates(&solids, &mut owners) {
+        let crossing = mesh_crossing(a, b, &context.facts.models);
+        // Where both models are known, they decide: an overlap of boxes
+        // whose models do not cross is an arch over a path, not a clash.
+        let keep = match clash {
+            Clash::Duplicate => true,
+            Clash::Overlap => crossing.is_none_or(|stretch| stretch > 0.0),
+            Clash::Touch => {
+                crossing.is_some_and(|stretch| stretch >= MIN_TOUCH)
+                    && !touched_as_placed_by_the_game(a, b, &context.facts.models)
+            }
         };
-        if owners.related(a.owner(), b.owner()) {
-            continue;
-        }
-        let Some(clash) = clash(a, b) else {
-            continue;
-        };
-        if !caused_by_moving(a, b) {
+        if !keep {
             continue;
         }
         let (first, second) = if a.owner() <= b.owner() {
@@ -158,6 +162,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
             (b.owner(), a.owner())
         };
         let mut found = found(a, b, clash, &names);
+        found.depth = crossing.map(whole_units);
         for (plugin, part) in &mut found.parts {
             part.object.plugin = owners.file_name(plugin);
         }
@@ -190,7 +195,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
                     None => pair_finding(&owners, &first, &second, clash, &found),
                 }
             }
-            Clash::Overlap => pair_finding(&owners, &first, &second, clash, &found),
+            Clash::Overlap | Clash::Touch => pair_finding(&owners, &first, &second, clash, &found),
         };
         collisions
             .spots
@@ -201,10 +206,140 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
                 objects: found.objects,
                 parts: found.parts.into_iter().map(|(_, part)| part).collect(),
                 position: Some(found.position),
+                kind: found.kind,
+                depth: found.depth,
             }));
         collisions.findings.push(finding);
     }
     collisions
+}
+
+/// The models of the objects that may collide, by their paths as the base
+/// objects name them. The engine reads these, and only these, into
+/// [`ModelFacts`] before the analyses run (ADR 0039).
+pub fn models_to_check(context: &Context<'_>) -> BTreeSet<String> {
+    let objects = &context.facts.objects;
+    let bases: HashMap<&RecordId, &BaseObject> =
+        objects.bases.iter().map(|base| (&base.id, base)).collect();
+    let solids = solids_of(context, &bases);
+    let mut owners = Owners::new(context);
+    let mut models = BTreeSet::new();
+    for (a, b, clash) in candidates(&solids, &mut owners) {
+        if clash != Clash::Duplicate {
+            models.extend(a.base.model.iter().cloned());
+            models.extend(b.base.model.iter().cloned());
+        }
+    }
+    models
+}
+
+/// The solid objects mods place, as boxes in the world.
+fn solids_of<'a>(
+    context: &'a Context<'_>,
+    bases: &HashMap<&RecordId, &'a BaseObject>,
+) -> Vec<Solid<'a>> {
+    context
+        .facts
+        .objects
+        .placed
+        .iter()
+        .filter_map(|object| {
+            let base = bases.get(&object.base).copied()?;
+            if base.solid {
+                Solid::new(object, base)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// The pairs of solids of different plugins that do not know each other
+/// and whose boxes collide, with how.
+fn candidates<'s>(
+    solids: &'s [Solid<'s>],
+    owners: &mut Owners<'_>,
+) -> Vec<(&'s Solid<'s>, &'s Solid<'s>, Clash)> {
+    let mut found = Vec::new();
+    for (first, second) in neighbours(solids) {
+        let (Some(a), Some(b)) = (solids.get(first), solids.get(second)) else {
+            continue;
+        };
+        if owners.related(a.owner(), b.owner()) {
+            continue;
+        }
+        let Some(clash) = clash(a, b) else {
+            continue;
+        };
+        if clash != Clash::Touch && !caused_by_moving(a, b) {
+            continue;
+        }
+        found.push((a, b, clash));
+    }
+    found
+}
+
+/// Whether two objects, at least one of them an object of the game that a
+/// mod moved, already touch where the game places them: then the touch is
+/// not the mods' doing.
+fn touched_as_placed_by_the_game(a: &Solid<'_>, b: &Solid<'_>, models: &ModelFacts) -> bool {
+    let original = |solid: &Solid<'_>| -> Option<PlacedObject> {
+        let from = solid.object.moved.as_ref()?.from?;
+        Some(PlacedObject {
+            position: from.position,
+            rotation: from.rotation,
+            scale: from.scale,
+            ..solid.object.clone()
+        })
+    };
+    let (first, second) = (original(a), original(b));
+    if first.is_none() && second.is_none() {
+        return false;
+    }
+    let (Some(a), Some(b)) = (
+        first
+            .as_ref()
+            .map_or(Some(a.clone()), |object| Solid::new(object, a.base)),
+        second
+            .as_ref()
+            .map_or(Some(b.clone()), |object| Solid::new(object, b.base)),
+    ) else {
+        return false;
+    };
+    mesh_crossing(&a, &b, models).is_some_and(|stretch| stretch >= MIN_TOUCH)
+}
+
+/// How long the stretch is along which the models of `a` and `b` cross,
+/// in game units; `None` where a model is not known or too detailed.
+fn mesh_crossing(a: &Solid<'_>, b: &Solid<'_>, models: &ModelFacts) -> Option<f64> {
+    let model = |solid: &Solid<'_>| models.meshes.get(solid.base.model.as_deref()?);
+    let placed = |solid: &Solid<'_>, mesh: &'_ ModelMesh| -> Vec<contact::Point> {
+        mesh.points
+            .iter()
+            .map(|&point| {
+                let world = solid.to_world(Vector::from(point).scaled(solid.scale));
+                [world.x, world.y, world.z]
+            })
+            .collect()
+    };
+    let (first, second) = (model(a)?, model(b)?);
+    contact::crossing(
+        &Placed {
+            points: placed(a, first),
+            triangles: &first.triangles,
+        },
+        &Placed {
+            points: placed(b, second),
+            triangles: &second.triangles,
+        },
+    )
+}
+
+/// A length in whole game units.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn whole_units(length: f64) -> u32 {
+    // Bounded before converting.
+    length.round().clamp(0.0, f64::from(u32::MAX)) as u32
 }
 
 /// Marks in each place the copy to hide: the one of `smaller` if it can
@@ -237,7 +372,8 @@ fn caused_by_moving(a: &Solid<'_>, b: &Solid<'_>) -> bool {
             scale: from.scale,
             ..moved.object.clone()
         };
-        Solid::new(&original, moved.base).is_none_or(|solid| clash(&solid, other).is_none())
+        Solid::new(&original, moved.base)
+            .is_none_or(|solid| clash(&solid, other).is_none_or(|clash| clash == Clash::Touch))
     })
 }
 
@@ -248,6 +384,9 @@ enum Clash {
     Duplicate,
     /// Two objects largely inside each other.
     Overlap,
+    /// Two objects whose boxes meet without one standing largely in the
+    /// other: whether they touch, only their models can tell.
+    Touch,
 }
 
 /// Which pairs of solids are close enough to be compared: each pair once,
@@ -310,8 +449,13 @@ fn clash(a: &Solid<'_>, b: &Solid<'_>) -> Option<Clash> {
     }
     let share = smaller.share_inside(larger);
     let share_of_larger = share * smaller.volume() / larger.volume();
-    (share >= MIN_SHARE_OF_SMALLER && share_of_larger >= MIN_SHARE_OF_LARGER)
-        .then_some(Clash::Overlap)
+    if share >= MIN_SHARE_OF_SMALLER && share_of_larger >= MIN_SHARE_OF_LARGER {
+        Some(Clash::Overlap)
+    } else {
+        // Landscape and snow are set into other things on purpose; only
+        // standing largely inside something counts for them.
+        (!a.base.natural && !b.base.natural).then_some(Clash::Touch)
+    }
 }
 
 /// What is said about one collision: the objects and where they are.
@@ -336,7 +480,7 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
     };
     let objects = match clash {
         Clash::Duplicate => a.name(),
-        Clash::Overlap => {
+        Clash::Overlap | Clash::Touch => {
             let mut pair = [a.name(), b.name()];
             pair.sort_unstable();
             let [first, second] = pair;
@@ -363,6 +507,12 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
         location,
         parts: [part(a), part(b)],
         position: middle(a.object.position, b.object.position),
+        kind: match clash {
+            Clash::Duplicate => SpotKind::Duplicate,
+            Clash::Overlap => SpotKind::Overlap,
+            Clash::Touch => SpotKind::Touch,
+        },
+        depth: None,
     }
 }
 
@@ -422,6 +572,7 @@ fn pair_finding(
     let kind = match clash {
         Clash::Duplicate => &kinds::OBJECTS_DUPLICATED,
         Clash::Overlap => &kinds::OBJECTS_OVERLAPPING,
+        Clash::Touch => &kinds::OBJECTS_TOUCHING,
     };
     Finding::new(kind, owners.pair(first, second))
         .with_arg("first", owners.display(first))
@@ -586,10 +737,13 @@ impl<'a> Owners<'a> {
 }
 
 /// A placed object as a box in the world.
+#[derive(Clone)]
 struct Solid<'a> {
     object: &'a PlacedObject,
     base: &'a BaseObject,
     position: Vector,
+    /// The size relative to the base object.
+    scale: f64,
     /// Turns a direction of the object into a direction of the world.
     rotation: Matrix,
     /// The object's own box, scaled.
@@ -614,6 +768,7 @@ impl<'a> Solid<'a> {
             object,
             base,
             position: Vector::new(f64::from(x), f64::from(y), f64::from(z)),
+            scale,
             rotation: Matrix::placed(rx, ry, rz),
             min,
             max,
@@ -1283,5 +1438,123 @@ mod tests {
         );
         let back = turned.apply_inverse(east);
         assert!((back.y - 1.0).abs() < 1e-9, "{back:?}");
+    }
+
+    /// A box-shaped model from `min` to `max`, as twelve triangles.
+    fn box_model(min: [i32; 3], max: [i32; 3]) -> ModelMesh {
+        let mut points = Vec::new();
+        for corner in 0..8u8 {
+            let pick = |axis: usize| {
+                if corner >> axis & 1 == 1 {
+                    max[axis]
+                } else {
+                    min[axis]
+                }
+            };
+            points.push([pick(0), pick(1), pick(2)]);
+        }
+        let faces = [
+            [0, 1, 3, 2],
+            [4, 6, 7, 5],
+            [0, 4, 5, 1],
+            [2, 3, 7, 6],
+            [0, 2, 6, 4],
+            [1, 5, 7, 3],
+        ];
+        ModelMesh {
+            points,
+            triangles: faces
+                .iter()
+                .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
+                .collect(),
+        }
+    }
+
+    /// Facts in which the house and the tower have models: the house's
+    /// fills only the western end of its box, as an arch leaves its middle
+    /// empty; the tower's fills its box.
+    fn facts_with_models(placed: Vec<PlacedObject>) -> Facts {
+        let mut facts = facts(two_mods(), placed);
+        for base in &mut facts.objects.bases {
+            base.model = Some(format!("meshes/{}.nif", base.id.local_id));
+        }
+        facts.models.meshes.insert(
+            format!("meshes/{HOUSE}.nif"),
+            box_model([-400, -300, 0], [-300, 300, 600]),
+        );
+        facts.models.meshes.insert(
+            format!("meshes/{TOWER}.nif"),
+            box_model([-200, -200, 0], [200, 200, 500]),
+        );
+        facts
+    }
+
+    #[test]
+    fn boxes_that_overlap_but_whose_models_do_not_meet_are_not_a_clash() {
+        // The tower stands in the empty middle of the house's box.
+        let placed = vec![
+            placed("Village.esp", 1, HOUSE, [0, 0, 0], 0),
+            placed("Hamlet.esp", 1, TOWER, [50, 0, 0], 0),
+        ];
+        assert!(
+            findings(&facts(two_mods(), placed.clone()))
+                .iter()
+                .any(|finding| finding.kind == "objects.overlapping")
+        );
+        assert_eq!(findings(&facts_with_models(placed)), Vec::new());
+    }
+
+    #[test]
+    fn models_that_cut_into_each_other_are_reported_as_touching() {
+        // The tower reaches 100 units into the house's solid western end.
+        let facts = facts_with_models(vec![
+            placed("Village.esp", 1, HOUSE, [0, 0, 0], 0),
+            placed("Hamlet.esp", 1, TOWER, [-500, 0, 0], 0),
+        ]);
+        let context = Context::new(&facts, &NoModSource);
+        let collisions = context.collisions();
+        let [finding] = collisions.findings.as_slice() else {
+            panic!("expected one finding, got {:?}", collisions.findings);
+        };
+        assert_eq!(finding.kind, "objects.touching");
+        assert_eq!(finding.severity, Severity::Info);
+        let [spot] = collisions.spots.as_slice() else {
+            panic!("expected one spot");
+        };
+        assert_eq!(spot.kind, SpotKind::Touch);
+        assert!(spot.depth.is_some_and(|depth| depth >= 100), "{spot:?}");
+    }
+
+    #[test]
+    fn touches_are_only_reported_where_the_models_tell() {
+        let facts = facts(
+            two_mods(),
+            vec![
+                placed("Village.esp", 1, HOUSE, [0, 0, 0], 0),
+                placed("Hamlet.esp", 1, TOWER, [-500, 0, 0], 0),
+            ],
+        );
+        assert_eq!(findings(&facts), Vec::new());
+        let context = Context::new(&facts, &NoModSource);
+        assert_eq!(
+            models_to_check(&context),
+            BTreeSet::new(),
+            "without model paths nothing can be read"
+        );
+    }
+
+    #[test]
+    fn the_models_of_possible_clashes_are_asked_for() {
+        let mut facts = facts_with_models(vec![
+            placed("Village.esp", 1, HOUSE, [0, 0, 0], 0),
+            placed("Hamlet.esp", 1, TOWER, [-500, 0, 0], 0),
+            placed("Hamlet.esp", 2, BARREL, [9000, 9000, 0], 0),
+        ]);
+        facts.models = ModelFacts::default();
+        let context = Context::new(&facts, &NoModSource);
+        assert_eq!(
+            models_to_check(&context),
+            BTreeSet::from([format!("meshes/{HOUSE}.nif"), format!("meshes/{TOWER}.nif")])
+        );
     }
 }

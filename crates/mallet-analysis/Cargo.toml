@@ -11,5 +11,8 @@ publish.workspace = true
 [dependencies]
 mallet-core.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

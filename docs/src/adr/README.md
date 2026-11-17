@@ -65,3 +65,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0036](0036-one-adapter-for-the-bethesda-family.md) | One adapter for the Bethesda family, settings per game | accepted |
 | [0037](0037-the-map-draws-the-games-own-lod.md) | The map draws the game's own level of detail | accepted |
 | [0038](0038-a-place-up-close.md) | A place up close: the objects themselves around a point | accepted |
+| [0039](0039-collisions-checked-with-the-models.md) | Collisions are checked with the models, and touches count | accepted |

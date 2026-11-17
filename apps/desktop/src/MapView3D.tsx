@@ -1,6 +1,7 @@
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
 import { AreaLayer, objectKey } from "./area-layer";
+import type { AreaObject } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
   colour,
@@ -61,9 +62,11 @@ const PIN = 0.9;
 /** How close to a pin a click has to land, in pixels. */
 const HIT = 11;
 /** How close the camera has to be, in cells, for the objects themselves. */
-const NEAR = 5;
-/** How far around the point the objects are read, in cells. */
-const AREA = 1.5;
+const NEAR = 8;
+/** How far around the point the objects are read, in cells: at least, and at most. */
+const AREA = [1.5, 3] as const;
+/** How close the camera may come, in cells: a few metres. */
+const MIN_DISTANCE = 0.04;
 
 /** The land as triangles: positions, heights, kinds and indices. */
 interface Mesh {
@@ -423,10 +426,16 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
-  const areaAt = useRef<[number, number] | null>(null);
+  const areaAt = useRef<[number, number, number] | null>(null);
+  // How far the models of the area have come, and the object picked.
+  const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
+  const progressKey = useRef("");
+  const [pickedObject, setPickedObject] = useState<AreaObject | null>(null);
   const areaTimer = useRef<number | null>(null);
   const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
   const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
+  /** How the relief was last drawn, to pick objects with. */
+  const lastView = useRef<{ matrix: Mat4; raise: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const mesh = useMemo(() => buildMesh(terrain), [terrain]);
 
@@ -482,8 +491,13 @@ export function MapView3D({
       }
       return;
     }
+    const radius = Math.min(AREA[1], Math.max(AREA[0], distance * 0.6));
     const at = areaAt.current;
-    if (at !== null && Math.hypot(at[0] - target[0], at[1] - target[1]) < AREA * 0.4) {
+    if (
+      at !== null &&
+      Math.hypot(at[0] - target[0], at[1] - target[1]) < at[2] * 0.35 &&
+      radius <= at[2] + 0.5
+    ) {
       return;
     }
     if (areaTimer.current !== null) {
@@ -496,10 +510,10 @@ export function MapView3D({
       if (layer === null) {
         return;
       }
-      areaAt.current = [x, y];
+      areaAt.current = [x, y, radius];
       setAreaState("loading");
       api
-        .areaObjects(world.name, x * CELL, y * CELL, AREA * CELL)
+        .areaObjects(world.name, x * CELL, y * CELL, radius * CELL)
         .then((found) => {
           if (found === null || area.current !== layer) {
             return;
@@ -582,15 +596,16 @@ export function MapView3D({
     } = state.current;
     wantArea.current(view.target, view.distance);
     const shownArea = near && view.distance <= NEAR * 1.5 ? (area.current?.area ?? null) : null;
-    const realObjects: [number, number, number, number] | null =
-      shownArea === null
-        ? null
-        : [
-            Math.floor((shownArea.centre[0] - shownArea.radius) / CELL),
-            Math.floor((shownArea.centre[1] - shownArea.radius) / CELL),
-            Math.floor((shownArea.centre[0] + shownArea.radius) / CELL),
-            Math.floor((shownArea.centre[1] + shownArea.radius) / CELL),
-          ];
+    // The level of detail stays: towns such as Whiterun are only there.
+    const realObjects = null;
+    if (area.current !== null) {
+      const progress = area.current.progress;
+      const key = `${progress.done}/${progress.total}`;
+      if (key !== progressKey.current) {
+        progressKey.current = key;
+        setAreaProgress(progress.total === 0 ? null : progress);
+      }
+    }
     const span = Math.max(1, terrain.highest - terrain.lowest);
 
     gl.enable(gl.DEPTH_TEST);
@@ -666,6 +681,7 @@ export function MapView3D({
     if (shownArea !== null && area.current !== null) {
       area.current.draw(matrix, raise, css("--accent"));
     }
+    lastView.current = { matrix, raise };
 
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
     gl.useProgram(current.pins);
@@ -722,7 +738,7 @@ export function MapView3D({
         if (!shown.marked) {
           continue;
         }
-        const [x, y, z] = shown.object.position;
+        const [x, y, z] = shown.centre;
         const top = project(matrix, [x / CELL, y / CELL, (z / CELL) * raise], width, height);
         if (top === null || top.depth > 1) {
           continue;
@@ -736,6 +752,50 @@ export function MapView3D({
       }
     }
     drawLabels(context, labels);
+    // Where the objects themselves are drawn: a dashed square on the ground.
+    if (shownArea !== null) {
+      const [cx, cy] = shownArea.centre;
+      const r = shownArea.radius;
+      const ground = groundHeight(mesh, terrain);
+      const corners = [
+        [cx - r, cy - r],
+        [cx + r, cy - r],
+        [cx + r, cy + r],
+        [cx - r, cy + r],
+      ];
+      context.save();
+      context.setLineDash([6, 5]);
+      context.lineWidth = 1.5;
+      context.strokeStyle = "rgb(255 255 255 / 70%)";
+      context.beginPath();
+      let started = false;
+      for (let side = 0; side < 4; side++) {
+        const [ax, ay] = corners[side] ?? [0, 0];
+        const [bx, by] = corners[(side + 1) % 4] ?? [0, 0];
+        for (let step = 0; step <= 16; step++) {
+          const px = (ax ?? 0) + (((bx ?? 0) - (ax ?? 0)) * step) / 16;
+          const py = (ay ?? 0) + (((by ?? 0) - (ay ?? 0)) * step) / 16;
+          const point = project(
+            matrix,
+            [px / CELL, py / CELL, (ground(px / CELL, py / CELL) / CELL) * raise],
+            width,
+            height,
+          );
+          if (point === null || point.depth > 1) {
+            started = false;
+            continue;
+          }
+          if (started) {
+            context.lineTo(point.x, point.y);
+          } else {
+            context.moveTo(point.x, point.y);
+            started = true;
+          }
+        }
+      }
+      context.stroke();
+      context.restore();
+    }
     for (const [shown, lineWidth] of [
       [state.current.hover, 1.5],
       [state.current.picked, 3],
@@ -749,7 +809,7 @@ export function MapView3D({
         context.stroke();
       }
     }
-  }, [terrain]);
+  }, [terrain, mesh]);
 
   const redraw = useCallback(() => {
     if (pending.current !== null) {
@@ -1186,6 +1246,24 @@ export function MapView3D({
     return best?.picked ?? null;
   };
 
+  /** The object drawn at a point of the screen, if any. */
+  const objectAt = (clientX: number, clientY: number): AreaObject | null => {
+    const element = canvas.current;
+    const view = lastView.current;
+    const layer = area.current;
+    if (element === null || view === null || layer === null) {
+      return null;
+    }
+    const rect = element.getBoundingClientRect();
+    const scaleX = element.width / Math.max(1, rect.width);
+    const scaleY = element.height / Math.max(1, rect.height);
+    const x = Math.floor((clientX - rect.left) * scaleX);
+    const y = Math.floor(element.height - (clientY - rect.top) * scaleY - 1);
+    const found = layer.pick(view.matrix, view.raise, x, y, element.width, element.height);
+    redraw();
+    return found;
+  };
+
   const drag = useRef<{
     x: number;
     y: number;
@@ -1232,11 +1310,12 @@ export function MapView3D({
       const along = dy / Math.max(0.35, Math.sin(from.pitch));
       camera.current = {
         ...from,
-        target: [
-          from.target[0] - ((right[0] ?? 0) * dx - (forward[0] ?? 0) * along) * perPixel,
-          from.target[1] - ((right[1] ?? 0) * dx - (forward[1] ?? 0) * along) * perPixel,
-          from.target[2],
-        ],
+        target: (() => {
+          const x = from.target[0] - ((right[0] ?? 0) * dx - (forward[0] ?? 0) * along) * perPixel;
+          const y = from.target[1] - ((right[1] ?? 0) * dx - (forward[1] ?? 0) * along) * perPixel;
+          const ground = groundHeight(mesh, terrain)(x, y);
+          return [x, y, (ground / CELL) * state.current.exaggeration] as Vec3;
+        })(),
       };
     }
     redraw();
@@ -1248,6 +1327,14 @@ export function MapView3D({
       const found = pickAt(event.clientX, event.clientY);
       if (found !== null || !start.turn) {
         onPick(found);
+      }
+      if (found === null && !start.turn) {
+        const object = objectAt(event.clientX, event.clientY);
+        setPickedObject(object);
+        area.current?.select(
+          object === null ? null : objectKey(object.id.plugin, object.id.localId),
+        );
+        redraw();
       }
     }
   };
@@ -1265,7 +1352,7 @@ export function MapView3D({
         ...camera.current,
         distance: Math.min(
           limit,
-          Math.max(1.5, camera.current.distance * Math.exp(event.deltaY * 0.0012)),
+          Math.max(MIN_DISTANCE, camera.current.distance * Math.exp(event.deltaY * 0.0012)),
         ),
       };
       redraw();
@@ -1282,7 +1369,10 @@ export function MapView3D({
     );
   }
   const zoom = (factor: number) => {
-    fly({ ...camera.current, distance: Math.max(1.5, camera.current.distance * factor) });
+    fly({
+      ...camera.current,
+      distance: Math.max(MIN_DISTANCE, camera.current.distance * factor),
+    });
   };
   return (
     <div className="map-frame relief-frame" ref={frame}>
@@ -1331,6 +1421,43 @@ export function MapView3D({
           {t.mapFit}
         </button>
       </div>
+      {pickedObject !== null && (
+        <div className="relief-object" role="status">
+          <div className="relief-object-head">
+            <strong>{pickedObject.name ?? pickedObject.model.split("/").pop()}</strong>
+            <button
+              type="button"
+              className="small quiet"
+              aria-label={t.viewerClose}
+              onClick={() => {
+                setPickedObject(null);
+                area.current?.select(null);
+                redraw();
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <dl>
+            <dt>{t.mapObjectFrom}</dt>
+            <dd>{pickedObject.plugin}</dd>
+            {pickedObject.id.plugin.toLowerCase() !== pickedObject.plugin.toLowerCase() && (
+              <>
+                <dt>{t.mapObjectPlacedBy}</dt>
+                <dd>{pickedObject.id.plugin}</dd>
+              </>
+            )}
+            <dt>{t.mapObjectId}</dt>
+            <dd>
+              <code>{pickedObject.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
+            </dd>
+            <dt>{t.mapObjectModel}</dt>
+            <dd>
+              <code>{pickedObject.model}</code>
+            </dd>
+          </dl>
+        </div>
+      )}
       <div className="relief-controls">
         <label className="relief-control">
           {t.mapHeight}
@@ -1383,7 +1510,9 @@ export function MapView3D({
                 ? t.mapNearFar
                 : areaState === "loading"
                   ? t.mapNearLoading
-                  : t.mapNearCount(areaState)}
+                  : areaProgress !== null && areaProgress.done < areaProgress.total
+                    ? t.mapNearProgress(areaState, areaProgress.done, areaProgress.total)
+                    : t.mapNearCount(areaState)}
           </span>
         </label>
         <span className="relief-hint">{t.mapReliefHint}</span>

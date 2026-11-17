@@ -2288,6 +2288,7 @@ name = "mallet-analysis"
 version = "0.0.0"
 dependencies = [
  "mallet-core",
+ "proptest",
 ]
 
 [[package]]

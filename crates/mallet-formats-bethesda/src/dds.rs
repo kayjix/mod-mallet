@@ -49,6 +49,8 @@ pub struct Rgb {
 pub enum Format {
     /// 8 bytes per block of 4 × 4 pixels: colour only.
     Bc1,
+    /// 16 bytes per block: 4 bits of alpha per pixel, then a BC1 colour block.
+    Bc2,
     /// 16 bytes per block: 8 bytes of alpha, then a BC1 colour block.
     Bc3,
     /// 16 bytes per block in one of eight modes; see `crate::bc7`.
@@ -63,7 +65,7 @@ impl Format {
     fn block_size(self) -> usize {
         match self {
             Self::Bc1 => 8,
-            Self::Bc3 | Self::Bc7 => 16,
+            Self::Bc2 | Self::Bc3 | Self::Bc7 => 16,
             // A "block" of an uncompressed texture is one pixel.
             Self::Rgba8 | Self::Bgra8 => 4,
         }
@@ -116,6 +118,7 @@ fn header(bytes: &[u8]) -> Result<(Size, Format, usize), DdsError> {
     let four_cc = bytes.get(84..88).ok_or(DdsError::NotDds)?;
     let (format, start) = match four_cc {
         b"DXT1" => (Format::Bc1, HEADER_SIZE),
+        b"DXT3" | b"DXT2" => (Format::Bc2, HEADER_SIZE),
         b"DXT5" | b"DXT4" => (Format::Bc3, HEADER_SIZE),
         b"DX10" => {
             let dxgi = u32_at(bytes, HEADER_SIZE).ok_or(DdsError::NotDds)?;
@@ -123,6 +126,8 @@ fn header(bytes: &[u8]) -> Result<(Size, Format, usize), DdsError> {
                 // BC1_TYPELESS, BC1_UNORM, BC1_UNORM_SRGB
                 70..=72 => Format::Bc1,
                 // BC3_TYPELESS, BC3_UNORM, BC3_UNORM_SRGB
+                // BC2_TYPELESS, BC2_UNORM, BC2_UNORM_SRGB
+                73..=75 => Format::Bc2,
                 76..=78 => Format::Bc3,
                 // BC7_TYPELESS, BC7_UNORM, BC7_UNORM_SRGB
                 97..=99 => Format::Bc7,
@@ -259,6 +264,10 @@ pub fn decode(level: &Level, data: &[u8]) -> Rgb {
     for (index, block) in data.chunks_exact(level.format.block_size()).enumerate() {
         let (texels, opacity) = match level.format {
             Format::Bc1 => (bc1_block(block), bc1_alpha(block)),
+            Format::Bc2 => (
+                bc1_block(block.get(8..).unwrap_or_default()),
+                bc2_alpha(block),
+            ),
             Format::Bc3 => (
                 bc1_block(block.get(8..).unwrap_or_default()),
                 bc3_alpha(block),
@@ -318,6 +327,21 @@ fn bc1_alpha(block: &[u8]) -> [u8; 16] {
                 *value = 0;
             }
         }
+    }
+    opacity
+}
+
+/// The opacity of a BC2 block: four bits per pixel, written out.
+fn bc2_alpha(block: &[u8]) -> [u8; 16] {
+    let mut opacity = [255u8; 16];
+    for (texel, value) in opacity.iter_mut().enumerate() {
+        let byte = block.get(texel / 2).copied().unwrap_or(0xff);
+        let nibble = if texel % 2 == 0 {
+            byte & 0x0f
+        } else {
+            byte >> 4
+        };
+        *value = nibble * 17;
     }
     opacity
 }
@@ -478,6 +502,24 @@ mod tests {
         }
         bytes.extend([1, 2, 3, 255]);
         bytes
+    }
+
+    #[test]
+    fn a_dxt3_block_keeps_its_written_out_alpha() {
+        let mut bytes = vec![0u8; HEADER_SIZE];
+        bytes[..4].copy_from_slice(b"DDS ");
+        bytes[12..16].copy_from_slice(&4u32.to_le_bytes());
+        bytes[16..20].copy_from_slice(&4u32.to_le_bytes());
+        bytes[28..32].copy_from_slice(&1u32.to_le_bytes());
+        bytes[84..88].copy_from_slice(b"DXT3");
+        // Alpha: in every row, one clear pixel, then three opaque ones.
+        bytes.extend([0xf0u8, 0xff].repeat(4));
+        bytes.extend(0xf800u16.to_le_bytes());
+        bytes.extend(0u16.to_le_bytes());
+        bytes.extend(0u32.to_le_bytes());
+        let decoded = decode_level(&bytes, 0).unwrap();
+        assert_eq!(&decoded.pixels[..3], &[255, 0, 0]);
+        assert_eq!(&decoded.alpha[..4], &[0, 255, 255, 255]);
     }
 
     #[test]

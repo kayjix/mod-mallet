@@ -52,6 +52,7 @@
   - [0036 One adapter for the Bethesda family, settings per game](adr/0036-one-adapter-for-the-bethesda-family.md)
   - [0037 The map draws the game's own level of detail](adr/0037-the-map-draws-the-games-own-lod.md)
   - [0038 A place up close: the objects themselves around a point](adr/0038-a-place-up-close.md)
+  - [0039 Collisions are checked with the models, and touches count](adr/0039-collisions-checked-with-the-models.md)
   - [Template](adr/template.md)
 
 # Reference

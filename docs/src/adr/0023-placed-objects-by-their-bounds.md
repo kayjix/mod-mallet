@@ -1,6 +1,6 @@
 # 0023 Placed objects are compared by the boxes around their models
 
-- Status: accepted
+- Status: accepted; where the models are known, they decide since [0039](0039-collisions-checked-with-the-models.md)
 - Date: 2026-11-15
 
 ## Context

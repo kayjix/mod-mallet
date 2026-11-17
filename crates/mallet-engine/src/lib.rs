@@ -234,6 +234,23 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         "read the setup"
     );
 
+    // Where objects of two mods meet by their boxes, their models decide
+    // (ADR 0039). Only those models are read.
+    let started = Instant::now();
+    let wanted = mallet_analysis::objects::models_to_check(&Context::new(&facts, mods.as_ref()));
+    facts.models = mallet_game_bethesda::models::read_models(
+        game,
+        &game_dir,
+        options.local_dir.as_deref(),
+        &wanted,
+    );
+    tracing::info!(
+        wanted = wanted.len(),
+        read = facts.models.meshes.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "read the models of objects that may collide"
+    );
+
     let started = Instant::now();
     let context = Context::new(&facts, mods.as_ref());
     let findings = mallet_analysis::run_all(&context);

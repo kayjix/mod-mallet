@@ -20,6 +20,7 @@ pub(crate) fn offer_disabling(finding: mallet_core::Finding) -> mallet_core::Fin
 }
 
 pub mod assets;
+mod contact;
 pub mod duels;
 pub mod extender;
 pub mod faces;

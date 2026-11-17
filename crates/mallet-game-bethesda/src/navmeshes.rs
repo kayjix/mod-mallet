@@ -1,10 +1,10 @@
-//! Which navigation meshes of other plugins a plugin changes.
+//! Which navigation meshes of other plugins a plugin changes, and which
+//! doors its own connect.
 //!
 //! A navigation mesh (`NAVM`) lies in the children of its cell, like the
-//! objects placed there. Only the meshes that change another plugin's
-//! are unpacked ([`OVERRIDES`]), and of their geometry only the doors
-//! characters walk through ([`navmesh::doors`]). A mesh's place is named
-//! after its cell: the cell's internal name inside, the worldspace's
+//! objects placed there. Of its geometry only the doors characters walk
+//! through are read ([`navmesh::doors`]). A mesh's place is named after
+//! its cell: the cell's internal name inside, the worldspace's
 //! internal name and the cell's grid position (`XCLC`) outside, which is
 //! what the game's console takes to go there.
 
@@ -18,15 +18,15 @@ use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_typ
 /// The record type of navigation meshes.
 pub const NAVMESH: Signature = *b"NAVM";
 
-/// The records read from the groups of places only where they change a
-/// record of another plugin.
-pub const OVERRIDES: [Signature; 1] = [NAVMESH];
+/// The records read from the groups of places for the navigation meshes.
+pub const RECORDS: [Signature; 1] = [NAVMESH];
 
 /// Record flag: the record is deleted.
 const FLAG_DELETED: u32 = 0x0000_0020;
 
 /// The navigation meshes of other plugins that `plugin`, named
-/// `plugin_name`, changes; `None` if it changes none. The plugin must have
+/// `plugin_name`, changes, and the doors its own connect; `None` if there
+/// are neither. The plugin must have
 /// been read with its cells, worldspaces and navigation meshes.
 pub fn changes(plugin_name: &str, plugin: &Plugin) -> Option<NavmeshChanges> {
     let masters = &plugin.header.masters;
@@ -43,6 +43,7 @@ pub fn changes(plugin_name: &str, plugin: &Plugin) -> Option<NavmeshChanges> {
         .filter_map(|record| Some((record.form_id, cell_name(record, &worlds)?)))
         .collect();
 
+    let mut connected = Vec::new();
     let navmeshes: Vec<NavmeshChange> = plugin
         .records
         .iter()
@@ -50,6 +51,8 @@ pub fn changes(plugin_name: &str, plugin: &Plugin) -> Option<NavmeshChanges> {
         .filter_map(|record| {
             let (origin, local_id) = plugin::resolve_form_id(record.form_id, masters, plugin_name);
             if origin.eq_ignore_ascii_case(plugin_name) {
+                // Its own: only the doors matter.
+                connected.extend(doors(record, masters, plugin_name).into_iter().flatten());
                 return None;
             }
             let cell = record
@@ -63,18 +66,14 @@ pub fn changes(plugin_name: &str, plugin: &Plugin) -> Option<NavmeshChanges> {
                     local_id,
                 },
                 place: cell.and_then(|cell| cells.get(&cell)).cloned(),
-                doors: record.first(b"NVNM").and_then(navmesh::doors).map(|doors| {
-                    doors
-                        .into_iter()
-                        .map(|door| record_id(door, masters, plugin_name))
-                        .collect()
-                }),
+                doors: doors(record, masters, plugin_name),
             })
         })
         .collect();
-    (!navmeshes.is_empty()).then(|| NavmeshChanges {
+    (!navmeshes.is_empty() || !connected.is_empty()).then(|| NavmeshChanges {
         plugin: plugin_name.to_owned(),
         navmeshes,
+        connected,
     })
 }
 
@@ -95,6 +94,18 @@ fn cell_name(cell: &Record, worlds: &HashMap<u32, String>) -> Option<String> {
         (Some(world), Some((x, y))) => Some(format!("{world} {x},{y}")),
         _ => editor_id(cell),
     }
+}
+
+/// The doors a navigation mesh lets characters walk through, if its
+/// geometry can be read.
+fn doors(record: &Record, masters: &[String], plugin_name: &str) -> Option<Vec<RecordId>> {
+    let doors = navmesh::doors(record.first(b"NVNM")?)?;
+    Some(
+        doors
+            .into_iter()
+            .map(|door| record_id(door, masters, plugin_name))
+            .collect(),
+    )
 }
 
 fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
@@ -121,7 +132,7 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::objects::{PLACE_GROUPS, PLACE_RECORDS};
+    use crate::objects::PLACE_GROUPS;
 
     fn read(data: &[u8]) -> Plugin {
         plugin::read_request(
@@ -129,8 +140,8 @@ mod tests {
             &Request {
                 flat: &[],
                 nested: &PLACE_GROUPS,
-                nested_records: &PLACE_RECORDS,
-                nested_overrides: &OVERRIDES,
+                nested_records: &[*b"REFR", *b"CELL", *b"WRLD", *b"LAND", NAVMESH],
+                nested_overrides: &[],
             },
         )
         .unwrap()
@@ -185,7 +196,8 @@ mod tests {
                         field,
                         vec![
                             RecordSpec::new(NAVMESH, 0x0000_0210).with(*b"NVNM", vec![7; 64]),
-                            RecordSpec::new(NAVMESH, 0x0100_0800),
+                            RecordSpec::new(NAVMESH, 0x0100_0800)
+                                .with(*b"NVNM", geometry(0x0100_0901)),
                         ],
                     )],
                 ),
@@ -232,6 +244,14 @@ mod tests {
                 }]),
                 None,
             ]
+        );
+        // Its own mesh counts only for the door it connects.
+        assert_eq!(
+            changes.connected,
+            vec![RecordId {
+                plugin: "village.esp".to_owned(),
+                local_id: 0x901,
+            }]
         );
     }
 

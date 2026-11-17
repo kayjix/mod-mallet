@@ -171,8 +171,22 @@ objects-overlapping = Objekte zweier Mods stehen ineinander
             [one] 1 Ort
            *[other] { $count } Orten
         } größtenteils ineinander stehen. Zum Beispiel: { $examples }. Angegeben ist jeweils der Ort: ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
-    .explanation = Zwei Mods, die denselben Ort verändern, stellen jeweils eigene Gebäude, Bäume oder andere Objekte dorthin, ohne voneinander zu wissen. Wo sie sich treffen, wächst ein Baum durch ein Dach, zwei Häuser verschmelzen zu einem oder ein Weg führt in eine Wand. Mod Mallet vergleicht den Kasten um das Modell eines Objekts, nicht das Modell selbst. Ein Objekt mit viel freiem Raum, etwa ein Torbogen, kann deshalb gemeldet werden, obwohl sichtbar nichts zusammenstößt.
+    .explanation = Zwei Mods, die denselben Ort verändern, stellen jeweils eigene Gebäude, Bäume oder andere Objekte dorthin, ohne voneinander zu wissen. Wo sie sich treffen, wächst ein Baum durch ein Dach, zwei Häuser verschmelzen zu einem oder ein Weg führt in eine Wand. Wo sich die Modelle beider Objekte lesen lassen, vergleicht Mod Mallet ihre Formen; sonst nur den Kasten um jedes Modell. Ein Objekt mit viel freiem Raum, etwa ein Torbogen, kann dann gemeldet werden, obwohl sichtbar nichts zusammenstößt.
     .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch. Gibt es keinen, sieh dir die genannten Orte im Spiel an. Steht dort etwas im Weg, entscheide, welche der beiden Mods du für diesen Ort behalten willst.
+
+objects-touching = Objekte zweier Mods ragen ineinander
+    .headline =
+        { $first } und { $second }: { $count ->
+            [one] 1 Objekt ragt
+           *[other] { $count } Objekte ragen
+        } in ein anderes
+    .summary =
+        Objekte von { $first } und von { $second } berühren sich oder ragen ein Stück ineinander, an { $count ->
+            [one] 1 Ort
+           *[other] { $count } Orten
+        }: Ihre Modelle schneiden sich, aber keins steht größtenteils im anderen. Zum Beispiel: { $examples }. Angegeben ist jeweils der Ort: ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+    .explanation = Zwei Mods, die Dinge in dieselbe Gegend stellen, wussten nichts voneinander. So läuft ein Zaun in eine Mauer, ein Karren steht halb in einem Marktstand oder eine Laterne wächst aus einem Dach. Mod Mallet hat die Formen beider Modelle verglichen, nicht nur die Kästen um sie herum. Innerhalb einer Mod sind solche Berührungen meist gewollt, deshalb werden sie nur zwischen Mods gemeldet, die nichts voneinander wissen.
+    .remedy = Sieh dir die genannten Orte im Spiel oder auf der Karte an. Oft fällt es nicht auf; wo doch, entscheide, welches Objekt du behalten willst, oder suche nach einem Kompatibilitäts-Patch beider Mods.
 
 navmeshes-door-cut-off = Figuren können Türen einer Mod nicht mehr benutzen
     .headline =

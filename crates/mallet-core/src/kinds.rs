@@ -176,6 +176,14 @@ pub const OBJECTS_OVERLAPPING: KindInfo = KindInfo {
     args: &["first", "second", "count", "examples"],
 };
 
+/// Objects of two mods whose models touch or cut a little into each other.
+pub const OBJECTS_TOUCHING: KindInfo = KindInfo {
+    id: "objects.touching",
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
+    args: &["first", "second", "count", "examples"],
+};
+
 /// Replacement meshes no longer use textures that a texture mod replaces.
 pub const MESHES_RETEXTURE_BYPASSED: KindInfo = KindInfo {
     id: "meshes.retexture-bypassed",
@@ -269,6 +277,7 @@ pub const ALL: &[KindInfo] = &[
     PLUGINS_CONTAINED,
     OBJECTS_DUPLICATED,
     OBJECTS_OVERLAPPING,
+    OBJECTS_TOUCHING,
     NAVMESHES_DOOR_CUT_OFF,
     NAVMESHES_CHANGES_UNDONE,
     MESHES_RETEXTURE_BYPASSED,

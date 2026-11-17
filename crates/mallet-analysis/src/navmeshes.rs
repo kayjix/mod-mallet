@@ -66,15 +66,32 @@ fn undone(facts: &Facts) -> HashMap<(&str, &str), Undone<'_>> {
                 .push((changes.plugin.as_str(), navmesh));
         }
     }
-    // Doors that mods add. A door of the game that a mod moves keeps its
-    // identity, and versions made from the game's mesh connect it too.
-    let added: HashSet<&RecordId> = facts
-        .objects
-        .placed
-        .iter()
-        .filter(|object| object.moved.is_none())
-        .map(|object| &object.id)
-        .collect();
+    let doors = Doors {
+        // A door of the game that a mod moves keeps its identity, and
+        // versions made from the game's mesh connect it too.
+        added: facts
+            .objects
+            .placed
+            .iter()
+            .filter(|object| object.moved.is_none())
+            .map(|object| &object.id)
+            .collect(),
+        // What the versions the game uses connect: of each changed mesh the
+        // last version, and the mods' own meshes.
+        connected: changed_by
+            .values()
+            .filter_map(|versions| versions.last())
+            .filter_map(|(_, used)| used.doors.as_ref())
+            .chain(
+                facts
+                    .navmeshes
+                    .changes
+                    .iter()
+                    .map(|changes| &changes.connected),
+            )
+            .flatten()
+            .collect(),
+    };
     let masters: HashMap<String, Vec<String>> = facts
         .plugins
         .iter()
@@ -100,7 +117,7 @@ fn undone(facts: &Facts) -> HashMap<(&str, &str), Undone<'_>> {
             let entry = undone.entry((*winner, *loser)).or_default();
             entry.count += 1;
             entry.places.extend(change.place.as_deref());
-            let cut_off = doors_cut_off(change, used, &added);
+            let cut_off = doors.cut_off(change, used);
             if cut_off > 0 {
                 entry.doors += cut_off;
                 entry.door_places.extend(change.place.as_deref());
@@ -110,16 +127,28 @@ fn undone(facts: &Facts) -> HashMap<(&str, &str), Undone<'_>> {
     undone
 }
 
-/// How many doors that mods add the `lost` version of a navigation mesh
-/// connects and the `used` one does not. Zero where either version's
-/// doors are unknown.
-fn doors_cut_off(lost: &NavmeshChange, used: &NavmeshChange, added: &HashSet<&RecordId>) -> usize {
-    let (Some(lost), Some(used)) = (&lost.doors, &used.doors) else {
-        return 0;
-    };
-    lost.iter()
-        .filter(|door| added.contains(door) && !used.contains(door))
-        .count()
+/// The doors that matter for whether characters can still use them.
+struct Doors<'a> {
+    /// The doors mods add.
+    added: HashSet<&'a RecordId>,
+    /// The doors some navigation mesh in the version the game uses
+    /// connects.
+    connected: HashSet<&'a RecordId>,
+}
+
+impl Doors<'_> {
+    /// How many doors that mods add the `lost` version of a navigation mesh
+    /// connects and no navigation mesh the game uses does, the `used`
+    /// version of this one included. Zero where either version's doors are
+    /// unknown.
+    fn cut_off(&self, lost: &NavmeshChange, used: &NavmeshChange) -> usize {
+        let (Some(lost), Some(_)) = (&lost.doors, &used.doors) else {
+            return 0;
+        };
+        lost.iter()
+            .filter(|door| self.added.contains(door) && !self.connected.contains(door))
+            .count()
+    }
 }
 
 /// The finding about what `winner` undoes of `loser`.
@@ -216,6 +245,7 @@ mod tests {
                     doors: None,
                 })
                 .collect(),
+            connected: Vec::new(),
         }
     }
 
@@ -327,6 +357,7 @@ mod tests {
                 place: Some("Riverwood".to_owned()),
                 doors: Some(doors),
             }],
+            connected: Vec::new(),
         }
     }
 
@@ -383,6 +414,28 @@ mod tests {
         assert_eq!(finding.args["places"], ArgValue::from("Riverwood"));
         // The same pair is not reported as a note as well.
         assert_eq!(navmesh_findings(&facts), Vec::new());
+    }
+
+    #[test]
+    fn a_door_the_winner_connects_in_a_mesh_of_its_own_is_no_warning() {
+        let house_door = id("house.esp", 0x0800);
+        let mut paths = with_doors("Paths.esp", Vec::new());
+        paths.connected.push(house_door.clone());
+        let mut facts = facts(
+            vec![
+                plugin("House.esp", &["Skyrim.esm"]),
+                plugin("Paths.esp", &["Skyrim.esm"]),
+            ],
+            vec![with_doors("House.esp", vec![house_door.clone()]), paths],
+        );
+        facts.objects = ObjectFacts {
+            placed: vec![door(house_door)],
+            ..ObjectFacts::default()
+        };
+        assert_eq!(
+            navmesh_findings_of(&facts, "navmeshes.door-cut-off"),
+            Vec::new()
+        );
     }
 
     #[test]

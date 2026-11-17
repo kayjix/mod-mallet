@@ -719,9 +719,23 @@
           "description": "The command of the game's console that takes the player there.",
           "type": "string"
         },
+        "depth": {
+          "description": "How far the two models reach into each other, in game units, where\ntheir meshes were compared; `None` where only their boxes were.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
         "finding": {
           "description": "The finding that reports the collision.",
           "$ref": "#/$defs/FindingId"
+        },
+        "kind": {
+          "description": "What kind of collision it is.",
+          "$ref": "#/$defs/SpotKind",
+          "default": "overlap"
         },
         "location": {
           "description": "Where it is.",
@@ -1421,6 +1435,26 @@
           "description": "Worth knowing, nothing to fix.",
           "type": "string",
           "const": "info"
+        }
+      ]
+    },
+    "SpotKind": {
+      "description": "What kind of collision a spot is.",
+      "oneOf": [
+        {
+          "description": "The same object placed twice in almost the same spot.",
+          "type": "string",
+          "const": "duplicate"
+        },
+        {
+          "description": "Two objects standing largely inside each other.",
+          "type": "string",
+          "const": "overlap"
+        },
+        {
+          "description": "Two objects whose models touch or cut a little into each other.",
+          "type": "string",
+          "const": "touch"
         }
       ]
     },

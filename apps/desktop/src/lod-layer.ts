@@ -269,6 +269,8 @@ export class LodLayer {
     gl.bindTexture(gl.TEXTURE_2D, view.cells);
     gl.uniform1i(at("u_cells"), 1);
     gl.uniform1i(at("u_texture"), 0);
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(2, 8);
     for (const tile of drawn.values()) {
       const loaded = this.loaded.get(key(tile.level, tile.x, tile.y));
       if (loaded === undefined) {
@@ -290,6 +292,7 @@ export class LodLayer {
       }
     }
     gl.bindVertexArray(null);
+    gl.disable(gl.POLYGON_OFFSET_FILL);
     this.evict(drawn);
   }
 

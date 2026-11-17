@@ -488,6 +488,26 @@ pub struct MapSpot {
     /// and height.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<[i32; 3]>,
+    /// What kind of collision it is.
+    #[serde(default)]
+    pub kind: SpotKind,
+    /// How far the two models reach into each other, in game units, where
+    /// their meshes were compared; `None` where only their boxes were.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<u32>,
+}
+
+/// What kind of collision a spot is.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SpotKind {
+    /// The same object placed twice in almost the same spot.
+    Duplicate,
+    /// Two objects standing largely inside each other.
+    #[default]
+    Overlap,
+    /// Two objects whose models touch or cut a little into each other.
+    Touch,
 }
 
 /// One object of a collision.
