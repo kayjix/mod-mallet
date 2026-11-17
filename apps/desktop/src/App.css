@@ -2382,6 +2382,12 @@ button.quiet {
   color: var(--muted);
 }
 
+.relief-value {
+  min-width: 12em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- the patch --------------------------------------------------------- */
 
 .patch-bar {

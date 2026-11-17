@@ -31,6 +31,7 @@ import {
   type Picked,
   type Picture,
   type PlaceFilter,
+  readLand,
   type Shape,
   samePick,
   shapeOf,
@@ -81,6 +82,22 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   const [worldIndex, setWorldIndex] = useState(Math.max(focusWorld, 0));
   const [owner, setOwner] = useState(-1);
   const [mode, setMode] = useState<"flat" | "relief">("flat");
+  // Whether the cells with objects of mods are tinted; remembered.
+  const [showCells, setShowCells] = useState(() => {
+    try {
+      return localStorage.getItem("mallet.mapCells") !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const changeCells = (next: boolean) => {
+    setShowCells(next);
+    try {
+      localStorage.setItem("mallet.mapCells", next ? "on" : "off");
+    } catch {
+      // Only a convenience.
+    }
+  };
   const world = map.worlds[worldIndex];
   const [filter, setFilter] = useState<PlaceFilter>(() => startingFilter(world));
   const [picked, setPicked] = useState<Picked | null>(
@@ -175,7 +192,15 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             {t.mapRelief}
           </button>
         </fieldset>
-        <Legend />
+        <label className="control control-check">
+          <input
+            type="checkbox"
+            checked={showCells}
+            onChange={(event) => changeCells(event.target.checked)}
+          />
+          {t.mapModCells}
+        </label>
+        <Legend cells={showCells} />
       </div>
       <div className="map-body map-body-places">
         <PlacesPanel
@@ -188,6 +213,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
           <Grid
             key={world.name}
             cells={world.cells}
+            showCells={showCells}
             terrain={world.terrain ?? null}
             picture={ownMap}
             owner={owner}
@@ -206,6 +232,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             terrain={world.terrain}
             picture={ownMap}
             owner={owner}
+            showCells={showCells}
             markers={shownMarkers}
             spots={shownSpots}
             picked={picked}
@@ -233,14 +260,18 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   );
 }
 
-function Legend() {
+function Legend({ cells }: { cells: boolean }) {
   const { t } = useSession();
   return (
     <div className="legend">
-      <span className="swatch" data-level="1" /> {t.mapLegendOne}
-      <span className="swatch" data-level="2" /> {t.mapLegendTwo}
-      <span className="swatch" data-level="3" /> {t.mapLegendThree}
-      <span className="swatch" data-level="4" /> {t.mapLegendMany}
+      {cells && (
+        <>
+          <span className="swatch" data-level="1" /> {t.mapLegendOne}
+          <span className="swatch" data-level="2" /> {t.mapLegendTwo}
+          <span className="swatch" data-level="3" /> {t.mapLegendThree}
+          <span className="swatch" data-level="4" /> {t.mapLegendMany}
+        </>
+      )}
       <span className="swatch swatch-spot" /> {t.mapLegendSpot}
     </div>
   );
@@ -417,16 +448,13 @@ function palette(element: Element): Palette {
  * tinted by height and shaded as if lit from the north-west.
  */
 function relief(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | null {
-  const width = terrain.columns * terrain.samples;
-  const height = terrain.rows * terrain.samples;
-  const binary = atob(terrain.heights);
-  if (binary.length !== width * height) {
+  const land = readLand(terrain);
+  if (land === null) {
     return null;
   }
-  const value = (x: number, y: number) =>
-    binary.charCodeAt(
-      Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x)),
-    );
+  const { width, height, heights, kinds } = land;
+  const at = (x: number, y: number) =>
+    Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -435,34 +463,67 @@ function relief(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | null
     return null;
   }
   const image = context.createImageData(width, height);
+  const span = Math.max(1, terrain.highest - terrain.lowest);
+  // Game units between two samples, and both sides of a sample.
+  const spacing = (CELL / terrain.samples) * 2;
   const mix = (share: number, channel: 0 | 1 | 2) =>
     colours.low[channel] + (colours.high[channel] - colours.low[channel]) * share;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const at = (y * width + x) * 4;
-      const here = value(x, y);
-      if (here === 0) {
+      const index = y * width + x;
+      const kind = kinds[index] ?? 0;
+      if (kind === 0) {
         continue;
       }
       let colour: [number, number, number];
-      if (here === 1) {
+      if (kind === 1) {
         colour = colours.water;
       } else {
-        const share = (here - 2) / 253;
+        const here = heights[index] ?? terrain.lowest;
+        const share = (here - terrain.lowest) / span;
         // Light from the north-west: slopes facing it are brighter.
-        const eastward = Math.max(value(x + 1, y), 2) - Math.max(value(x - 1, y), 2);
-        const southward = Math.max(value(x, y + 1), 2) - Math.max(value(x, y - 1), 2);
-        const shade = Math.min(1.35, Math.max(0.55, 1 - (eastward + southward) * 0.02));
+        const eastward =
+          ((heights[at(x + 1, y)] ?? here) - (heights[at(x - 1, y)] ?? here)) / spacing;
+        const southward =
+          ((heights[at(x, y + 1)] ?? here) - (heights[at(x, y - 1)] ?? here)) / spacing;
+        const shade = Math.min(1.35, Math.max(0.55, 1 - (eastward + southward) * 0.9));
         colour = [
           Math.min(255, mix(share, 0) * shade),
           Math.min(255, mix(share, 1) * shade),
           Math.min(255, mix(share, 2) * shade),
         ];
       }
-      image.data[at] = colour[0];
-      image.data[at + 1] = colour[1];
-      image.data[at + 2] = colour[2];
-      image.data[at + 3] = 255;
+      const pixel = index * 4;
+      image.data[pixel] = colour[0];
+      image.data[pixel + 1] = colour[1];
+      image.data[pixel + 2] = colour[2];
+      image.data[pixel + 3] = 255;
+    }
+  }
+  context.putImageData(image, 0, 0);
+  return canvas;
+}
+
+/**
+ * The water as an image with one pixel per height sample, to lay over the
+ * game's terrain picture: that shows the ground under the water.
+ */
+function waterOver(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | null {
+  const land = readLand(terrain);
+  if (land === null) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = land.width;
+  canvas.height = land.height;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    return null;
+  }
+  const image = context.createImageData(land.width, land.height);
+  for (let index = 0; index < land.kinds.length; index++) {
+    if (land.kinds[index] === 1) {
+      image.data.set([...colours.water, 150], index * 4);
     }
   }
   context.putImageData(image, 0, 0);
@@ -471,6 +532,8 @@ function relief(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | null
 
 interface GridProps {
   cells: MapCell[];
+  /** Whether the cells with objects of mods are tinted. */
+  showCells: boolean;
   terrain: MapTerrain | null;
   picture: Picture | null;
   owner: number;
@@ -485,6 +548,7 @@ interface GridProps {
 
 function Grid({
   cells,
+  showCells,
   terrain,
   picture,
   owner,
@@ -541,12 +605,16 @@ function Grid({
 
   // The land is drawn once per worldspace and then scaled with the view.
   const [land, setLand] = useState<HTMLCanvasElement | null>(null);
+  const [water, setWater] = useState<HTMLCanvasElement | null>(null);
   useEffect(() => {
     if (terrain === null || canvas.current === null) {
       setLand(null);
+      setWater(null);
       return;
     }
-    setLand(relief(terrain, palette(canvas.current)));
+    const colours = palette(canvas.current);
+    setLand(relief(terrain, colours));
+    setWater(waterOver(terrain, colours));
   }, [terrain]);
 
   const fit = useCallback((): View => {
@@ -675,6 +743,16 @@ function Grid({
         picture.meta.columns * view.size,
         picture.meta.rows * view.size,
       );
+      if (water !== null && terrain !== null) {
+        context.imageSmoothingEnabled = true;
+        context.drawImage(
+          water,
+          view.x + (terrain.west - bounds.minX) * view.size,
+          view.y + (bounds.maxY - (terrain.south + terrain.rows - 1)) * view.size,
+          terrain.columns * view.size,
+          terrain.rows * view.size,
+        );
+      }
     } else if (land !== null && terrain !== null) {
       context.imageSmoothingEnabled = true;
       context.drawImage(
@@ -711,7 +789,7 @@ function Grid({
     }
     const gap = view.size >= 8 ? 1 : 0;
     context.globalAlpha = ground ? 0.55 : 1;
-    for (const cell of cells) {
+    for (const cell of showCells ? cells : []) {
       const px = view.x + (cell.x - bounds.minX) * view.size;
       const py = view.y + (bounds.maxY - cell.y) * view.size;
       if (px + view.size < 0 || py + view.size < 0 || px > width || py > height) {
@@ -834,8 +912,10 @@ function Grid({
     }
   }, [
     cells,
+    showCells,
     terrain,
     land,
+    water,
     picture,
     owner,
     view,

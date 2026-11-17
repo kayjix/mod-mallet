@@ -1116,18 +1116,19 @@ export interface MapTerrain {
    */
   columns: number;
   /**
-   * One byte per sample, written in Base64: rows from north to south,
-   * samples from west to east. 0 means no land is known there, 1 water,
-   * and 2 to 255 land from [`MapTerrain::lowest`] to
+   * Two bytes per sample (little endian), written in Base64: rows from
+   * north to south, samples from west to east. 0 means nothing is known
+   * there; 1 to 65535 is the height of the ground, or of the water
+   * surface where water covers it, from [`MapTerrain::lowest`] to
    * [`MapTerrain::highest`].
    */
   heights: string;
   /**
-   * The height of the highest land, in game units.
+   * The highest height, of ground or water, in game units.
    */
   highest: number;
   /**
-   * The height of the lowest land, in game units.
+   * The lowest height, of ground or water, in game units.
    */
   lowest: number;
   /**
@@ -1142,6 +1143,12 @@ export interface MapTerrain {
    * The southmost cell row the image covers.
    */
   south: number;
+  /**
+   * One byte per sample, in the order of the heights, written in Base64:
+   * 1 where water covers the ground, 0 elsewhere. Empty in reports of
+   * versions that did not keep it.
+   */
+  water?: string;
   /**
    * The westmost cell column the image covers.
    */

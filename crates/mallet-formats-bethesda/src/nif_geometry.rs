@@ -95,6 +95,9 @@ fn read_rotation(bytes: &mut Bytes<'_>) -> Option<[[f32; 3]; 3]> {
 /// The parts of a block of the `NiAVObject` family the reader needs.
 struct Placed {
     transform: Transform,
+    /// Whether the block is hidden: the game does not draw it, nor
+    /// anything below it.
+    hidden: bool,
 }
 
 /// Reads name, extra data, controller, flags and transform, and the
@@ -106,11 +109,11 @@ fn read_av_object(bytes: &mut Bytes<'_>, bs_version: u32) -> Option<Placed> {
         bytes.u32()?;
     }
     bytes.u32()?; // controller
-    if bs_version > 26 {
-        bytes.u32()?; // flags
+    let flags = if bs_version > 26 {
+        bytes.u32()?
     } else {
-        bytes.u16()?;
-    }
+        u32::from(bytes.u16()?)
+    };
     let translation = [bytes.f32()?, bytes.f32()?, bytes.f32()?];
     let rotation = read_rotation(bytes)?;
     let scale = bytes.f32()?;
@@ -132,6 +135,7 @@ fn read_av_object(bytes: &mut Bytes<'_>, bs_version: u32) -> Option<Placed> {
             translation,
             scale,
         },
+        hidden: flags & 0x1 != 0,
     })
 }
 
@@ -140,8 +144,8 @@ fn reference(value: u32) -> Option<usize> {
     usize::try_from(index).ok()
 }
 
-/// The children of a node.
-fn node_children(block: &[u8], bs_version: u32) -> Option<(Transform, Vec<usize>)> {
+/// The place of a node, whether it is hidden, and its children.
+fn node_children(block: &[u8], bs_version: u32) -> Option<(Placed, Vec<usize>)> {
     let mut bytes = Bytes::new(block);
     let placed = read_av_object(&mut bytes, bs_version)?;
     let count = bytes.u32()?;
@@ -151,7 +155,7 @@ fn node_children(block: &[u8], bs_version: u32) -> Option<(Transform, Vec<usize>
             children.push(child);
         }
     }
-    Some((placed.transform, children))
+    Some((placed, children))
 }
 
 /// A half-precision float.
@@ -293,6 +297,10 @@ fn read_ni_tri_shape(
 ) -> Option<(Transform, usize, Option<usize>, bool)> {
     let mut bytes = Bytes::new(block);
     let placed = read_av_object(&mut bytes, bs_version)?;
+    if placed.hidden {
+        // The game does not draw it.
+        return None;
+    }
     let data = reference(bytes.u32()?)?;
     bytes.u32()?; // skin instance
     let materials = bytes.u32()?;
@@ -627,7 +635,8 @@ fn first_texture(set: &[u8]) -> Option<String> {
 
 /// Where every node of a mesh lies, and every other block hanging from a
 /// node with the place of that node. Walked from the root, which is the
-/// first block.
+/// first block. Blocks below a hidden node keep their place, since bones
+/// may be among them, but are not counted as hanging there to be drawn.
 #[allow(clippy::type_complexity)]
 fn place<'a>(
     block: &dyn Fn(usize) -> Option<(&'a str, &'a [u8])>,
@@ -635,8 +644,8 @@ fn place<'a>(
 ) -> (HashMap<usize, Transform>, Vec<(usize, Transform)>) {
     let mut world: HashMap<usize, Transform> = HashMap::new();
     let mut hanging = Vec::new();
-    let mut pending = vec![(0usize, Transform::IDENTITY, 0u32)];
-    while let Some((index, parent, depth)) = pending.pop() {
+    let mut pending = vec![(0usize, Transform::IDENTITY, 0u32, false)];
+    while let Some((index, parent, depth, hidden)) = pending.pop() {
         if depth > 64 || world.contains_key(&index) {
             continue;
         }
@@ -648,16 +657,18 @@ fn place<'a>(
                 let here = if index == 0 {
                     Transform::IDENTITY
                 } else {
-                    local.within(&parent)
+                    local.transform.within(&parent)
                 };
                 world.insert(index, here);
                 for child in children {
-                    pending.push((child, here, depth + 1));
+                    pending.push((child, here, depth + 1, hidden || local.hidden));
                 }
             }
         } else {
             world.insert(index, parent);
-            hanging.push((index, parent));
+            if !hidden {
+                hanging.push((index, parent));
+            }
         }
     }
     (world, hanging)
@@ -687,6 +698,14 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
         first_texture(set)
     };
 
+    // Glow, flames and mist are cards with an effect shader: light, not
+    // a body; drawn plainly they would hide the thing.
+    let is_effect = |shader: Option<usize>| -> bool {
+        shader
+            .and_then(block)
+            .is_some_and(|(kind, _)| kind == "BSEffectShaderProperty")
+    };
+
     let (world, shape_blocks) = place(&block, bs_version);
 
     let mut shapes = Vec::new();
@@ -697,40 +716,21 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
         match kind {
             "BSTriShape" | "BSMeshLODTriShape" | "BSSubIndexTriShape" | "BSDynamicTriShape" => {
                 let dynamic = kind == "BSDynamicTriShape";
+                let placed = read_av_object(&mut Bytes::new(bytes), bs_version);
+                if placed.as_ref().is_some_and(|placed| placed.hidden) {
+                    continue;
+                }
                 let Some(mut raw) = read_bs_tri_shape(bytes, bs_version, dynamic) else {
                     continue;
                 };
-                let local = read_av_object(&mut Bytes::new(bytes), bs_version)
-                    .map_or(Transform::IDENTITY, |placed| placed.transform);
-                let skin = raw.skin.and_then(block).map(|(_, skin)| skin);
-                let mut influences = HashMap::new();
-                let mut skinned = false;
-                if let Some((_, partition)) = skin.and_then(skin_partition_of).and_then(block)
-                    && let Some(partition) = read_skin_partition(partition, bs_version)
-                {
-                    if raw.indices.is_empty() {
-                        if raw.positions.is_empty() {
-                            raw.positions = partition.positions;
-                        }
-                        if raw.uvs.is_empty() {
-                            raw.uvs = partition.uvs;
-                        }
-                        raw.indices = partition.indices;
-                    }
-                    influences = partition.influences;
+                if is_effect(raw.shader) {
+                    continue;
                 }
-                // Each point goes where the bones it hangs on hold it, by
-                // their weights, as the game puts it in its resting pose.
-                if let Some(skin) = skin
-                    && !influences.is_empty()
-                {
-                    let bones = bone_places(skin, &block, &world);
-                    raw.positions = skin_points(&raw.positions, &influences, &bones);
-                    skinned = true;
-                }
-                // Skinned points are stored for the skeleton: they are put
-                // where the first bone they hang on holds them.
-                let bound = skin.and_then(|skin| {
+                let local = placed.map_or(Transform::IDENTITY, |placed| placed.transform);
+                let skinned = apply_skin(&mut raw, &block, &world, bs_version);
+                // Points of a skin that has no weights are stored for the
+                // skeleton: they are put where the first bone holds them.
+                let bound = raw.skin.and_then(block).and_then(|(_, skin)| {
                     let bone = *world.get(&first_bone(skin)?)?;
                     let (_, data) = block(skin_data_of(skin)?)?;
                     Some(first_bone_transform(data)?.within(&bone))
@@ -753,6 +753,9 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                 else {
                     continue;
                 };
+                if is_effect(shader) {
+                    continue;
+                }
                 let Some((positions, uvs, indices)) = block(data_index)
                     .filter(|(kind, _)| *kind == "NiTriShapeData")
                     .and_then(|(_, data)| read_ni_tri_shape_data(data))
@@ -771,6 +774,43 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
         }
     }
     Ok(shapes)
+}
+
+/// Takes what a shape keeps in its skin partition (points, texture
+/// coordinates, triangles, if the shape has none itself) and moves each
+/// point where the bones it hangs on hold it, by their weights, as the game
+/// puts it in its resting pose. Whether the points were moved.
+#[allow(clippy::type_complexity)]
+fn apply_skin<'a>(
+    raw: &mut RawShape,
+    block: &dyn Fn(usize) -> Option<(&'a str, &'a [u8])>,
+    world: &HashMap<usize, Transform>,
+    bs_version: u32,
+) -> bool {
+    let Some((_, skin)) = raw.skin.and_then(block) else {
+        return false;
+    };
+    let Some(partition) = skin_partition_of(skin)
+        .and_then(block)
+        .and_then(|(_, partition)| read_skin_partition(partition, bs_version))
+    else {
+        return false;
+    };
+    if raw.indices.is_empty() {
+        if raw.positions.is_empty() {
+            raw.positions = partition.positions;
+        }
+        if raw.uvs.is_empty() {
+            raw.uvs = partition.uvs;
+        }
+        raw.indices = partition.indices;
+    }
+    if partition.influences.is_empty() {
+        return false;
+    }
+    let bones = bone_places(skin, block, world);
+    raw.positions = skin_points(&raw.positions, &partition.influences, &bones);
+    true
 }
 
 /// Where each bone of a skin instance takes the points stored for it: its
@@ -994,6 +1034,51 @@ mod tests {
         let at = shape.len() - 4 - 2;
         shape[at..at + 2].copy_from_slice(&7u16.to_le_bytes());
         let data = mesh(100, &[("BSFadeNode", node(&[1])), ("BSTriShape", shape)]);
+        assert_eq!(shapes(&data).unwrap(), Vec::new());
+    }
+
+    /// Sets the hidden flag of a node or shape built by `av_object`.
+    fn hide(mut block: Vec<u8>) -> Vec<u8> {
+        block[12..16].copy_from_slice(&15u32.to_le_bytes());
+        block
+    }
+
+    #[test]
+    fn hidden_shapes_and_shapes_below_hidden_nodes_are_not_drawn() {
+        let hidden_shape = mesh(
+            100,
+            &[
+                ("BSFadeNode", node(&[1])),
+                ("BSTriShape", hide(tri_shape())),
+            ],
+        );
+        assert_eq!(shapes(&hidden_shape).unwrap(), Vec::new());
+        let below_hidden_node = mesh(
+            100,
+            &[
+                ("BSFadeNode", node(&[1, 2])),
+                ("NiNode", hide(node(&[3]))),
+                ("BSTriShape", tri_shape()),
+                ("BSTriShape", tri_shape()),
+            ],
+        );
+        assert_eq!(shapes(&below_hidden_node).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn shapes_with_an_effect_shader_are_not_drawn() {
+        let mut glow = tri_shape();
+        // The shader reference follows the object (72 bytes), the bounding
+        // sphere (16) and the skin reference (4).
+        glow[92..96].copy_from_slice(&2i32.to_le_bytes());
+        let data = mesh(
+            100,
+            &[
+                ("BSFadeNode", node(&[1])),
+                ("BSTriShape", glow),
+                ("BSEffectShaderProperty", vec![0; 8]),
+            ],
+        );
         assert_eq!(shapes(&data).unwrap(), Vec::new());
     }
 

@@ -18,6 +18,7 @@ use mallet_messages::{
     Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
     RenderedToolbox,
 };
+use tauri::Manager;
 
 /// Examines the setup and returns what is wrong with it, in the language
 /// `lang`. The result is remembered for [`last_report`].
@@ -392,6 +393,29 @@ fn render(report: &ScanReport, lang: &str) -> RenderedReport {
     messages(lang).render_report(report)
 }
 
+/// Opens the window at Full HD, or smaller where the screen is: never
+/// more than nine tenths of it, and in the middle. Not maximized.
+fn fit_window(window: &tauri::WebviewWindow) {
+    // Before the window is shown it may not know its screen yet.
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        tracing::info!("no screen known; the window keeps its size");
+        return;
+    };
+    let screen = monitor.size().to_logical::<f64>(monitor.scale_factor());
+    let size = tauri::LogicalSize::new(
+        1920f64.min(screen.width * 0.9),
+        1080f64.min(screen.height * 0.9),
+    );
+    tracing::info!(width = size.width, height = size.height, "window size");
+    let _ = window.set_size(size);
+    let _ = window.center();
+}
+
 /// Opens the app's window and runs until it is closed.
 pub fn run() -> tauri::Result<()> {
     // Without a log the app still works; there is just nothing to read
@@ -400,6 +424,12 @@ pub fn run() -> tauri::Result<()> {
         let _ = mallet_engine::start_logging(&dir);
     }
     tauri::Builder::default()
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                fit_window(&window);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scan,
             last_report,

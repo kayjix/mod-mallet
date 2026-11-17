@@ -8,7 +8,7 @@
 use super::RecordId;
 
 /// How many height samples per cell side are kept.
-pub const SAMPLES_PER_CELL: usize = 4;
+pub const SAMPLES_PER_CELL: usize = 8;
 
 /// The land of every worldspace, in the version the game uses.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

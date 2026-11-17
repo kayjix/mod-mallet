@@ -421,14 +421,20 @@ pub struct MapTerrain {
     pub rows: u32,
     /// How many samples each cell has along each side.
     pub samples: u32,
-    /// One byte per sample, written in Base64: rows from north to south,
-    /// samples from west to east. 0 means no land is known there, 1 water,
-    /// and 2 to 255 land from [`MapTerrain::lowest`] to
+    /// Two bytes per sample (little endian), written in Base64: rows from
+    /// north to south, samples from west to east. 0 means nothing is known
+    /// there; 1 to 65535 is the height of the ground, or of the water
+    /// surface where water covers it, from [`MapTerrain::lowest`] to
     /// [`MapTerrain::highest`].
     pub heights: String,
-    /// The height of the lowest land, in game units.
+    /// One byte per sample, in the order of the heights, written in Base64:
+    /// 1 where water covers the ground, 0 elsewhere. Empty in reports of
+    /// versions that did not keep it.
+    #[serde(default)]
+    pub water: String,
+    /// The lowest height, of ground or water, in game units.
     pub lowest: i32,
-    /// The height of the highest land, in game units.
+    /// The highest height, of ground or water, in game units.
     pub highest: i32,
 }
 

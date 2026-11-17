@@ -2,7 +2,7 @@
 // related to collisions. Shared by the flat map and the 3D relief.
 
 import type { MapImage } from "./generated/map-image";
-import type { MapMarker, MapSpot, MapWorld } from "./generated/rendered-report";
+import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import type { PlaceKind, PlaceOrigin } from "./i18n";
 
 /** What is picked or pointed at on the map. */
@@ -78,6 +78,42 @@ const UNITS_PER_METRE = 70;
 
 /** Game units per cell side. */
 export const CELL = 4096;
+
+/** The land of a worldspace, one value per sample, rows from north to south. */
+export interface Land {
+  /** Samples from west to east. */
+  width: number;
+  /** Samples from north to south. */
+  height: number;
+  /** Height of the ground or the water surface, in game units. */
+  heights: Float32Array;
+  /** 0 where nothing is known, 1 water, 2 land. */
+  kinds: Uint8Array;
+}
+
+/** The report's heights and water, read for drawing. */
+export function readLand(terrain: MapTerrain): Land | null {
+  const width = terrain.columns * terrain.samples;
+  const height = terrain.rows * terrain.samples;
+  const values = atob(terrain.heights);
+  const water = atob(terrain.water ?? "");
+  if (values.length !== width * height * 2 || water.length !== width * height) {
+    return null;
+  }
+  const span = Math.max(1, terrain.highest - terrain.lowest);
+  const heights = new Float32Array(width * height);
+  const kinds = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index++) {
+    const value = values.charCodeAt(index * 2) | (values.charCodeAt(index * 2 + 1) << 8);
+    if (value === 0) {
+      heights[index] = terrain.lowest;
+      continue;
+    }
+    heights[index] = terrain.lowest + ((value - 1) / 65534) * span;
+    kinds[index] = water.charCodeAt(index) === 1 ? 1 : 2;
+  }
+  return { width, height, heights, kinds };
+}
 
 /** The origins, in the order the filter lists them. */
 export const ORIGINS: PlaceOrigin[] = ["game", "added", "changed", "removed"];

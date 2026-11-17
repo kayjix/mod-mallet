@@ -384,21 +384,36 @@ const sampleMods: ModInfo[] = [
 
 /** Made-up land: hills around a lake, a sea in the north. */
 function sampleTerrain(): MapTerrain {
-  const [west, south, columns, rows, samples] = [-28, -23, 57, 47, 4];
+  const [west, south, columns, rows, samples] = [-28, -23, 57, 47, 8];
+  const [lowest, highest] = [-200, 9000];
   const width = columns * samples;
   const height = rows * samples;
-  let text = "";
+  let heights = "";
+  let water = "";
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const north = 1 - y / height;
-      const hills = Math.sin(x / 9) * Math.cos(y / 11) + Math.sin((x + y) / 23);
-      const lake = Math.hypot(x - width * 0.6, y - height * 0.55) < 14;
-      const value =
-        north > 0.86 || lake ? 1 : Math.max(2, Math.min(255, Math.round(120 + hills * 60)));
-      text += String.fromCharCode(value);
+      const hills = Math.sin(x / 18) * Math.cos(y / 22) + Math.sin((x + y) / 46);
+      const lake = Math.hypot(x - width * 0.6, y - height * 0.55) < 28;
+      // The sea lies at the lowest height, the lake a little higher.
+      const ground = Math.max(0, Math.min(1, 0.45 + hills * 0.25));
+      const share = north > 0.86 ? 0 : lake ? 0.3 : ground;
+      const value = Math.round(1 + share * 65534);
+      heights += String.fromCharCode(value & 255, value >> 8);
+      water += String.fromCharCode(north > 0.86 || lake ? 1 : 0);
     }
   }
-  return { west, south, columns, rows, samples, heights: btoa(text), lowest: -200, highest: 9000 };
+  return {
+    west,
+    south,
+    columns,
+    rows,
+    samples,
+    heights: btoa(heights),
+    water: btoa(water),
+    lowest,
+    highest,
+  };
 }
 
 /** A made-up worldspace: a town where two mods meet, and land around it. */
@@ -462,10 +477,9 @@ function sampleHeight(terrain: MapTerrain, x: number, y: number) {
   const width = terrain.columns * terrain.samples;
   const column = Math.floor((x - terrain.west) * terrain.samples);
   const row = Math.floor((terrain.south + terrain.rows - y) * terrain.samples);
-  const value = binary.charCodeAt(row * width + column) || 2;
-  return value < 2
-    ? terrain.lowest
-    : Math.round(terrain.lowest + ((value - 2) / 253) * (terrain.highest - terrain.lowest));
+  const at = (row * width + column) * 2;
+  const value = binary.charCodeAt(at) | (binary.charCodeAt(at + 1) << 8) || 1;
+  return Math.round(terrain.lowest + ((value - 1) / 65534) * (terrain.highest - terrain.lowest));
 }
 
 /** Made-up places: the game's own, and some that mods add, change or remove. */

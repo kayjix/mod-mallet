@@ -20,8 +20,8 @@ use mallet_formats_bethesda::plugin::{self, Plugin, Record, group_type};
 /// Points per side of the height grid of a cell.
 const GRID: usize = 33;
 
-/// The grid points that are kept: the middle of each quarter of a side.
-const SAMPLED: [usize; SAMPLES_PER_CELL] = [4, 12, 20, 28];
+/// The grid points that are kept: the middle of each eighth of a side.
+const SAMPLED: [usize; SAMPLES_PER_CELL] = [2, 6, 10, 14, 18, 22, 26, 30];
 
 /// Cell flag: the cell has water.
 const HAS_WATER: u8 = 0x02;
@@ -191,6 +191,9 @@ impl Contribution {
                 ["L", plugin, local_id, x, y, heights] => {
                     let heights: Option<Vec<i32>> =
                         heights.split(',').map(|value| value.parse().ok()).collect();
+                    // Kept with another number of samples: read anew.
+                    let heights = heights
+                        .filter(|heights| heights.len() == SAMPLES_PER_CELL * SAMPLES_PER_CELL);
                     contribution.land.push((
                         (id(plugin, local_id)?, x.parse().ok()?, y.parse().ok()?),
                         heights?,
@@ -381,13 +384,13 @@ mod tests {
     #[test]
     fn heights_are_rebuilt_from_their_differences() {
         let samples = heights(&slope(10.0)).unwrap();
-        assert_eq!(samples.len(), 16);
-        // Row 4 starts at 10 + 2 * 5; column 4 adds 4. In steps of 8.
-        assert_eq!(samples[0], (10 + 10 + 4) * 8);
-        // Column 28 of the same row.
-        assert_eq!(samples[3], (10 + 10 + 28) * 8);
-        // Row 28, column 4.
-        assert_eq!(samples[12], (10 + 2 * 29 + 4) * 8);
+        assert_eq!(samples.len(), 64);
+        // Row 2 starts at 10 + 2 * 3; column 2 adds 2. In steps of 8.
+        assert_eq!(samples[0], (10 + 6 + 2) * 8);
+        // Column 30 of the same row.
+        assert_eq!(samples[7], (10 + 6 + 30) * 8);
+        // Row 30, column 2.
+        assert_eq!(samples[56], (10 + 2 * 31 + 2) * 8);
     }
 
     #[test]
@@ -437,7 +440,7 @@ mod tests {
         };
         assert_eq!((cell.x, cell.y), (3, -2));
         assert_eq!(cell.water, Some(-500));
-        assert_eq!(cell.heights.len(), 16);
+        assert_eq!(cell.heights.len(), 64);
     }
 
     #[test]
@@ -457,11 +460,14 @@ mod tests {
                 },
             )],
             world_water: vec![(world(), -500.0)],
-            land: vec![((world(), -3, 7), vec![1, -2, 3])],
+            land: vec![((world(), -3, 7), (0..64).collect())],
         };
         let text = contribution.to_text();
         assert_eq!(Contribution::from_text(&text), Some(contribution));
         assert_eq!(Contribution::from_text("nonsense"), None);
+        // Land kept with another number of samples is read anew.
+        let old = "L	skyrim.esm	60	-3	7	1,-2,3";
+        assert_eq!(Contribution::from_text(old), None);
     }
 
     #[test]

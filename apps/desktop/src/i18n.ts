@@ -291,6 +291,8 @@ export interface Texts {
   mapNoRelief: string;
   mapReliefHint: string;
   mapHeight: string;
+  mapHeightValue: (times: number) => string;
+  mapBase: string;
   mapModCells: string;
   mapTopView: string;
   mapPlaces: string;
@@ -663,6 +665,9 @@ export const texts: Record<Lang, Texts> = {
     mapNoRelief: "The land of this worldspace is not known, so there is no relief to show.",
     mapReliefHint: "Drag to move · right-drag to turn · wheel to zoom",
     mapHeight: "Height",
+    mapBase: "On a base",
+    mapHeightValue: (times) =>
+      times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
     mapModCells: "Cells of mods",
     mapTopView: "From above",
     mapPlaces: "Places",
@@ -1081,6 +1086,9 @@ export const texts: Record<Lang, Texts> = {
     mapNoRelief: "Das Gelände dieses Weltraums ist nicht bekannt, darum gibt es kein Relief.",
     mapReliefHint: "Ziehen verschiebt · rechts ziehen dreht · Mausrad zoomt",
     mapHeight: "Höhe",
+    mapBase: "Auf Sockel",
+    mapHeightValue: (times) =>
+      times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
     mapModCells: "Zellen von Mods",
     mapTopView: "Von oben",
     mapPlaces: "Orte",

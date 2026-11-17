@@ -18,6 +18,7 @@ import {
   type Label,
   type Picked,
   type Picture,
+  readLand,
   samePick,
   shapeOf,
   spotPosition,
@@ -28,6 +29,8 @@ interface MapView3DProps {
   terrain: MapTerrain;
   picture: Picture | null;
   owner: number;
+  /** Whether the cells with objects of mods are tinted. */
+  showCells: boolean;
   markers: MapMarker[];
   spots: MapSpot[];
   picked: Picked | null;
@@ -64,37 +67,35 @@ interface Mesh {
   xy: Float32Array;
   /** Height of each sample, in game units. */
   heights: Float32Array;
-  /** 0 where nothing is known, 1 water, 2 land. */
+  /** 0 where nothing is known, 1 water, 2 land, 3 the walls of the base. */
   kinds: Float32Array;
+  /** The land's triangles first, then the walls'. */
   indices: Uint32Array;
-  /** The height of the water, in game units. */
-  water: number;
+  /** How many indices the land has, before the walls'. */
+  landIndices: number;
+  /** The normals of the walls' points, which do not change with the height. */
+  wallNormals: Float32Array;
 }
 
 function buildMesh(terrain: MapTerrain): Mesh | null {
-  const columns = terrain.columns * terrain.samples;
-  const rows = terrain.rows * terrain.samples;
-  const binary = atob(terrain.heights);
-  if (binary.length !== columns * rows || columns < 2 || rows < 2) {
+  const land = readLand(terrain);
+  if (land === null || land.width < 2 || land.height < 2) {
     return null;
   }
-  const span = Math.max(1, terrain.highest - terrain.lowest);
-  const water = terrain.lowest - span * 0.004 - 32;
+  const columns = land.width;
+  const rows = land.height;
   const north = terrain.south + terrain.rows;
   const xy = new Float32Array(columns * rows * 2);
-  const heights = new Float32Array(columns * rows);
-  const kinds = new Float32Array(columns * rows);
+  const heights = land.heights;
+  const kinds = Float32Array.from(land.kinds);
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
       const index = row * columns + column;
-      const value = binary.charCodeAt(index);
       xy[index * 2] = terrain.west + (column + 0.5) / terrain.samples;
       xy[index * 2 + 1] = north - (row + 0.5) / terrain.samples;
-      heights[index] = value >= 2 ? terrain.lowest + ((value - 2) / 253) * span : water;
-      kinds[index] = Math.min(value, 2);
     }
   }
-  const indices = new Uint32Array((columns - 1) * (rows - 1) * 6);
+  const ground = new Uint32Array((columns - 1) * (rows - 1) * 6);
   let at = 0;
   for (let row = 0; row < rows - 1; row++) {
     for (let column = 0; column < columns - 1; column++) {
@@ -102,17 +103,82 @@ function buildMesh(terrain: MapTerrain): Mesh | null {
       const b = a + 1;
       const c = a + columns;
       const d = c + 1;
-      indices.set([a, c, b, b, c, d], at);
+      ground.set([a, c, b, b, c, d], at);
       at += 6;
     }
   }
-  return { columns, rows, xy, heights, kinds, indices, water };
+
+  // The base: a wall along each side, from the edge of the land down to a
+  // little below the lowest point, like a model on a plinth.
+  const span = Math.max(1, terrain.highest - terrain.lowest);
+  const floor = terrain.lowest - Math.max(span * 0.06, CELL);
+  const sides: { samples: number[]; normal: [number, number] }[] = [
+    { samples: range(columns, (column) => column), normal: [0, 1] },
+    { samples: range(columns, (column) => (rows - 1) * columns + column), normal: [0, -1] },
+    { samples: range(rows, (row) => row * columns), normal: [-1, 0] },
+    { samples: range(rows, (row) => row * columns + columns - 1), normal: [1, 0] },
+  ];
+  const wallXy: number[] = [];
+  const wallHeights: number[] = [];
+  const wallNormals: number[] = [];
+  const walls: number[] = [];
+  let next = columns * rows;
+  for (const side of sides) {
+    side.samples.forEach((sample, index) => {
+      for (const height of [heights[sample] ?? terrain.lowest, floor]) {
+        wallXy.push(xy[sample * 2] ?? 0, xy[sample * 2 + 1] ?? 0);
+        wallHeights.push(height);
+        wallNormals.push(side.normal[0], side.normal[1], 0);
+      }
+      if (index > 0) {
+        const [top, bottom] = [next + index * 2, next + index * 2 + 1];
+        walls.push(top - 2, bottom - 2, top, top, bottom - 2, bottom);
+      }
+    });
+    next += side.samples.length * 2;
+  }
+  const join = (a: Float32Array, b: number[]) => {
+    const out = new Float32Array(a.length + b.length);
+    out.set(a);
+    out.set(b, a.length);
+    return out;
+  };
+  return {
+    columns,
+    rows,
+    xy: join(xy, wallXy),
+    heights: join(heights, wallHeights),
+    kinds: join(
+      kinds,
+      wallHeights.map(() => 3),
+    ),
+    indices: joinIndices(ground, walls),
+    landIndices: ground.length,
+    wallNormals: Float32Array.from(wallNormals),
+  };
 }
 
-/** The normal of each sample for heights raised `exaggeration` times. */
+/** The land's triangles followed by the walls'. */
+function joinIndices(ground: Uint32Array, walls: number[]): Uint32Array {
+  const out = new Uint32Array(ground.length + walls.length);
+  out.set(ground);
+  out.set(walls, ground.length);
+  return out;
+}
+
+/** The numbers `make(0)` to `make(count - 1)`. */
+function range(count: number, make: (index: number) => number): number[] {
+  return Array.from({ length: count }, (_, index) => make(index));
+}
+
+/**
+ * The normal of each sample for heights raised `exaggeration` times,
+ * followed by those of the walls.
+ */
 function normals(mesh: Mesh, samples: number, exaggeration: number): Float32Array {
   const { columns, rows, heights } = mesh;
-  const out = new Float32Array(columns * rows * 3);
+  const out = new Float32Array(columns * rows * 3 + mesh.wallNormals.length);
+  out.set(mesh.wallNormals, columns * rows * 3);
   const step = 2 / samples;
   const height = (column: number, row: number) =>
     ((heights[
@@ -171,26 +237,40 @@ uniform vec4 u_cellsRect;
 uniform vec3 u_low;
 uniform vec3 u_high;
 uniform vec3 u_water;
+uniform bool u_base;
 out vec4 colour;
 vec2 within(vec4 rect) {
   return vec2((v_xy.x - rect.x) / rect.z, (rect.y + rect.w - v_xy.y) / rect.w);
 }
 void main() {
-  if (v_kind < 0.5) {
+  if (v_kind < 0.5 && !u_base) {
     discard;
+  }
+  vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
+  float facing = max(dot(normalize(v_normal), light), 0.0);
+  if (v_kind > 2.5) {
+    // The walls of the base: a plain, darker earth.
+    vec3 wall = mix(u_low, vec3(0.16, 0.15, 0.13), 0.65);
+    colour = vec4(wall * (0.55 + 0.5 * abs(dot(normalize(v_normal), vec3(light.xy, 0.0)))), 1.0);
+    return;
   }
   vec3 base;
   vec2 uv = within(u_pictureRect);
   bool onPicture = u_hasPicture && uv.x >= 0.0 && uv.y >= 0.0 && uv.x <= 1.0 && uv.y <= 1.0;
   if (onPicture) {
     base = texture(u_picture, uv).rgb;
+    // The picture shows the ground under the water.
+    if (v_kind < 1.5) {
+      base = mix(base, u_water, 0.65);
+    }
+  } else if (v_kind < 0.5) {
+    base = mix(u_low, vec3(0.2), 0.5);
   } else if (v_kind < 1.5) {
     base = u_water;
   } else {
     base = mix(u_low, u_high, v_share);
   }
-  vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
-  float lit = v_kind < 1.5 ? 1.0 : 0.5 + 0.62 * max(dot(normalize(v_normal), light), 0.0);
+  float lit = v_kind < 1.5 ? 1.0 : 0.5 + 0.62 * facing;
   vec3 shaded = base * lit;
   if (u_showCells) {
     vec4 cell = texture(u_cells, within(u_cellsRect));
@@ -268,6 +348,7 @@ interface Scene {
   terrainVao: WebGLVertexArrayObject;
   normalBuffer: WebGLBuffer;
   indexCount: number;
+  landIndices: number;
   picture: WebGLTexture | null;
   cells: WebGLTexture;
   pinVao: WebGLVertexArrayObject;
@@ -303,6 +384,7 @@ export function MapView3D({
   terrain,
   picture,
   owner,
+  showCells,
   markers,
   spots,
   picked,
@@ -316,8 +398,10 @@ export function MapView3D({
   const overlay = useRef<HTMLCanvasElement>(null);
   const scene = useRef<Scene | null>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
-  const [exaggeration, setExaggeration] = useState(2);
-  const [showCells, setShowCells] = useState(true);
+  // The true height of the land; raised only when the user asks.
+  const [exaggeration, setExaggeration] = useState(1);
+  // The land on a block with walls, so that it cannot be seen from below.
+  const [withBase, setWithBase] = useState(true);
   const [failed, setFailed] = useState(false);
   const mesh = useMemo(() => buildMesh(terrain), [terrain]);
 
@@ -345,10 +429,20 @@ export function MapView3D({
     hover,
     exaggeration,
     showCells,
+    withBase,
     size,
     picture,
   });
-  state.current = { ...state.current, picked, hover, exaggeration, showCells, size, picture };
+  state.current = {
+    ...state.current,
+    picked,
+    hover,
+    exaggeration,
+    showCells,
+    withBase,
+    size,
+    picture,
+  };
 
   // The canvas fills the space the window leaves it.
   useEffect(() => {
@@ -380,8 +474,17 @@ export function MapView3D({
       return;
     }
     const { gl } = current;
-    const { width, height } = state.current.size;
     const ratio = window.devicePixelRatio || 1;
+    // The canvas fills the frame; its size is measured here, so that a
+    // drawing never uses a size the window has left behind.
+    const element = gl.canvas as HTMLCanvasElement;
+    const width = Math.max(1, element.clientWidth || state.current.size.width);
+    const height = Math.max(1, element.clientHeight || state.current.size.height);
+    const wanted = [Math.round(width * ratio), Math.round(height * ratio)];
+    if (element.width !== wanted[0] || element.height !== wanted[1]) {
+      element.width = wanted[0] ?? element.width;
+      element.height = wanted[1] ?? element.height;
+    }
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -397,7 +500,7 @@ export function MapView3D({
       perspective(FIELD_OF_VIEW, width / height, view.distance * 0.02, view.distance * 6 + 400),
       lookAt(eye, view.target, [0, 0, 1]),
     );
-    const { exaggeration: raise, showCells: tinted } = state.current;
+    const { exaggeration: raise, showCells: tinted, withBase } = state.current;
     const span = Math.max(1, terrain.highest - terrain.lowest);
 
     gl.enable(gl.DEPTH_TEST);
@@ -438,8 +541,14 @@ export function MapView3D({
       terrain.columns,
       terrain.rows,
     );
+    gl.uniform1i(terrainUniform("u_base"), withBase ? 1 : 0);
     gl.bindVertexArray(current.terrainVao);
-    gl.drawElements(gl.TRIANGLES, current.indexCount, gl.UNSIGNED_INT, 0);
+    gl.drawElements(
+      gl.TRIANGLES,
+      withBase ? current.indexCount : current.landIndices,
+      gl.UNSIGNED_INT,
+      0,
+    );
 
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
     gl.useProgram(current.pins);
@@ -626,6 +735,7 @@ export function MapView3D({
         terrainVao,
         normalBuffer,
         indexCount: mesh.indices.length,
+        landIndices: mesh.landIndices,
         picture: null,
         cells,
         pinVao,
@@ -811,14 +921,19 @@ export function MapView3D({
   // from a ref so that drawing need not be made anew for each.
   // biome-ignore lint/correctness/useExhaustiveDependencies: these trigger a redraw.
   useEffect(() => {
-    const element = canvas.current;
-    if (element !== null) {
-      const ratio = window.devicePixelRatio || 1;
-      element.width = size.width * ratio;
-      element.height = size.height * ratio;
-    }
     redraw();
-  }, [size, picked, hover, showCells, exaggeration, redraw]);
+  }, [size, picked, hover, showCells, withBase, exaggeration, redraw]);
+
+  // Whatever changes the canvas's size, it is drawn anew at its new size.
+  useEffect(() => {
+    const element = canvas.current;
+    if (element === null) {
+      return;
+    }
+    const observer = new ResizeObserver(() => redraw());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [redraw]);
 
   /** Moves the camera smoothly to `goal`. */
   const fly = useCallback(
@@ -1000,12 +1115,12 @@ export function MapView3D({
       <canvas
         className="relief-canvas"
         ref={canvas}
-        style={{ width: size.width, height: size.height }}
+        style={{ width: "100%", height: size.height }}
       />
       <canvas
         className="map-canvas relief-overlay"
         ref={overlay}
-        style={{ width: size.width, height: size.height }}
+        style={{ width: "100%", height: "100%" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1047,9 +1162,9 @@ export function MapView3D({
           {t.mapHeight}
           <input
             type="range"
-            min={1}
-            max={5}
-            step={0.5}
+            min={0.5}
+            max={4}
+            step={0.25}
             value={exaggeration}
             onChange={(event) => {
               const next = Number(event.target.value);
@@ -1062,14 +1177,15 @@ export function MapView3D({
               setExaggeration(next);
             }}
           />
+          <span className="relief-value">{t.mapHeightValue(exaggeration)}</span>
         </label>
         <label className="relief-control">
           <input
             type="checkbox"
-            checked={showCells}
-            onChange={(event) => setShowCells(event.target.checked)}
+            checked={withBase}
+            onChange={(event) => setWithBase(event.target.checked)}
           />
-          {t.mapModCells}
+          {t.mapBase}
         </label>
         <span className="relief-hint">{t.mapReliefHint}</span>
       </div>

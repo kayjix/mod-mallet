@@ -242,18 +242,22 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
     let samples = SAMPLES_PER_CELL;
     let width = columns * samples;
 
-    // Land is what lies above its cell's water.
-    let above = |height: i32, water: Option<i32>| water.is_none_or(|water| height > water);
-    let land_heights = cells.iter().flat_map(|cell| {
+    // Ground below its cell's water shows the water surface instead, so
+    // that a lake lies at its own height and not at the sea's.
+    let surface = |height: i32, water: Option<i32>| match water {
+        Some(water) if height <= water => (water, true),
+        _ => (height, false),
+    };
+    let all_heights = cells.iter().flat_map(|cell| {
         cell.heights
             .iter()
-            .copied()
-            .filter(move |height| above(*height, cell.water))
+            .map(move |height| surface(*height, cell.water).0)
     });
-    let lowest = land_heights.clone().min().unwrap_or_default();
-    let highest = land_heights.max().unwrap_or_default().max(lowest + 1);
+    let lowest = all_heights.clone().min().unwrap_or_default();
+    let highest = all_heights.max().unwrap_or_default().max(lowest + 1);
 
-    let mut image = vec![0u8; width * rows * samples];
+    let mut image = vec![0u8; width * rows * samples * 2];
+    let mut water_mask = vec![0u8; width * rows * samples];
     for cell in &cells {
         let column = usize::try_from(cell.x - west).ok()?;
         let row = usize::try_from(north - cell.y).ok()?;
@@ -262,14 +266,13 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
             // goes from north to south.
             let (sample_row, sample_column) = (samples - 1 - index / samples, index % samples);
             let at = (row * samples + sample_row) * width + column * samples + sample_column;
-            let value = if above(*height, cell.water) {
-                let share = f64::from(height - lowest) / f64::from(highest - lowest);
-                level(share)
-            } else {
-                1
-            };
-            if let Some(pixel) = image.get_mut(at) {
-                *pixel = value;
+            let (height, under_water) = surface(*height, cell.water);
+            let share = f64::from(height - lowest) / f64::from(highest - lowest);
+            if let Some(pixel) = image.get_mut(at * 2..at * 2 + 2) {
+                pixel.copy_from_slice(&level(share).to_le_bytes());
+            }
+            if let Some(pixel) = water_mask.get_mut(at) {
+                *pixel = u8::from(under_water);
             }
         }
     }
@@ -280,16 +283,17 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
         rows: u32::try_from(rows).ok()?,
         samples: u32::try_from(samples).ok()?,
         heights: mallet_core::encoding::base64(&image),
+        water: mallet_core::encoding::base64(&water_mask),
         lowest,
         highest,
     })
 }
 
-/// A share from 0 to 1 as a land value from 2 to 255.
+/// A share from 0 to 1 as a height value from 1 to 65535.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn level(share: f64) -> u8 {
+fn level(share: f64) -> u16 {
     // Clamped to the range of the result first.
-    (2.0 + share.clamp(0.0, 1.0) * 253.0).round() as u8
+    (1.0 + share.clamp(0.0, 1.0) * 65534.0).round() as u16
 }
 
 #[cfg(test)]
@@ -335,7 +339,7 @@ mod tests {
         let flat = |x: i32, height: i32, water: Option<i32>| TerrainCell {
             x,
             y: 0,
-            heights: vec![height; 16],
+            heights: vec![height; 64],
             water,
         };
         let land = TerrainWorld {
@@ -350,17 +354,29 @@ mod tests {
         // Limited to the first two cells.
         assert_eq!(terrain_columns(&land, Some((0, 1, 0, 0))), 2);
         assert_eq!((terrain.west, terrain.south), (0, 0));
-        assert_eq!((terrain.columns, terrain.rows, terrain.samples), (4, 1, 4));
-        assert_eq!((terrain.lowest, terrain.highest), (100, 500));
-        // 16 samples per row: cell 0 low land, cell 1 high land, cell 2
-        // unknown, cell 3 water.
-        let expected: Vec<u8> = [2u8, 255, 0, 1]
+        assert_eq!((terrain.columns, terrain.rows, terrain.samples), (4, 1, 8));
+        // The water of cell 3 lies at 0, below the land.
+        assert_eq!((terrain.lowest, terrain.highest), (0, 500));
+        // 32 samples per row, 8 rows: cell 0 low land (100 of 0 to 500),
+        // cell 1 high land, cell 2 unknown, cell 3 water at its surface.
+        let row: Vec<u16> = [13_108u16, 65_535, 0, 1]
             .iter()
-            .flat_map(|value| [*value; 4])
+            .flat_map(|value| [*value; 8])
             .collect();
-        let row: Vec<u8> = expected.iter().copied().cycle().take(16).collect();
-        let image: Vec<u8> = row.iter().copied().cycle().take(64).collect();
+        let image: Vec<u8> = row
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .cycle()
+            .take(32 * 8 * 2)
+            .collect();
         assert_eq!(terrain.heights, mallet_core::encoding::base64(&image));
+        let water: Vec<u8> = [0u8, 0, 0, 1]
+            .iter()
+            .flat_map(|value| [*value; 8])
+            .cycle()
+            .take(32 * 8)
+            .collect();
+        assert_eq!(terrain.water, mallet_core::encoding::base64(&water));
     }
 
     #[test]

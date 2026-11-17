@@ -349,7 +349,15 @@ pub fn last_report(
     if !cache_path.exists() {
         return Ok(None);
     }
-    Ok(open_store(&cache_path)?.load_scan()?)
+    match open_store(&cache_path)?.load_scan() {
+        // The store is a cache (ADR 0006): a report another version of Mod
+        // Mallet kept, which this one cannot read, is as good as none.
+        Err(StoreError::Corrupt(error)) => {
+            tracing::info!(%error, "the last report cannot be read; it is left for the next scan");
+            Ok(None)
+        }
+        other => Ok(other?),
+    }
 }
 
 /// The cache of `game`, next to `cache_path`. Skyrim Special Edition, the
