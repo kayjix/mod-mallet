@@ -14,31 +14,62 @@
 use mallet_core::facts::{NpcFacts, RecordId};
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature};
 
+use crate::game::{Family, Game};
+
 /// The record type of characters.
 pub const NPC: Signature = *b"NPC_";
 
-/// Fields that refer to another record: race, head part, hair colour, face
-/// texture set.
-const REFERENCES: [&Signature; 4] = [b"RNAM", b"PNAM", b"HCLF", b"FTST"];
+/// Where a game keeps what a character's face looks like.
+struct FaceFields {
+    /// Fields that refer to another record.
+    references: &'static [&'static Signature],
+    /// Fields whose bytes describe the face directly.
+    values: &'static [&'static Signature],
+    /// Offset of the template flags inside the `ACBS` field.
+    template_flags_offset: usize,
+}
 
-/// Fields whose bytes describe the face directly: texture lighting, face
-/// morphs, face parts, and the four fields of each tint layer.
-const VALUES: [&Signature; 7] = [
-    b"QNAM", b"NAM9", b"NAMA", b"TINI", b"TINC", b"TINV", b"TIAS",
-];
+/// Skyrim: race, head parts, hair colour and face texture set; texture
+/// lighting, face morphs, face parts, and the four fields of each tint
+/// layer.
+const SKYRIM_FACE: FaceFields = FaceFields {
+    references: &[b"RNAM", b"PNAM", b"HCLF", b"FTST"],
+    values: &[
+        b"QNAM", b"NAM9", b"NAMA", b"TINI", b"TINC", b"TINV", b"TIAS",
+    ],
+    template_flags_offset: 18,
+};
 
-/// Offset of the template flags inside the `ACBS` field.
-const TEMPLATE_FLAGS_OFFSET: usize = 18;
+/// Fallout 4: race, head parts, hair and facial hair colour, face texture
+/// set; texture lighting, the keys and values of the face sliders, the
+/// face regions and their changes, how strong the face morphs are, and
+/// both fields of each tint layer.
+const FALLOUT4_FACE: FaceFields = FaceFields {
+    references: &[b"RNAM", b"PNAM", b"HCLF", b"BCLF", b"FTST"],
+    values: &[
+        b"QNAM", b"MSDK", b"MSDV", b"FMRI", b"FMRS", b"FMIN", b"TETI", b"TEND",
+    ],
+    template_flags_offset: 14,
+};
+
+/// The face fields of `game`, for the games that keep faces in meshes.
+const fn face_fields(game: Game) -> &'static FaceFields {
+    match game.family() {
+        Family::Fallout4 => &FALLOUT4_FACE,
+        Family::Skyrim | Family::Fallout3 | Family::Oblivion => &SKYRIM_FACE,
+    }
+}
 
 /// Template flag "use traits": the character takes its looks from its
 /// template.
 const TEMPLATE_USE_TRAITS: u16 = 0x0001;
 
-/// The characters a plugin defines or changes.
+/// The characters a plugin of `game` defines or changes.
 ///
 /// `plugin_name` is the plugin's file name; `plugin` must have been read
 /// with [`NPC`] among the wanted record types.
-pub fn npc_facts(plugin_name: &str, plugin: &Plugin) -> Vec<NpcFacts> {
+pub fn npc_facts(game: Game, plugin_name: &str, plugin: &Plugin) -> Vec<NpcFacts> {
+    let fields = face_fields(game);
     plugin
         .records
         .iter()
@@ -49,8 +80,8 @@ pub fn npc_facts(plugin_name: &str, plugin: &Plugin) -> Vec<NpcFacts> {
                 .first(b"EDID")
                 .map(plugin::zstring)
                 .filter(|name| !name.is_empty()),
-            inherits_appearance: inherits_appearance(record),
-            appearance: appearance(record, &plugin.header.masters, plugin_name),
+            inherits_appearance: inherits_appearance(record, fields),
+            appearance: appearance(record, fields, &plugin.header.masters, plugin_name),
         })
         .collect()
 }
@@ -64,14 +95,19 @@ fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
 }
 
 /// Whether the record has a template and is flagged to take its traits,
-/// which include the face, from it.
-fn inherits_appearance(record: &Record) -> bool {
-    let has_template = record
-        .first(b"TPLT")
-        .is_some_and(|template| template.iter().any(|&byte| byte != 0));
+/// which include the face, from it. Fallout 4 names a template for each
+/// flag (`TPTA`, traits first) besides the one for all (`TPLT`).
+fn inherits_appearance(record: &Record, fields: &FaceFields) -> bool {
+    let names_one = |data: &[u8]| data.iter().any(|&byte| byte != 0);
+    let has_template = record.first(b"TPLT").is_some_and(names_one)
+        || record
+            .first(b"TPTA")
+            .and_then(|templates| templates.get(..4))
+            .is_some_and(names_one);
+    let offset = fields.template_flags_offset;
     let flags = record
         .first(b"ACBS")
-        .and_then(|data| data.get(TEMPLATE_FLAGS_OFFSET..TEMPLATE_FLAGS_OFFSET + 2))
+        .and_then(|data| data.get(offset..offset + 2))
         .and_then(|flags| flags.try_into().ok())
         .map_or(0, u16::from_le_bytes);
     has_template && flags & TEMPLATE_USE_TRAITS != 0
@@ -83,12 +119,17 @@ fn inherits_appearance(record: &Record) -> bool {
 /// raw form ID, because the raw number depends on the masters of the plugin
 /// it was read from. Head parts are sorted, because their order in a record
 /// does not matter to the game.
-fn appearance(record: &Record, masters: &[String], plugin_name: &str) -> Vec<u8> {
+fn appearance(
+    record: &Record,
+    fields: &FaceFields,
+    masters: &[String],
+    plugin_name: &str,
+) -> Vec<u8> {
     let mut references: Vec<Vec<u8>> = Vec::new();
     let mut values: Vec<u8> = Vec::new();
 
     for subrecord in &record.subrecords {
-        if REFERENCES.contains(&&subrecord.signature) {
+        if fields.references.contains(&&subrecord.signature) {
             let Some(form_id) = subrecord
                 .data
                 .get(..4)
@@ -103,7 +144,7 @@ fn appearance(record: &Record, masters: &[String], plugin_name: &str) -> Vec<u8>
             entry.push(0);
             entry.extend(id.local_id.to_le_bytes());
             references.push(entry);
-        } else if VALUES.contains(&&subrecord.signature) {
+        } else if fields.values.contains(&&subrecord.signature) {
             values.extend(subrecord.signature);
             values.extend(
                 u32::try_from(subrecord.data.len())
@@ -128,18 +169,83 @@ mod tests {
 
     use super::*;
 
-    /// An `ACBS` field with the given template flags.
+    /// A Skyrim `ACBS` field with the given template flags.
     fn acbs(template_flags: u16) -> Vec<u8> {
-        let mut data = vec![0u8; 24];
-        data[TEMPLATE_FLAGS_OFFSET..TEMPLATE_FLAGS_OFFSET + 2]
-            .copy_from_slice(&template_flags.to_le_bytes());
+        acbs_of(&SKYRIM_FACE, 24, template_flags)
+    }
+
+    fn acbs_of(fields: &FaceFields, len: usize, template_flags: u16) -> Vec<u8> {
+        let mut data = vec![0u8; len];
+        let offset = fields.template_flags_offset;
+        data[offset..offset + 2].copy_from_slice(&template_flags.to_le_bytes());
         data
     }
 
     fn read(masters: &[&str], records: Vec<RecordSpec>, name: &str) -> Vec<NpcFacts> {
+        read_in(Game::SkyrimSe, masters, records, name)
+    }
+
+    fn read_in(
+        game: Game,
+        masters: &[&str],
+        records: Vec<RecordSpec>,
+        name: &str,
+    ) -> Vec<NpcFacts> {
         let bytes = fixture::plugin(masters, 0, &[(NPC, records)]);
         let plugin = plugin::read(&mut Cursor::new(bytes), &[NPC]).unwrap();
-        npc_facts(name, &plugin)
+        npc_facts(game, name, &plugin)
+    }
+
+    #[test]
+    fn fallout_4s_face_sliders_are_part_of_the_face() {
+        let with = |value: u8| {
+            read_in(
+                Game::Fallout4,
+                &["Fallout4.esm"],
+                vec![
+                    RecordSpec::new(NPC, 0x0001_3BA1)
+                        .with(*b"MSDK", form(0x10))
+                        .with(*b"MSDV", vec![value, 0, 0, 0]),
+                ],
+                "Faces.esp",
+            )
+        };
+        assert_ne!(with(1)[0].appearance, with(2)[0].appearance);
+        // Skyrim has no such fields; they say nothing about its faces.
+        let skyrim = |value: u8| {
+            read(
+                &["Skyrim.esm"],
+                vec![RecordSpec::new(NPC, 0x0001_3BA1).with(*b"MSDV", vec![value, 0, 0, 0])],
+                "Faces.esp",
+            )
+        };
+        assert_eq!(skyrim(1)[0].appearance, skyrim(2)[0].appearance);
+    }
+
+    #[test]
+    fn fallout_4s_templates_are_read_where_fallout_4_keeps_them() {
+        let use_traits = acbs_of(&FALLOUT4_FACE, 20, TEMPLATE_USE_TRAITS);
+        let mut templates = form(0x0001_0000);
+        templates.extend([0; 48]);
+        let npcs = read_in(
+            Game::Fallout4,
+            &["Fallout4.esm"],
+            vec![
+                RecordSpec::new(NPC, 0x801)
+                    .with(*b"ACBS", use_traits.clone())
+                    .with(*b"TPTA", templates),
+                RecordSpec::new(NPC, 0x802)
+                    .with(*b"ACBS", use_traits)
+                    .with(*b"TPLT", form(0x0001_0000)),
+                // Skyrim's place of the flags means nothing in Fallout 4.
+                RecordSpec::new(NPC, 0x803)
+                    .with(*b"ACBS", acbs_of(&SKYRIM_FACE, 20, TEMPLATE_USE_TRAITS))
+                    .with(*b"TPLT", form(0x0001_0000)),
+            ],
+            "Faces.esp",
+        );
+        let inherits: Vec<_> = npcs.iter().map(|npc| npc.inherits_appearance).collect();
+        assert_eq!(inherits, [true, true, false]);
     }
 
     fn form(id: u32) -> Vec<u8> {

@@ -158,7 +158,7 @@ pub fn read_setup(
                 }
                 facts.plugins.push(PluginFacts {
                     npcs: if game.has_face_meshes() {
-                        npc::npc_facts(&name, &plugin)
+                        npc::npc_facts(game, &name, &plugin)
                     } else {
                         Vec::new()
                     },
