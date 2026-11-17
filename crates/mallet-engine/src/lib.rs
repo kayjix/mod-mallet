@@ -15,6 +15,7 @@
 //! [`run_action`], and only when the user asks for them.
 
 mod actions;
+mod area;
 mod installers;
 mod knowledge;
 mod lod;
@@ -43,6 +44,7 @@ pub use actions::{
     CreatedPatch, ManagerLink, ManagerOptions, create_patch, install_manager_link, manager_link,
     patch_file, run_action,
 };
+pub use area::{area_mesh, area_objects, area_texture};
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
@@ -466,6 +468,18 @@ fn gather_facts(
                 placed = facts.objects.placed.len(),
                 bases = facts.objects.bases.len(),
                 "read placed objects"
+            );
+            let changed = facts
+                .navmeshes
+                .changes
+                .iter()
+                .flat_map(|plugin| &plugin.navmeshes);
+            let (with_doors, without): (Vec<_>, Vec<_>) =
+                changed.partition(|navmesh| navmesh.doors.is_some());
+            tracing::info!(
+                changed = with_doors.len() + without.len(),
+                unreadable = without.len(),
+                "read navigation meshes that mods change"
             );
         }
         Err(error) => {

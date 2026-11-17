@@ -174,6 +174,23 @@ objects-overlapping = Objekte zweier Mods stehen ineinander
     .explanation = Zwei Mods, die denselben Ort verändern, stellen jeweils eigene Gebäude, Bäume oder andere Objekte dorthin, ohne voneinander zu wissen. Wo sie sich treffen, wächst ein Baum durch ein Dach, zwei Häuser verschmelzen zu einem oder ein Weg führt in eine Wand. Mod Mallet vergleicht den Kasten um das Modell eines Objekts, nicht das Modell selbst. Ein Objekt mit viel freiem Raum, etwa ein Torbogen, kann deshalb gemeldet werden, obwohl sichtbar nichts zusammenstößt.
     .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch. Gibt es keinen, sieh dir die genannten Orte im Spiel an. Steht dort etwas im Weg, entscheide, welche der beiden Mods du für diesen Ort behalten willst.
 
+navmeshes-door-cut-off = Figuren können Türen einer Mod nicht mehr benutzen
+    .headline =
+        { $winner } schneidet { $count ->
+            [one] 1 Tür
+           *[other] { $count } Türen
+        } von { $loser } ab
+    .summary =
+        { $loser } bindet { $count ->
+            [one] eine Tür, die Mods hinzufügen,
+           *[other] { $count } Türen, die Mods hinzufügen,
+        } an die Wege an, auf denen Figuren laufen. { $winner } ersetzt diese Wege durch eine Fassung, die ohne { $loser } erstellt wurde und in der { $count ->
+            [one] die Tür nicht angebunden ist
+           *[other] die Türen nicht angebunden sind
+        }. Zum Beispiel: { $places }. Angegeben ist ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+    .explanation = Das Spiel legt auf den Boden jedes Ortes ein unsichtbares Netz, über das Figuren ihren Weg finden: sein Navigationsnetz. Eine Tür können Figuren nur benutzen, wenn das Netz zu ihr führt. Eine Mod, die ein Haus hinzufügt, bindet das Netz an die Tür des Hauses an. Ersetzt eine spätere Mod dasselbe Netz durch ihre eigene Fassung, ist die Tür nicht mehr angebunden: Begleiter, Wachen und Bewohner bleiben davor stehen oder gehen nie hinein, und Quests, die jemanden hindurchschicken, können hängen bleiben. Nur du kannst sie noch öffnen.
+    .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch und installiere ihn, wenn es einen gibt. Ohne Patch entscheide, welche der beiden Mods du für diese Orte behalten willst. Die Mod mit der Tür später zu laden, verschiebt das Problem nur: Dann gehen die Wege der anderen Mod verloren.
+
 navmeshes-changes-undone = Eine Mod macht rückgängig, wo eine andere Mod Figuren laufen lässt
     .headline =
         { $winner } macht { $count ->

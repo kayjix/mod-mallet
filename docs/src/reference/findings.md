@@ -22,6 +22,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `plugins.contained` | Warning | likely | A mod is already part of another |
 | `objects.duplicated` | Warning | likely | Two mods place the same object twice |
 | `objects.overlapping` | Warning | hint | Objects of two mods stand inside each other |
+| `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
 | `meshes.retexture-bypassed` | Warning | likely | A texture mod does not reach replaced meshes |
 | `assets.loose-over-archive` | Note | certain | Loose files cover files in another mod's archive |
@@ -220,6 +221,18 @@ Mods that change the same town or the same stretch of land often add the same th
 Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Mod Mallet compares the box around each object's model, not the model itself, so an object with a lot of empty space, such as an arch, can be reported although nothing visibly collides.
 
 **What to do:** Look on the pages of both mods for a compatibility patch. If there is none, look at the places named above in the game. If something is in the way, decide which of the two mods you want to keep for this place.
+
+## navmeshes.door-cut-off
+
+**Characters can no longer walk through doors of a mod**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `winner`, `loser`, `count`, `places`
+
+The game keeps an invisible net on the ground of every place, which characters use to find their way: its navigation mesh. A door can only be used by characters if the net leads to it. A mod that adds a house connects the net to the house's door. When a later mod replaces the same net with its own version, the door is no longer connected: followers, guards and townspeople stop in front of it or never go in, and quests that send someone through it can get stuck. Only you can still open it.
+
+**What to do:** Look on the pages of both mods for a compatibility patch, and install it if there is one. Without a patch, decide which of the two mods you want to keep for these places. Loading the mod with the door later moves the problem elsewhere: then the other mod's paths are lost.
 
 ## navmeshes.changes-undone
 

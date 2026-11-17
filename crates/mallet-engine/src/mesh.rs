@@ -45,6 +45,20 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
             .clone()
     };
 
+    // From Fallout 4 on, the material a shader names decides the texture,
+    // also where the mesh names one of its own.
+    let mut materials: HashMap<String, Option<String>> = HashMap::new();
+    let mut material_texture = |raw: &str| -> Option<String> {
+        let normalized = below(raw, "materials/");
+        materials
+            .entry(normalized.clone())
+            .or_insert_with(|| {
+                let version = files::versions(game, &game_dir, local_dir, &normalized).pop()?;
+                files::material_texture(&version.bytes)
+            })
+            .clone()
+    };
+
     let lower = path.replace('\\', "/").to_ascii_lowercase();
     let tint = lower
         .find(FACE_MESHES)
@@ -57,9 +71,13 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
     let shapes = shapes
         .into_iter()
         .map(|shape| {
+            let named = shape
+                .material
+                .as_deref()
+                .and_then(&mut material_texture)
+                .or(shape.texture);
             let tinted = tint.is_some()
-                && shape
-                    .texture
+                && named
                     .as_deref()
                     .is_some_and(|name| name.to_ascii_lowercase().contains("head"));
             MeshShape {
@@ -72,7 +90,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
                         .flat_map(|index| index.to_le_bytes())
                         .collect::<Vec<u8>>(),
                 ),
-                texture: shape.texture.as_deref().and_then(&mut texture),
+                texture: named.as_deref().and_then(&mut texture),
                 tinted,
                 alpha_test: shape.alpha,
             }
@@ -89,17 +107,26 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
     })
 }
 
-/// A texture as a mesh names it, as a path below the data directory:
-/// meshes write `textures\a.dds`, `a.dds` or `Data\Textures\a.dds`.
-pub(crate) fn texture_path(raw: &str) -> String {
-    let lower = raw.replace('\\', "/").to_ascii_lowercase();
-    let lower = lower.trim_start_matches('/');
-    let lower = lower.strip_prefix("data/").unwrap_or(lower);
-    if lower.starts_with("textures/") {
-        lower.to_owned()
-    } else {
-        format!("textures/{lower}")
+/// A path from a mesh as the game looks it up below the data directory, in
+/// the folder `folder` (`textures/`). Meshes spell such paths relative to
+/// that folder, with it, or with the folders of the machine they were made
+/// on in front (`C:\Projects\...\Data\materials\...`); the game reads
+/// from the folder's name on.
+fn below(raw: &str, folder: &str) -> String {
+    let normalized = raw.replace('\\', "/").to_ascii_lowercase();
+    let normalized = normalized.trim_start_matches('/');
+    if normalized.starts_with(folder) {
+        return normalized.to_owned();
     }
+    match normalized.find(&format!("/{folder}")) {
+        Some(at) => normalized.get(at + 1..).unwrap_or_default().to_owned(),
+        None => format!("{folder}{normalized}"),
+    }
+}
+
+/// A texture as a mesh names it, as a path below the data directory.
+pub(crate) fn texture_path(raw: &str) -> String {
+    below(raw, "textures/")
 }
 
 /// Numbers as their little-endian bytes.
@@ -122,4 +149,28 @@ fn picture(
     let png =
         crate::png::encode_rgba(image.width, image.height, &image.pixels, &image.alpha).ok()?;
     Some(format!("data:image/png;base64,{}", base64(&png)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paths_are_read_from_the_folders_name_on() {
+        assert_eq!(
+            below(r"Props\Bottle_d.dds", "textures/"),
+            "textures/props/bottle_d.dds"
+        );
+        assert_eq!(
+            below(r"textures\Props\Bottle_d.dds", "textures/"),
+            "textures/props/bottle_d.dds"
+        );
+        assert_eq!(
+            below(
+                r"C:\Projects\Fallout4\Build\PC\Data\materials\Architecture\Roof.BGSM",
+                "materials/"
+            ),
+            "materials/architecture/roof.bgsm"
+        );
+    }
 }

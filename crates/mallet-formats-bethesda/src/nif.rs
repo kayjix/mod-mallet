@@ -21,7 +21,10 @@
 //! the blocks
 //! ```
 //!
-//! Supported are the meshes of Skyrim and Skyrim Special Edition. The
+//! Supported are the meshes of Fallout 3, New Vegas, Skyrim, Skyrim
+//! Special Edition and Fallout 4. Oblivion's, of an older version that does
+//! not say where its blocks lie, are read by a reader of their own, which
+//! reads them block by block. The
 //! layout was checked against real files; the reader takes nothing in a
 //! file on trust (ADR 0013).
 
@@ -33,9 +36,28 @@ const MAGIC: &[u8] = b"Gamebryo File Format, Version ";
 const VERSION_20_2_0_7: u32 = 0x1402_0007;
 const TEXTURE_SET: &str = "BSShaderTextureSet";
 
-/// The newest Bethesda variant of the format this reader knows: Skyrim
-/// Special Edition. Fallout 4 and later changed the header.
-const NEWEST_BETHESDA_VERSION: u32 = 100;
+/// The newest Bethesda variant of the format this reader knows: Fallout 4
+/// (130). Fallout 76 and Starfield changed the header again.
+const NEWEST_BETHESDA_VERSION: u32 = 130;
+
+/// From this Bethesda variant on (Fallout 4), the header names one more
+/// thing after the export script: the longest file path.
+const MAX_FILEPATH_VERSION: u32 = 103;
+
+/// How many short texts follow the Bethesda version in the header: the
+/// author, the process script and the export script, and the longest file
+/// path in newer variants.
+fn header_texts(bethesda_version: u32) -> usize {
+    if bethesda_version >= MAX_FILEPATH_VERSION {
+        4
+    } else {
+        3
+    }
+}
+
+/// The largest Oblivion mesh that is read for its textures. The game's
+/// largest is under 4 MB.
+const MAX_OBLIVION_MESH: u64 = 64 * 1024 * 1024;
 
 /// How much of a file is read at first to get its header.
 const FIRST_READ: usize = 16 * 1024;
@@ -61,6 +83,9 @@ pub enum NifError {
 /// The texture paths a mesh names, in the mesh's own spelling, without
 /// empty slots and without duplicates.
 pub fn texture_paths(data: &[u8]) -> Result<Vec<String>, NifError> {
+    if crate::nif_oblivion::has_oblivion_version(data) {
+        return crate::nif_oblivion::texture_paths(data);
+    }
     let layout = parse_layout(data)?;
     let mut bytes = Bytes::new(data);
     bytes.skip(layout.blocks_start).ok_or(NifError::Damaged)?;
@@ -94,6 +119,18 @@ pub fn read_texture_paths<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>,
             .map_err(io)?;
         match parse_layout(&start) {
             Err(NifError::Damaged) if read == missing => wanted = wanted.saturating_mul(4),
+            // Oblivion's meshes do not say where their blocks lie; they
+            // are read whole.
+            Err(NifError::UnsupportedVersion)
+                if crate::nif_oblivion::has_oblivion_version(&start) =>
+            {
+                reader
+                    .by_ref()
+                    .take(MAX_OBLIVION_MESH)
+                    .read_to_end(&mut start)
+                    .map_err(io)?;
+                return crate::nif_oblivion::texture_paths(&start);
+            }
             result => break result?,
         }
     };
@@ -159,8 +196,9 @@ fn parse_layout(data: &[u8]) -> Result<Layout, NifError> {
     if version != VERSION_20_2_0_7 || !little_endian || bethesda_version > NEWEST_BETHESDA_VERSION {
         return Err(NifError::UnsupportedVersion);
     }
-    // Author, process script, export script: a length byte and text each.
-    for _ in 0..3 {
+    // Author, process script, export script and perhaps the longest file
+    // path: a length byte and text each.
+    for _ in 0..header_texts(bethesda_version) {
         let len = usize::from(bytes.u8().ok_or_else(damaged)?);
         bytes.skip(len).ok_or_else(damaged)?;
     }
@@ -215,8 +253,9 @@ pub(crate) struct BlockInfo {
 }
 
 /// The Bethesda version of the mesh in `data` (83 for Skyrim, 100 for
-/// Skyrim Special Edition) and all its blocks.
-pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>), NifError> {
+/// Skyrim Special Edition, 130 for Fallout 4), all its blocks, and the
+/// texts its blocks name by number, such as the names of shaders.
+pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>, Vec<String>), NifError> {
     let mut bytes = Bytes::new(data);
     let damaged = || NifError::Damaged;
     let line_len = data
@@ -236,7 +275,7 @@ pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>), NifError> {
     if version != VERSION_20_2_0_7 || !little_endian || bethesda_version > NEWEST_BETHESDA_VERSION {
         return Err(NifError::UnsupportedVersion);
     }
-    for _ in 0..3 {
+    for _ in 0..header_texts(bethesda_version) {
         let len = usize::from(bytes.u8().ok_or_else(damaged)?);
         bytes.skip(len).ok_or_else(damaged)?;
     }
@@ -255,8 +294,9 @@ pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>), NifError> {
     }
     let string_count = bytes.u32().ok_or_else(damaged)?;
     let _longest_string = bytes.u32().ok_or_else(damaged)?;
+    let mut strings = Vec::new();
     for _ in 0..string_count {
-        sized_string(&mut bytes).ok_or_else(damaged)?;
+        strings.push(decode_text(sized_string(&mut bytes).ok_or_else(damaged)?));
     }
     let group_count = bytes.u32().ok_or_else(damaged)?;
     for _ in 0..group_count {
@@ -275,7 +315,7 @@ pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>), NifError> {
         });
         start = start.checked_add(size).ok_or_else(damaged)?;
     }
-    Ok((bethesda_version, found))
+    Ok((bethesda_version, found, strings))
 }
 
 /// Adds the paths of one texture set block to `paths`.
@@ -380,10 +420,24 @@ mod tests {
         let mut mesh = fixture::nif(&[WALL]);
         let after_line = mesh.iter().position(|&byte| byte == b'\n').unwrap() + 1;
         // The Bethesda version follows version, endianness, user version
-        // and block count. 130 is Fallout 4.
+        // and block count. 155 is Fallout 76.
+        let bethesda_version = after_line + 4 + 1 + 4 + 4;
+        mesh[bethesda_version..bethesda_version + 4].copy_from_slice(&155u32.to_le_bytes());
+        assert_eq!(texture_paths(&mesh), Err(NifError::UnsupportedVersion));
+    }
+
+    #[test]
+    fn fallout_4_meshes_have_one_more_text_in_their_header() {
+        let mut mesh = fixture::nif(&[WALL]);
+        let after_line = mesh.iter().position(|&byte| byte == b'\n').unwrap() + 1;
         let bethesda_version = after_line + 4 + 1 + 4 + 4;
         mesh[bethesda_version..bethesda_version + 4].copy_from_slice(&130u32.to_le_bytes());
-        assert_eq!(texture_paths(&mesh), Err(NifError::UnsupportedVersion));
+        // An empty longest file path after the three texts of two bytes.
+        let after_texts = bethesda_version + 4 + 6;
+        mesh.splice(after_texts..after_texts, [1, 0]);
+        let skyrim = texture_paths(&fixture::nif(&[WALL])).unwrap();
+        assert_eq!(texture_paths(&mesh).unwrap(), skyrim);
+        assert_eq!(skyrim.len(), 2);
     }
 
     #[test]

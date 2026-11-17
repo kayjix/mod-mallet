@@ -56,11 +56,11 @@ pub const PLACE_RECORDS: [Signature; 4] = [*b"REFR", *b"CELL", *b"WRLD", *b"LAND
 pub const LAND_RECORDS: [Signature; 3] = [*b"CELL", *b"WRLD", *b"LAND"];
 
 /// Record flag: the record is deleted.
-const FLAG_DELETED: u32 = 0x0000_0020;
+pub(crate) const FLAG_DELETED: u32 = 0x0000_0020;
 
 /// Record flag of references: the object is switched off when the game
 /// starts and only appears if a script switches it on.
-const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
+pub(crate) const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
 
 /// Record flag of references: the object is persistent.
 const FLAG_PERSISTENT: u32 = 0x0000_0400;
@@ -295,7 +295,7 @@ fn base_kind(signature: Signature) -> Option<BaseKind> {
         .map(|(_, kind)| *kind)
 }
 
-fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
+pub(crate) fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
     let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
     RecordId {
         plugin: origin.to_lowercase(),
@@ -303,7 +303,7 @@ fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
     }
 }
 
-fn editor_id(record: &Record) -> Option<String> {
+pub(crate) fn editor_id(record: &Record) -> Option<String> {
     record
         .first(b"EDID")
         .map(plugin::zstring)
@@ -311,7 +311,7 @@ fn editor_id(record: &Record) -> Option<String> {
 }
 
 /// The model of a record, as a path below the data directory.
-fn model_path(record: &Record) -> Option<String> {
+pub(crate) fn model_path(record: &Record) -> Option<String> {
     let model = record.first(b"MODL").map(plugin::zstring)?;
     let model = model.replace('\\', "/").to_ascii_lowercase();
     if model.is_empty() {
@@ -447,7 +447,7 @@ fn place(plugin_name: &str, masters: &[String], record: &Record) -> Option<Place
     }
 }
 
-fn floats(data: &[u8]) -> Vec<f32> {
+pub(crate) fn floats(data: &[u8]) -> Vec<f32> {
     data.as_chunks::<4>()
         .0
         .iter()
@@ -494,7 +494,7 @@ mod tests {
                 flat: &flat,
                 nested: &PLACE_GROUPS,
                 nested_records: &PLACE_RECORDS,
-                nested_headers: &[],
+                nested_overrides: &[],
             },
         )
         .unwrap()

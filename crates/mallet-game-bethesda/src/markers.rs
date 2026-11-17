@@ -22,7 +22,7 @@ use mallet_core::facts::markers::{MapMarkerFact, MarkerFacts, MarkerVersion};
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, Signature, group_type};
 use mallet_formats_bethesda::strings;
 
-use crate::game::{Family, Game};
+use crate::game::Game;
 use crate::meshes::LoadedArchive;
 
 /// Record flag: the record is deleted.
@@ -47,8 +47,11 @@ pub fn may_hold_markers(group: GroupLabel) -> bool {
     group.group_type != group_type::CELL_TEMPORARY_CHILDREN
 }
 
-/// The language whose string tables are preferred when several are there.
-const PREFERRED_LANGUAGE: &str = "english";
+/// The names of English in string tables, which are preferred when several
+/// languages are there: Skyrim spells it out (`skyrim_english.strings`),
+/// Fallout 4 uses a code (`fallout4_en.strings`) and ships every language
+/// the game was released in.
+const PREFERRED_LANGUAGES: [&str; 2] = ["english", "en"];
 
 /// One entry of what a plugin says about markers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,7 +248,7 @@ impl Collector {
                     let version = MarkerVersion {
                         plugin: plugin_name.to_owned(),
                         official: self.game.is_official(plugin_name),
-                        kind: self.kind(kind),
+                        kind: crate::place_kinds::place_kind(self.game, kind),
                         name,
                         position,
                         removed,
@@ -276,18 +279,6 @@ impl Collector {
                     }
                 }
             }
-        }
-    }
-
-    /// The kind of a marker as `MarkerVersion::kind` gives it: in Skyrim's
-    /// numbering. The other games number their kinds of places
-    /// differently, and their tables are not known here yet; their
-    /// markers are of no particular kind (0).
-    fn kind(&self, kind: u8) -> u8 {
-        if self.game.family() == Family::Skyrim {
-            kind
-        } else {
-            0
         }
     }
 
@@ -352,18 +343,19 @@ pub(crate) fn string_table(
             .strip_suffix(".strings")
             .map(str::to_owned)
     };
-    let rank = |language: &str| u8::from(language != PREFERRED_LANGUAGE);
+    // English first; otherwise the same language every time, whatever the
+    // order of the files on disk.
+    let rank = |language: &str| {
+        (
+            !PREFERRED_LANGUAGES.contains(&language),
+            language.to_owned(),
+        )
+    };
 
-    // A loose table takes precedence over the same table in an archive.
     let best_loose = loose
         .iter()
         .filter_map(|(path, file)| Some((language(path.as_str())?, file)))
         .min_by_key(|(language, _)| rank(language));
-    if let Some((_, file)) = best_loose
-        && let Ok(data) = std::fs::read(file)
-    {
-        return strings::parse_strings(&data);
-    }
     let best_packed = archives
         .iter()
         .rev()
@@ -380,6 +372,20 @@ pub(crate) fn string_table(
                 })
         })
         .min_by_key(|(language, _, _)| rank(language));
+
+    // A loose table takes precedence over a table of the same or a less
+    // preferred language in an archive, never over a better language.
+    let loose_wins = match (&best_loose, &best_packed) {
+        (Some((loose, _)), Some((packed, _, _))) => rank(loose) <= rank(packed),
+        (Some(_), None) => true,
+        (None, _) => false,
+    };
+    if loose_wins
+        && let Some((_, file)) = best_loose
+        && let Ok(data) = std::fs::read(file)
+    {
+        return strings::parse_strings(&data);
+    }
     let Some((_, archive, index)) = best_packed else {
         return HashMap::new();
     };
@@ -420,7 +426,7 @@ mod tests {
                 flat: &[],
                 nested: &MARKER_GROUP,
                 nested_records: &MARKER_RECORDS,
-                nested_headers: &[],
+                nested_overrides: &[],
             },
         )
         .unwrap()
@@ -515,7 +521,7 @@ mod tests {
         let riverwood = &facts.markers[0];
         assert_eq!(riverwood.first.plugin, "Skyrim.esm");
         assert_eq!(riverwood.first.name.as_deref(), Some("Millbrook"));
-        assert_eq!(riverwood.first.kind, 2);
+        assert_eq!(riverwood.first.kind, mallet_core::PlaceKind::Town);
         assert_eq!(riverwood.first.position, [1000, 2000, 30]);
         assert_eq!(riverwood.worldspace.local_id, 0x3C);
     }
@@ -533,7 +539,7 @@ mod tests {
         assert_eq!(cave.last.plugin, "Patch.esp");
         assert!(cave.last.removed);
         // The removal keeps what was known of the marker.
-        assert_eq!(cave.last.kind, 4);
+        assert_eq!(cave.last.kind, mallet_core::PlaceKind::Cave);
 
         let camp = &facts.markers[2];
         assert_eq!(camp.id.plugin, "village.esp");
@@ -615,6 +621,39 @@ mod tests {
         let names = string_table("Skyrim.esm", &loose, &[]);
         assert_eq!(names.get(&7).map(String::as_str), Some("Millbrook"));
         assert!(string_table("Unknown.esp", &loose, &[]).is_empty());
+
+        // Fallout 4 packs every language into one archive, named by codes;
+        // the Chinese table comes first in it. A German table lying loose
+        // does not win over English either.
+        let archive_file = directory.path().join("Fallout4 - Interface.ba2");
+        let chinese = table("Chinese");
+        let english = table("Diamond City");
+        std::fs::write(
+            &archive_file,
+            fixture::ba2_with(
+                &[
+                    (r"STRINGS\Fallout4_cn.STRINGS", chinese.as_slice()),
+                    (r"STRINGS\Fallout4_de.STRINGS", chinese.as_slice()),
+                    (r"STRINGS\Fallout4_en.STRINGS", english.as_slice()),
+                ],
+                fixture::Ba2Options {
+                    version: 1,
+                    compressed: false,
+                },
+            ),
+        )
+        .unwrap();
+        let archives = [LoadedArchive {
+            directory: crate::archive::read_directory(&archive_file).unwrap(),
+            file: archive_file,
+            path: GamePath::new("data/fallout4 - interface.ba2"),
+        }];
+        let loose_german = vec![(
+            GamePath::new("data/strings/fallout4_de.strings"),
+            directory.path().join("german.strings"),
+        )];
+        let names = string_table("Fallout4.esm", &loose_german, &archives);
+        assert_eq!(names.get(&7).map(String::as_str), Some("Diamond City"));
     }
 
     proptest! {

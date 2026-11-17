@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AreaObjects",
+  "description": "Everything placed around a point of a worldspace, as the game shows\nit, for looking at the place closely (ADR 0038).",
+  "type": "object",
+  "properties": {
+    "centre": {
+      "description": "The point, in game units.",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "format": "float"
+      },
+      "maxItems": 2,
+      "minItems": 2
+    },
+    "objects": {
+      "description": "The objects, with a model, in no particular order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AreaObject"
+      }
+    },
+    "radius": {
+      "description": "How far around the point, in game units, in each direction.",
+      "type": "number",
+      "format": "float"
+    },
+    "world": {
+      "description": "The worldspace, by its internal name.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "world",
+    "centre",
+    "radius",
+    "objects"
+  ],
+  "$defs": {
+    "AreaObject": {
+      "description": "One object near the point.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The reference: the plugin that placed it first and its number there.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "model": {
+          "description": "Its model, below the data directory.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name players see, or else the internal one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plugin": {
+          "description": "The plugin whose version the game uses.",
+          "type": "string"
+        },
+        "position": {
+          "description": "Where, in game units.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "rotation": {
+          "description": "Turned about the x, y and z axes, in radians.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "scale": {
+          "description": "The size relative to the base object.",
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "id",
+        "plugin",
+        "model",
+        "position",
+        "rotation",
+        "scale"
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    }
+  }
+}

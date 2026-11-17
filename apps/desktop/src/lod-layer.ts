@@ -142,6 +142,9 @@ export interface LodView {
   cells: WebGLTexture;
   /** West, south, columns, rows of the cells texture. */
   cellsRect: [number, number, number, number];
+  /** Cells (west, south, east, north) where the real objects are drawn,
+   * so that the reduced ones are left out there. */
+  realObjects: [number, number, number, number] | null;
 }
 
 export class LodLayer {
@@ -275,7 +278,14 @@ export class LodLayer {
       if (Array.isArray(loaded.land)) {
         this.drawSurfaces(loaded.land, at, true);
       }
-      if (Array.isArray(loaded.objects)) {
+      const real = view.realObjects;
+      const overlapsReal =
+        real !== null &&
+        tile.x <= real[2] &&
+        tile.x + tile.level > real[0] &&
+        tile.y <= real[3] &&
+        tile.y + tile.level > real[1];
+      if (Array.isArray(loaded.objects) && !overlapsReal) {
         this.drawSurfaces(loaded.objects, at, false);
       }
     }

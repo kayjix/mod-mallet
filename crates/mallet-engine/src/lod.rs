@@ -121,12 +121,18 @@ pub fn lod_mesh(
     } else {
         [cell_units(x), cell_units(y)]
     };
-    let shapes = files::mesh_shapes(&bytes)
+    Some(mesh_of(&bytes, corner))
+}
+
+/// The surfaces of the mesh in `bytes`, moved by `offset` (game units, east
+/// and north), with their textures named by path.
+pub(crate) fn mesh_of(bytes: &[u8], offset: [f32; 2]) -> LodMesh {
+    let shapes = files::mesh_shapes(bytes)
         .into_iter()
         .map(|mut shape| {
             for point in shape.positions.as_chunks_mut::<3>().0 {
-                point[0] += corner[0];
-                point[1] += corner[1];
+                point[0] += offset[0];
+                point[1] += offset[1];
             }
             shape
         })
@@ -144,7 +150,7 @@ pub fn lod_mesh(
             alpha_test: shape.alpha,
         })
         .collect();
-    Some(LodMesh { shapes })
+    LodMesh { shapes }
 }
 
 /// Game units from the world's origin to the edge of cell `cell`.
@@ -188,7 +194,12 @@ fn lod_picture(options: &ScanOptions, world: &str, path: &str, max_side: u32) ->
             .pop()
             .map(|version| version.bytes)
     })?;
-    let image = files::thumbnail(&bytes, max_side.clamp(TEXTURE_SIDES.0, TEXTURE_SIDES.1))?;
+    picture_of(&bytes, max_side)
+}
+
+/// A texture as a PNG `data:` address no wider or higher than `max_side`.
+pub(crate) fn picture_of(bytes: &[u8], max_side: u32) -> Option<String> {
+    let image = files::thumbnail(bytes, max_side.clamp(TEXTURE_SIDES.0, TEXTURE_SIDES.1))?;
     let png =
         crate::png::encode_rgba(image.width, image.height, &image.pixels, &image.alpha).ok()?;
     Some(format!("data:image/png;base64,{}", base64(&png)))

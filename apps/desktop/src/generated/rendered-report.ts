@@ -1074,6 +1074,14 @@ export interface MapMarker {
     | "docks"
     | "daedric-shrine"
     | "passage"
+    | "vault"
+    | "ruin"
+    | "factory"
+    | "station"
+    | "building"
+    | "ayleid-ruin"
+    | "oblivion-gate"
+    | "inn"
     | "other";
   /**
    * Where the game puts it, if a mod moved it.

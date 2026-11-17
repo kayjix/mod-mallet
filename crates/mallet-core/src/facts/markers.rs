@@ -5,6 +5,7 @@
 //! markers for the places they add, and change or remove the game's.
 
 use super::RecordId;
+use crate::report::PlaceKind;
 
 /// The map markers of a setup.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -35,9 +36,9 @@ pub struct MarkerVersion {
     pub plugin: String,
     /// Whether the plugin is one of the game's own.
     pub official: bool,
-    /// The kind of place, as the game numbers it (1 city, 2 town, 4 cave
-    /// and so on; see the game adapter).
-    pub kind: u8,
+    /// The kind of place. Each game numbers its kinds in its own way; the
+    /// game adapter translates them.
+    pub kind: PlaceKind,
     /// The name the map shows, if it could be read.
     pub name: Option<String>,
     /// The position, in game units.

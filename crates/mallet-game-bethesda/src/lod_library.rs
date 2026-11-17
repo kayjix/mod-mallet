@@ -53,15 +53,27 @@ impl LodLibrary {
     /// holds `plugins.txt`, as for [`ingest::read_setup`].
     pub fn open(game: Game, game_dir: &Path, local_dir: Option<&Path>, world: &str) -> Self {
         let world = world.to_ascii_lowercase();
-        let data_dir = game_dir.join("Data");
         let prefixes = [
             format!("meshes/terrain/{world}/"),
             format!("textures/terrain/{world}/"),
         ];
+        let mut library = Self::with_prefixes(game, game_dir, local_dir, &prefixes);
+        library.world = world;
+        library
+    }
+
+    /// Finds every file below the folders `prefixes` (normalized, each
+    /// ending in `/`, such as `meshes/`), for reading with [`Self::read`].
+    pub fn with_prefixes(
+        game: Game,
+        game_dir: &Path,
+        local_dir: Option<&Path>,
+        prefixes: &[String],
+    ) -> Self {
+        let data_dir = game_dir.join("Data");
         let wanted = |path: &str| prefixes.iter().any(|prefix| path.starts_with(prefix));
         let mut library = Self {
             data_dir: data_dir.clone(),
-            world,
             ..Self::default()
         };
 
@@ -97,7 +109,7 @@ impl LodLibrary {
                 library.archives.push((path, directory));
             }
         }
-        for prefix in &prefixes {
+        for prefix in prefixes {
             for file in loose_files(&data_dir, prefix) {
                 library.files.insert(file, Source::Loose);
             }
@@ -140,7 +152,7 @@ impl LodLibrary {
     }
 
     /// The file at `path` below the data directory, if this library has
-    /// it: a file of the worldspace's level of detail.
+    /// it: a file below its folders.
     pub fn read(&self, path: &str) -> Option<Vec<u8>> {
         let path = files::normalize(path);
         match *self.files.get(&path)? {

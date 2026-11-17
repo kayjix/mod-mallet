@@ -92,3 +92,38 @@ pub struct LodShape {
     /// Whether the transparent parts of the texture are left out.
     pub alpha_test: bool,
 }
+
+/// Everything placed around a point of a worldspace, as the game shows
+/// it, for looking at the place closely (ADR 0038).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaObjects {
+    /// The worldspace, by its internal name.
+    pub world: String,
+    /// The point, in game units.
+    pub centre: [f32; 2],
+    /// How far around the point, in game units, in each direction.
+    pub radius: f32,
+    /// The objects, with a model, in no particular order.
+    pub objects: Vec<AreaObject>,
+}
+
+/// One object near the point.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaObject {
+    /// The reference: the plugin that placed it first and its number there.
+    pub id: crate::ObjectRef,
+    /// The plugin whose version the game uses.
+    pub plugin: String,
+    /// Its model, below the data directory.
+    pub model: String,
+    /// The name players see, or else the internal one.
+    pub name: Option<String>,
+    /// Where, in game units.
+    pub position: [f32; 3],
+    /// Turned about the x, y and z axes, in radians.
+    pub rotation: [f32; 3],
+    /// The size relative to the base object.
+    pub scale: f32,
+}

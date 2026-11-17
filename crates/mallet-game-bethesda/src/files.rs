@@ -90,6 +90,14 @@ pub fn versions(
     found
 }
 
+/// The colour texture the material file in `bytes` (`.bgsm`, `.bgem`)
+/// names, as it spells it; `None` if it names none or is not a material.
+pub fn material_texture(bytes: &[u8]) -> Option<String> {
+    mallet_formats_bethesda::material::main_texture(bytes)
+        .ok()
+        .flatten()
+}
+
 /// The surfaces of a mesh, for drawing it; empty if it cannot be read.
 pub fn mesh_shapes(bytes: &[u8]) -> Vec<mallet_formats_bethesda::nif_geometry::Shape> {
     mallet_formats_bethesda::nif_geometry::shapes(bytes).unwrap_or_default()

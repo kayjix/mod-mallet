@@ -181,10 +181,10 @@ pub struct Request<'a> {
     /// Records of other types are skipped without being unpacked.
     pub nested_records: &'a [Signature],
     /// Of the records inside the `nested` groups, the types that are kept
-    /// with their header only: their fields are not unpacked, and their
-    /// `subrecords` stay empty. For large records whose identity and place
-    /// are all that is needed.
-    pub nested_headers: &'a [Signature],
+    /// only where they change a record of one of the plugin's masters. The
+    /// plugin's own records of these types are skipped without being
+    /// unpacked. For large records of which only the changes matter.
+    pub nested_overrides: &'a [Signature],
 }
 
 impl Record {
@@ -271,13 +271,14 @@ pub fn read_request_where<R: Read + Seek>(
             let scope = if nested {
                 Scope::Nested {
                     records: request.nested_records,
-                    headers: request.nested_headers,
+                    overrides: request.nested_overrides,
                 }
             } else {
                 Scope::Flat
             };
             let reading = Reading {
                 header_len,
+                masters: plugin.header.masters.len(),
                 scope,
                 descend,
             };
@@ -374,10 +375,11 @@ enum Scope<'a> {
     /// Every record, and no nested group.
     Flat,
     /// The records of these types, in this group and all nested ones:
-    /// `records` with their fields, `headers` without.
+    /// `records` always, `overrides` where they change a record of a
+    /// master.
     Nested {
         records: &'a [Signature],
-        headers: &'a [Signature],
+        overrides: &'a [Signature],
     },
 }
 
@@ -385,6 +387,8 @@ enum Scope<'a> {
 struct Reading<'a> {
     /// The length of every record and group header in the plugin.
     header_len: usize,
+    /// How many masters the plugin has.
+    masters: usize,
     /// What to read from the groups.
     scope: Scope<'a>,
     /// Which nested groups to descend into.
@@ -401,6 +405,7 @@ fn read_group(
 ) {
     let Reading {
         header_len,
+        masters,
         scope,
         descend,
     } = *reading;
@@ -448,14 +453,13 @@ fn read_group(
             plugin.damaged += 1;
             return;
         };
-        let subrecords = if let Scope::Nested { records, headers } = scope
+        if let Scope::Nested { records, overrides } = scope
             && !records.contains(&signature)
+            && !(overrides.contains(&signature) && changes_master(form_id, masters))
         {
-            if !headers.contains(&signature) {
-                continue;
-            }
-            Some(Vec::new())
-        } else if flags & FLAG_COMPRESSED == 0 {
+            continue;
+        }
+        let subrecords = if flags & FLAG_COMPRESSED == 0 {
             Some(read_subrecords(data))
         } else {
             decompress(data).map(|data| read_subrecords(&data))
@@ -471,6 +475,12 @@ fn read_group(
             None => plugin.damaged += 1,
         }
     }
+}
+
+/// Whether a record with this form ID, in a plugin with `masters` masters,
+/// changes a record of one of them rather than being the plugin's own.
+fn changes_master(form_id: u32, masters: usize) -> bool {
+    usize::try_from(form_id >> 24).is_ok_and(|index| index < masters)
 }
 
 /// Unpacks the data of a compressed record: the unpacked size, then a zlib
@@ -660,32 +670,34 @@ mod tests {
                 flat: &[NPC],
                 nested: &[*b"CELL", *b"WRLD"],
                 nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
-                nested_headers: &[],
+                nested_overrides: &[],
             },
         )
         .unwrap()
     }
 
     #[test]
-    fn records_asked_for_by_header_are_kept_without_their_fields() {
+    fn records_asked_for_as_overrides_are_kept_only_where_they_change_a_master() {
         let plugin = read_request(
             &mut Cursor::new(places()),
             &Request {
                 flat: &[],
-                nested: &[*b"WRLD"],
+                nested: &[*b"CELL", *b"WRLD"],
                 nested_records: &[],
-                nested_headers: &[*b"LAND"],
+                nested_overrides: &[*b"WRLD", *b"CELL", *b"LAND"],
             },
         )
         .unwrap();
         assert_eq!(plugin.damaged, 0);
 
-        let [land] = plugin.records.as_slice() else {
-            panic!("expected the land only, got {:?}", plugin.records);
-        };
-        assert_eq!((land.signature, land.form_id), (*b"LAND", 0x0100_0803));
-        assert_eq!(land.subrecords, Vec::new());
-        assert_eq!(land.groups.len(), 5);
+        // The worldspace belongs to the master; the cells and the land are
+        // the plugin's own.
+        let found: Vec<_> = plugin
+            .records
+            .iter()
+            .map(|record| (record.signature, record.form_id))
+            .collect();
+        assert_eq!(found, [(*b"WRLD", 0x0000_003C)]);
     }
 
     #[test]
@@ -753,7 +765,7 @@ mod tests {
                 flat: &[NPC],
                 nested: &[*b"CELL", *b"WRLD"],
                 nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
-                nested_headers: &[],
+                nested_overrides: &[],
             },
             &|group| group.group_type != group_type::CELL_TEMPORARY_CHILDREN,
         )
@@ -1020,7 +1032,7 @@ mod tests {
                     flat: &[NPC],
                     nested: &[*b"CELL", *b"WRLD"],
                     nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
-                    nested_headers: &[],
+                    nested_overrides: &[],
                 },
             );
         }
@@ -1058,7 +1070,7 @@ mod tests {
                     flat: &[NPC],
                     nested: &[*b"CELL", *b"WRLD"],
                     nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
-                    nested_headers: &[],
+                    nested_overrides: &[],
                 },
             );
         }

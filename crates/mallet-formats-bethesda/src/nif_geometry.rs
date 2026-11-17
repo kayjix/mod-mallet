@@ -37,6 +37,10 @@ pub struct Shape {
     pub indices: Vec<u32>,
     /// The colour texture, as the mesh names it, if it names one.
     pub texture: Option<String>,
+    /// The material file (`.bgsm`, `.bgem`) the shape's shader names, as
+    /// the mesh spells it. From Fallout 4 on, it often holds the textures
+    /// the mesh does not name itself.
+    pub material: Option<String>,
     /// Whether the shape has an alpha property: its texture's transparent
     /// parts, such as between strands of hair, are left out.
     pub alpha: bool,
@@ -44,10 +48,10 @@ pub struct Shape {
 
 /// A transform: rotation (row by row), translation, scale.
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct Transform {
-    rotation: [[f32; 3]; 3],
-    translation: [f32; 3],
-    scale: f32,
+pub(crate) struct Transform {
+    pub(crate) rotation: [[f32; 3]; 3],
+    pub(crate) translation: [f32; 3],
+    pub(crate) scale: f32,
 }
 
 fn dot(row: [f32; 3], column: [f32; 3]) -> f32 {
@@ -55,7 +59,7 @@ fn dot(row: [f32; 3], column: [f32; 3]) -> f32 {
 }
 
 impl Transform {
-    const IDENTITY: Self = Self {
+    pub(crate) const IDENTITY: Self = Self {
         rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         translation: [0.0; 3],
         scale: 1.0,
@@ -72,7 +76,7 @@ impl Transform {
     }
 
     /// `self` placed inside `parent`.
-    fn within(&self, parent: &Self) -> Self {
+    pub(crate) fn within(&self, parent: &Self) -> Self {
         let [[xx, xy, xz], [yx, yy, yz], [zx, zy, zz]] = self.rotation;
         let columns = [[xx, yx, zx], [xy, yy, zy], [xz, yz, zz]];
         let rotation = parent
@@ -87,7 +91,7 @@ impl Transform {
 }
 
 /// Reads a rotation of nine numbers, row by row.
-fn read_rotation(bytes: &mut Bytes<'_>) -> Option<[[f32; 3]; 3]> {
+pub(crate) fn read_rotation(bytes: &mut Bytes<'_>) -> Option<[[f32; 3]; 3]> {
     let mut row = || Some([bytes.f32()?, bytes.f32()?, bytes.f32()?]);
     Some([row()?, row()?, row()?])
 }
@@ -621,6 +625,60 @@ fn texture_set_of(shader: &[u8], bs_version: u32) -> Option<usize> {
     reference(bytes.u32()?)
 }
 
+/// The colour texture a shader of the type `kind` names: through its
+/// texture set (found with `block`), or itself for an effect shader.
+fn shader_texture<'a>(
+    kind: &str,
+    shader: &[u8],
+    bs_version: u32,
+    block: &dyn Fn(usize) -> Option<(&'a str, &'a [u8])>,
+) -> Option<String> {
+    match kind {
+        "BSLightingShaderProperty" => {
+            let (_, set) = block(texture_set_of(shader, bs_version)?)?;
+            first_texture(set)
+        }
+        "BSEffectShaderProperty" => effect_texture(shader),
+        _ => None,
+    }
+}
+
+/// The material file a shader of the type `kind` names, if its name is
+/// one: shaders of Fallout 4 are named after their material.
+fn material_name(kind: &str, shader: &[u8], bs_version: u32, strings: &[String]) -> Option<String> {
+    let mut bytes = Bytes::new(shader);
+    match kind {
+        "BSLightingShaderProperty" if bs_version >= 83 => bytes.u32()?, // shader type
+        "BSLightingShaderProperty" | "BSEffectShaderProperty" => 0,
+        _ => return None,
+    };
+    let name = strings.get(usize::try_from(bytes.u32()?).ok()?)?;
+    let is_material = std::path::Path::new(name)
+        .extension()
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("bgsm") || extension.eq_ignore_ascii_case("bgem")
+        });
+    is_material.then(|| name.clone())
+}
+
+/// The texture an effect shader (glass, glow, fire) names itself, instead
+/// of through a texture set.
+fn effect_texture(shader: &[u8]) -> Option<String> {
+    let mut bytes = Bytes::new(shader);
+    bytes.u32()?; // name
+    let extra = bytes.u32()?;
+    for _ in 0..extra.min(4096) {
+        bytes.u32()?;
+    }
+    bytes.u32()?; // controller
+    bytes.u32()?; // flags 1
+    bytes.u32()?; // flags 2
+    bytes.skip(16)?; // texture offset and scale
+    let length = bytes.u32()? as usize;
+    let text = crate::decode_text(bytes.take(length)?);
+    (!text.is_empty()).then_some(text)
+}
+
 /// The colour texture of a texture set: its first slot.
 fn first_texture(set: &[u8]) -> Option<String> {
     let mut bytes = Bytes::new(set);
@@ -681,7 +739,10 @@ fn place<'a>(
 /// If the data is not a mesh of a supported version. Shapes that cannot be
 /// read are left out.
 pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
-    let (bs_version, found) = blocks(data)?;
+    if crate::nif_oblivion::has_oblivion_version(data) {
+        return crate::nif_oblivion::shapes(data);
+    }
+    let (bs_version, found, strings) = blocks(data)?;
     let block = |index: usize| -> Option<(&str, &[u8])> {
         let info = found.get(index)?;
         Some((
@@ -691,19 +752,21 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
     };
     let texture_of = |shader: Option<usize>| -> Option<String> {
         let (kind, shader) = block(shader?)?;
-        if kind != "BSLightingShaderProperty" {
-            return None;
-        }
-        let (_, set) = block(texture_set_of(shader, bs_version)?)?;
-        first_texture(set)
+        shader_texture(kind, shader, bs_version, &block)
+    };
+    let material_of = |shader: Option<usize>| -> Option<String> {
+        let (kind, shader) = block(shader?)?;
+        material_name(kind, shader, bs_version, &strings)
     };
 
-    // Glow, flames and mist are cards with an effect shader: light, not
-    // a body; drawn plainly they would hide the thing.
+    // In Skyrim, surfaces with an effect shader are glow, flames and mist:
+    // light, not a body; drawn plainly they would hide the thing. From
+    // Fallout 4 on, glass and other real surfaces use it too, and are kept.
     let is_effect = |shader: Option<usize>| -> bool {
-        shader
-            .and_then(block)
-            .is_some_and(|(kind, _)| kind == "BSEffectShaderProperty")
+        bs_version < 130
+            && shader
+                .and_then(block)
+                .is_some_and(|(kind, _)| kind == "BSEffectShaderProperty")
     };
 
     let (world, shape_blocks) = place(&block, bs_version);
@@ -743,6 +806,7 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                 if let Some(shape) = finish(&raw.positions, raw.uvs, &raw.indices, transform) {
                     shapes.push(Shape {
                         texture: texture_of(raw.shader),
+                        material: material_of(raw.shader),
                         alpha: raw.alpha,
                         ..shape
                     });
@@ -765,6 +829,7 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                 if let Some(shape) = finish(&positions, uvs, &indices, local.within(&parent)) {
                     shapes.push(Shape {
                         texture: texture_of(shader),
+                        material: material_of(shader),
                         alpha,
                         ..shape
                     });
@@ -872,7 +937,7 @@ fn skin_points(
 }
 
 /// A shape with its transform applied, if its numbers fit together.
-fn finish(
+pub(crate) fn finish(
     positions: &[f32],
     uvs: Vec<f32>,
     indices: &[u32],
@@ -907,6 +972,7 @@ fn finish(
         uvs,
         indices,
         texture: None,
+        material: None,
         alpha: false,
     })
 }
@@ -919,13 +985,19 @@ mod tests {
 
     /// A mesh file of Bethesda version `bs_version` with the given blocks.
     fn mesh(bs_version: u32, blocks: &[(&str, Vec<u8>)]) -> Vec<u8> {
+        mesh_with_strings(bs_version, blocks, &[])
+    }
+
+    /// A mesh file whose blocks can name `strings` by number.
+    fn mesh_with_strings(bs_version: u32, blocks: &[(&str, Vec<u8>)], strings: &[&str]) -> Vec<u8> {
         let mut out = b"Gamebryo File Format, Version 20.2.0.7\n".to_vec();
         out.extend(0x1402_0007u32.to_le_bytes());
         out.push(1);
         out.extend(12u32.to_le_bytes());
         out.extend(u32::try_from(blocks.len()).unwrap().to_le_bytes());
         out.extend(bs_version.to_le_bytes());
-        out.extend([0, 0, 0]);
+        // Empty author and scripts, and in Fallout 4 the longest path.
+        out.extend(vec![0u8; if bs_version >= 103 { 4 } else { 3 }]);
         let mut types: Vec<&str> = Vec::new();
         for (kind, _) in blocks {
             if !types.contains(kind) {
@@ -944,7 +1016,13 @@ mod tests {
         for (_, data) in blocks {
             out.extend(u32::try_from(data.len()).unwrap().to_le_bytes());
         }
-        out.extend([0u8; 12]); // no strings, no groups
+        out.extend(u32::try_from(strings.len()).unwrap().to_le_bytes());
+        out.extend(0u32.to_le_bytes()); // longest string, not checked
+        for text in strings {
+            out.extend(u32::try_from(text.len()).unwrap().to_le_bytes());
+            out.extend(text.as_bytes());
+        }
+        out.extend(0u32.to_le_bytes()); // no groups
         for (_, data) in blocks {
             out.extend(data);
         }
@@ -1025,6 +1103,106 @@ mod tests {
         );
         assert_eq!(shape.uvs, [0.5; 6]);
         assert_eq!(shape.texture, None);
+    }
+
+    /// A one-triangle `BSTriShape` of Fallout 4 with the shader in block
+    /// `shader`: like Skyrim Special Edition's, but with a 32-bit triangle
+    /// count, half-precision positions and no particle data.
+    fn fallout_4_tri_shape(shader: i32) -> Vec<u8> {
+        let mut out = av_object([0.0, 0.0, 10.0]);
+        out.extend([0u8; 16]); // bounding sphere
+        out.extend((-1i32).to_le_bytes()); // skin
+        out.extend(shader.to_le_bytes());
+        out.extend((-1i32).to_le_bytes()); // alpha
+        // 12-byte vertices: half-precision position at 0 (8 bytes),
+        // texture coordinates at 8.
+        let desc: u64 = 3 | (2 << 8) | (0x3 << 44);
+        out.extend(desc.to_le_bytes());
+        out.extend(1u32.to_le_bytes());
+        out.extend(3u16.to_le_bytes());
+        out.extend((3u32 * 12 + 6).to_le_bytes());
+        // 1.0 is 0x3C00 as a half float.
+        for (x, y) in [(0u16, 0u16), (0x3C00, 0), (0, 0x3C00)] {
+            for value in [x, y, 0, 0, 0x3800, 0x3800] {
+                out.extend(value.to_le_bytes());
+            }
+        }
+        for index in [0u16, 1, 2] {
+            out.extend(index.to_le_bytes());
+        }
+        out
+    }
+
+    /// An effect shader that names its texture itself.
+    fn effect_shader(texture: &str) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend(0u32.to_le_bytes()); // name
+        out.extend(0u32.to_le_bytes()); // extra data
+        out.extend((-1i32).to_le_bytes()); // controller
+        out.extend([0u8; 8]); // flags
+        for value in [0.0f32, 0.0, 1.0, 1.0] {
+            out.extend(value.to_le_bytes());
+        }
+        out.extend(u32::try_from(texture.len()).unwrap().to_le_bytes());
+        out.extend(texture.as_bytes());
+        out
+    }
+
+    #[test]
+    fn a_fallout_4_shape_is_read_with_its_effect_texture() {
+        let data = mesh(
+            130,
+            &[
+                ("BSFadeNode", node(&[1])),
+                ("BSTriShape", fallout_4_tri_shape(2)),
+                (
+                    "BSEffectShaderProperty",
+                    effect_shader(r"texturesPropsGlass_d.dds"),
+                ),
+            ],
+        );
+        let found = shapes(&data).unwrap();
+        assert_eq!(found.len(), 1);
+        let shape = &found[0];
+        assert_eq!(shape.indices, [0, 1, 2]);
+        assert_eq!(
+            shape.positions,
+            [0.0, 0.0, 10.0, 1.0, 0.0, 10.0, 0.0, 1.0, 10.0]
+        );
+        assert_eq!(shape.texture.as_deref(), Some(r"texturesPropsGlass_d.dds"));
+    }
+
+    #[test]
+    fn a_fallout_4_shape_names_its_material() {
+        let mut shader = Vec::new();
+        shader.extend(1u32.to_le_bytes()); // shader type
+        shader.extend(0u32.to_le_bytes()); // name: the first string
+        shader.extend(0u32.to_le_bytes()); // extra data
+        shader.extend((-1i32).to_le_bytes()); // controller
+        shader.extend([0u8; 8]); // flags
+        shader.extend([0u8; 16]); // texture offset and scale
+        shader.extend((-1i32).to_le_bytes()); // no texture set
+        let data = mesh_with_strings(
+            130,
+            &[
+                ("BSFadeNode", node(&[1])),
+                ("BSTriShape", fallout_4_tri_shape(2)),
+                ("BSLightingShaderProperty", shader),
+            ],
+            &[r"MaterialsPropsBottle.BGSM"],
+        );
+        let found = shapes(&data).unwrap();
+        assert_eq!(found[0].texture, None);
+        assert_eq!(
+            found[0].material.as_deref(),
+            Some(r"MaterialsPropsBottle.BGSM")
+        );
+    }
+
+    #[test]
+    fn meshes_newer_than_fallout_4_are_not_read() {
+        let data = mesh(155, &[("BSFadeNode", node(&[]))]);
+        assert_eq!(shapes(&data), Err(NifError::UnsupportedVersion));
     }
 
     #[test]

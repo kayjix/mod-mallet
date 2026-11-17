@@ -214,7 +214,7 @@ fn map_marker(
             .clone()
             .or_else(|| marker.first.name.clone())
             .unwrap_or_default(),
-        kind: places::kind(version.kind),
+        kind: version.kind,
         position: version.position,
         origin: origin.whose,
         owner: origin.plugin.map(owner),
@@ -424,7 +424,7 @@ mod tests {
         use mallet_core::facts::markers::{MapMarkerFact, MarkerFacts, MarkerVersion};
         use mallet_core::{PlaceKind, PlaceOrigin};
 
-        let version = |plugin: &str, kind: u8, name: &str, x: i32| MarkerVersion {
+        let version = |plugin: &str, kind: PlaceKind, name: &str, x: i32| MarkerVersion {
             plugin: plugin.to_owned(),
             official: plugin == "Skyrim.esm",
             kind,
@@ -443,18 +443,18 @@ mod tests {
                 markers: vec![
                     marker(
                         1,
-                        version("Skyrim.esm", 2, "Millbrook", 0),
-                        version("Skyrim.esm", 2, "Millbrook", 0),
+                        version("Skyrim.esm", PlaceKind::Town, "Millbrook", 0),
+                        version("Skyrim.esm", PlaceKind::Town, "Millbrook", 0),
                     ),
                     marker(
                         2,
-                        version("Skyrim.esm", 4, "Echo Hollow", 0),
-                        version("Caves.esp", 4, "Echo Hollow", 9000),
+                        version("Skyrim.esm", PlaceKind::Cave, "Echo Hollow", 0),
+                        version("Caves.esp", PlaceKind::Cave, "Echo Hollow", 9000),
                     ),
                     marker(
                         3,
-                        version("Village.esp", 3, "New Village", -5000),
-                        version("Village.esp", 3, "New Village", -5000),
+                        version("Village.esp", PlaceKind::Settlement, "New Village", -5000),
+                        version("Village.esp", PlaceKind::Settlement, "New Village", -5000),
                     ),
                 ],
             },

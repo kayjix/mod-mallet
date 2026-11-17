@@ -4,8 +4,8 @@
 //! removed by one (ADR 0031). This is decided by comparing the version of
 //! the plugin that placed the marker with the version the game uses.
 
+use mallet_core::PlaceOrigin;
 use mallet_core::facts::markers::{MapMarkerFact, MarkerVersion};
-use mallet_core::{PlaceKind, PlaceOrigin};
 
 /// How far a mod has to move a place before it counts as moved, in game
 /// units: about 3.5 metres. Smaller shifts are corrections, not changes.
@@ -86,59 +86,9 @@ fn moved(first: &MarkerVersion, last: &MarkerVersion) -> bool {
     distance_squared > MOVED * MOVED
 }
 
-/// The group of the game's kind of map marker `kind`.
-pub(crate) fn kind(kind: u8) -> PlaceKind {
-    use PlaceKind::{
-        Camp, Castle, Cave, City, Clearing, DaedricShrine, Docks, Doomstone, DragonLair,
-        DwemerRuin, Farm, Fort, GiantCamp, Grove, ImperialCamp, ImperialTower, Landmark,
-        Lighthouse, Mine, NordicDwelling, NordicRuin, NordicTower, OrcStronghold, Other, Pass,
-        Passage, Settlement, Shack, Shipwreck, Shrine, Smelter, Stable, StormcloakCamp, Town,
-        WheatMill, WoodMill,
-    };
-    match kind {
-        1 => City,
-        2 | 54 => Town,
-        3 | 56 => Settlement,
-        4 => Cave,
-        5 => Camp,
-        6 => Fort,
-        7 => NordicRuin,
-        8 => DwemerRuin,
-        9 => Shipwreck,
-        10 => Grove,
-        11 | 26 | 53 => Landmark,
-        12 => DragonLair,
-        13 => Farm,
-        14 => WoodMill,
-        15 => Mine,
-        16 => ImperialCamp,
-        17 => StormcloakCamp,
-        18 | 55 => Doomstone,
-        19 => WheatMill,
-        20 => Smelter,
-        21 => Stable,
-        22 => ImperialTower,
-        23 => Clearing,
-        24 => Pass,
-        25 => Shrine,
-        27 => Lighthouse,
-        28 => OrcStronghold,
-        29 => GiantCamp,
-        30 => Shack,
-        31 => NordicTower,
-        32 => NordicDwelling,
-        33 => Docks,
-        34 => DaedricShrine,
-        // The holds' castles (odd) and capitals (even).
-        35..=52 if kind.is_multiple_of(2) => City,
-        35..=52 | 59 => Castle,
-        57 | 58 => Passage,
-        _ => Other,
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use mallet_core::PlaceKind;
     use mallet_core::facts::RecordId;
 
     use super::*;
@@ -147,7 +97,7 @@ mod tests {
         MarkerVersion {
             plugin: plugin.to_owned(),
             official: plugin == "Skyrim.esm" || plugin == "Update.esm",
-            kind: 2,
+            kind: PlaceKind::Town,
             name: Some(name.to_owned()),
             position,
             removed: false,
@@ -228,16 +178,5 @@ mod tests {
             ..game.clone()
         };
         assert_eq!(origin(&marker(game, gone)).whose, PlaceOrigin::Removed);
-    }
-
-    #[test]
-    fn kinds_are_grouped_as_the_map_shows_them() {
-        assert_eq!(kind(1), PlaceKind::City);
-        assert_eq!(kind(4), PlaceKind::Cave);
-        assert_eq!(kind(35), PlaceKind::Castle);
-        assert_eq!(kind(36), PlaceKind::City);
-        assert_eq!(kind(58), PlaceKind::Passage);
-        assert_eq!(kind(0), PlaceKind::Other);
-        assert_eq!(kind(200), PlaceKind::Other);
     }
 }

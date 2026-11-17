@@ -1,5 +1,6 @@
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
+import { AreaLayer, objectKey } from "./area-layer";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
   colour,
@@ -59,6 +60,10 @@ const MAX_PITCH = 1.55;
 const PIN = 0.9;
 /** How close to a pin a click has to land, in pixels. */
 const HIT = 11;
+/** How close the camera has to be, in cells, for the objects themselves. */
+const NEAR = 5;
+/** How far around the point the objects are read, in cells. */
+const AREA = 1.5;
 
 /** The land as triangles: positions, heights, kinds and indices. */
 interface Mesh {
@@ -415,6 +420,13 @@ export function MapView3D({
   const [withLod, setWithLod] = useState(true);
   const lod = useRef<LodLayer | null>(null);
   const coveredKey = useRef<string | null>(null);
+  // The objects themselves, around the point the camera looks at (ADR 0038).
+  const [withObjects, setWithObjects] = useState(true);
+  const area = useRef<AreaLayer | null>(null);
+  const areaAt = useRef<[number, number] | null>(null);
+  const areaTimer = useRef<number | null>(null);
+  const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
+  const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
   const [failed, setFailed] = useState(false);
   const mesh = useMemo(() => buildMesh(terrain), [terrain]);
 
@@ -444,6 +456,7 @@ export function MapView3D({
     showCells,
     withBase,
     withLod,
+    withObjects,
     size,
     picture,
   });
@@ -455,8 +468,53 @@ export function MapView3D({
     showCells,
     withBase,
     withLod,
+    withObjects,
     size,
     picture,
+  };
+
+  // Asks for the objects around `target` once the camera is close and has
+  // come to rest somewhere new.
+  wantArea.current = (target, distance) => {
+    if (!withObjects || distance > NEAR) {
+      if (areaState !== "far") {
+        setAreaState("far");
+      }
+      return;
+    }
+    const at = areaAt.current;
+    if (at !== null && Math.hypot(at[0] - target[0], at[1] - target[1]) < AREA * 0.4) {
+      return;
+    }
+    if (areaTimer.current !== null) {
+      window.clearTimeout(areaTimer.current);
+    }
+    const [x, y] = target;
+    areaTimer.current = window.setTimeout(() => {
+      areaTimer.current = null;
+      const layer = area.current;
+      if (layer === null) {
+        return;
+      }
+      areaAt.current = [x, y];
+      setAreaState("loading");
+      api
+        .areaObjects(world.name, x * CELL, y * CELL, AREA * CELL)
+        .then((found) => {
+          if (found === null || area.current !== layer) {
+            return;
+          }
+          const marked = new Set(
+            spots.flatMap((spot) =>
+              (spot.parts ?? []).map((part) => objectKey(part.object.plugin, part.object.localId)),
+            ),
+          );
+          layer.show(found, marked);
+          setAreaState(found.objects.length);
+          redraw();
+        })
+        .catch(() => setAreaState("far"));
+    }, 450);
   };
 
   // The canvas fills the space the window leaves it.
@@ -515,7 +573,24 @@ export function MapView3D({
       perspective(FIELD_OF_VIEW, width / height, view.distance * 0.02, view.distance * 6 + 400),
       lookAt(eye, view.target, [0, 0, 1]),
     );
-    const { exaggeration: raise, showCells: tinted, withBase, withLod } = state.current;
+    const {
+      exaggeration: raise,
+      showCells: tinted,
+      withBase,
+      withLod,
+      withObjects: near,
+    } = state.current;
+    wantArea.current(view.target, view.distance);
+    const shownArea = near && view.distance <= NEAR * 1.5 ? (area.current?.area ?? null) : null;
+    const realObjects: [number, number, number, number] | null =
+      shownArea === null
+        ? null
+        : [
+            Math.floor((shownArea.centre[0] - shownArea.radius) / CELL),
+            Math.floor((shownArea.centre[1] - shownArea.radius) / CELL),
+            Math.floor((shownArea.centre[0] + shownArea.radius) / CELL),
+            Math.floor((shownArea.centre[1] + shownArea.radius) / CELL),
+          ];
     const span = Math.max(1, terrain.highest - terrain.lowest);
 
     gl.enable(gl.DEPTH_TEST);
@@ -532,6 +607,7 @@ export function MapView3D({
         showCells: tinted,
         cells: current.cells,
         cellsRect: [terrain.west, terrain.south, terrain.columns, terrain.rows],
+        realObjects,
       });
       if (layer.drawnKey !== coveredKey.current) {
         coveredKey.current = layer.drawnKey;
@@ -587,6 +663,10 @@ export function MapView3D({
       0,
     );
 
+    if (shownArea !== null && area.current !== null) {
+      area.current.draw(matrix, raise, css("--accent"));
+    }
+
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
     gl.useProgram(current.pins);
     const pinUniform = (name: string) => gl.getUniformLocation(current.pins, name);
@@ -636,6 +716,25 @@ export function MapView3D({
       }
     }
     heads.current = placed;
+    // The parts of collisions among the objects, by name.
+    if (shownArea !== null && area.current !== null) {
+      for (const shown of area.current.shown) {
+        if (!shown.marked) {
+          continue;
+        }
+        const [x, y, z] = shown.object.position;
+        const top = project(matrix, [x / CELL, y / CELL, (z / CELL) * raise], width, height);
+        if (top === null || top.depth > 1) {
+          continue;
+        }
+        labels.push({
+          x: top.x,
+          y: top.y - 10,
+          text: shown.object.name ?? shown.object.model.split("/").pop() ?? "",
+          strong: true,
+        });
+      }
+    }
     drawLabels(context, labels);
     for (const [shown, lineWidth] of [
       [state.current.hover, 1.5],
@@ -790,6 +889,12 @@ export function MapView3D({
     }
     scene.current = made;
     redraw();
+    try {
+      area.current = new AreaLayer(gl, api, redraw);
+    } catch {
+      area.current = null;
+    }
+    areaAt.current = null;
     // The game's own level of detail, where the setup has it.
     let gone = false;
     api
@@ -816,6 +921,9 @@ export function MapView3D({
       gone = true;
       lod.current?.dispose();
       lod.current = null;
+      area.current?.dispose();
+      area.current = null;
+      areaAt.current = null;
       // Frees the graphics memory at once rather than when collected.
       for (const made of buffers) {
         gl.deleteBuffer(made);
@@ -987,7 +1095,7 @@ export function MapView3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these trigger a redraw.
   useEffect(() => {
     redraw();
-  }, [size, picked, hover, showCells, withBase, withLod, exaggeration, redraw]);
+  }, [size, picked, hover, showCells, withBase, withLod, withObjects, exaggeration, redraw]);
 
   // Whatever changes the canvas's size, it is drawn anew at its new size.
   useEffect(() => {
@@ -1056,7 +1164,8 @@ export function MapView3D({
     fly({
       ...camera.current,
       target: [position[0] / CELL, position[1] / CELL, (position[2] / CELL) * raise],
-      distance: Math.min(camera.current.distance, 28),
+      // A collision is looked at up close, with the objects themselves.
+      distance: Math.min(camera.current.distance, picked.type === "spot" ? NEAR * 0.7 : 28),
     });
   }, [picked, fly]);
 
@@ -1259,6 +1368,23 @@ export function MapView3D({
             onChange={(event) => setWithLod(event.target.checked)}
           />
           {t.mapLod}
+        </label>
+        <label className="relief-control">
+          <input
+            type="checkbox"
+            checked={withObjects}
+            onChange={(event) => setWithObjects(event.target.checked)}
+          />
+          {t.mapNear}
+          <span className="relief-value">
+            {!withObjects
+              ? ""
+              : areaState === "far"
+                ? t.mapNearFar
+                : areaState === "loading"
+                  ? t.mapNearLoading
+                  : t.mapNearCount(areaState)}
+          </span>
         </label>
         <span className="relief-hint">{t.mapReliefHint}</span>
       </div>

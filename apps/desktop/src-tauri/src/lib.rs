@@ -298,6 +298,41 @@ fn map_image(world: String) -> Result<Option<mallet_core::MapImage>, String> {
     ))
 }
 
+/// Everything placed around a point of a worldspace (ADR 0038).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn area_objects(
+    world: String,
+    x: f32,
+    y: f32,
+    radius: f32,
+) -> Result<Option<mallet_core::mesh::AreaObjects>, String> {
+    Ok(mallet_engine::area_objects(
+        &settings()?.scan_options(),
+        &world,
+        [x, y],
+        radius,
+    ))
+}
+
+/// A mesh of the setup in its own units, with its textures named by path.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn area_mesh(path: String) -> Result<Option<mallet_core::mesh::LodMesh>, String> {
+    Ok(mallet_engine::area_mesh(&settings()?.scan_options(), &path))
+}
+
+/// A texture of the setup as a PNG `data:` address.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn area_texture(path: String, max_side: u32) -> Result<Option<String>, String> {
+    Ok(mallet_engine::area_texture(
+        &settings()?.scan_options(),
+        &path,
+        max_side,
+    ))
+}
+
 /// The blocks of the game's level of detail a worldspace has (ADR 0037).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -498,6 +533,9 @@ pub fn run() -> tauri::Result<()> {
             lod_tiles,
             lod_mesh,
             lod_texture,
+            area_objects,
+            area_mesh,
+            area_texture,
             ranking,
             set_ranking,
             games,

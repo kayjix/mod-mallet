@@ -294,6 +294,10 @@ export interface Texts {
   mapHeightValue: (times: number) => string;
   mapBase: string;
   mapLod: string;
+  mapNear: string;
+  mapNearFar: string;
+  mapNearLoading: string;
+  mapNearCount: (count: number) => string;
   mapModCells: string;
   mapTopView: string;
   mapPlaces: string;
@@ -668,6 +672,10 @@ export const texts: Record<Lang, Texts> = {
     mapHeight: "Height",
     mapBase: "On a base",
     mapLod: "Game detail",
+    mapNear: "Objects up close",
+    mapNearFar: "come closer to see them",
+    mapNearLoading: "loading…",
+    mapNearCount: (count) => (count === 1 ? "1 object" : `${count} objects`),
     mapHeightValue: (times) =>
       times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
     mapModCells: "Cells of mods",
@@ -723,6 +731,14 @@ export const texts: Record<Lang, Texts> = {
       docks: "Docks",
       "daedric-shrine": "Daedric shrine",
       passage: "Passage",
+      vault: "Vault",
+      ruin: "Ruins",
+      factory: "Factory",
+      station: "Station",
+      building: "Building",
+      "ayleid-ruin": "Ayleid ruin",
+      "oblivion-gate": "Oblivion gate",
+      inn: "Inn",
       other: "Other",
     },
     placesCollisions: "Collisions of mods",
@@ -1090,6 +1106,10 @@ export const texts: Record<Lang, Texts> = {
     mapHeight: "Höhe",
     mapBase: "Auf Sockel",
     mapLod: "Spieldetail",
+    mapNear: "Objekte aus der Nähe",
+    mapNearFar: "zum Sehen näher heran",
+    mapNearLoading: "wird geladen …",
+    mapNearCount: (count) => (count === 1 ? "1 Objekt" : `${count} Objekte`),
     mapHeightValue: (times) =>
       times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
     mapModCells: "Zellen von Mods",
@@ -1146,6 +1166,14 @@ export const texts: Record<Lang, Texts> = {
       docks: "Hafen",
       "daedric-shrine": "Daedra-Schrein",
       passage: "Überfahrt",
+      vault: "Vault",
+      ruin: "Ruinen",
+      factory: "Fabrik",
+      station: "Bahnhof",
+      building: "Gebäude",
+      "ayleid-ruin": "Ayleiden-Ruine",
+      "oblivion-gate": "Oblivion-Tor",
+      inn: "Gasthaus",
       other: "Sonstiges",
     },
     placesCollisions: "Zusammenstöße von Mods",

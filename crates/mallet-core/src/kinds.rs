@@ -242,6 +242,15 @@ pub const NAVMESHES_CHANGES_UNDONE: KindInfo = KindInfo {
     args: &["winner", "loser", "count", "places"],
 };
 
+/// A later plugin replaces navigation meshes in which an earlier plugin
+/// connects doors that mods add, and its version does not connect them.
+pub const NAVMESHES_DOOR_CUT_OFF: KindInfo = KindInfo {
+    id: "navmeshes.door-cut-off",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["winner", "loser", "count", "places"],
+};
+
 /// Every kind, in the order the reference documentation lists them.
 pub const ALL: &[KindInfo] = &[
     EXTENDER_PLUGIN_INCOMPATIBLE,
@@ -260,6 +269,7 @@ pub const ALL: &[KindInfo] = &[
     PLUGINS_CONTAINED,
     OBJECTS_DUPLICATED,
     OBJECTS_OVERLAPPING,
+    NAVMESHES_DOOR_CUT_OFF,
     NAVMESHES_CHANGES_UNDONE,
     MESHES_RETEXTURE_BYPASSED,
     ASSETS_LOOSE_OVER_ARCHIVE,

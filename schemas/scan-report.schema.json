@@ -1305,6 +1305,46 @@
           "const": "passage"
         },
         {
+          "description": "A vault of Vault-Tec (the Fallout games).",
+          "type": "string",
+          "const": "vault"
+        },
+        {
+          "description": "The ruins of a town or of city blocks (the Fallout games).",
+          "type": "string",
+          "const": "ruin"
+        },
+        {
+          "description": "A factory or another industrial site.",
+          "type": "string",
+          "const": "factory"
+        },
+        {
+          "description": "A station of the subway or the railway.",
+          "type": "string",
+          "const": "station"
+        },
+        {
+          "description": "A building of offices, homes, a school, a hospital or the like (the\nFallout games).",
+          "type": "string",
+          "const": "building"
+        },
+        {
+          "description": "An Ayleid ruin (Oblivion).",
+          "type": "string",
+          "const": "ayleid-ruin"
+        },
+        {
+          "description": "A gate to Oblivion (Oblivion).",
+          "type": "string",
+          "const": "oblivion-gate"
+        },
+        {
+          "description": "An inn, a tavern or stables.",
+          "type": "string",
+          "const": "inn"
+        },
+        {
           "description": "A marker without a kind of its own.",
           "type": "string",
           "const": "other"

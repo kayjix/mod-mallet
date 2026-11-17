@@ -61,8 +61,9 @@ warned against, in the other direction.
   order, file conflicts between loose files and archives, missing masters,
   LOOT's rules, placed objects, the map's relief and the toolbox. Checks
   that need more knowledge of a game come one at a time.
-- Meshes of Fallout 4 and Oblivion are not read for textures yet (their
-  mesh versions differ); a mesh that cannot be read is left out, as before.
+- Oblivion's meshes do not say how long their blocks are. They are read
+  block by block, for the block types the game's own meshes use; reading
+  stops at the first unknown type, and what lies before is used.
 - The map shows the land's picture only for games that keep terrain LOD
   textures in Skyrim's layout (the Skyrim games and Fallout 4); the others
   show the relief alone.

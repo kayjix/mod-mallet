@@ -26,6 +26,7 @@
 
 mod archive;
 pub mod archives;
+pub mod area;
 pub mod files;
 pub mod game;
 pub mod ingest;
@@ -37,6 +38,7 @@ pub mod meshes;
 pub mod navmeshes;
 pub mod npc;
 pub mod objects;
+pub mod place_kinds;
 pub mod skse_log;
 pub mod swap;
 pub mod terrain;

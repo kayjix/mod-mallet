@@ -178,8 +178,10 @@ pub fn read_setup(
     Ok(facts)
 }
 
-/// Under which name the markers of a plugin are kept in the cache.
-const MARKER_CACHE: &str = "markers";
+/// Under which name the markers of a plugin are kept in the cache. Raised
+/// when the way they are read changes, so that nothing read the old way
+/// is shown again (the second version prefers Fallout 4's English names).
+const MARKER_CACHE: &str = "markers-2";
 
 /// Gathers the map markers of the plugins, with the files their names
 /// come from.
@@ -253,7 +255,7 @@ impl<'a> MarkerReader<'a> {
                 flat: &[],
                 nested: &markers::MARKER_GROUP,
                 nested_records: &markers::MARKER_RECORDS,
-                nested_headers: &[],
+                nested_overrides: &[],
             },
             &markers::may_hold_markers,
         )
@@ -449,7 +451,7 @@ fn read_references(path: &Path) -> Result<plugin::Plugin, String> {
         flat: &[],
         nested: &objects::PLACE_GROUPS,
         nested_records: &[*b"REFR"],
-        nested_headers: &[],
+        nested_overrides: &[],
     };
     plugin::read_request(&mut BufReader::new(file), &request).map_err(|error| error.to_string())
 }
@@ -473,8 +475,8 @@ fn read_plugin(path: &Path, reading: Reading) -> Result<plugin::Plugin, String> 
         } else {
             &objects::LAND_RECORDS
         },
-        nested_headers: if reading == Reading::Everything {
-            &navmeshes::HEADERS
+        nested_overrides: if reading == Reading::Everything {
+            &navmeshes::OVERRIDES
         } else {
             &[]
         },

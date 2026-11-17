@@ -35,4 +35,8 @@ pub struct NavmeshChange {
     /// worldspace and the cell's grid position outside. `None` if the
     /// plugin does not say.
     pub place: Option<String>,
+    /// The placed doors the plugin's version lets characters walk through.
+    /// `None` where its geometry could not be read, as in games other than
+    /// Skyrim.
+    pub doors: Option<Vec<RecordId>>,
 }

@@ -1,23 +1,26 @@
 //! Which navigation meshes of other plugins a plugin changes.
 //!
 //! A navigation mesh (`NAVM`) lies in the children of its cell, like the
-//! objects placed there. Only its identity is read, never its triangles,
-//! so it is not even unpacked ([`HEADERS`]). Its place is named after its
-//! cell: the cell's internal name inside, the worldspace's internal name
-//! and the cell's grid position (`XCLC`) outside, which is what the game's
-//! console takes to go there.
+//! objects placed there. Only the meshes that change another plugin's
+//! are unpacked ([`OVERRIDES`]), and of their geometry only the doors
+//! characters walk through ([`navmesh::doors`]). A mesh's place is named
+//! after its cell: the cell's internal name inside, the worldspace's
+//! internal name and the cell's grid position (`XCLC`) outside, which is
+//! what the game's console takes to go there.
 
 use std::collections::HashMap;
 
 use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::{NavmeshChange, NavmeshChanges};
+use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
 /// The record type of navigation meshes.
 pub const NAVMESH: Signature = *b"NAVM";
 
-/// The records to read with their header only from the groups of places.
-pub const HEADERS: [Signature; 1] = [NAVMESH];
+/// The records read from the groups of places only where they change a
+/// record of another plugin.
+pub const OVERRIDES: [Signature; 1] = [NAVMESH];
 
 /// Record flag: the record is deleted.
 const FLAG_DELETED: u32 = 0x0000_0020;
@@ -60,6 +63,12 @@ pub fn changes(plugin_name: &str, plugin: &Plugin) -> Option<NavmeshChanges> {
                     local_id,
                 },
                 place: cell.and_then(|cell| cells.get(&cell)).cloned(),
+                doors: record.first(b"NVNM").and_then(navmesh::doors).map(|doors| {
+                    doors
+                        .into_iter()
+                        .map(|door| record_id(door, masters, plugin_name))
+                        .collect()
+                }),
             })
         })
         .collect();
@@ -88,6 +97,14 @@ fn cell_name(cell: &Record, worlds: &HashMap<u32, String>) -> Option<String> {
     }
 }
 
+fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
+    let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
+    RecordId {
+        plugin: origin.to_lowercase(),
+        local_id,
+    }
+}
+
 fn editor_id(record: &Record) -> Option<String> {
     record
         .first(b"EDID")
@@ -113,7 +130,7 @@ mod tests {
                 flat: &[],
                 nested: &PLACE_GROUPS,
                 nested_records: &PLACE_RECORDS,
-                nested_headers: &HEADERS,
+                nested_overrides: &OVERRIDES,
             },
         )
         .unwrap()
@@ -123,6 +140,23 @@ mod tests {
         let mut data = x.to_le_bytes().to_vec();
         data.extend(y.to_le_bytes());
         data.extend(0u32.to_le_bytes());
+        data
+    }
+
+    /// The geometry of a Skyrim navigation mesh with one triangle, through
+    /// whose door characters reach `door`.
+    fn geometry(door: u32) -> Vec<u8> {
+        let mut data = 12u32.to_le_bytes().to_vec();
+        data.extend([0; 12]);
+        data.extend(1u32.to_le_bytes());
+        data.extend([0; 12]);
+        data.extend(1u32.to_le_bytes());
+        data.extend([0; 16]);
+        data.extend(0u32.to_le_bytes());
+        data.extend(1u32.to_le_bytes());
+        data.extend(0u16.to_le_bytes());
+        data.extend(0u32.to_le_bytes());
+        data.extend(door.to_le_bytes());
         data
     }
 
@@ -141,7 +175,7 @@ mod tests {
                     inn,
                     vec![
                         RecordSpec::new(NAVMESH, 0x0000_0110)
-                            .with(*b"NVNM", vec![7; 64])
+                            .with(*b"NVNM", geometry(0x0100_0900))
                             .compressed(),
                     ],
                 )]),
@@ -150,7 +184,7 @@ mod tests {
                     &[(
                         field,
                         vec![
-                            RecordSpec::new(NAVMESH, 0x0000_0210),
+                            RecordSpec::new(NAVMESH, 0x0000_0210).with(*b"NVNM", vec![7; 64]),
                             RecordSpec::new(NAVMESH, 0x0100_0800),
                         ],
                     )],
@@ -180,6 +214,23 @@ mod tests {
             vec![
                 ("skyrim.esm", 0x110, Some("Inn")),
                 ("skyrim.esm", 0x210, Some("Tamriel 5,-3")),
+            ]
+        );
+        // The doors are those of the geometry, by the plugin that placed
+        // them; a geometry of another format leaves them unknown.
+        let doors: Vec<_> = changes
+            .navmeshes
+            .iter()
+            .map(|change| change.doors.clone())
+            .collect();
+        assert_eq!(
+            doors,
+            vec![
+                Some(vec![RecordId {
+                    plugin: "village.esp".to_owned(),
+                    local_id: 0x900,
+                }]),
+                None,
             ]
         );
     }

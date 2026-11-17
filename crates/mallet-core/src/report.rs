@@ -403,6 +403,23 @@ pub enum PlaceKind {
     DaedricShrine,
     /// A passage to another land, such as the boat to Solstheim.
     Passage,
+    /// A vault of Vault-Tec (the Fallout games).
+    Vault,
+    /// The ruins of a town or of city blocks (the Fallout games).
+    Ruin,
+    /// A factory or another industrial site.
+    Factory,
+    /// A station of the subway or the railway.
+    Station,
+    /// A building of offices, homes, a school, a hospital or the like (the
+    /// Fallout games).
+    Building,
+    /// An Ayleid ruin (Oblivion).
+    AyleidRuin,
+    /// A gate to Oblivion (Oblivion).
+    OblivionGate,
+    /// An inn, a tavern or stables.
+    Inn,
     /// A marker without a kind of its own.
     Other,
 }

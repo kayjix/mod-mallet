@@ -5,6 +5,7 @@
 // that the other does not follow fails the type check.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { AreaObjects } from "./generated/area-objects";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
 import type { LodMesh } from "./generated/lod-mesh";
@@ -62,6 +63,12 @@ export interface Api {
   filePreview(path: string): Promise<FilePreview | null>;
   /** A version of a mesh, ready to draw; the one in the game unless `version` names another. */
   meshView(path: string, version: number | null): Promise<MeshView | null>;
+  /** Everything placed within `radius` game units of a point. */
+  areaObjects(world: string, x: number, y: number, radius: number): Promise<AreaObjects | null>;
+  /** A mesh of the setup in its own units, textures named by path. */
+  areaMesh(path: string): Promise<LodMesh | null>;
+  /** A texture of the setup, no larger than `maxSide`. */
+  areaTexture(path: string, maxSide: number): Promise<string | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -109,6 +116,10 @@ const tauriApi: Api = {
   mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
+  areaObjects: (world, x, y, radius) =>
+    invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
+  areaMesh: (path) => invoke<LodMesh | null>("area_mesh", { path }),
+  areaTexture: (path, maxSide) => invoke<string | null>("area_texture", { path, maxSide }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),
