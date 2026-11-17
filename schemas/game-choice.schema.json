@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GameChoice",
+  "description": "The games Mod Mallet knows, and which of them the user looks at.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "description": "The identifier of the game the user looks at.",
+      "type": "string"
+    },
+    "games": {
+      "description": "Every game Mod Mallet knows, in the order they are offered.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/KnownGame"
+      }
+    }
+  },
+  "required": [
+    "active",
+    "games"
+  ],
+  "$defs": {
+    "GameSupport": {
+      "description": "How far Mod Mallet can look at a setup of a game.",
+      "oneOf": [
+        {
+          "description": "Every check Mod Mallet has runs for this game.",
+          "type": "string",
+          "const": "full"
+        },
+        {
+          "description": "The load order, files, archives, plugins, placed objects, the map\nand the toolbox are read; checks that need more knowledge of the\ngame, such as the kinds of its map's places, are still missing.",
+          "type": "string",
+          "const": "basic"
+        }
+      ]
+    },
+    "KnownGame": {
+      "description": "A game Mod Mallet knows, and where it is on this machine.",
+      "type": "object",
+      "properties": {
+        "dir": {
+          "description": "The directory the game is installed in, if it was found or named.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Identifier of the game, the same the mod manager uses, for example\n`skyrimse`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The game's name.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "How the directory was found.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocationOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scriptExtender": {
+          "description": "The short name of the game's script extender, such as `SKSE`.",
+          "type": "string"
+        },
+        "support": {
+          "description": "How far Mod Mallet can look at a setup of this game.",
+          "$ref": "#/$defs/GameSupport"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "support",
+        "scriptExtender"
+      ]
+    },
+    "LocationOrigin": {
+      "description": "How Mod Mallet came to look at a place.",
+      "oneOf": [
+        {
+          "description": "The user named it.",
+          "type": "string",
+          "const": "given"
+        },
+        {
+          "description": "It was read from the entry the game's launcher writes into the\nWindows registry.",
+          "type": "string",
+          "const": "registry"
+        },
+        {
+          "description": "It is the place where the game or the mod manager always puts this\nfile.",
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "description": "It was found in one of Steam's game libraries.",
+          "type": "string",
+          "const": "steam"
+        },
+        {
+          "description": "It was read from the entry GOG Galaxy writes into the Windows\nregistry.",
+          "type": "string",
+          "const": "gog"
+        }
+      ]
+    }
+  }
+}

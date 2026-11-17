@@ -25,7 +25,7 @@ desktop app grows only once the findings are right.
 
 - **Mod Organizer 2** as the second mod manager, to prove that the
   [`ModSource`](../adr/0009-mod-managers.md) seam holds.
-- **Fallout 4** as the second game, for the same reason on the game side.
+- **The other Bethesda games** (begun: Skyrim VR, Skyrim, Fallout 4, Fallout 4 VR, New Vegas, Fallout 3 and Oblivion are found and read with the checks that need only the shared formats; see [ADR 0036](../adr/0036-one-adapter-for-the-bethesda-family.md)). Still open: the kinds of their map markers, faces in Fallout 4, reading their meshes for textures, Oblivion Remastered.
 - **Generators** such as DynDOLOD, Nemesis or Seamless Studio: their output
   is derived from the load order and goes stale when the load order changes.
   Mod Mallet should notice that and say so.

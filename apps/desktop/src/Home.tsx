@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./Actions";
 import type { Counts } from "./arrange";
+import { type Games, isPlayable } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
-
-/** The game Mod Mallet works on; the others are on the list as a promise. */
-const ACTIVE_GAME = "skyrimse";
 
 type Target = "tasks" | "collisions" | "mods" | "patch";
 
 interface HomeProps {
+  games: Games;
   report: RenderedReport | null;
   counts: Counts | null;
   scanning: boolean;
@@ -18,10 +17,10 @@ interface HomeProps {
 
 /**
  * Where the window starts: the game in use with its state at a glance, and
- * the games Mod Mallet knows. Pictures of the games come from the mod
+ * the games Mod Mallet knows, with a button for each one that is installed. Pictures of the games come from the mod
  * manager's installation on this machine; Mod Mallet ships none.
  */
-export function Home({ report, counts, scanning, onScan, onOpen }: HomeProps) {
+export function Home({ games, report, counts, scanning, onScan, onOpen }: HomeProps) {
   const { t, api } = useSession();
   const [art, setArt] = useState<Record<string, string>>({});
 
@@ -42,8 +41,10 @@ export function Home({ report, counts, scanning, onScan, onOpen }: HomeProps) {
     };
   }, [api, t.games]);
 
-  const active = t.games.find((game) => game.id === ACTIVE_GAME);
-  const hero = art[ACTIVE_GAME];
+  const activeId = games.choice?.active;
+  const active = t.games.find((game) => game.id === activeId);
+  const hero = activeId === undefined ? undefined : art[activeId];
+  const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
   const installed = report?.installedPatch?.objects.length;
   const stats: { target: Target; value: string; label: string }[] =
     counts === null || report === null
@@ -76,7 +77,7 @@ export function Home({ report, counts, scanning, onScan, onOpen }: HomeProps) {
             <span>
               {report.game.version ?? t.versionUnknown}
               {report.game.extenderVersion != null &&
-                ` · ${t.scriptExtender} ${report.game.extenderVersion}`}
+                ` · ${games.active?.scriptExtender ?? t.scriptExtender} ${report.game.extenderVersion}`}
             </span>
           )}
           <div className="home-hero-actions">
@@ -115,9 +116,25 @@ export function Home({ report, counts, scanning, onScan, onOpen }: HomeProps) {
         <ul className="game-grid">
           {t.games.map((game) => {
             const picture = art[game.id];
-            const isActive = game.id === ACTIVE_GAME;
+            const isActive = game.id === activeId;
+            const knownGame = known.get(game.id);
+            const playable = isPlayable(knownGame);
+            const state = isActive
+              ? t.homeActive
+              : knownGame === undefined
+                ? `${t.soon} – ${game.quip ?? ""}`
+                : playable
+                  ? knownGame.support === "basic"
+                    ? t.gameBasic
+                    : ""
+                  : t.gameNotInstalled;
             return (
-              <li className="game-card" key={game.id} data-active={isActive}>
+              <li
+                className="game-card"
+                key={game.id}
+                data-active={isActive}
+                data-playable={playable}
+              >
                 <div
                   className="game-art"
                   style={picture === undefined ? undefined : { backgroundImage: `url(${picture})` }}
@@ -127,9 +144,18 @@ export function Home({ report, counts, scanning, onScan, onOpen }: HomeProps) {
                 </div>
                 <div className="game-text">
                   <strong>{game.name}</strong>
-                  <span className="aside">
-                    {isActive ? t.homeActive : `${t.soon} – ${game.quip ?? ""}`}
-                  </span>
+                  {state !== "" && <span className="aside">{state}</span>}
+                  {playable && !isActive && (
+                    <button
+                      type="button"
+                      className="game-switch"
+                      onClick={() => {
+                        games.select(game.id).catch(() => {});
+                      }}
+                    >
+                      {t.gameSwitch}
+                    </button>
+                  )}
                 </div>
               </li>
             );

@@ -1,15 +1,16 @@
 //! Readers for the file formats shared by Bethesda's games.
 //!
-//! Skyrim, Fallout 4 and their relatives store game data in the same two
-//! containers: *plugins* (`.esp`, `.esm`, `.esl`), which hold records, and
-//! *archives* (`.bsa`), which pack assets. This crate reads the structure of
-//! both. What a record *means* differs per game and is left to the game
-//! adapters.
+//! Oblivion, Skyrim, Fallout 4 and their relatives store game data in the
+//! same two containers: *plugins* (`.esp`, `.esm`, `.esl`), which hold
+//! records, and *archives*, which pack assets: `.bsa` up to Skyrim, `.ba2`
+//! from Fallout 4 on. This crate reads the structure of both. What a record
+//! *means* differs per game and is left to the game adapters.
 //!
 //! The readers extract only what Mod Mallet's analyses need, which keeps
-//! them small and fast: [`bsa`] reads the list of file names and unpacks
-//! single files on request, [`plugin`] skips every group of records that
-//! was not asked for, and [`nif`] reads only the texture paths of a mesh.
+//! them small and fast: [`bsa`] and [`ba2`] read the list of file names and
+//! unpack single files on request, [`plugin`] skips every group of records
+//! that was not asked for, and [`nif`] reads only the texture paths of a
+//! mesh.
 //!
 //! Every file is untrusted input (ADR 0013). The readers never panic, never
 //! trust a size field without checking it against the data, and stop at the
@@ -17,6 +18,7 @@
 //!
 //! [`fixture`] builds small files in these formats for tests.
 
+pub mod ba2;
 pub mod bc7;
 pub mod bsa;
 pub mod dds;
@@ -62,6 +64,10 @@ impl<'a> Bytes<'a> {
 
     fn u32(&mut self) -> Option<u32> {
         Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+    }
+
+    fn u64(&mut self) -> Option<u64> {
+        Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?))
     }
 
     fn f32(&mut self) -> Option<f32> {

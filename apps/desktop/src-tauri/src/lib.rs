@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use mallet_core::{Action, ArgValue, LocationRole, ObjectRef, ScanReport};
+use mallet_core::{Action, ArgValue, GameChoice, LocationRole, ObjectRef, ScanReport};
 use mallet_engine::{ManagerOptions, Settings};
 use mallet_messages::{
     Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
@@ -43,7 +43,8 @@ fn last_report(lang: String) -> Result<Option<RenderedReport>, String> {
     let Some(cache) = mallet_engine::default_cache_path() else {
         return Ok(None);
     };
-    let report = mallet_engine::last_report(&cache).map_err(|error| error.to_string())?;
+    let report = mallet_engine::last_report(&settings()?.scan_options(), &cache)
+        .map_err(|error| error.to_string())?;
     Ok(report.map(|report| render(&report, &lang)))
 }
 
@@ -52,7 +53,7 @@ fn last_report(lang: String) -> Result<Option<RenderedReport>, String> {
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn run_action(action: Action, lang: String) -> RenderedOutcome {
-    let outcome = mallet_engine::run_action(&action, &ManagerOptions::default());
+    let outcome = mallet_engine::run_action(&action, &manager_options());
     messages(&lang).render_outcome(&outcome)
 }
 
@@ -60,7 +61,7 @@ fn run_action(action: Action, lang: String) -> RenderedOutcome {
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn manager_link(lang: String) -> RenderedLink {
-    let link = mallet_engine::manager_link(&ManagerOptions::default());
+    let link = mallet_engine::manager_link(&manager_options());
     messages(&lang).render_link(link.installed, link.running, link.restart_needed)
 }
 
@@ -69,7 +70,7 @@ fn manager_link(lang: String) -> RenderedLink {
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn install_manager_link(lang: String) -> Result<String, String> {
-    let path = mallet_engine::install_manager_link(&ManagerOptions::default())
+    let path = mallet_engine::install_manager_link(&manager_options())
         .map_err(|error| error.to_string())?;
     let path = ArgValue::from(path.display().to_string());
     Ok(messages(&lang).text("link-installed", &[("path", path)]))
@@ -96,6 +97,7 @@ fn confirm_places(
     // What else the user decided stays as it was.
     let previous = settings()?;
     let settings = Settings {
+        game: previous.game,
         confirmed: true,
         ignored: previous.ignored,
         decisions: previous.decisions,
@@ -190,9 +192,17 @@ fn setup_fingerprint() -> Result<String, String> {
 
 /// The addresses Mod Mallet opens in the browser: mod pages, and the pages
 /// of the tools in the toolbox.
-const OPENABLE_PAGES: [&str; 6] = [
+const OPENABLE_PAGES: [&str; 14] = [
     "https://www.nexusmods.com/",
     "https://skse.silverlock.org/",
+    "https://f4se.silverlock.org/",
+    "https://fose.silverlock.org/",
+    "https://github.com/xNVSE/NVSE",
+    "https://github.com/llde/xOBSE",
+    "https://store.steampowered.com/app/202480/",
+    "https://store.steampowered.com/app/1946160/",
+    "https://geckwiki.com/",
+    "https://cs.uesp.net/",
     "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist",
     "https://store.steampowered.com/app/1946180/",
     "https://loot.github.io/",
@@ -234,7 +244,7 @@ fn open_page(url: String) -> Result<(), String> {
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn create_patch(objects: Vec<ObjectRef>) -> Result<String, String> {
-    mallet_engine::create_patch(&objects, &ManagerOptions::default())
+    mallet_engine::create_patch(&objects, &manager_options())
         .map(|created| created.path.display().to_string())
         .map_err(|error| {
             tracing::warn!(%error, "patch not written");
@@ -248,7 +258,7 @@ fn create_patch(objects: Vec<ObjectRef>) -> Result<String, String> {
 #[allow(clippy::needless_pass_by_value)]
 fn open_folder(which: String) -> Result<(), String> {
     let folder = match which.as_str() {
-        "patches" => mallet_engine::patch_file(&ManagerOptions::default())
+        "patches" => mallet_engine::patch_file(&manager_options())
             .and_then(|file| file.parent().map(std::path::Path::to_path_buf)),
         "logs" => mallet_engine::default_log_dir(),
         _ => None,
@@ -273,7 +283,7 @@ fn open_folder(which: String) -> Result<(), String> {
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn toolbox(lang: String) -> Result<RenderedToolbox, String> {
-    let tools = mallet_engine::toolbox(&settings()?.scan_options(), &ManagerOptions::default());
+    let tools = mallet_engine::toolbox(&settings()?.scan_options(), &manager_options());
     Ok(messages(&lang).render_toolbox(&tools))
 }
 
@@ -333,6 +343,35 @@ fn log_file() -> Option<String> {
         .map(|dir| dir.join(mallet_engine::LOG_FILE).display().to_string())
 }
 
+/// The games Mod Mallet knows, where each is, and which one the user
+/// looks at.
+#[tauri::command(async)]
+fn games() -> Result<GameChoice, String> {
+    let path = settings_path()?;
+    mallet_engine::known_games(&path).map_err(|error| error.to_string())
+}
+
+/// Makes `game` the game to look at and returns the games afterwards. Each
+/// game keeps its own places, findings set aside and ranking. Only ever
+/// called because the user chose a game.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn select_game(game: String) -> Result<GameChoice, String> {
+    let path = settings_path()?;
+    mallet_engine::select_game(&path, &game).map_err(|error| error.to_string())?;
+    mallet_engine::known_games(&path).map_err(|error| error.to_string())
+}
+
+fn settings_path() -> Result<PathBuf, String> {
+    mallet_engine::default_settings_path()
+        .ok_or_else(|| "the system does not say where settings are kept".to_owned())
+}
+
+/// Where the mod manager is, for the game the user looks at.
+fn manager_options() -> ManagerOptions {
+    settings().map_or_default(|settings| settings.manager_options())
+}
+
 fn settings() -> Result<Settings, String> {
     match mallet_engine::default_settings_path() {
         Some(path) => mallet_engine::load_settings(&path).map_err(|error| error.to_string()),
@@ -385,7 +424,9 @@ pub fn run() -> tauri::Result<()> {
             set_decision,
             mesh_view,
             ranking,
-            set_ranking
+            set_ranking,
+            games,
+            select_game
         ])
         .run(tauri::generate_context!())
 }

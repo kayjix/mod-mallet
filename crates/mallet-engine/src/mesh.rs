@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use mallet_core::encoding::base64;
 use mallet_core::mesh::{MeshShape, MeshView};
+use mallet_game_bethesda::Game;
 use mallet_game_bethesda::files::{self, Origin};
-use mallet_game_bethesda::locate;
 
 use crate::ScanOptions;
 
@@ -22,9 +22,10 @@ const FACE_TEXTURES: &str = "textures/actors/character/facegendata/facetint/";
 /// its textures as the setup has them. `None` if there is no such version
 /// or it is not a mesh that can be read. Only reads.
 pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> Option<MeshView> {
-    let game_dir = options.game_dir.clone().or_else(locate::game_dir)?;
+    let game = options.game().ok()?;
+    let (game_dir, _) = options.located_game_dir()?;
     let local_dir = options.local_dir.as_deref();
-    let mut versions = files::versions(&game_dir, local_dir, path);
+    let mut versions = files::versions(game, &game_dir, local_dir, path);
     let index = version.unwrap_or(versions.len().checked_sub(1)?);
     if index >= versions.len() {
         return None;
@@ -45,7 +46,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         };
         textures
             .entry(normalized.clone())
-            .or_insert_with(|| picture(&game_dir, local_dir, &normalized))
+            .or_insert_with(|| picture(game, &game_dir, local_dir, &normalized))
             .clone()
     };
 
@@ -56,7 +57,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
             let rest = lower.get(at + FACE_MESHES.len()..).unwrap_or_default();
             format!("{FACE_TEXTURES}{}", rest.replace(".nif", ".dds"))
         })
-        .and_then(|tint_path| picture(&game_dir, local_dir, &tint_path));
+        .and_then(|tint_path| picture(game, &game_dir, local_dir, &tint_path));
 
     let shapes = shapes
         .into_iter()
@@ -102,11 +103,12 @@ fn floats(values: &[f32]) -> Vec<u8> {
 
 /// The texture the game uses at `path`, as a PNG `data:` address.
 fn picture(
+    game: Game,
     game_dir: &std::path::Path,
     local_dir: Option<&std::path::Path>,
     path: &str,
 ) -> Option<String> {
-    let version = files::versions(game_dir, local_dir, path).pop()?;
+    let version = files::versions(game, game_dir, local_dir, path).pop()?;
     let image = files::thumbnail(&version.bytes, TEXTURE_SIDE)?;
     let png =
         crate::png::encode_rgba(image.width, image.height, &image.pixels, &image.alpha).ok()?;

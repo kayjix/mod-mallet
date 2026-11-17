@@ -49,6 +49,7 @@
   - [0033 Mods are compared on a stage and decided by a ranking](adr/0033-comparison-stage-and-ranking.md)
   - [0034 Missing installer options are ticked in advance](adr/0034-installer-options-ticked-in-advance.md)
   - [0035 LOOT's messages are quoted](adr/0035-loots-messages-are-quoted.md)
+  - [0036 One adapter for the Bethesda family, settings per game](adr/0036-one-adapter-for-the-bethesda-family.md)
   - [Template](adr/template.md)
 
 # Reference

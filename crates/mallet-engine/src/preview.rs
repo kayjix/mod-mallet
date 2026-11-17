@@ -5,7 +5,6 @@ use std::path::Path;
 
 use mallet_core::{FilePreview, GamePath, ModSource, NoModSource, PreviewVersion};
 use mallet_game_bethesda::files::{self, Origin};
-use mallet_game_bethesda::locate;
 use mallet_source_vortex::VortexDeployment;
 
 use crate::ScanOptions;
@@ -17,8 +16,9 @@ const MAX_SIDE: u32 = 256;
 /// setup has, as pictures where the file is a texture that can be shown;
 /// the version the game uses comes last. Only reads.
 pub fn file_preview(options: &ScanOptions, path: &str) -> Option<FilePreview> {
-    let game_dir = options.game_dir.clone().or_else(locate::game_dir)?;
-    let found = files::versions(&game_dir, options.local_dir.as_deref(), path);
+    let game = options.game().ok()?;
+    let (game_dir, _) = options.located_game_dir()?;
+    let found = files::versions(game, &game_dir, options.local_dir.as_deref(), path);
     let mods = deployment(options, &game_dir);
     let inside = |name: &str| GamePath::new(&format!("data/{name}"));
     let versions = found

@@ -5,6 +5,7 @@ import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, type Filter, modsByName } from "./arrange";
 import { CompareView } from "./Compare";
 import { Duels } from "./Duels";
+import { type Games, isPlayable, useGames } from "./games";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
@@ -58,6 +59,7 @@ export default function App({ api, startLang }: AppProps) {
   const [focus, setFocus] = useState<MapSpot | null>(null);
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
+  const games = useGames(api);
   // The patch's choice starts from the patch in the game, once; later scans
   // keep what the user chose since.
   const [patchChoices, setPatchChoices] = useState<PatchChoices | null>(null);
@@ -338,6 +340,7 @@ export default function App({ api, startLang }: AppProps) {
           report={report}
           link={link}
           toolbox={toolbox}
+          games={games}
           t={t}
         />
         <main className="content" data-view={current}>
@@ -383,6 +386,7 @@ export default function App({ api, startLang }: AppProps) {
             />
           ) : current === "home" ? (
             <Home
+              games={games}
               report={report}
               counts={counts}
               scanning={scanning}
@@ -464,10 +468,21 @@ interface SidebarProps {
   report: RenderedReport | null;
   link: RenderedLink | null;
   toolbox: RenderedToolbox | null;
+  games: Games;
   t: Texts;
 }
 
-function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: SidebarProps) {
+function Sidebar({
+  view,
+  onView,
+  disabled,
+  counts,
+  report,
+  link,
+  toolbox,
+  games,
+  t,
+}: SidebarProps) {
   const open = counts === null ? null : counts.errors + counts.warnings;
   const collisions = counts === null ? null : counts.collisions;
   const items: { name: ViewName; label: string; icon: ReactNode; badge?: number | null }[] = [
@@ -514,7 +529,7 @@ function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: S
         <Mallet />
         <span className="brand-name">Mod Mallet</span>
       </div>
-      <GamePicker t={t} />
+      <GamePicker games={games} t={t} />
       <nav>{items.map(navButton)}</nav>
       <nav className="nav-bottom">
         {navButton({ name: "settings", label: t.viewSettings, icon: <IconSettings /> })}
@@ -530,7 +545,8 @@ function Sidebar({ view, onView, disabled, counts, report, link, toolbox, t }: S
         {game != null && (
           <p className="game-version">
             {game.version ?? t.versionUnknown}
-            {game.extenderVersion != null && ` · ${t.scriptExtender} ${game.extenderVersion}`}
+            {game.extenderVersion != null &&
+              ` · ${games.active?.scriptExtender ?? t.scriptExtender} ${game.extenderVersion}`}
           </p>
         )}
         {status !== null && (
@@ -616,17 +632,33 @@ function ManagerStatus({ toolbox, link, disabled, onOpen, t }: ManagerStatusProp
 }
 
 /**
- * The game Mod Mallet works on. Only Skyrim Special Edition so far; the
- * others are on the list so that it is clear where this is going.
+ * The game Mod Mallet looks at. Games it reads and that are on this machine
+ * can be chosen; the others are on the list so that it is clear where this
+ * is going. Choosing a game starts the window over for it.
  */
-function GamePicker({ t }: { t: Texts }) {
+function GamePicker({ games, t }: { games: Games; t: Texts }) {
+  const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
+  const label = (entry: Texts["games"][number]) => {
+    const game = known.get(entry.id);
+    if (game !== undefined) {
+      return isPlayable(game) ? entry.name : `${entry.name} – ${t.gameNotInstalled}`;
+    }
+    return entry.quip === undefined ? entry.name : `${entry.name} – ${entry.quip}`;
+  };
   return (
     <label className="game-picker">
       <span className="brand-tagline">{t.tagline}</span>
-      <select value={0} onChange={() => {}} aria-label={t.gameLabel}>
-        {t.games.map((game, index) => (
-          <option key={game.name} value={index} disabled={index > 0}>
-            {game.quip === undefined ? game.name : `${game.name} – ${game.quip}`}
+      <select
+        value={games.choice?.active ?? ""}
+        disabled={games.choice === null}
+        onChange={(event) => {
+          games.select(event.target.value).catch(() => {});
+        }}
+        aria-label={t.gameLabel}
+      >
+        {t.games.map((entry) => (
+          <option key={entry.id} value={entry.id} disabled={!isPlayable(known.get(entry.id))}>
+            {label(entry)}
           </option>
         ))}
       </select>

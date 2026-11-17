@@ -28,6 +28,11 @@ Options:
   -v, --verbose
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
+
   -h, --help
           Print help
 
@@ -61,6 +66,11 @@ Options:
 
       --extender-log <FILE>
           The script extender's log file. Detected if omitted
+
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
 
       --deployment-manifest <FILE>
           The Vortex deployment manifest. Detected if omitted
@@ -133,6 +143,11 @@ Options:
       --cache <FILE>
           Where the result of the last scan is kept
 
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
+
   -h, --help
           Print help (see a summary with '-h')
 
@@ -160,6 +175,11 @@ Options:
   -v, --verbose
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
+
   -h, --help
           Print help
 
@@ -182,6 +202,11 @@ Options:
 
   -v, --verbose
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
+
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
 
   -h, --help
           Print help
@@ -219,6 +244,11 @@ Options:
 
   -v, --verbose
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
+
+      --game <GAME>
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+
+          [default: skyrimse]
 
   -h, --help
           Print help (see a summary with '-h')

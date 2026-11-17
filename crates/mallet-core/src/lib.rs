@@ -36,8 +36,8 @@ pub use kinds::KindInfo;
 pub use mods::{ModRef, ModSource, NoModSource};
 pub use path::GamePath;
 pub use report::{
-    FilePreview, GameInfo, InstalledPatch, LocationOrigin, LocationRole, MapCell, MapImage,
-    MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo, PlaceKind, PlaceOrigin, PreviewVersion,
-    ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
+    FilePreview, GameChoice, GameInfo, GameSupport, InstalledPatch, KnownGame, LocationOrigin,
+    LocationRole, MapCell, MapImage, MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo, PlaceKind,
+    PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotLocation, SpotPart, WorldMap,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};

@@ -6,6 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { FilePreview } from "./generated/file-preview";
+import type { GameChoice } from "./generated/game-choice";
 import type { MapImage } from "./generated/map-image";
 import type { MeshView } from "./generated/mesh-view";
 import type { RenderedLink } from "./generated/rendered-link";
@@ -67,6 +68,10 @@ export interface Api {
   decisions(): Promise<Record<string, number>>;
   /** Remembers the side picked in a duel, or forgets it with null. */
   setDecision(id: string, side: number | null): Promise<Record<string, number>>;
+  /** The games Mod Mallet knows, where each is, and which one is looked at. */
+  games(): Promise<GameChoice>;
+  /** Makes a game the one to look at; each game keeps its own settings. */
+  selectGame(game: string): Promise<GameChoice>;
 }
 
 const tauriApi: Api = {
@@ -94,6 +99,8 @@ const tauriApi: Api = {
   setRanking: (ranking) => invoke<string[]>("set_ranking", { ranking }),
   decisions: () => invoke<Record<string, number>>("decisions"),
   setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),
+  games: () => invoke<GameChoice>("games"),
+  selectGame: (game) => invoke<GameChoice>("select_game", { game }),
 };
 
 function runsInsideTauri(): boolean {

@@ -556,6 +556,16 @@
           "description": "It is the place where the game or the mod manager always puts this\nfile.",
           "type": "string",
           "const": "standard"
+        },
+        {
+          "description": "It was found in one of Steam's game libraries.",
+          "type": "string",
+          "const": "steam"
+        },
+        {
+          "description": "It was read from the entry GOG Galaxy writes into the Windows\nregistry.",
+          "type": "string",
+          "const": "gog"
         }
       ]
     },

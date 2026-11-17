@@ -1,4 +1,6 @@
-//! Reads `skse64.log`, the log SKSE writes every time the game starts.
+//! Reads the log a script extender writes every time the game starts:
+//! `skse64.log` for SKSE, and the logs of its siblings (F4SE, SKSEVR,
+//! F4SEVR), which come from the same authors and share its lines.
 //!
 //! The log is the game's own account of which native plugins it accepted,
 //! so everything derived from it is a fact, not a guess.
@@ -18,9 +20,11 @@
 use mallet_core::GamePath;
 use mallet_core::facts::{ExtenderPlugin, ExtenderPluginStatus, ExtenderReport};
 
-use crate::EXTENDER_PLUGIN_DIR;
+use crate::game::Game;
 
-const HEADER_PREFIX: &str = "SKSE64 runtime: initialize (version = ";
+/// What follows the extender's name in its first line, such as
+/// `SKSE64 runtime: initialize (version = `.
+const HEADER_MARKER: &str = " runtime: initialize (version = ";
 const PLUGIN_PREFIX: &str = "plugin ";
 const HANDLE_MARKER: &str = " (handle ";
 
@@ -28,19 +32,19 @@ const STATUS_LOADED: &str = "loaded correctly";
 const STATUS_INCOMPATIBLE: &str = "disabled, incompatible with current version of the game";
 const STATUS_NO_VERSION_DATA: &str = "no version data";
 
-/// Extracts what SKSE reported about itself and its plugins from the text of
-/// a `skse64.log`.
-pub fn parse(text: &str) -> ExtenderReport {
+/// Extracts what the script extender of `game` reported about itself and
+/// its plugins from the text of its log.
+pub fn parse(game: Game, text: &str) -> ExtenderReport {
     let mut report = ExtenderReport {
         extender_version: None,
         game_version: None,
-        plugin_dir: GamePath::new(EXTENDER_PLUGIN_DIR),
+        plugin_dir: GamePath::new(game.script_extender().plugin_dir),
         plugins: Vec::new(),
     };
 
     for line in text.lines() {
         let line = line.trim_end();
-        if let Some(header) = line.strip_prefix(HEADER_PREFIX) {
+        if let Some(header) = header_of(line) {
             let (extender_version, game_version) = parse_header(header);
             report.extender_version = extender_version;
             report.game_version = game_version;
@@ -50,6 +54,13 @@ pub fn parse(text: &str) -> ExtenderReport {
     }
 
     report
+}
+
+/// The part of the extender's first line after `version = `, if `line`
+/// is that line. The extender's name before it is a single word.
+fn header_of(line: &str) -> Option<&str> {
+    let (name, header) = line.split_once(HEADER_MARKER)?;
+    (!name.is_empty() && !name.contains(char::is_whitespace)).then_some(header)
 }
 
 /// Parses the part of the header after `version = `, for example
@@ -189,7 +200,7 @@ plugin 1 allocated 1536 bytes from local pool
 
     #[test]
     fn reads_versions_from_the_header() {
-        let report = parse(SAMPLE);
+        let report = parse(Game::SkyrimSe, SAMPLE);
         assert_eq!(report.extender_version.as_deref(), Some("2.3.1"));
         assert_eq!(report.game_version.as_deref(), Some("1.7.104"));
     }
@@ -210,7 +221,7 @@ plugin 1 allocated 1536 bytes from local pool
 
     #[test]
     fn finds_exactly_the_plugin_result_lines() {
-        let report = parse(SAMPLE);
+        let report = parse(Game::SkyrimSe, SAMPLE);
         let names: Vec<_> = report
             .plugins
             .iter()
@@ -230,7 +241,7 @@ plugin 1 allocated 1536 bytes from local pool
 
     #[test]
     fn classifies_each_status() {
-        let report = parse(SAMPLE);
+        let report = parse(Game::SkyrimSe, SAMPLE);
         assert_eq!(
             status_of(&report, "Fixes.dll"),
             &ExtenderPluginStatus::Loaded
@@ -253,13 +264,14 @@ plugin 1 allocated 1536 bytes from local pool
 
     #[test]
     fn plugin_names_may_contain_brackets() {
-        let report = parse(SAMPLE);
+        let report = parse(Game::SkyrimSe, SAMPLE);
         assert_eq!(status_of(&report, "Odd.dll"), &ExtenderPluginStatus::Loaded);
     }
 
     #[test]
     fn a_logged_directory_is_stripped_from_the_file_name() {
         let report = parse(
+            Game::SkyrimSe,
             r"plugin C:\Games\Data\SKSE\Plugins\Deep.dll (00000001 Deep 00000001) loaded correctly (handle 4)",
         );
         assert_eq!(
@@ -270,7 +282,7 @@ plugin 1 allocated 1536 bytes from local pool
 
     #[test]
     fn windows_line_endings_are_handled() {
-        let report = parse(&SAMPLE.replace('\n', "\r\n"));
+        let report = parse(Game::SkyrimSe, &SAMPLE.replace('\n', "\r\n"));
         assert_eq!(report.plugins.len(), 5);
         assert_eq!(
             status_of(&report, "Fixes.dll"),
@@ -279,8 +291,33 @@ plugin 1 allocated 1536 bytes from local pool
     }
 
     #[test]
+    fn the_siblings_of_skse_are_read_the_same_way() {
+        let report = parse(
+            Game::Fallout4,
+            "F4SE runtime: initialize (version = 0.7.2 010A0A30 01DA6E3A5F0B1D2C, os = 6.2 (9200))\n\
+             plugin Mine.dll (00000001 Mine 00000001) loaded correctly (handle 1)\n",
+        );
+        assert_eq!(report.extender_version.as_deref(), Some("0.7.2"));
+        assert_eq!(report.game_version.as_deref(), Some("1.10.163"));
+        assert_eq!(report.plugin_dir.as_str(), "data/f4se/plugins");
+        assert_eq!(
+            status_of(&report, "Mine.dll"),
+            &ExtenderPluginStatus::Loaded
+        );
+    }
+
+    #[test]
+    fn a_sentence_that_mentions_the_header_is_not_the_header() {
+        let report = parse(
+            Game::SkyrimSe,
+            "note: SKSE64 runtime: initialize (version = 9.9.9 01070680)",
+        );
+        assert_eq!(report.extender_version, None);
+    }
+
+    #[test]
     fn an_empty_log_gives_an_empty_report() {
-        let report = parse("");
+        let report = parse(Game::SkyrimSe, "");
         assert_eq!(report.extender_version, None);
         assert_eq!(report.game_version, None);
         assert_eq!(report.plugins, Vec::new());
@@ -289,7 +326,7 @@ plugin 1 allocated 1536 bytes from local pool
     proptest! {
         #[test]
         fn never_panics_on_arbitrary_text(text in ".*") {
-            let _ = parse(&text);
+            let _ = parse(Game::SkyrimSe, &text);
         }
 
         #[test]
@@ -298,8 +335,8 @@ plugin 1 allocated 1536 bytes from local pool
             info in ".{0,40}",
             tail in ".{0,60}",
         ) {
-            let _ = parse(&format!("plugin {name}.dll ({info}) {tail}"));
-            let _ = parse(&format!("plugin {name}.dll (00000001 {info} 00000001) {tail} (handle 1)"));
+            let _ = parse(Game::SkyrimSe, &format!("plugin {name}.dll ({info}) {tail}"));
+            let _ = parse(Game::SkyrimSe, &format!("plugin {name}.dll (00000001 {info} 00000001) {tail} (handle 1)"));
         }
     }
 }

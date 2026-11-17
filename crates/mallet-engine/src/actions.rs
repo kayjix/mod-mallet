@@ -15,9 +15,6 @@ use mallet_source_vortex::link::{self, Link, LinkError};
 
 use crate::EngineError;
 
-/// Vortex's identifier of the game this engine works on.
-const VORTEX_GAME: &str = "skyrimse";
-
 /// How long Vortex is given to answer. The extension looks for requests
 /// once a second.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -26,6 +23,9 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 /// place.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ManagerOptions {
+    /// The game whose mods are meant, by its identifier (`skyrimse`).
+    /// Skyrim Special Edition if `None`.
+    pub game: Option<String>,
     /// The directory in which Vortex keeps its data.
     pub vortex_data_dir: Option<PathBuf>,
     /// The folder shared with the Vortex extension.
@@ -35,6 +35,14 @@ pub struct ManagerOptions {
 }
 
 impl ManagerOptions {
+    /// The game whose mods are meant. An unknown identifier is taken for
+    /// what it says: Vortex knows more games than Mod Mallet.
+    pub(crate) fn vortex_game(&self) -> &str {
+        self.game
+            .as_deref()
+            .unwrap_or_else(|| mallet_game_bethesda::Game::default().id())
+    }
+
     pub(crate) fn vortex_data_dir(&self) -> Option<PathBuf> {
         self.vortex_data_dir
             .clone()
@@ -115,12 +123,12 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
         Action::HideObjects { objects } => hide_objects(objects, options),
         Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
             tracing::info!(plugin, after, "asking Vortex for a plugin rule");
-            link.load_after(VORTEX_GAME, plugin, after, timeout)
+            link.load_after(options.vortex_game(), plugin, after, timeout)
         }),
         Action::DisableMod { mod_ref } if mod_ref.source == SOURCE_ID => {
             in_vortex(options, |link, timeout| {
                 tracing::info!(mod_id = mod_ref.id, "asking Vortex to disable a mod");
-                link.set_mod_enabled(VORTEX_GAME, &mod_ref.id, false, timeout)
+                link.set_mod_enabled(options.vortex_game(), &mod_ref.id, false, timeout)
             })
         }
         Action::ReinstallMod { mod_ref, .. } | Action::DisableMod { mod_ref } => ActionOutcome {
@@ -207,6 +215,14 @@ pub fn create_patch(
 
 /// Writes the patch that hides `objects` and asks Vortex to install it.
 fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcome {
+    let swaps = mallet_game_bethesda::Game::from_id(options.vortex_game())
+        .is_some_and(mallet_game_bethesda::Game::has_object_swapper);
+    if !swaps {
+        return ActionOutcome {
+            status: ActionStatus::Failed,
+            detail: Some(EngineError::NoObjectSwapper.to_string()),
+        };
+    }
     if objects.is_empty() {
         return ActionOutcome {
             status: ActionStatus::Failed,
@@ -232,7 +248,7 @@ fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcom
     };
     let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
     tracing::info!(archive = %created.path.display(), "asking Vortex to install the patch");
-    outcome_of(Link::new(link_dir).install_archive(VORTEX_GAME, &created.path, timeout))
+    outcome_of(Link::new(link_dir).install_archive(options.vortex_game(), &created.path, timeout))
 }
 
 fn reinstall_in_vortex(
@@ -253,7 +269,7 @@ fn reinstall_in_vortex(
         options = tick.len(),
         "asking Vortex to reinstall a mod"
     );
-    outcome_of(Link::new(link_dir).reinstall_mod(VORTEX_GAME, mod_id, tick, timeout))
+    outcome_of(Link::new(link_dir).reinstall_mod(options.vortex_game(), mod_id, tick, timeout))
 }
 
 /// What a reply of the extension means.

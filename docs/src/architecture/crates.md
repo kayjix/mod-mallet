@@ -41,7 +41,7 @@ flowchart TD
 | `mallet-messages` | Texts in every language; renders findings. | `mallet-core` |
 | `mallet-store` | SQLite cache: the last report, and texts that are slow to obtain. | `mallet-core` |
 | `mallet-formats-bethesda` | Reads the structure of plugins, archives and meshes, the formats shared by Bethesda's games. No knowledge of what a record means. | nothing |
-| `mallet-game-bethesda` | Finds Skyrim SE on the machine, reads its installation, and knows what its records mean. | `mallet-core`, `mallet-formats-bethesda` |
+| `mallet-game-bethesda` | Finds the games of the Bethesda family on the machine (Skyrim SE, Skyrim VR, Skyrim, Fallout 4, Fallout 4 VR, New Vegas, Fallout 3, Oblivion), reads their installations, and knows what their records mean (ADR 0036). | `mallet-core`, `mallet-formats-bethesda` |
 | `mallet-format-fomod` | Reads FOMOD installer descriptions into the installer model of `mallet-core`. | `mallet-core` |
 | `mallet-unpack` | Reads single files out of mod archives by running a 7-Zip that is on the machine. | nothing |
 | `mallet-source-vortex` | Reads Vortex's deployment manifest and saved state; implements `ModSource`; asks a running Vortex to act, through the extension in `integrations/vortex-extension`. | `mallet-core` |

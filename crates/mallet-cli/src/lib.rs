@@ -32,6 +32,11 @@ struct Cli {
     #[arg(long, short, global = true)]
     verbose: bool,
 
+    /// The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`,
+    /// `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`.
+    #[arg(long, global = true, value_name = "GAME", default_value = "skyrimse")]
+    game: String,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -208,6 +213,7 @@ where
     match cli.command {
         Command::Scan(args) => {
             let options = ScanOptions {
+                game: Some(cli.game.clone()),
                 game_dir: args.game_dir,
                 local_dir: args.local_dir,
                 extender_log: args.extender_log,
@@ -234,7 +240,11 @@ where
         }
         Command::Report(args) => {
             let cache = cache_path(args.output.cache)?;
-            if let Some(report) = mallet_engine::last_report(&cache)? {
+            let options = ScanOptions {
+                game: Some(cli.game.clone()),
+                ..ScanOptions::default()
+            };
+            if let Some(report) = mallet_engine::last_report(&options, &cache)? {
                 print(
                     &report,
                     args.output.format,
@@ -255,12 +265,18 @@ where
             }
             Ok(())
         }
-        Command::Vortex(args) => vortex(args, &messages, out),
+        Command::Vortex(args) => vortex(args, &cli.game, &messages, out),
     }
 }
 
-fn vortex(args: VortexArgs, messages: &Messages, out: &mut dyn Write) -> anyhow::Result<()> {
+fn vortex(
+    args: VortexArgs,
+    game: &str,
+    messages: &Messages,
+    out: &mut dyn Write,
+) -> anyhow::Result<()> {
     let options = ManagerOptions {
+        game: Some(game.to_owned()),
         vortex_data_dir: args.vortex_data_dir,
         link_dir: args.link_dir,
         timeout: None,

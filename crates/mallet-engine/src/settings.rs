@@ -11,17 +11,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use mallet_core::{LocationOrigin, LocationRole, ScanLocation};
-use mallet_game_bethesda::{ingest, locate};
+use mallet_core::{GameChoice, KnownGame, LocationOrigin, LocationRole, ScanLocation};
+use mallet_game_bethesda::{Game, ingest, locate};
 use mallet_unpack::Unpacker;
 use serde::{Deserialize, Serialize};
 
 use crate::{EngineError, ScanOptions, installers, read_if_exists};
 
-/// What the user decided about where Mod Mallet looks.
+/// What the user decided about one game: where Mod Mallet looks, and what
+/// they made of the findings.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    /// The game these settings are for, by its identifier (`skyrimse`).
+    /// It is the key under which they are kept, not part of them.
+    #[serde(skip)]
+    pub game: String,
     /// Whether the user has seen the places a scan reads and agreed.
     pub confirmed: bool,
     /// The places the user named. A place that is not listed is found by
@@ -39,10 +44,19 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Where the mod manager is, for actions on the mods of this game.
+    pub fn manager_options(&self) -> crate::ManagerOptions {
+        crate::ManagerOptions {
+            game: (!self.game.is_empty()).then(|| self.game.clone()),
+            ..crate::ManagerOptions::default()
+        }
+    }
+
     /// The options for a scan that looks where these settings say.
     pub fn scan_options(&self) -> ScanOptions {
         let place = |role: LocationRole| self.places.get(&role).cloned();
         ScanOptions {
+            game: (!self.game.is_empty()).then(|| self.game.clone()),
             game_dir: place(LocationRole::GameDir),
             local_dir: place(LocationRole::PluginList).map(|path| plugin_list_dir(&path)),
             extender_log: place(LocationRole::ExtenderLog),
@@ -75,29 +89,148 @@ pub fn default_settings_path() -> Option<PathBuf> {
     Some(dirs::config_dir()?.join("mod-mallet").join("settings.json"))
 }
 
-/// Reads the settings. A file that does not exist yet means that nothing
-/// has been decided.
-pub fn load_settings(path: &Path) -> Result<Settings, EngineError> {
-    match read_if_exists(path)? {
-        None => Ok(Settings::default()),
-        Some(text) => serde_json::from_str(&text).map_err(|error| EngineError::Settings {
+/// The settings file: the settings of each game, and which game the user
+/// looked at last.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct SettingsFile {
+    /// The game looked at last, by its identifier.
+    game: Option<String>,
+    /// The settings of each game, by the game's identifier.
+    games: BTreeMap<String, Settings>,
+}
+
+impl SettingsFile {
+    /// Reads the file at `path`. A file that does not exist yet means that
+    /// nothing has been decided.
+    ///
+    /// Before there were settings per game, the file held those of Skyrim
+    /// Special Edition at its top level. Such a file is read as theirs.
+    fn load(path: &Path) -> Result<Self, EngineError> {
+        let Some(text) = read_if_exists(path)? else {
+            return Ok(Self::default());
+        };
+        let invalid = |error: serde_json::Error| EngineError::Settings {
             path: path.to_path_buf(),
             reason: error.to_string(),
-        }),
+        };
+        let value: serde_json::Value = serde_json::from_str(&text).map_err(invalid)?;
+        let per_game = value
+            .as_object()
+            .is_some_and(|object| object.contains_key("games") || object.contains_key("game"));
+        if per_game {
+            serde_json::from_value(value).map_err(invalid)
+        } else {
+            let skyrim: Settings = serde_json::from_value(value).map_err(invalid)?;
+            let id = Game::SkyrimSe.id().to_owned();
+            Ok(Self {
+                game: Some(id.clone()),
+                games: BTreeMap::from([(id, skyrim)]),
+            })
+        }
+    }
+
+    /// Writes the file, creating its directory if needed.
+    fn save(&self, path: &Path) -> Result<(), EngineError> {
+        let failed = |source: std::io::Error| EngineError::WriteSettings {
+            path: path.to_path_buf(),
+            source,
+        };
+        if let Some(directory) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
+            std::fs::create_dir_all(directory).map_err(failed)?;
+        }
+        let text = serde_json::to_string_pretty(self).map_err(|error| failed(error.into()))?;
+        std::fs::write(path, text).map_err(failed)
+    }
+
+    /// The game to look at: the one looked at last, or else the first
+    /// game that is installed, or else Skyrim Special Edition.
+    fn active_game(&self) -> Game {
+        self.game
+            .as_deref()
+            .and_then(Game::from_id)
+            .or_else(|| {
+                locate::installed_games()
+                    .into_iter()
+                    .map(|(game, _, _)| game)
+                    .next()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The settings of `game`.
+    fn of(&self, game: Game) -> Settings {
+        Settings {
+            game: game.id().to_owned(),
+            ..self.games.get(game.id()).cloned().unwrap_or_default()
+        }
     }
 }
 
-/// Writes the settings, creating their directory if needed.
+/// Reads the settings of the game the user looked at last. A file that
+/// does not exist yet means that nothing has been decided.
+pub fn load_settings(path: &Path) -> Result<Settings, EngineError> {
+    let file = SettingsFile::load(path)?;
+    Ok(file.of(file.active_game()))
+}
+
+/// Writes the settings of the game they are for, creating their directory
+/// if needed, and remembers that game as the one looked at last. The
+/// settings of the other games stay as they were.
 pub fn save_settings(path: &Path, settings: &Settings) -> Result<(), EngineError> {
-    let failed = |source: std::io::Error| EngineError::WriteSettings {
-        path: path.to_path_buf(),
-        source,
-    };
-    if let Some(directory) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
-        std::fs::create_dir_all(directory).map_err(failed)?;
-    }
-    let text = serde_json::to_string_pretty(settings).map_err(|error| failed(error.into()))?;
-    std::fs::write(path, text).map_err(failed)
+    let game = Game::from_id(&settings.game).unwrap_or_default();
+    let mut file = SettingsFile::load(path)?;
+    let mut kept = settings.clone();
+    kept.game = String::new();
+    file.games.insert(game.id().to_owned(), kept);
+    file.game = Some(game.id().to_owned());
+    file.save(path)
+}
+
+/// Makes the game with the identifier `game` the one to look at, and
+/// returns its settings. Only ever called because the user chose the game.
+///
+/// # Errors
+///
+/// If Mod Mallet does not know the game, or the settings cannot be read
+/// or written.
+pub fn select_game(path: &Path, game: &str) -> Result<Settings, EngineError> {
+    let game = Game::from_id(game).ok_or_else(|| EngineError::UnknownGame(game.to_owned()))?;
+    let mut file = SettingsFile::load(path)?;
+    file.game = Some(game.id().to_owned());
+    file.save(path)?;
+    tracing::info!(game = game.id(), "game chosen");
+    Ok(file.of(game))
+}
+
+/// The games Mod Mallet knows, with where each is on this machine (where
+/// the user said it is, or else where it was found), and which of them the
+/// user looks at. Only looks up a few registry entries and folders.
+pub fn known_games(path: &Path) -> Result<GameChoice, EngineError> {
+    let file = SettingsFile::load(path)?;
+    let games = Game::ALL
+        .into_iter()
+        .map(|game| {
+            let named = file
+                .of(game)
+                .places
+                .get(&LocationRole::GameDir)
+                .map(|dir| (dir.clone(), LocationOrigin::Given));
+            let found = named.or_else(|| locate::game_dir(game));
+            KnownGame {
+                id: game.id().to_owned(),
+                name: game.name().to_owned(),
+                support: game.support(),
+                dir: found.as_ref().map(|(dir, _)| dir.display().to_string()),
+                origin: found.map(|(_, origin)| origin),
+                script_extender: game.script_extender().short_name.to_owned(),
+            }
+        })
+        .collect();
+    Ok(GameChoice {
+        active: file.active_game().id().to_owned(),
+        games,
+    })
 }
 
 /// The places a scan with `options` would read, how each was found and
@@ -109,10 +242,8 @@ pub fn save_settings(path: &Path, settings: &Settings) -> Result<(), EngineError
 pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
     let mut locations = Vec::new();
 
-    let game_dir = match &options.game_dir {
-        Some(given) => Some((given.clone(), LocationOrigin::Given)),
-        None => locate::game_dir().map(|path| (path, LocationOrigin::Registry)),
-    };
+    let game = options.game().unwrap_or_default();
+    let game_dir = options.located_game_dir();
     locations.push(match &game_dir {
         Some((path, origin)) => planned(LocationRole::GameDir, path, *origin, path.is_dir()),
         None => missing(LocationRole::GameDir, LocationOrigin::Registry),
@@ -121,7 +252,7 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
 
     if let Some(list) = game_dir
         .as_deref()
-        .and_then(|game_dir| ingest::plugin_list_path(game_dir, options.local_dir.as_deref()))
+        .and_then(|game_dir| ingest::plugin_list_path(game, game_dir, options.local_dir.as_deref()))
     {
         let origin = given_or_standard(options.local_dir.is_some());
         locations.push(planned(
@@ -132,7 +263,11 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
         ));
     }
 
-    if let Some(log) = options.extender_log.clone().or_else(locate::extender_log) {
+    if let Some(log) = options
+        .extender_log
+        .clone()
+        .or_else(|| locate::extender_log(game, game_dir.as_deref()))
+    {
         let origin = given_or_standard(options.extender_log.is_some());
         locations.push(planned(
             LocationRole::ExtenderLog,
@@ -274,8 +409,103 @@ mod tests {
     fn nothing_is_decided_before_the_settings_exist() {
         let directory = tempfile::tempdir().unwrap();
         let settings = load_settings(&directory.path().join("settings.json")).unwrap();
-        assert_eq!(settings, Settings::default());
+        // The game is the first one installed on the machine running the
+        // test, or Skyrim Special Edition.
+        assert!(Game::from_id(&settings.game).is_some());
+        assert_eq!(
+            settings,
+            Settings {
+                game: settings.game.clone(),
+                ..Settings::default()
+            }
+        );
         assert!(!settings.confirmed);
+    }
+
+    #[test]
+    fn settings_written_before_there_were_games_are_skyrim_special_editions() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{ "confirmed": true, "places": { "game-dir": "games/skyrim" }, "ranking": ["faces"] }"#,
+        )
+        .unwrap();
+
+        let settings = load_settings(&path).unwrap();
+        assert_eq!(settings.game, "skyrimse");
+        assert!(settings.confirmed);
+        assert_eq!(settings.ranking, ["faces"]);
+
+        // Saving writes the new form and keeps what was there.
+        save_settings(&path, &settings).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"games\""), "{text}");
+        assert_eq!(load_settings(&path).unwrap(), settings);
+    }
+
+    #[test]
+    fn each_game_keeps_settings_of_its_own() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        let skyrim = Settings {
+            game: "skyrimse".to_owned(),
+            confirmed: true,
+            ignored: BTreeSet::from(["a finding".to_owned()]),
+            ..Settings::default()
+        };
+        save_settings(&path, &skyrim).unwrap();
+
+        let fallout = select_game(&path, "fallout4").unwrap();
+        assert_eq!(fallout.game, "fallout4");
+        assert!(!fallout.confirmed);
+        assert!(fallout.ignored.is_empty());
+        assert_eq!(load_settings(&path).unwrap(), fallout);
+
+        let fallout = Settings {
+            confirmed: true,
+            ..fallout
+        };
+        save_settings(&path, &fallout).unwrap();
+        assert_eq!(select_game(&path, "skyrimse").unwrap(), skyrim);
+        assert_eq!(select_game(&path, "fallout4").unwrap(), fallout);
+        assert_eq!(fallout.scan_options().game.as_deref(), Some("fallout4"));
+        assert_eq!(fallout.manager_options().game.as_deref(), Some("fallout4"));
+    }
+
+    #[test]
+    fn an_unknown_game_cannot_be_chosen() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        assert!(matches!(
+            select_game(&path, "morrowind"),
+            Err(EngineError::UnknownGame(_))
+        ));
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn every_game_is_known_with_where_the_user_put_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        let settings = Settings {
+            game: "falloutnv".to_owned(),
+            places: BTreeMap::from([(LocationRole::GameDir, PathBuf::from("games/nv"))]),
+            ..Settings::default()
+        };
+        save_settings(&path, &settings).unwrap();
+
+        let choice = known_games(&path).unwrap();
+        assert_eq!(choice.active, "falloutnv");
+        let games = choice.games;
+        assert_eq!(games.len(), Game::ALL.len());
+        let nv = games.iter().find(|game| game.id == "falloutnv").unwrap();
+        assert_eq!(
+            nv.dir.as_deref(),
+            Some(PathBuf::from("games/nv").display().to_string().as_str())
+        );
+        assert_eq!(nv.origin, Some(LocationOrigin::Given));
+        assert_eq!(nv.script_extender, "xNVSE");
     }
 
     #[test]
@@ -283,6 +513,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("nested").join("settings.json");
         let settings = Settings {
+            game: "skyrimse".to_owned(),
             confirmed: true,
             places: BTreeMap::from([
                 (LocationRole::GameDir, PathBuf::from("games/skyrim")),
@@ -333,6 +564,7 @@ mod tests {
     #[test]
     fn named_places_become_the_options_of_a_scan() {
         let settings = Settings {
+            game: "skyrimse".to_owned(),
             confirmed: true,
             ignored: BTreeSet::new(),
             decisions: BTreeMap::new(),

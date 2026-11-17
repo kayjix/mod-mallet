@@ -4,12 +4,12 @@
 //! were gone. Only reads.
 
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use mallet_formats_bethesda::{bsa, dds};
+use mallet_formats_bethesda::dds;
 
-use crate::{archives, ingest};
+use crate::game::Game;
+use crate::{archive, archives, ingest};
 
 /// Files larger than this are not read for showing.
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
@@ -40,11 +40,16 @@ fn normalize(path: &str) -> String {
     trimmed.strip_prefix("data/").unwrap_or(trimmed).to_owned()
 }
 
-/// Every version of `path` (below the data directory) in the setup in
-/// `game_dir`, the one the game uses last. `local_dir` holds `plugins.txt`,
+/// Every version of `path` (below the data directory) in the setup of
+/// `game` in `game_dir`, the one the game uses last. `local_dir` holds `plugins.txt`,
 /// as for [`ingest::read_setup`]. Archives and files that cannot be read are
 /// left out.
-pub fn versions(game_dir: &Path, local_dir: Option<&Path>, path: &str) -> Vec<FileVersion> {
+pub fn versions(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    path: &str,
+) -> Vec<FileVersion> {
     let wanted = normalize(path);
     if wanted.is_empty() || wanted.split('/').any(|part| part == "..") {
         return Vec::new();
@@ -52,18 +57,19 @@ pub fn versions(game_dir: &Path, local_dir: Option<&Path>, path: &str) -> Vec<Fi
     let data_dir = game_dir.join("Data");
     let mut found = Vec::new();
 
-    let active = ingest::active_plugin_names(game_dir, local_dir).unwrap_or_default();
+    let active = ingest::active_plugin_names(game, game_dir, local_dir).unwrap_or_default();
+    let extension = format!(".{}", game.archive_extension());
     let on_disk: Vec<String> = std::fs::read_dir(&data_dir).map_or_else(
         |_| Vec::new(),
         |entries| {
             entries
                 .filter_map(Result::ok)
                 .filter_map(|entry| entry.file_name().into_string().ok())
-                .filter(|name| name.to_ascii_lowercase().ends_with(".bsa"))
+                .filter(|name| name.to_ascii_lowercase().ends_with(&extension))
                 .collect()
         },
     );
-    for name in archives::load_order(&on_disk, &active) {
+    for name in archives::load_order(game, &on_disk, &active) {
         if let Some(bytes) = from_archive(&data_dir.join(&name), &wanted) {
             found.push(FileVersion {
                 origin: Origin::Archive(name),
@@ -105,21 +111,14 @@ pub fn thumbnail(bytes: &[u8], max_side: u32) -> Option<dds::Rgb> {
 
 /// The file `wanted` (normalized) from the archive at `archive`, if it has it.
 fn from_archive(archive: &Path, wanted: &str) -> Option<Vec<u8>> {
-    let directory = ingest::archive_directory(archive).ok()?;
-    let entry = directory
-        .entries
-        .iter()
-        .find(|entry| normalize(&entry.path) == wanted)?;
-    if u64::from(entry.size) > MAX_BYTES {
-        return None;
-    }
+    let directory = archive::read_directory(archive).ok()?;
+    let index = directory
+        .paths()
+        .into_iter()
+        .position(|path| normalize(path) == wanted)?;
     let mut file = File::open(archive).ok()?;
-    file.seek(SeekFrom::Start(u64::from(entry.offset))).ok()?;
-    let mut stored = Vec::new();
-    file.take(u64::from(entry.size))
-        .read_to_end(&mut stored)
-        .ok()?;
-    bsa::unpack(&stored, entry, &directory).ok()
+    let bytes = directory.read(&mut file, index)?;
+    (bytes.len() as u64 <= MAX_BYTES).then_some(bytes)
 }
 
 #[cfg(test)]
@@ -142,12 +141,22 @@ mod tests {
         let local = tempfile::tempdir().unwrap();
         std::fs::write(local.path().join("plugins.txt"), b"").unwrap();
 
-        let found = versions(game.path(), Some(local.path()), "Textures\\A.dds");
+        let found = versions(
+            Game::SkyrimSe,
+            game.path(),
+            Some(local.path()),
+            "Textures\\A.dds",
+        );
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].origin, Origin::Loose);
         assert_eq!(found[0].bytes, b"loose");
         assert_eq!(
-            versions(game.path(), Some(local.path()), "../secret.txt"),
+            versions(
+                Game::SkyrimSe,
+                game.path(),
+                Some(local.path()),
+                "../secret.txt"
+            ),
             Vec::new()
         );
     }

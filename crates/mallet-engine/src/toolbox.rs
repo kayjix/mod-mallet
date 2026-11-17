@@ -23,15 +23,18 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 /// its libraries, and the tools Mod Mallet uses. Only reads.
 pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
     let mut found = vortex(manager);
-    let game_dir = scan.game_dir.clone().or_else(locate::game_dir);
-    if let Some(game_dir) = game_dir {
+    if let (Ok(game), Some((game_dir, _))) = (scan.game(), scan.located_game_dir()) {
         let game_version = scan
             .extender_log
             .clone()
-            .or_else(locate::extender_log)
+            .or_else(|| locate::extender_log(game, Some(&game_dir)))
             .and_then(|path| std::fs::read_to_string(path).ok())
-            .and_then(|text| skse_log::parse(&text).game_version);
-        found.extend(tools::requirements(&game_dir, game_version.as_deref()));
+            .and_then(|text| skse_log::parse(game, &text).game_version);
+        found.extend(tools::requirements(
+            game,
+            &game_dir,
+            game_version.as_deref(),
+        ));
     }
     let unpacker = scan
         .unpacker

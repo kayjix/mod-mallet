@@ -25,9 +25,6 @@ use mallet_unpack::Unpacker;
 
 use crate::{EngineError, ScanOptions, read_if_exists};
 
-/// Vortex's identifier of the game this engine scans.
-const VORTEX_GAME: &str = "skyrimse";
-
 /// Under which name installer descriptions are kept in the cache.
 const CACHE_NAMESPACE: &str = "fomod";
 
@@ -57,7 +54,7 @@ pub(crate) fn read(
         return Ok(ManagerFacts::default());
     };
     let (state_path, origin) = &sources.backup;
-    let state = if let Some(state) = read_live_state(&sources, locations) {
+    let state = if let Some(state) = read_live_state(&sources, options.game_id(), locations) {
         state
     } else {
         let state_json = read_if_exists(state_path)?;
@@ -70,7 +67,7 @@ pub(crate) fn read(
         let Some(state_json) = state_json else {
             return Ok(ManagerFacts::default());
         };
-        VortexState::parse(&state_json, VORTEX_GAME)?
+        VortexState::parse(&state_json, options.game_id())?
     };
     let mut facts = ManagerFacts {
         names: state.names(),
@@ -111,7 +108,7 @@ pub(crate) fn read(
         // The backup lies three levels below Vortex's data directory.
         let data_dir = state_path.ancestors().nth(3).unwrap_or(Path::new(""));
         (
-            state.downloads_dir(data_dir, VORTEX_GAME),
+            state.downloads_dir(data_dir, options.game_id()),
             LocationOrigin::Standard,
         )
     };
@@ -282,8 +279,12 @@ fn state_sources(options: &ScanOptions) -> Option<StateSources> {
     };
     let live = match (&options.manager_live_state, &options.manager_state) {
         (Some(given), _) => Some((given.clone(), LocationOrigin::Given)),
-        (None, None) => crate::actions::default_link_dir()
-            .map(|dir| (live_state_path(&dir, VORTEX_GAME), LocationOrigin::Standard)),
+        (None, None) => crate::actions::default_link_dir().map(|dir| {
+            (
+                live_state_path(&dir, options.game_id()),
+                LocationOrigin::Standard,
+            )
+        }),
         // Whoever names the backup wants that file read, not one from the
         // machine's standard places.
         (None, Some(_)) => None,
@@ -299,11 +300,12 @@ fn state_sources(options: &ScanOptions) -> Option<StateSources> {
 /// and then the backup knows more.
 fn read_live_state(
     sources: &StateSources,
+    game: &str,
     locations: &mut Vec<ScanLocation>,
 ) -> Option<VortexState> {
     let (path, origin) = sources.newer_live()?;
     let state_json = read_if_exists(path).ok().flatten()?;
-    match VortexState::parse(&state_json, VORTEX_GAME) {
+    match VortexState::parse(&state_json, game) {
         Ok(state) => {
             locations.push(location(LocationRole::ManagerState, path, *origin, true));
             Some(state)

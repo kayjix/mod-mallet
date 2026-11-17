@@ -6,6 +6,8 @@ use std::time::Instant;
 use mallet_core::facts::{KnowledgeFacts, PluginFacts};
 use mallet_core::{LocationOrigin, LocationRole, ScanLocation};
 
+use mallet_game_bethesda::Game;
+
 use crate::ScanOptions;
 
 /// The masterlist a scan with `options` reads, and how it was found.
@@ -14,10 +16,11 @@ use crate::ScanOptions;
 /// names the state wants a scan of exactly the files they named, not one
 /// that also takes rules from this machine.
 pub(crate) fn planned_masterlist(options: &ScanOptions) -> Option<(PathBuf, LocationOrigin)> {
+    let game = options.game_id();
     match (&options.masterlist, &options.manager_state) {
         (Some(given), _) => Some((given.clone(), LocationOrigin::Given)),
         (None, None) => {
-            mallet_knowledge::find_masterlist().map(|path| (path, LocationOrigin::Standard))
+            mallet_knowledge::find_masterlist(game).map(|path| (path, LocationOrigin::Standard))
         }
         (None, Some(_)) => None,
     }
@@ -28,6 +31,7 @@ pub(crate) fn planned_masterlist(options: &ScanOptions) -> Option<(PathBuf, Loca
 /// on; the reason is logged.
 pub(crate) fn read(
     options: &ScanOptions,
+    game: Game,
     game_dir: &Path,
     plugins: &[PluginFacts],
     locations: &mut Vec<ScanLocation>,
@@ -49,11 +53,12 @@ pub(crate) fn read(
 
     let started = Instant::now();
     match mallet_knowledge::read(
+        game.id(),
         game_dir,
         options.local_dir.as_deref(),
         &path,
         plugins,
-        &mallet_game_bethesda::locate::shipped_plugins(game_dir),
+        &mallet_game_bethesda::locate::shipped_plugins(game, game_dir),
     ) {
         Ok(knowledge) => {
             tracing::info!(

@@ -62,3 +62,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0033](0033-comparison-stage-and-ranking.md) | Mods are compared on a stage and decided by a ranking | accepted |
 | [0034](0034-installer-options-ticked-in-advance.md) | Missing installer options are ticked in advance | accepted |
 | [0035](0035-loots-messages-are-quoted.md) | LOOT's messages are quoted | accepted |
+| [0036](0036-one-adapter-for-the-bethesda-family.md) | One adapter for the Bethesda family, settings per game | accepted |

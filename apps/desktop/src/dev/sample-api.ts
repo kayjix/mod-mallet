@@ -5,6 +5,7 @@
 // development and is not part of a release build.
 
 import type { Api } from "../api";
+import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { MeshView } from "../generated/mesh-view";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
@@ -770,6 +771,39 @@ const ignoredIds = new Set<string>();
 let decided: Record<string, number> = {};
 let ranked: string[] = [];
 
+/** The game the sample looks at. */
+let activeGame = "skyrimse";
+
+/** The games of the sample: two installed, the others not. */
+function sampleGames(): GameChoice {
+  const game = (
+    id: string,
+    name: string,
+    scriptExtender: string,
+    dir: string | null,
+  ): KnownGame => ({
+    id,
+    name,
+    support: id === "skyrimse" ? "full" : "basic",
+    dir,
+    origin: dir === null ? null : "steam",
+    scriptExtender,
+  });
+  return {
+    active: activeGame,
+    games: [
+      game("skyrimse", "Skyrim Special Edition", "SKSE", "D:SteamSkyrim Special Edition"),
+      game("skyrimvr", "Skyrim VR", "SKSEVR", null),
+      game("skyrim", "Skyrim (2011)", "SKSE", null),
+      game("fallout4", "Fallout 4", "F4SE", "D:SteamFallout 4"),
+      game("fallout4vr", "Fallout 4 VR", "F4SEVR", null),
+      game("falloutnv", "Fallout: New Vegas", "xNVSE", null),
+      game("fallout3", "Fallout 3", "FOSE", null),
+      game("oblivion", "Oblivion", "OBSE", null),
+    ],
+  };
+}
+
 export const sampleApi: Api = {
   scan: (lang) => later(report(lang)),
   lastReport: () => later(null),
@@ -849,6 +883,11 @@ export const sampleApi: Api = {
     }
     decided = next;
     return later({ ...decided });
+  },
+  games: () => later(sampleGames()),
+  selectGame: (game) => {
+    activeGame = game;
+    return later(sampleGames());
   },
   // The sample has no terrain textures; the map draws its height relief.
   mapImage: () => later(null),

@@ -39,6 +39,7 @@ impl Vortex {
 
     fn options(&self) -> ManagerOptions {
         ManagerOptions {
+            game: None,
             vortex_data_dir: Some(self.data_dir()),
             link_dir: Some(self.link_dir()),
             timeout: Some(Duration::from_secs(5)),

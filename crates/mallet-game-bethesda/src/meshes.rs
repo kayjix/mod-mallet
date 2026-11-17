@@ -14,15 +14,15 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use mallet_core::facts::MeshOverride;
 use mallet_core::{GamePath, TextCache};
-use mallet_formats_bethesda::{bsa, nif};
+use mallet_formats_bethesda::nif;
 
-use crate::DATA_DIR;
+use crate::{DATA_DIR, archive};
 
 /// File extension of meshes.
 const MESH_EXTENSION: &str = ".nif";
@@ -41,7 +41,7 @@ pub(crate) struct LoadedArchive {
     /// The archive's path in the game.
     pub(crate) path: GamePath,
     /// Its directory.
-    pub(crate) directory: bsa::Directory,
+    pub(crate) directory: archive::Directory,
 }
 
 /// The game path a texture path in a mesh refers to.
@@ -77,9 +77,9 @@ pub(crate) fn read_overrides(
     // For every mesh in an archive, the archive that wins and the entry.
     let mut packed: HashMap<GamePath, (usize, usize)> = HashMap::new();
     for (archive_index, archive) in archives.iter().enumerate() {
-        for (entry_index, entry) in archive.directory.entries.iter().enumerate() {
-            if entry.path.to_ascii_lowercase().ends_with(MESH_EXTENSION) {
-                packed.insert(data_path.join(&entry.path), (archive_index, entry_index));
+        for (entry_index, path) in archive.directory.paths().into_iter().enumerate() {
+            if path.to_ascii_lowercase().ends_with(MESH_EXTENSION) {
+                packed.insert(data_path.join(path), (archive_index, entry_index));
             }
         }
     }
@@ -187,19 +187,13 @@ fn packed_textures(
     entry_index: usize,
     open_archives: &mut HashMap<usize, File>,
 ) -> Option<Vec<GamePath>> {
-    let entry = archive.directory.entries.get(entry_index)?;
     let file = match open_archives.entry(archive_index) {
         std::collections::hash_map::Entry::Occupied(open) => open.into_mut(),
         std::collections::hash_map::Entry::Vacant(vacant) => {
             vacant.insert(File::open(&archive.file).ok()?)
         }
     };
-    file.seek(SeekFrom::Start(u64::from(entry.offset))).ok()?;
-    let mut stored = Vec::new();
-    file.take(u64::from(entry.size))
-        .read_to_end(&mut stored)
-        .ok()?;
-    let data = bsa::unpack(&stored, entry, &archive.directory).ok()?;
+    let data = archive.directory.read(file, entry_index)?;
     Some(game_paths(&nif::texture_paths(&data).ok()?))
 }
 

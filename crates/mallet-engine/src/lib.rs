@@ -34,7 +34,7 @@ use mallet_core::{
     Facts, GameInfo, GamePath, InstalledPatch, LocationOrigin, LocationRole, ModInfo, ModSource,
     NoCache, NoModSource, ScanLocation, ScanReport, TextCache, report,
 };
-use mallet_game_bethesda::{GAME_ID, GAME_NAME, ingest, locate, skse_log};
+use mallet_game_bethesda::{Game, ingest, locate, skse_log};
 use mallet_source_vortex::{VortexDeployment, VortexError};
 use mallet_store::{Store, StoreError};
 
@@ -46,14 +46,17 @@ pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
 pub use preview::file_preview;
 pub use settings::{
-    Settings, default_settings_path, load_settings, planned_locations, save_settings,
-    setup_fingerprint,
+    Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
+    select_game, setup_fingerprint,
 };
 pub use toolbox::{game_art, restart_manager, toolbox};
 
 /// Where to look. Every field that is `None` is detected automatically.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ScanOptions {
+    /// The game to look at, by its identifier (`skyrimse`, `fallout4`,
+    /// ...). Skyrim Special Edition if `None`.
+    pub game: Option<String>,
     /// The directory the game is installed in.
     pub game_dir: Option<PathBuf>,
     /// The directory in which the game keeps `plugins.txt`, the list of
@@ -79,6 +82,36 @@ pub struct ScanOptions {
     pub masterlist: Option<PathBuf>,
 }
 
+impl ScanOptions {
+    /// The game these options are about.
+    ///
+    /// # Errors
+    ///
+    /// If the game's identifier is not one Mod Mallet knows.
+    pub(crate) fn game(&self) -> Result<Game, EngineError> {
+        match &self.game {
+            None => Ok(Game::default()),
+            Some(id) => Game::from_id(id).ok_or_else(|| EngineError::UnknownGame(id.clone())),
+        }
+    }
+
+    /// The identifier of the game these options are about, as the mod
+    /// manager knows it.
+    pub(crate) fn game_id(&self) -> &str {
+        self.game.as_deref().unwrap_or_else(|| Game::default().id())
+    }
+
+    /// The game's directory: the one named, or the one found on this
+    /// machine, and how it came to be known. `None` for an unknown game or
+    /// one that is not found.
+    pub(crate) fn located_game_dir(&self) -> Option<(PathBuf, LocationOrigin)> {
+        match &self.game_dir {
+            Some(given) => Some((given.clone(), LocationOrigin::Given)),
+            None => locate::game_dir(self.game().ok()?),
+        }
+    }
+}
+
 /// Why a scan could not be completed.
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
@@ -87,6 +120,12 @@ pub enum EngineError {
         "the game directory could not be found automatically; pass it explicitly (--game-dir on the command line)"
     )]
     GameNotFound,
+    /// A game was named that Mod Mallet does not know.
+    #[error("Mod Mallet does not know the game `{0}`")]
+    UnknownGame(String),
+    /// A patch was asked for in a game Base Object Swapper does not run in.
+    #[error("patches hide objects through Base Object Swapper, which this game does not have")]
+    NoObjectSwapper,
     /// The mod manager's data directory could not be found.
     #[error("Vortex's data directory could not be found; is Vortex installed for this user?")]
     ManagerNotFound,
@@ -156,17 +195,14 @@ pub fn scan(options: &ScanOptions) -> Result<ScanReport, EngineError> {
 }
 
 fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport, EngineError> {
-    let (game_dir, game_dir_origin) = match &options.game_dir {
-        Some(given) => (given.clone(), LocationOrigin::Given),
-        None => (
-            locate::game_dir().ok_or(EngineError::GameNotFound)?,
-            LocationOrigin::Registry,
-        ),
-    };
+    let game = options.game()?;
+    let (game_dir, game_dir_origin) = options
+        .located_game_dir()
+        .ok_or(EngineError::GameNotFound)?;
     if !game_dir.is_dir() {
         return Err(EngineError::GameDirMissing(game_dir));
     }
-    tracing::info!(game_dir = %game_dir.display(), "scanning");
+    tracing::info!(game = game.id(), game_dir = %game_dir.display(), "scanning");
     let mut locations = vec![ScanLocation {
         role: LocationRole::GameDir,
         path: game_dir.display().to_string(),
@@ -178,11 +214,11 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
     let mut facts = match store {
         // Reading the setup writes thousands of small cache entries.
         Some(store) => {
-            store.batched(|| gather_facts(options, &game_dir, store, &mut locations))??
+            store.batched(|| gather_facts(options, game, &game_dir, store, &mut locations))??
         }
-        None => gather_facts(options, &game_dir, &NoCache, &mut locations)?,
+        None => gather_facts(options, game, &game_dir, &NoCache, &mut locations)?,
     };
-    facts.knowledge = knowledge::read(options, &game_dir, &facts.plugins, &mut locations);
+    facts.knowledge = knowledge::read(options, game, &game_dir, &facts.plugins, &mut locations);
     let (mods, installers, mod_infos) = load_mod_source(options, &game_dir, store, &mut locations)?;
     facts.installers = installers;
     tracing::info!(
@@ -205,14 +241,17 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         "analysed the setup"
     );
 
-    let installed_patch = installed_patch(&game_dir, mods.as_ref());
+    let installed_patch = game
+        .has_object_swapper()
+        .then(|| installed_patch(&game_dir, mods.as_ref()))
+        .flatten();
     let extender = facts.extender.as_ref();
     Ok(ScanReport {
         schema_version: report::SCHEMA_VERSION,
         scanned_at: now(),
         game: GameInfo {
-            id: GAME_ID.to_owned(),
-            name: GAME_NAME.to_owned(),
+            id: game.id().to_owned(),
+            name: game.name().to_owned(),
             version: extender.and_then(|report| report.game_version.clone()),
             extender_version: extender.and_then(|report| report.extender_version.clone()),
         },
@@ -225,10 +264,11 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         findings,
         mods: mod_infos,
         map,
-        object_swapper: game_dir
-            .join("Data")
-            .join(mallet_game_bethesda::swap::SWAPPER_PLUGIN)
-            .is_file(),
+        object_swapper: game.has_object_swapper()
+            && game_dir
+                .join("Data")
+                .join(mallet_game_bethesda::swap::SWAPPER_PLUGIN)
+                .is_file(),
         installed_patch,
         duels,
     })
@@ -257,7 +297,10 @@ const MAP_PIXELS_PER_CELL: u32 = 8;
 /// game's data directory, or `None` if the worldspace has none there.
 /// Only reads.
 pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapImage> {
-    let game_dir = options.game_dir.clone().or_else(locate::game_dir)?;
+    if !options.game().ok()?.has_terrain_lod_pictures() {
+        return None;
+    }
+    let (game_dir, _) = options.located_game_dir()?;
     let started = Instant::now();
     let image =
         mallet_game_bethesda::lod::world_image(&game_dir.join("Data"), world, MAP_PIXELS_PER_CELL)?;
@@ -287,20 +330,43 @@ pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapI
 
 /// Runs a scan with the cache at `cache_path`: what is expensive to read
 /// and has not changed is taken from the cache, and the result is
-/// remembered for [`last_report`].
+/// remembered for [`last_report`]. Each game has a cache of its own next
+/// to `cache_path`.
 pub fn scan_and_store(options: &ScanOptions, cache_path: &Path) -> Result<ScanReport, EngineError> {
-    let mut store = open_store(cache_path)?;
+    let mut store = open_store(&game_cache_path(cache_path, options.game()?))?;
     let report = scan_with(options, Some(&store))?;
     store.save_scan(&report)?;
     Ok(report)
 }
 
-/// The result of the last stored scan, or `None` if there is none.
-pub fn last_report(cache_path: &Path) -> Result<Option<ScanReport>, EngineError> {
+/// The result of the last stored scan of the game `options` are about, or
+/// `None` if there is none.
+pub fn last_report(
+    options: &ScanOptions,
+    cache_path: &Path,
+) -> Result<Option<ScanReport>, EngineError> {
+    let cache_path = game_cache_path(cache_path, options.game()?);
     if !cache_path.exists() {
         return Ok(None);
     }
-    Ok(open_store(cache_path)?.load_scan()?)
+    Ok(open_store(&cache_path)?.load_scan()?)
+}
+
+/// The cache of `game`, next to `cache_path`. Skyrim Special Edition, the
+/// first game, keeps the file as it is named; every other game has one
+/// with its identifier added (`cache-fallout4.sqlite`).
+fn game_cache_path(cache_path: &Path, game: Game) -> PathBuf {
+    if game == Game::SkyrimSe {
+        return cache_path.to_path_buf();
+    }
+    let stem = cache_path
+        .file_stem()
+        .map_or_else(|| "cache".into(), |stem| stem.to_string_lossy());
+    let name = match cache_path.extension() {
+        Some(extension) => format!("{stem}-{}.{}", game.id(), extension.to_string_lossy()),
+        None => format!("{stem}-{}", game.id()),
+    };
+    cache_path.with_file_name(name)
 }
 
 /// Where the cache lives unless the caller chooses another place.
@@ -330,13 +396,16 @@ fn open_store(cache_path: &Path) -> Result<Store, EngineError> {
 
 fn gather_facts(
     options: &ScanOptions,
+    game: Game,
     game_dir: &Path,
     cache: &dyn TextCache,
     locations: &mut Vec<ScanLocation>,
 ) -> Result<Facts, EngineError> {
     let log_path = match &options.extender_log {
         Some(given) => Some((given.clone(), LocationOrigin::Given)),
-        None => locate::extender_log().map(|path| (path, LocationOrigin::Standard)),
+        None => {
+            locate::extender_log(game, Some(game_dir)).map(|path| (path, LocationOrigin::Standard))
+        }
     };
     let extender = match log_path {
         Some((path, origin)) => {
@@ -347,7 +416,7 @@ fn gather_facts(
                 origin,
                 found: text.is_some(),
             });
-            text.map(|text| without_removed_plugins(skse_log::parse(&text), game_dir))
+            text.map(|text| without_removed_plugins(skse_log::parse(game, &text), game_dir))
         }
         None => None,
     };
@@ -362,7 +431,7 @@ fn gather_facts(
     // Without a load order there is nothing to say about plugins and
     // archives. The scan still reports what it can, and says what it could
     // not look at.
-    match ingest::read_setup(game_dir, options.local_dir.as_deref(), cache) {
+    match ingest::read_setup(game, game_dir, options.local_dir.as_deref(), cache) {
         Ok(setup) => {
             locations.push(ScanLocation {
                 role: LocationRole::PluginList,

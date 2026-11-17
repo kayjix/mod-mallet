@@ -27,14 +27,7 @@ use mallet_core::facts::objects::{
 };
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
-/// The game's own plugins, in lower case.
-pub const OFFICIAL_PLUGINS: [&str; 5] = [
-    "skyrim.esm",
-    "update.esm",
-    "dawnguard.esm",
-    "hearthfires.esm",
-    "dragonborn.esm",
-];
+use crate::game::Game;
 
 /// The record types of base objects whose placement is compared.
 pub const BASE_TYPES: [(Signature, BaseKind); 8] = [
@@ -90,13 +83,6 @@ const FULL_TURN: i32 = 6283;
 /// few hundred thousand units wide.
 const MAX_COORDINATE: f32 = 1.0e7;
 
-/// Whether `plugin` is one of the game's own plugins.
-pub fn is_official(plugin: &str) -> bool {
-    OFFICIAL_PLUGINS
-        .iter()
-        .any(|official| official.eq_ignore_ascii_case(plugin))
-}
-
 /// The record types a plugin is read for, besides characters: the base
 /// objects always, the places only for plugins that are not the game's.
 pub fn wanted_base_types() -> impl Iterator<Item = Signature> {
@@ -107,6 +93,8 @@ pub fn wanted_base_types() -> impl Iterator<Item = Signature> {
 /// order so that later versions replace earlier ones.
 #[derive(Debug, Default)]
 pub struct Collector {
+    /// The game whose plugins are added.
+    game: Game,
     bases: HashMap<RecordId, BaseObject>,
     /// `None` where the winning version deletes or switches off the object.
     placed: HashMap<RecordId, Option<PlacedObject>>,
@@ -121,10 +109,18 @@ pub struct Collector {
 }
 
 impl Collector {
+    /// A collector for the plugins of `game`.
+    pub fn new(game: Game) -> Self {
+        Self {
+            game,
+            ..Self::default()
+        }
+    }
+
     /// Takes in what `plugin`, named `plugin_name`, says about objects.
     pub fn add(&mut self, plugin_name: &str, plugin: &Plugin) {
         let masters = &plugin.header.masters;
-        let official = is_official(plugin_name);
+        let official = self.game.is_official(plugin_name);
         for record in &plugin.records {
             let id = || record_id(record.form_id, masters, plugin_name);
             if let Some(kind) = base_kind(record.signature) {
@@ -154,7 +150,7 @@ impl Collector {
                     let placed = placed(plugin_name, masters, record, id.clone());
                     // Changes to the game's own objects are kept apart:
                     // they count only if they move the object.
-                    if is_official(&id.plugin) {
+                    if self.game.is_official(&id.plugin) {
                         self.game_objects.insert(id, placed);
                     } else {
                         self.placed.insert(id, placed);

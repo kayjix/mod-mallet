@@ -853,7 +853,7 @@ export interface ScanLocation {
   /**
    * How Mod Mallet came to look there.
    */
-  origin: "given" | "registry" | "standard";
+  origin: "given" | "registry" | "standard" | "steam" | "gog";
   /**
    * The path on this machine.
    */

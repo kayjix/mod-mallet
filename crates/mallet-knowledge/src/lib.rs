@@ -36,18 +36,38 @@ pub enum KnowledgeError {
     },
 }
 
-/// The places a mod manager or LOOT itself keeps the masterlist for
-/// Skyrim Special Edition on this machine, whether or not a file is there.
+/// LOOT's kind of game for the game with the mod manager's identifier
+/// `game` (`skyrimse`), and the folder LOOT keeps that game's data in.
+fn loot_game(game: &str) -> Option<(GameType, &'static str)> {
+    Some(match game {
+        "skyrimse" => (GameType::SkyrimSE, "Skyrim Special Edition"),
+        "skyrimvr" => (GameType::SkyrimVR, "Skyrim VR"),
+        "skyrim" => (GameType::Skyrim, "Skyrim"),
+        "fallout4" => (GameType::Fallout4, "Fallout4"),
+        "fallout4vr" => (GameType::Fallout4VR, "Fallout4VR"),
+        "falloutnv" => (GameType::FalloutNV, "FalloutNV"),
+        "fallout3" => (GameType::Fallout3, "Fallout3"),
+        "oblivion" => (GameType::Oblivion, "Oblivion"),
+        _ => return None,
+    })
+}
+
+/// The places a mod manager or LOOT itself keeps the masterlist for the
+/// game with the mod manager's identifier `game` (`skyrimse`) on this
+/// machine, whether or not a file is there.
 ///
 /// Vortex keeps its copy in its own data folder and updates it while it
 /// runs; LOOT keeps one per game in its local data folder.
-pub fn standard_places() -> Vec<PathBuf> {
+pub fn standard_places(game: &str) -> Vec<PathBuf> {
     let mut places = Vec::new();
+    let Some((_, loot_folder)) = loot_game(game) else {
+        return places;
+    };
     if let Some(roaming) = dirs::config_dir() {
         places.push(
             roaming
                 .join("Vortex")
-                .join("skyrimse")
+                .join(game)
                 .join("masterlist")
                 .join("masterlist.yaml"),
         );
@@ -57,17 +77,17 @@ pub fn standard_places() -> Vec<PathBuf> {
             local
                 .join("LOOT")
                 .join("games")
-                .join("Skyrim Special Edition")
+                .join(loot_folder)
                 .join("masterlist.yaml"),
         );
     }
     places
 }
 
-/// The masterlist to read: the most recently updated of those in
-/// [`standard_places`], or `None` if there is none.
-pub fn find_masterlist() -> Option<PathBuf> {
-    standard_places()
+/// The masterlist of `game` to read: the most recently updated of those
+/// in [`standard_places`], or `None` if there is none.
+pub fn find_masterlist(game: &str) -> Option<PathBuf> {
+    standard_places(game)
         .into_iter()
         .filter_map(|path| {
             let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
@@ -78,22 +98,26 @@ pub fn find_masterlist() -> Option<PathBuf> {
 }
 
 /// Reads what the masterlist at `masterlist` says about the active
-/// `plugins` of the game in `game_dir`.
+/// `plugins` of the game with the mod manager's identifier `game`
+/// (`skyrimse`), installed in `game_dir`.
 ///
 /// `local_dir` is the directory of the list of active plugins, if it is not
 /// the standard one. `shipped` names, in lower case, the plugins that come
 /// with the game. A plugin whose rules cannot be evaluated is left out and
 /// logged; the others are still reported.
 pub fn read(
+    game: &str,
     game_dir: &Path,
     local_dir: Option<&Path>,
     masterlist: &Path,
     plugins: &[PluginFacts],
     shipped: &[String],
 ) -> Result<KnowledgeFacts, KnowledgeError> {
+    let (game_type, _) =
+        loot_game(game).ok_or_else(|| KnowledgeError::Game(format!("unknown game `{game}`")))?;
     let mut game = match local_dir {
-        Some(local_dir) => Game::with_local_path(GameType::SkyrimSE, game_dir, local_dir),
-        None => Game::new(GameType::SkyrimSE, game_dir),
+        Some(local_dir) => Game::with_local_path(game_type, game_dir, local_dir),
+        None => Game::new(game_type, game_dir),
     }
     .map_err(|error| KnowledgeError::Game(error.to_string()))?;
     game.load_current_load_order_state()
@@ -316,6 +340,7 @@ mod tests {
                 })
                 .collect();
             read(
+                "skyrimse",
                 &self.root.path().join("game"),
                 Some(&self.root.path().join("local")),
                 masterlist,
@@ -444,6 +469,7 @@ plugins:
         let masterlist = setup.masterlist("plugins: [ unclosed");
         let plugins = Vec::new();
         let result = read(
+            "skyrimse",
             &setup.root.path().join("game"),
             Some(&setup.root.path().join("local")),
             &masterlist,

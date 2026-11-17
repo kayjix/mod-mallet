@@ -136,6 +136,7 @@ impl Setup {
 
     fn options(&self) -> ScanOptions {
         ScanOptions {
+            game: None,
             game_dir: Some(self.game_dir()),
             local_dir: Some(self.local_dir()),
             extender_log: Some(self.log_path()),
@@ -877,10 +878,16 @@ fn a_deployment_for_another_installation_is_an_error() {
 #[test]
 fn the_last_scan_can_be_shown_again_without_scanning() {
     let setup = Setup::new().with_vortex_deployment();
-    assert_eq!(last_report(&setup.cache_path()).unwrap(), None);
+    assert_eq!(
+        last_report(&setup.options(), &setup.cache_path()).unwrap(),
+        None
+    );
 
     let report = scan_and_store(&setup.options(), &setup.cache_path()).unwrap();
-    assert_eq!(last_report(&setup.cache_path()).unwrap(), Some(report));
+    assert_eq!(
+        last_report(&setup.options(), &setup.cache_path()).unwrap(),
+        Some(report)
+    );
 }
 
 #[test]

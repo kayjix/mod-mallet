@@ -13,15 +13,16 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+
 use std::path::PathBuf;
 
 use mallet_core::GamePath;
 use mallet_core::facts::RecordId;
 use mallet_core::facts::markers::{MapMarkerFact, MarkerFacts, MarkerVersion};
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, Signature, group_type};
-use mallet_formats_bethesda::{bsa, strings};
+use mallet_formats_bethesda::strings;
 
+use crate::game::{Family, Game};
 use crate::meshes::LoadedArchive;
 
 /// Record flag: the record is deleted.
@@ -215,10 +216,20 @@ impl Contribution {
 /// order so that later versions replace earlier ones.
 #[derive(Debug, Default)]
 pub struct Collector {
+    /// The game whose plugins are added.
+    game: Game,
     markers: HashMap<RecordId, MapMarkerFact>,
 }
 
 impl Collector {
+    /// A collector for the plugins of `game`.
+    pub fn new(game: Game) -> Self {
+        Self {
+            game,
+            markers: HashMap::new(),
+        }
+    }
+
     /// Takes in what the plugin `plugin_name` says about markers.
     pub fn merge(&mut self, plugin_name: &str, contribution: Contribution) {
         for entry in contribution.entries {
@@ -233,8 +244,8 @@ impl Collector {
                 } => {
                     let version = MarkerVersion {
                         plugin: plugin_name.to_owned(),
-                        official: crate::objects::is_official(plugin_name),
-                        kind,
+                        official: self.game.is_official(plugin_name),
+                        kind: self.kind(kind),
                         name,
                         position,
                         removed,
@@ -258,13 +269,25 @@ impl Collector {
                     if let Some(marker) = self.markers.get_mut(&id) {
                         marker.last = MarkerVersion {
                             plugin: plugin_name.to_owned(),
-                            official: crate::objects::is_official(plugin_name),
+                            official: self.game.is_official(plugin_name),
                             removed: true,
                             ..marker.last.clone()
                         };
                     }
                 }
             }
+        }
+    }
+
+    /// The kind of a marker as `MarkerVersion::kind` gives it: in Skyrim's
+    /// numbering. The other games number their kinds of places
+    /// differently, and their tables are not known here yet; their
+    /// markers are of no particular kind (0).
+    fn kind(&self, kind: u8) -> u8 {
+        if self.game.family() == Family::Skyrim {
+            kind
+        } else {
+            0
         }
     }
 
@@ -345,28 +368,28 @@ pub(crate) fn string_table(
         .iter()
         .rev()
         .flat_map(|archive| {
-            archive.directory.entries.iter().filter_map(move |entry| {
-                // Paths in an archive lie below the data directory.
-                let path = GamePath::new(crate::DATA_DIR).join(&entry.path);
-                Some((language(path.as_str())?, archive, entry))
-            })
+            archive
+                .directory
+                .paths()
+                .into_iter()
+                .enumerate()
+                .filter_map(move |(index, path)| {
+                    // Paths in an archive lie below the data directory.
+                    let path = GamePath::new(crate::DATA_DIR).join(path);
+                    Some((language(path.as_str())?, archive, index))
+                })
         })
         .min_by_key(|(language, _, _)| rank(language));
-    let Some((_, archive, entry)) = best_packed else {
+    let Some((_, archive, index)) = best_packed else {
         return HashMap::new();
     };
-    read_packed(archive, entry).map_or_else(HashMap::new, |data| strings::parse_strings(&data))
+    read_packed(archive, index).map_or_else(HashMap::new, |data| strings::parse_strings(&data))
 }
 
 /// The content of one file in an archive.
-fn read_packed(archive: &LoadedArchive, entry: &bsa::Entry) -> Option<Vec<u8>> {
+fn read_packed(archive: &LoadedArchive, index: usize) -> Option<Vec<u8>> {
     let mut file = File::open(&archive.file).ok()?;
-    file.seek(SeekFrom::Start(u64::from(entry.offset))).ok()?;
-    let mut stored = Vec::new();
-    file.take(u64::from(entry.size))
-        .read_to_end(&mut stored)
-        .ok()?;
-    bsa::unpack(&stored, entry, &archive.directory).ok()
+    archive.directory.read(&mut file, index)
 }
 
 #[cfg(test)]

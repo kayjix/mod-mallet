@@ -75,8 +75,17 @@ export interface Texts {
   managerLinkOutdated: string;
   managerLinkMissing: string;
   gameLabel: string;
-  /** The games of the game menu; only the first can be chosen so far. */
+  /**
+   * The games of the game menu. Those Mod Mallet reads have no quip; which
+   * of them are installed comes from the Rust side. The others are a promise.
+   */
   games: { id: string; name: string; quip?: string }[];
+  /** A game Mod Mallet reads, but that is not on this machine. */
+  gameNotInstalled: string;
+  /** A game Mod Mallet reads, but not yet with every check. */
+  gameBasic: string;
+  /** The button that makes a game the one to look at. */
+  gameSwitch: string;
   viewHome: string;
   homeGames: string;
   homeActive: string;
@@ -383,11 +392,13 @@ export const texts: Record<Lang, Texts> = {
     gameLabel: "Game",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
-      { id: "skyrim", name: "Skyrim (2011)", quip: "the mallet is still warming up" },
-      { id: "skyrimvr", name: "Skyrim VR", quip: "the mallet needs both hands" },
-      { id: "fallout4", name: "Fallout 4", quip: "still in the forge" },
-      { id: "falloutnv", name: "Fallout: New Vegas", quip: "still in the forge, too" },
-      { id: "oblivion", name: "Oblivion", quip: "closing a few gates first" },
+      { id: "skyrimvr", name: "Skyrim VR" },
+      { id: "skyrim", name: "Skyrim (2011)" },
+      { id: "fallout4", name: "Fallout 4" },
+      { id: "fallout4vr", name: "Fallout 4 VR" },
+      { id: "falloutnv", name: "Fallout: New Vegas" },
+      { id: "fallout3", name: "Fallout 3" },
+      { id: "oblivion", name: "Oblivion" },
       { id: "morrowind", name: "Morrowind", quip: "waiting for a silt strider" },
       { id: "starfield", name: "Starfield", quip: "the mallet needs a space suit" },
       { id: "tes6", name: "The Elder Scrolls VI", quip: "as soon as it exists" },
@@ -395,6 +406,9 @@ export const texts: Record<Lang, Texts> = {
       { id: "cyberpunk2077", name: "Cyberpunk 2077", quip: "waiting for a patch (yes, we know)" },
     ],
     soon: "soon",
+    gameNotInstalled: "not found on this computer",
+    gameBasic: "the basics: load order, files, archives, map, toolbox",
+    gameSwitch: "Switch to this game",
     viewHome: "Home",
     homeGames: "Games",
     homeActive: "Active",
@@ -794,11 +808,13 @@ export const texts: Record<Lang, Texts> = {
     gameLabel: "Spiel",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
-      { id: "skyrim", name: "Skyrim (2011)", quip: "der Hammer wärmt sich noch auf" },
-      { id: "skyrimvr", name: "Skyrim VR", quip: "der Hammer braucht beide Hände" },
-      { id: "fallout4", name: "Fallout 4", quip: "liegt noch in der Schmiede" },
-      { id: "falloutnv", name: "Fallout: New Vegas", quip: "liegt auch noch in der Schmiede" },
-      { id: "oblivion", name: "Oblivion", quip: "schließt erst noch ein paar Tore" },
+      { id: "skyrimvr", name: "Skyrim VR" },
+      { id: "skyrim", name: "Skyrim (2011)" },
+      { id: "fallout4", name: "Fallout 4" },
+      { id: "fallout4vr", name: "Fallout 4 VR" },
+      { id: "falloutnv", name: "Fallout: New Vegas" },
+      { id: "fallout3", name: "Fallout 3" },
+      { id: "oblivion", name: "Oblivion" },
       { id: "morrowind", name: "Morrowind", quip: "wartet noch auf einen Schlickschreiter" },
       { id: "starfield", name: "Starfield", quip: "der Hammer braucht noch einen Raumanzug" },
       { id: "tes6", name: "The Elder Scrolls VI", quip: "sobald es das gibt" },
@@ -810,6 +826,9 @@ export const texts: Record<Lang, Texts> = {
       },
     ],
     soon: "bald",
+    gameNotInstalled: "auf diesem Computer nicht gefunden",
+    gameBasic: "das Grundlegende: Ladereihenfolge, Dateien, Archive, Karte, Werkzeuge",
+    gameSwitch: "Zu diesem Spiel wechseln",
     viewHome: "Start",
     homeGames: "Spiele",
     homeActive: "Aktiv",

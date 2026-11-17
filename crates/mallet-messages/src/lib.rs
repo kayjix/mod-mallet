@@ -572,6 +572,8 @@ impl Messages {
             LocationOrigin::Given => "origin-given",
             LocationOrigin::Registry => "origin-registry",
             LocationOrigin::Standard => "origin-standard",
+            LocationOrigin::Steam => "origin-steam",
+            LocationOrigin::Gog => "origin-gog",
         };
         RenderedLocation {
             location: location.clone(),

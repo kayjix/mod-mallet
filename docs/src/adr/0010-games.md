@@ -1,6 +1,6 @@
 # 0010 Games: the Bethesda family first
 
-- Status: accepted
+- Status: accepted; the adapter per game was changed into one adapter for the family by [0036](0036-one-adapter-for-the-bethesda-family.md)
 - Date: 2026-11-15
 
 ## Context

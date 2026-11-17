@@ -39,6 +39,11 @@
 //! A record's identifier (its *form ID*) is written relative to the plugin's
 //! masters. [`resolve_form_id`] turns it into the plugin that defines the
 //! record and the record's number there, which is the same in every plugin.
+//!
+//! Every record and group starts with a header of 24 bytes, except in
+//! Oblivion, where the last four bytes are missing. The reader tells the two
+//! apart by the plugin's header record: in an Oblivion plugin its first
+//! field, `HEDR`, starts where the longer header would still go on.
 
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -49,7 +54,12 @@ use crate::{Bytes, decode_text};
 /// The four-character type of a record, group or subrecord, such as `NPC_`.
 pub type Signature = [u8; 4];
 
+/// The length of a record or group header from Fallout 3 on.
 const HEADER_LEN: usize = 24;
+/// The length of a record or group header in Oblivion.
+const SHORT_HEADER_LEN: usize = 20;
+/// The first field of the plugin header record.
+const HEADER_FIELD: &Signature = b"HEDR";
 const GROUP: &Signature = b"GRUP";
 const PLUGIN_HEADER: &Signature = b"TES4";
 const OVERSIZED: &Signature = b"XXXX";
@@ -221,13 +231,13 @@ pub fn read_request_where<R: Read + Seek>(
     request: &Request<'_>,
     descend: &dyn Fn(GroupLabel) -> bool,
 ) -> Result<Plugin, PluginError> {
-    let header = read_plugin_header(reader)?;
+    let (header, header_len) = read_plugin_header(reader)?;
     let mut plugin = Plugin {
         header,
         ..Plugin::default()
     };
 
-    while let Some(group_header) = read_header(reader)? {
+    while let Some(group_header) = read_header(reader, header_len)? {
         let mut bytes = Bytes::new(&group_header);
         let (Some(signature), Some(size), Some(label), Some(group_type)) = (
             bytes.signature(),
@@ -237,7 +247,7 @@ pub fn read_request_where<R: Read + Seek>(
         ) else {
             break;
         };
-        let body_len = u64::from(size).checked_sub(HEADER_LEN as u64);
+        let body_len = u64::from(size).checked_sub(header_len as u64);
         let (true, Some(body_len)) = (&signature == GROUP, body_len) else {
             // Anything but a well-formed group at the top level means the
             // rest of the file cannot be trusted.
@@ -258,7 +268,12 @@ pub fn read_request_where<R: Read + Seek>(
             } else {
                 Scope::Flat
             };
-            read_group(&body, scope, descend, &mut Vec::new(), &mut plugin);
+            let reading = Reading {
+                header_len,
+                scope,
+                descend,
+            };
+            read_group(&body, &reading, &mut Vec::new(), &mut plugin);
         } else {
             let Ok(offset) = i64::try_from(body_len) else {
                 plugin.damaged += 1;
@@ -286,10 +301,11 @@ pub fn resolve_form_id<'a>(
     (origin, form_id & 0x00FF_FFFF)
 }
 
-/// Reads up to one 24-byte header. `None` at a clean end of the file, and
-/// also when the file ends in the middle of a header.
-fn read_header<R: Read>(reader: &mut R) -> io::Result<Option<[u8; HEADER_LEN]>> {
-    let mut header = [0u8; HEADER_LEN];
+/// Reads up to one header of `len` bytes, at most [`HEADER_LEN`]. `None` at
+/// a clean end of the file, and also when the file ends in the middle of a
+/// header.
+fn read_header<R: Read>(reader: &mut R, len: usize) -> io::Result<Option<Vec<u8>>> {
+    let mut header = vec![0u8; len.min(HEADER_LEN)];
     let mut filled = 0;
     while let Some(rest) = header.get_mut(filled..).filter(|rest| !rest.is_empty()) {
         match reader.read(rest) {
@@ -302,8 +318,10 @@ fn read_header<R: Read>(reader: &mut R) -> io::Result<Option<[u8; HEADER_LEN]>> 
     Ok(Some(header))
 }
 
-fn read_plugin_header<R: Read>(reader: &mut R) -> Result<PluginHeader, PluginError> {
-    let header = read_header(reader)?.ok_or(PluginError::NotAPlugin)?;
+/// Reads the plugin header record. Returns it with the length of every
+/// record and group header in this plugin.
+fn read_plugin_header<R: Read>(reader: &mut R) -> Result<(PluginHeader, usize), PluginError> {
+    let header = read_header(reader, HEADER_LEN)?.ok_or(PluginError::NotAPlugin)?;
     let mut bytes = Bytes::new(&header);
     let (Some(signature), Some(size), Some(flags)) = (bytes.signature(), bytes.u32(), bytes.u32())
     else {
@@ -314,10 +332,18 @@ fn read_plugin_header<R: Read>(reader: &mut R) -> Result<PluginHeader, PluginErr
         return Err(PluginError::NotAPlugin);
     }
 
-    let mut data = Vec::new();
+    // In Oblivion the header is four bytes shorter, so what was read as its
+    // last four bytes is already the record's first field.
+    let first_field = header.get(SHORT_HEADER_LEN..HEADER_LEN);
+    let (header_len, mut data) = match first_field {
+        Some(field) if field == HEADER_FIELD.as_slice() => (SHORT_HEADER_LEN, field.to_vec()),
+        _ => (HEADER_LEN, Vec::new()),
+    };
+    data.truncate(size);
+    let rest = size.saturating_sub(data.len());
     reader
         .by_ref()
-        .take(u64::try_from(size).unwrap_or(u64::MAX))
+        .take(u64::try_from(rest).unwrap_or(u64::MAX))
         .read_to_end(&mut data)?;
 
     let masters = read_subrecords(&data)
@@ -325,12 +351,13 @@ fn read_plugin_header<R: Read>(reader: &mut R) -> Result<PluginHeader, PluginErr
         .filter(|subrecord| &subrecord.signature == b"MAST")
         .map(|subrecord| decode_text(until_nul(&subrecord.data)))
         .collect();
-    Ok(PluginHeader {
+    let header = PluginHeader {
         masters,
         is_master: flags & FLAG_MASTER != 0,
         is_light: flags & FLAG_LIGHT != 0,
         is_localized: flags & FLAG_LOCALIZED != 0,
-    })
+    };
+    Ok((header, header_len))
 }
 
 /// What to read from the body of a group.
@@ -342,15 +369,29 @@ enum Scope<'a> {
     Nested(&'a [Signature]),
 }
 
+/// What stays the same while the groups of a plugin are read.
+struct Reading<'a> {
+    /// The length of every record and group header in the plugin.
+    header_len: usize,
+    /// What to read from the groups.
+    scope: Scope<'a>,
+    /// Which nested groups to descend into.
+    descend: &'a dyn Fn(GroupLabel) -> bool,
+}
+
 /// Reads the records in the body of a group. `groups` are the nested
 /// groups the body lies in.
 fn read_group(
     body: &[u8],
-    scope: Scope<'_>,
-    descend: &dyn Fn(GroupLabel) -> bool,
+    reading: &Reading<'_>,
     groups: &mut Vec<GroupLabel>,
     plugin: &mut Plugin,
 ) {
+    let Reading {
+        header_len,
+        scope,
+        descend,
+    } = *reading;
     let mut bytes = Bytes::new(body);
     while bytes.remaining() > 0 {
         let (Some(signature), Some(size), Some(third), Some(form_id)) =
@@ -359,15 +400,15 @@ fn read_group(
             plugin.damaged += 1;
             return;
         };
-        // The rest of the 24-byte header: version control data.
-        let rest_of_header = HEADER_LEN - 16;
+        // The rest of the header: version control data.
+        let rest_of_header = header_len.saturating_sub(16);
         let size = usize::try_from(size).unwrap_or(usize::MAX);
 
         if &signature == GROUP {
             // For a group, the size includes the header just read, and its
             // third field is the type that the label belongs to.
             let (label, group_type) = (third, form_id);
-            let Some(nested) = size.checked_sub(HEADER_LEN).and_then(|body_len| {
+            let Some(nested) = size.checked_sub(header_len).and_then(|body_len| {
                 bytes
                     .skip(rest_of_header)
                     .and_then(|()| bytes.take(body_len))
@@ -381,7 +422,7 @@ fn read_group(
             {
                 if groups.len() < MAX_GROUP_DEPTH {
                     groups.push(group);
-                    read_group(nested, scope, descend, groups, plugin);
+                    read_group(nested, reading, groups, plugin);
                     groups.pop();
                 } else {
                     plugin.damaged += 1;
@@ -747,6 +788,178 @@ mod tests {
         assert_eq!(plugin.damaged, 1);
     }
 
+    /// Like [`sample`], with Oblivion's 20-byte headers.
+    fn oblivion_sample() -> Vec<u8> {
+        fixture::oblivion::plugin(
+            &["Oblivion.esm"],
+            FLAG_MASTER,
+            &[
+                (WEAPON, vec![RecordSpec::new(WEAPON, 0x0001_2EB7)]),
+                (
+                    NPC,
+                    vec![
+                        npc(0x0001_3BA1, "Umbacano"),
+                        npc(0x0100_0D62, "NewGuard").compressed(),
+                    ],
+                ),
+            ],
+        )
+    }
+
+    /// Like [`places`], with Oblivion's 20-byte headers.
+    fn oblivion_places() -> Vec<u8> {
+        let cell = RecordSpec::new(*b"CELL", 0x0000_0801).with(*b"EDID", fixture::zstring("Room"));
+        let world = RecordSpec::new(*b"WRLD", 0x0000_003C);
+        let outside = RecordSpec::new(*b"CELL", 0x0000_0802);
+        let placed = |form_id| fixture::reference(form_id, 0x0001_0000, [1.0; 3], [0.0; 3], None);
+        let land = RecordSpec::new(*b"LAND", 0x0000_0803)
+            .with(*b"VHGT", vec![0; 64])
+            .compressed();
+        fixture::oblivion::plugin_with_raw_groups(
+            &["Oblivion.esm"],
+            0,
+            &[
+                fixture::oblivion::group(
+                    NPC,
+                    0,
+                    &fixture::oblivion::record(&npc(0x0000_0900, "Somebody")),
+                ),
+                fixture::oblivion::interior_cells(&[(cell, vec![placed(0x0000_0811)])]),
+                fixture::oblivion::worldspace(
+                    &world,
+                    &[(outside, vec![land, placed(0x0000_0812)])],
+                ),
+            ],
+        )
+    }
+
+    #[test]
+    fn oblivion_fixtures_have_short_headers() {
+        let data = oblivion_sample();
+        assert_eq!(&data[20..24], b"HEDR");
+        let data = sample();
+        assert_ne!(&data[20..24], b"HEDR");
+    }
+
+    #[test]
+    fn reads_the_header_of_an_oblivion_plugin() {
+        let plugin = read_bytes(&oblivion_sample(), &[]);
+        assert_eq!(plugin.header.masters, ["Oblivion.esm"]);
+        assert!(plugin.header.is_master);
+        assert_eq!(plugin.records, Vec::new());
+        assert_eq!(plugin.damaged, 0);
+    }
+
+    #[test]
+    fn reads_the_records_of_an_oblivion_plugin() {
+        let plugin = read_bytes(&oblivion_sample(), &[NPC, WEAPON]);
+        assert_eq!(plugin.damaged, 0);
+        let found: Vec<_> = plugin
+            .records
+            .iter()
+            .map(|record| (record.signature, record.form_id))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                (WEAPON, 0x0001_2EB7),
+                (NPC, 0x0001_3BA1),
+                (NPC, 0x0100_0D62)
+            ]
+        );
+        assert_eq!(
+            plugin.records[1].first(b"EDID"),
+            Some(b"Umbacano\0".as_slice())
+        );
+    }
+
+    #[test]
+    fn compressed_records_of_an_oblivion_plugin_are_unpacked() {
+        let plugin = read_bytes(&oblivion_sample(), &[NPC]);
+        let compressed = &plugin.records[1];
+        assert_ne!(compressed.flags & FLAG_COMPRESSED, 0);
+        assert_eq!(compressed.first(b"EDID"), Some(b"NewGuard\0".as_slice()));
+    }
+
+    #[test]
+    fn nested_groups_of_an_oblivion_plugin_are_read_on_request() {
+        let plugin = read_places(&oblivion_places());
+        assert_eq!(plugin.damaged, 0);
+        let found: Vec<_> = plugin
+            .records
+            .iter()
+            .map(|record| (record.signature, record.form_id))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                (NPC, 0x0000_0900),
+                (*b"CELL", 0x0000_0801),
+                (*b"REFR", 0x0000_0811),
+                (*b"WRLD", 0x0000_003C),
+                (*b"CELL", 0x0000_0802),
+                (*b"REFR", 0x0000_0812),
+            ]
+        );
+        let outside = plugin
+            .records
+            .iter()
+            .find(|record| record.form_id == 0x0000_0812)
+            .unwrap();
+        let groups: Vec<_> = outside
+            .groups
+            .iter()
+            .map(|group| (group.group_type, group.label))
+            .collect();
+        assert_eq!(
+            groups,
+            [
+                (group_type::WORLD_CHILDREN, 0x0000_003C),
+                (group_type::EXTERIOR_BLOCK, 0),
+                (group_type::EXTERIOR_SUB_BLOCK, 0),
+                (group_type::CELL_CHILDREN, 0x0000_0802),
+                (group_type::CELL_TEMPORARY_CHILDREN, 0x0000_0802),
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_groups_of_an_oblivion_plugin_are_skipped_in_flat_reading() {
+        let mut data = fixture::oblivion::plugin(&[], 0, &[]);
+        let nested = fixture::oblivion::group(
+            *b"\x01\0\0\0",
+            6,
+            &fixture::oblivion::record(&npc(0x999, "Inner")),
+        );
+        let mut body = fixture::oblivion::record(&npc(0x801, "Before"));
+        body.extend(nested);
+        body.extend(fixture::oblivion::record(&npc(0x802, "After")));
+        data.extend(fixture::oblivion::group(NPC, 0, &body));
+
+        let plugin = read_bytes(&data, &[NPC]);
+        let ids: Vec<_> = plugin.records.iter().map(|record| record.form_id).collect();
+        assert_eq!(ids, [0x801, 0x802]);
+        assert_eq!(plugin.damaged, 0);
+    }
+
+    #[test]
+    fn a_cut_off_oblivion_plugin_yields_what_was_complete() {
+        let data = oblivion_sample();
+        let plugin = read_bytes(&data[..data.len() - 10], &[NPC]);
+        assert_eq!(plugin.records.len(), 1);
+        assert!(plugin.damaged > 0);
+    }
+
+    #[test]
+    fn an_oblivion_header_record_cut_short_is_not_a_crash() {
+        // A plugin header whose size is smaller than the field already
+        // read ahead.
+        let mut data = oblivion_sample();
+        data[4..8].copy_from_slice(&2u32.to_le_bytes());
+        let plugin = read_bytes(&data, &[NPC]);
+        assert_eq!(plugin.header.masters, Vec::<String>::new());
+    }
+
     proptest! {
         #[test]
         fn never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..512)) {
@@ -754,12 +967,33 @@ mod tests {
         }
 
         #[test]
+        fn never_panics_on_arbitrary_bytes_after_an_oblivion_header(
+            size in any::<u32>(),
+            rest in proptest::collection::vec(any::<u8>(), 0..512),
+        ) {
+            let mut data = b"TES4".to_vec();
+            data.extend(size.to_le_bytes());
+            data.extend([0; 12]);
+            data.extend(b"HEDR");
+            data.extend(rest);
+            let _ = read_request(
+                &mut Cursor::new(&data),
+                &Request {
+                    flat: &[NPC],
+                    nested: &[*b"CELL", *b"WRLD"],
+                    nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+                },
+            );
+        }
+
+        #[test]
         fn never_panics_on_a_damaged_plugin(
+            oblivion in any::<bool>(),
             position in 0usize..400,
             value in any::<u8>(),
             cut in 0usize..400,
         ) {
-            let mut data = sample();
+            let mut data = if oblivion { oblivion_sample() } else { sample() };
             if let Some(byte) = data.get_mut(position) {
                 *byte = value;
             }
@@ -769,11 +1003,12 @@ mod tests {
 
         #[test]
         fn never_panics_on_damaged_places(
+            oblivion in any::<bool>(),
             position in 0usize..700,
             value in any::<u8>(),
             cut in 0usize..700,
         ) {
-            let mut data = places();
+            let mut data = if oblivion { oblivion_places() } else { places() };
             if let Some(byte) = data.get_mut(position) {
                 *byte = value;
             }

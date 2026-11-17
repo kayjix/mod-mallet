@@ -1,58 +1,59 @@
-//! What Skyrim Special Edition needs besides the mods: the script
-//! extender, the libraries most of its plugins need, and the tools that are
-//! used to make or check mods.
+//! What a game needs besides the mods: the script extender, the libraries
+//! most of its plugins need, and the tools that are used to make or check
+//! mods.
 
 use std::path::Path;
 
 use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
 
+use crate::game::{AddressLibrary, Game};
 use crate::swap::SWAPPER_PLUGIN;
 
-/// The script extender's page.
-const SKSE_PAGE: &str = "https://skse.silverlock.org/";
-/// Address Library for SKSE Plugins on Nexus Mods.
-const ADDRESS_LIBRARY_PAGE: &str = "https://www.nexusmods.com/skyrimspecialedition/mods/32444";
 /// Base Object Swapper on Nexus Mods.
 const SWAPPER_PAGE: &str = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
 /// Microsoft's page of the Visual C++ runtime.
 const VC_RUNTIME_PAGE: &str =
     "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist";
-/// The Creation Kit on Steam.
-const CREATION_KIT_PAGE: &str = "https://store.steampowered.com/app/1946180/";
 /// LOOT's page.
 const LOOT_PAGE: &str = "https://loot.github.io/";
 
-/// Looks at what the game in `game_dir` needs besides its mods.
+/// Looks at what `game`, installed in `game_dir`, needs besides its mods.
 /// `game_version` is the version the game last ran in, as the script
 /// extender logged it (`1.7.104`); without it, versions are not compared.
-pub fn requirements(game_dir: &Path, game_version: Option<&str>) -> Vec<Tool> {
-    let plugins = game_dir.join("Data").join("SKSE").join("Plugins");
-    vec![
-        script_extender(game_dir, game_version),
-        address_library(&plugins, game_version),
-        vc_runtime(),
-        swapper(game_dir),
-        creation_kit(game_dir),
-        loot(),
-    ]
+pub fn requirements(game: Game, game_dir: &Path, game_version: Option<&str>) -> Vec<Tool> {
+    let plugins = game_dir.join(game.script_extender().plugin_dir);
+    let mut tools = vec![script_extender(game, game_dir, game_version)];
+    if let Some(library) = game.address_library() {
+        tools.push(address_library(library, &plugins, game_version));
+    }
+    tools.push(vc_runtime(game.is_64_bit()));
+    if game.has_object_swapper() {
+        tools.push(swapper(game_dir));
+    }
+    tools.push(editor(game, game_dir));
+    tools.push(loot());
+    tools
 }
 
-/// SKSE: its loader, and its library for the game's version.
-fn script_extender(game_dir: &Path, game_version: Option<&str>) -> Tool {
-    let loader = game_dir.join("skse64_loader.exe");
+/// The script extender: its loader, and its library for the game's
+/// version where it ships one per version.
+fn script_extender(game: Game, game_dir: &Path, game_version: Option<&str>) -> Tool {
+    let extender = game.script_extender();
+    let loader = game_dir.join(extender.loader);
     let tool = |state| {
-        Tool::new("skse", ToolNeed::Required, state)
-            .with_page(SKSE_PAGE)
+        Tool::new(extender.tool, ToolNeed::Required, state)
+            .with_page(extender.page)
             .with_path(Some(loader.display().to_string()))
     };
     if !loader.is_file() {
         return tool(ToolState::Missing).with_path(None);
     }
-    let Some(version) = game_version else {
+    let (Some(version), Some(prefix)) = (game_version, extender.versioned_library) else {
         return tool(ToolState::Ready);
     };
-    // SKSE ships one library per game version it supports, named after it.
-    let library = game_dir.join(format!("skse64_{}.dll", version.replace('.', "_")));
+    // The extender ships one library per game version it supports, named
+    // after it.
+    let library = game_dir.join(format!("{prefix}_{}.dll", version.replace('.', "_")));
     let state = if library.is_file() {
         ToolState::Ready
     } else {
@@ -61,9 +62,10 @@ fn script_extender(game_dir: &Path, game_version: Option<&str>) -> Tool {
     tool(state).with_version(Some(format!("→ {version}")))
 }
 
-/// Address Library: one database file per game version. Files for 1.5 are
-/// called `version-…`, those for 1.6 and later `versionlib-…`.
-fn address_library(plugins: &Path, game_version: Option<&str>) -> Tool {
+/// Address Library: one database file per game version. Files for
+/// Skyrim 1.5, Skyrim VR and Fallout 4 are called `version-…`, those for
+/// Skyrim 1.6 and later `versionlib-…`.
+fn address_library(library: AddressLibrary, plugins: &Path, game_version: Option<&str>) -> Tool {
     let names: Vec<String> = std::fs::read_dir(plugins).map_or_else(
         |_| Vec::new(),
         |entries| {
@@ -73,16 +75,15 @@ fn address_library(plugins: &Path, game_version: Option<&str>) -> Tool {
                 .filter(|name| {
                     let path = Path::new(name);
                     name.to_ascii_lowercase().starts_with("version")
-                        && path
-                            .extension()
-                            .is_some_and(|extension| extension.eq_ignore_ascii_case("bin"))
+                        && path.extension().is_some_and(|extension| {
+                            extension.eq_ignore_ascii_case(library.extension)
+                        })
                 })
                 .collect()
         },
     );
-    let tool = |state| {
-        Tool::new("address-library", ToolNeed::Recommended, state).with_page(ADDRESS_LIBRARY_PAGE)
-    };
+    let tool =
+        |state| Tool::new(library.tool, ToolNeed::Recommended, state).with_page(library.page);
     if names.is_empty() {
         return tool(ToolState::Missing);
     }
@@ -91,8 +92,8 @@ fn address_library(plugins: &Path, game_version: Option<&str>) -> Tool {
     };
     let dashed = version.replace('.', "-");
     let wanted = [
-        format!("versionlib-{dashed}-0.bin"),
-        format!("version-{dashed}-0.bin"),
+        format!("versionlib-{dashed}-0.{}", library.extension),
+        format!("version-{dashed}-0.{}", library.extension),
     ];
     let found = names
         .iter()
@@ -118,17 +119,18 @@ fn swapper(game_dir: &Path) -> Tool {
         .with_path((state == ToolState::Ready).then(|| path.display().to_string()))
 }
 
-/// Bethesda's editor, used to make and inspect mods.
-fn creation_kit(game_dir: &Path) -> Tool {
-    let path = game_dir.join("CreationKit.exe");
+/// Bethesda's editor for the game, used to make and inspect mods.
+fn editor(game: Game, game_dir: &Path) -> Tool {
+    let editor = game.editor();
+    let path = game_dir.join(editor.program);
     let state = if path.is_file() {
         ToolState::Ready
     } else {
         ToolState::Missing
     };
-    Tool::new("creation-kit", ToolNeed::Optional, state)
+    Tool::new(editor.tool, ToolNeed::Optional, state)
         .in_group(ToolGroup::Helper)
-        .with_page(CREATION_KIT_PAGE)
+        .with_page(editor.page)
         .with_path((state == ToolState::Ready).then(|| path.display().to_string()))
 }
 
@@ -152,9 +154,10 @@ fn loot() -> Tool {
 }
 
 /// The Visual C++ runtime, which nearly every script extender plugin is
-/// built against.
-fn vc_runtime() -> Tool {
-    let version = vc_runtime_version();
+/// built against: the 64-bit one for the newer games, the 32-bit one for
+/// the older.
+fn vc_runtime(wide: bool) -> Tool {
+    let version = vc_runtime_version(wide);
     let state = if version.is_some() {
         ToolState::Ready
     } else {
@@ -166,13 +169,17 @@ fn vc_runtime() -> Tool {
 }
 
 #[cfg(windows)]
-fn vc_runtime_version() -> Option<String> {
+fn vc_runtime_version(wide: bool) -> Option<String> {
     use winreg::RegKey;
     use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY};
 
     let key = RegKey::predef(HKEY_LOCAL_MACHINE)
         .open_subkey_with_flags(
-            r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+            if wide {
+                r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+            } else {
+                r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86"
+            },
             KEY_READ | KEY_WOW64_64KEY,
         )
         .ok()?;
@@ -185,7 +192,7 @@ fn vc_runtime_version() -> Option<String> {
 }
 
 #[cfg(not(windows))]
-fn vc_runtime_version() -> Option<String> {
+fn vc_runtime_version(_wide: bool) -> Option<String> {
     None
 }
 
@@ -206,7 +213,7 @@ mod tests {
     #[test]
     fn an_empty_game_lacks_the_extender_and_its_library() {
         let dir = game();
-        let tools = requirements(dir.path(), Some("1.7.104"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.7.104"));
         assert_eq!(state_of(&tools, "skse"), ToolState::Missing);
         assert_eq!(state_of(&tools, "address-library"), ToolState::Missing);
         assert_eq!(state_of(&tools, "base-object-swapper"), ToolState::Missing);
@@ -217,12 +224,22 @@ mod tests {
         let dir = game();
         std::fs::write(dir.path().join("skse64_loader.exe"), b"").unwrap();
         std::fs::write(dir.path().join("skse64_1_6_1170.dll"), b"").unwrap();
-        let tools = requirements(dir.path(), Some("1.7.104"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.7.104"));
         assert_eq!(state_of(&tools, "skse"), ToolState::Outdated);
 
         std::fs::write(dir.path().join("skse64_1_7_104.dll"), b"").unwrap();
-        let tools = requirements(dir.path(), Some("1.7.104"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.7.104"));
         assert_eq!(state_of(&tools, "skse"), ToolState::Ready);
+    }
+
+    #[test]
+    fn new_vegas_needs_its_own_extender_and_editor_and_no_address_library() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("nvse_loader.exe"), b"").unwrap();
+        let tools = requirements(Game::FalloutNv, dir.path(), None);
+        let ids: Vec<&str> = tools.iter().map(|tool| tool.id.as_str()).collect();
+        assert_eq!(ids, ["nvse", "vc-runtime", "geck", "loot"]);
+        assert_eq!(state_of(&tools, "nvse"), ToolState::Ready);
     }
 
     #[test]
@@ -230,17 +247,17 @@ mod tests {
         let dir = game();
         let plugins = dir.path().join("Data/SKSE/Plugins");
         std::fs::write(plugins.join("versionlib-1-6-1170-0.bin"), b"").unwrap();
-        let tools = requirements(dir.path(), Some("1.7.104"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.7.104"));
         assert_eq!(state_of(&tools, "address-library"), ToolState::Outdated);
 
         std::fs::write(plugins.join("versionlib-1-7-104-0.bin"), b"").unwrap();
-        let tools = requirements(dir.path(), Some("1.7.104"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.7.104"));
         assert_eq!(state_of(&tools, "address-library"), ToolState::Ready);
 
-        let tools = requirements(dir.path(), Some("1.5.97"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.5.97"));
         assert_eq!(state_of(&tools, "address-library"), ToolState::Outdated);
         std::fs::write(plugins.join("version-1-5-97-0.bin"), b"").unwrap();
-        let tools = requirements(dir.path(), Some("1.5.97"));
+        let tools = requirements(Game::SkyrimSe, dir.path(), Some("1.5.97"));
         assert_eq!(state_of(&tools, "address-library"), ToolState::Ready);
     }
 }

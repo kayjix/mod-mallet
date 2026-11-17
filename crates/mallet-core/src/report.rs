@@ -64,6 +64,52 @@ pub enum LocationOrigin {
     /// It is the place where the game or the mod manager always puts this
     /// file.
     Standard,
+    /// It was found in one of Steam's game libraries.
+    Steam,
+    /// It was read from the entry GOG Galaxy writes into the Windows
+    /// registry.
+    Gog,
+}
+
+/// How far Mod Mallet can look at a setup of a game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum GameSupport {
+    /// Every check Mod Mallet has runs for this game.
+    Full,
+    /// The load order, files, archives, plugins, placed objects, the map
+    /// and the toolbox are read; checks that need more knowledge of the
+    /// game, such as the kinds of its map's places, are still missing.
+    Basic,
+}
+
+/// The games Mod Mallet knows, and which of them the user looks at.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameChoice {
+    /// The identifier of the game the user looks at.
+    pub active: String,
+    /// Every game Mod Mallet knows, in the order they are offered.
+    pub games: Vec<KnownGame>,
+}
+
+/// A game Mod Mallet knows, and where it is on this machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KnownGame {
+    /// Identifier of the game, the same the mod manager uses, for example
+    /// `skyrimse`.
+    pub id: String,
+    /// The game's name.
+    pub name: String,
+    /// How far Mod Mallet can look at a setup of this game.
+    pub support: GameSupport,
+    /// The directory the game is installed in, if it was found or named.
+    pub dir: Option<String>,
+    /// How the directory was found.
+    pub origin: Option<LocationOrigin>,
+    /// The short name of the game's script extender, such as `SKSE`.
+    pub script_extender: String,
 }
 
 /// A place the scan looked at, so that nobody has to wonder what was read.

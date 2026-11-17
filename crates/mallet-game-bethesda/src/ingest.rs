@@ -1,4 +1,4 @@
-//! Reads a Skyrim Special Edition installation into facts.
+//! Reads an installation of one of the games into facts.
 //!
 //! This is the part of the adapter that touches the disk. It only reads
 //! (ADR 0005), and it reads as little as possible: the directory listing of
@@ -12,22 +12,19 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
-use loadorder::{GameId, GameSettings};
+use loadorder::GameSettings;
 use mallet_core::facts::{
     ArchiveFacts, MarkerFacts, MeshOverride, ObjectFacts, PluginFacts, TerrainFacts, UnreadableFile,
 };
 use mallet_core::{GamePath, TextCache};
-use mallet_formats_bethesda::{bsa, plugin};
+use mallet_formats_bethesda::plugin;
 
+use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
-use crate::{DATA_DIR, archives, markers, npc, objects, terrain};
-
-/// The largest archive file list that is read. Far above any real archive;
-/// it keeps a damaged header from asking for gigabytes of memory.
-const MAX_LISTING: u64 = 512 * 1024 * 1024;
+use crate::{DATA_DIR, archive, archives, markers, npc, objects, terrain};
 
 /// What was read from the installation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -63,17 +60,18 @@ pub enum IngestError {
     DataDir(#[from] io::Error),
 }
 
-/// Reads the installation in `game_dir`.
+/// Reads the installation of `game` in `game_dir`.
 ///
 /// `local_dir` is the directory that holds `plugins.txt`. It is detected if
 /// `None`, which works on Windows only. `cache` keeps what is slow to read
 /// until the files it came from change.
 pub fn read_setup(
+    game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
     cache: &dyn TextCache,
 ) -> Result<SetupFacts, IngestError> {
-    let (active_plugins, plugin_list) = active_plugins(game_dir, local_dir)?;
+    let (active_plugins, plugin_list) = active_plugins(game, game_dir, local_dir)?;
     let data_dir = game_dir.join("Data");
     let data_path = GamePath::new(DATA_DIR);
 
@@ -85,22 +83,18 @@ pub fn read_setup(
     };
     let mut loaded_archives = Vec::new();
 
-    let archives_on_disk: Vec<String> = std::fs::read_dir(&data_dir)?
-        .filter_map(Result::ok)
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| name.to_ascii_lowercase().ends_with(".bsa"))
-        .collect();
-    for name in archives::load_order(&archives_on_disk, &active_plugins) {
+    let archives_on_disk = archives_in(game, &data_dir)?;
+    for name in archives::load_order(game, &archives_on_disk, &active_plugins) {
         let path = data_path.join(&name);
         let file = data_dir.join(&name);
-        match read_archive_directory(&file) {
+        match archive::read_directory(&file) {
             Ok(directory) => {
                 facts.archives.push(ArchiveFacts {
                     path: path.clone(),
                     files: directory
-                        .entries
-                        .iter()
-                        .map(|entry| data_path.join(&entry.path))
+                        .paths()
+                        .into_iter()
+                        .map(|entry| data_path.join(entry))
                         .collect(),
                 });
                 loaded_archives.push(LoadedArchive {
@@ -114,14 +108,14 @@ pub fn read_setup(
     }
     facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
 
-    let mut placed = objects::Collector::default();
+    let mut placed = objects::Collector::new(game);
     let mut land = terrain::Collector::default();
     let mut game_plugins = Vec::new();
-    let mut map_markers = MarkerReader::new(&loose, &loaded_archives, cache);
+    let mut map_markers = MarkerReader::new(game, &loose, &loaded_archives, cache);
     for name in active_plugins {
         let path = data_path.join(&name);
         let file = data_dir.join(&name);
-        let official = objects::is_official(&name);
+        let official = game.is_official(&name);
         if official {
             game_plugins.push((name.clone(), file.clone()));
         }
@@ -154,7 +148,11 @@ pub fn read_setup(
                     land.merge(contribution);
                 }
                 facts.plugins.push(PluginFacts {
-                    npcs: npc::npc_facts(&name, &plugin),
+                    npcs: if game.has_face_meshes() {
+                        npc::npc_facts(&name, &plugin)
+                    } else {
+                        Vec::new()
+                    },
                     masters: plugin.header.masters.clone(),
                     name,
                     path,
@@ -193,6 +191,7 @@ struct MarkerReader<'a> {
 
 impl<'a> MarkerReader<'a> {
     fn new(
+        game: Game,
         loose: &'a [(GamePath, PathBuf)],
         archives: &'a [LoadedArchive],
         cache: &'a dyn TextCache,
@@ -201,7 +200,7 @@ impl<'a> MarkerReader<'a> {
             loose,
             archives,
             cache,
-            collector: markers::Collector::default(),
+            collector: markers::Collector::new(game),
         }
     }
 
@@ -267,26 +266,41 @@ impl<'a> MarkerReader<'a> {
 /// list was read from.
 /// The file in which the game keeps the list of active plugins, without
 /// reading it. `None` if that cannot be told for this installation.
-pub fn plugin_list_path(game_dir: &Path, local_dir: Option<&Path>) -> Option<PathBuf> {
-    let settings = match local_dir {
-        Some(local_dir) => GameSettings::with_local_path(GameId::SkyrimSE, game_dir, local_dir),
-        None => GameSettings::new(GameId::SkyrimSE, game_dir),
-    }
-    .ok()?;
+pub fn plugin_list_path(game: Game, game_dir: &Path, local_dir: Option<&Path>) -> Option<PathBuf> {
+    let settings = load_order_settings(game, game_dir, local_dir).ok()?;
     Some(settings.active_plugins_file().clone())
 }
 
+/// The load order library's view of the installation.
+fn load_order_settings(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+) -> Result<GameSettings, loadorder::Error> {
+    match local_dir {
+        Some(local_dir) => GameSettings::with_local_path(game.load_order_id(), game_dir, local_dir),
+        None => GameSettings::new(game.load_order_id(), game_dir),
+    }
+}
+
+/// The archives of `game` in `data_dir`, by file name.
+fn archives_in(game: Game, data_dir: &Path) -> io::Result<Vec<String>> {
+    let extension = format!(".{}", game.archive_extension());
+    Ok(std::fs::read_dir(data_dir)?
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.to_ascii_lowercase().ends_with(&extension))
+        .collect())
+}
+
 fn active_plugins(
+    game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
 ) -> Result<(Vec<String>, PathBuf), IngestError> {
     let load_order_error = |error: loadorder::Error| IngestError::LoadOrder(error.to_string());
 
-    let settings = match local_dir {
-        Some(local_dir) => GameSettings::with_local_path(GameId::SkyrimSE, game_dir, local_dir),
-        None => GameSettings::new(GameId::SkyrimSE, game_dir),
-    }
-    .map_err(load_order_error)?;
+    let settings = load_order_settings(game, game_dir, local_dir).map_err(load_order_error)?;
     let plugin_list = settings.active_plugins_file().clone();
     let mut load_order = settings.into_load_order();
     load_order.load().map_err(load_order_error)?;
@@ -333,36 +347,11 @@ fn loose_files(directory: &Path, base: &GamePath) -> io::Result<Vec<(GamePath, P
 /// The names of the active plugins in load order, as `plugins.txt` in
 /// `local_dir` (or its standard place) has them.
 pub(crate) fn active_plugin_names(
+    game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
 ) -> Result<Vec<String>, IngestError> {
-    active_plugins(game_dir, local_dir).map(|(names, _)| names)
-}
-
-/// The directory of the archive at `path`.
-pub(crate) fn archive_directory(path: &Path) -> Result<bsa::Directory, String> {
-    read_archive_directory(path)
-}
-
-/// The directory of the archive at `path`.
-fn read_archive_directory(path: &Path) -> Result<bsa::Directory, String> {
-    let read = || -> io::Result<Result<bsa::Directory, bsa::BsaError>> {
-        let mut file = File::open(path)?;
-        let mut data = vec![0u8; bsa::HEADER_LEN];
-        file.read_exact(&mut data)?;
-        let listing_len = match bsa::listing_len(&data) {
-            Ok(len) => len.min(MAX_LISTING),
-            Err(error) => return Ok(Err(error)),
-        };
-        let rest = listing_len.saturating_sub(bsa::HEADER_LEN as u64);
-        file.take(rest).read_to_end(&mut data)?;
-        Ok(bsa::parse_directory(&data))
-    };
-    match read() {
-        Ok(Ok(directory)) => Ok(directory),
-        Ok(Err(error)) => Err(error.to_string()),
-        Err(error) => Err(error.to_string()),
-    }
+    active_plugins(game, game_dir, local_dir).map(|(names, _)| names)
 }
 
 /// The header and the character records of the plugin at `path`.
@@ -525,7 +514,13 @@ mod tests {
         }
 
         fn read(&self) -> SetupFacts {
-            read_setup(&self.game_dir(), Some(&self.local_dir()), &NoCache).unwrap()
+            read_setup(
+                Game::SkyrimSe,
+                &self.game_dir(),
+                Some(&self.local_dir()),
+                &NoCache,
+            )
+            .unwrap()
         }
     }
 
@@ -610,6 +605,96 @@ mod tests {
         );
     }
 
+    /// Writes `content` to `relative` below the data directory of a game
+    /// directory in `root`.
+    fn write(root: &Path, relative: &str, content: &[u8]) {
+        let path = root.join("Game").join("Data").join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
+    #[test]
+    fn fallout_4_is_read_with_its_ba2_archives() {
+        let root = tempfile::tempdir().unwrap();
+        let local = root.path().join("Local");
+        fs::create_dir_all(&local).unwrap();
+        fs::write(local.join("plugins.txt"), "*Town.esp\n").unwrap();
+        write(
+            root.path(),
+            "Fallout4.esm",
+            &fixture::plugin(&[], MASTER_FLAG, &[]),
+        );
+        write(
+            root.path(),
+            "Town.esp",
+            &fixture::plugin(&["Fallout4.esm"], 0, &[]),
+        );
+        write(
+            root.path(),
+            "Town - Main.ba2",
+            &fixture::ba2(&[r"meshes\town\hall.nif"]),
+        );
+        write(
+            root.path(),
+            "Town.bsa",
+            &fixture::bsa(&[r"meshes\ignored.nif"]),
+        );
+
+        let facts = read_setup(
+            Game::Fallout4,
+            &root.path().join("Game"),
+            Some(&local),
+            &NoCache,
+        )
+        .unwrap();
+
+        assert_eq!(names(&facts.plugins), ["Fallout4.esm", "Town.esp"]);
+        let paths: Vec<_> = facts.archives.iter().map(|a| a.path.as_str()).collect();
+        assert_eq!(paths, ["data/town - main.ba2"]);
+        assert_eq!(
+            facts.archives[0].files,
+            [GamePath::new("data/meshes/town/hall.nif")]
+        );
+        assert_eq!(facts.unreadable, Vec::new());
+    }
+
+    #[test]
+    fn oblivion_plugins_with_short_headers_are_read() {
+        let root = tempfile::tempdir().unwrap();
+        let local = root.path().join("Local");
+        fs::create_dir_all(&local).unwrap();
+        fs::write(local.join("plugins.txt"), "Oblivion.esm\nCastle.esp\n").unwrap();
+        write(
+            root.path(),
+            "Oblivion.esm",
+            &fixture::oblivion::plugin(&[], MASTER_FLAG, &[]),
+        );
+        write(
+            root.path(),
+            "Castle.esp",
+            &fixture::oblivion::plugin(&["Oblivion.esm"], 0, &[]),
+        );
+        write(
+            root.path(),
+            "Castle - Meshes.bsa",
+            &fixture::bsa_with_version(&[r"meshes\castle.nif"], 103),
+        );
+
+        let facts = read_setup(
+            Game::Oblivion,
+            &root.path().join("Game"),
+            Some(&local),
+            &NoCache,
+        )
+        .unwrap();
+
+        assert_eq!(names(&facts.plugins), ["Oblivion.esm", "Castle.esp"]);
+        assert_eq!(facts.plugins[1].masters, ["Oblivion.esm"]);
+        let paths: Vec<_> = facts.archives.iter().map(|a| a.path.as_str()).collect();
+        assert_eq!(paths, ["data/castle - meshes.bsa"]);
+        assert_eq!(facts.unreadable, Vec::new());
+    }
+
     #[test]
     fn a_damaged_archive_is_recorded_and_the_rest_is_still_read() {
         let installation = Installation::new(&["Broken.esp", "Fine.esp"]);
@@ -629,7 +714,12 @@ mod tests {
     #[test]
     fn a_missing_game_directory_is_an_error() {
         let root = tempfile::tempdir().unwrap();
-        let result = read_setup(&root.path().join("Nowhere"), Some(root.path()), &NoCache);
+        let result = read_setup(
+            Game::SkyrimSe,
+            &root.path().join("Nowhere"),
+            Some(root.path()),
+            &NoCache,
+        );
         assert!(result.is_err());
     }
 }
