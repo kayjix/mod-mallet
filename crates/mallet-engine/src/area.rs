@@ -1,18 +1,20 @@
 //! A place of a worldspace up close (ADR 0038): everything placed around a
-//! point, by the game and by mods, with the meshes and textures to draw it.
+//! point, by the game and by mods, with the meshes and textures to draw it,
+//! and the ground they stand on (ADR 0041).
 //! Only reads.
 
 use std::sync::{Arc, Mutex};
 
 use mallet_core::ObjectRef;
-use mallet_core::mesh::{AreaObject, AreaObjects, LodMesh};
+use mallet_core::encoding::base64;
+use mallet_core::mesh::{AreaLand, AreaObject, AreaObjects, LandCell, LodMesh};
 use mallet_game_bethesda::area::AreaReader;
 use mallet_game_bethesda::files;
 use mallet_game_bethesda::lod_library::LodLibrary;
 
 use crate::ScanOptions;
 use crate::lod::{mesh_of, picture_of};
-use crate::mesh::texture_path;
+use crate::mesh::{floats, texture_path};
 
 /// The largest distance around a point that is read, in game units: three
 /// cells in each direction.
@@ -104,6 +106,7 @@ pub fn area_objects(
                 position: object.position,
                 rotation: object.rotation,
                 scale: object.scale,
+                anchored: object.anchored,
             })
         })
         .collect();
@@ -144,4 +147,40 @@ pub fn area_mesh(options: &ScanOptions, path: &str) -> Option<LodMesh> {
 pub fn area_texture(options: &ScanOptions, path: &str, max_side: u32) -> Option<String> {
     let bytes = file(options, &texture_path(path))?;
     picture_of(&bytes, max_side)
+}
+
+/// The ground of the outside cells within `radius` game units (at most
+/// three cells) of `centre` in the worldspace `world`, in the version the
+/// game uses (ADR 0041); the same cells [`area_objects`] reads. `None` if
+/// the setup cannot be read.
+pub fn area_land(
+    options: &ScanOptions,
+    world: &str,
+    centre: [f32; 2],
+    radius: f32,
+) -> Option<AreaLand> {
+    let started = std::time::Instant::now();
+    let radius = radius.clamp(256.0, MAX_RADIUS);
+    let reader = reader(options)?;
+    let mut reader = reader.lock().ok()?;
+    let cells: Vec<LandCell> = reader
+        .land(world, centre, radius)
+        .into_iter()
+        .map(|cell| LandCell {
+            x: cell.x,
+            y: cell.y,
+            heights: base64(&floats(&cell.heights)),
+            colours: cell.colours.as_deref().map_or_default(base64),
+        })
+        .collect();
+    tracing::info!(
+        world,
+        cells = cells.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "read the land of a place up close"
+    );
+    Some(AreaLand {
+        world: world.to_owned(),
+        cells,
+    })
 }

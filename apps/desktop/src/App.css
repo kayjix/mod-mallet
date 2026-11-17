@@ -71,6 +71,7 @@
   --spot-duplicate: #e03131;
   --spot-overlap: #ff7a18;
   --spot-touch: #adb5bd;
+  --spot-deep: #fcc419;
   --spot-focus: #22d3ee;
   --spot-ghost: #f03e3e;
 
@@ -2935,13 +2936,12 @@ button.quiet {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  min-height: 0;
 }
 
 .work-list {
-  position: sticky;
-  top: 8px;
-  max-height: calc(100vh - 150px);
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -3098,8 +3098,10 @@ button.quiet {
 
 .work-stage {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
+  min-height: 0;
 }
 
 .work-decision {
@@ -3262,4 +3264,171 @@ button.quiet {
     position: static;
     max-height: 40vh;
   }
+}
+
+/* The spots fill the window: nothing below them to scroll to. */
+.content[data-view="collisions"]:has(.work-spots) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.work-spots {
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.work-tabs .count {
+  margin-left: 4px;
+}
+
+.swatch-spot[data-kind="deep"],
+.work-count[data-kind="deep"],
+.work-kind[data-kind="deep"] {
+  background: var(--spot-deep);
+  color: #1b2a2e;
+}
+
+.work-in-passage .work-item {
+  border-left-color: color-mix(in srgb, var(--spot-focus) 35%, transparent);
+}
+
+.work-side {
+  display: flex;
+  align-items: stretch;
+}
+
+.work-side .work-choice {
+  border-radius: 0 6px 6px 0;
+}
+
+.work-side[data-left] .work-choice-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--spot-ghost);
+}
+
+.work-eye {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-right-width: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.work-eye[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--spot-ghost) 18%, var(--surface));
+}
+
+.eye {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -4px;
+}
+
+.work-marks[aria-pressed="false"] {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.work-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.work-line-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.work-line[data-many] {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.work-line[data-many] .aside {
+  color: var(--text);
+}
+
+.work-pairs {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.work-pair-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-pair-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.work-pair-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.work-pair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.relief-object-warning {
+  margin-bottom: 6px;
+  color: var(--warning);
+}
+
+.compare-spots {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+.patch-own {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.patch-own-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patch-own-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--surface);
 }

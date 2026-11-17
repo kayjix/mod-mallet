@@ -94,7 +94,7 @@ pub fn texture_paths(data: &[u8]) -> Result<Vec<String>, NifError> {
     for block in &layout.blocks {
         let data = bytes.take(block.size).ok_or(NifError::Damaged)?;
         if block.is_texture_set {
-            add_texture_set(data, &mut paths)?;
+            add_texture_set(data, usize::MAX, &mut paths)?;
         }
     }
     Ok(paths)
@@ -104,6 +104,24 @@ pub fn texture_paths(data: &[u8]) -> Result<Vec<String>, NifError> {
 /// texture blocks and leaves the rest of the file, which is nearly all of
 /// it, on disk.
 pub fn read_texture_paths<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>, NifError> {
+    read_textures(reader, usize::MAX)
+}
+
+/// Like [`read_texture_paths`], with only the textures that make up the
+/// look of each surface: the colour map and the normal map, the first two
+/// slots of each texture set. The other slots hold extras, such as glow,
+/// reflection or height maps, that some shaders use when they are there.
+/// Oblivion's meshes, which have no slots, give all their textures.
+pub fn read_surface_textures<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>, NifError> {
+    read_textures(reader, SURFACE_SLOTS)
+}
+
+/// The first two slots of a texture set: colour and normal map.
+const SURFACE_SLOTS: usize = 2;
+
+/// The textures of a mesh in a file, of the first `slots` slots of each
+/// texture set.
+fn read_textures<R: Read + Seek>(reader: &mut R, slots: usize) -> Result<Vec<String>, NifError> {
     let io = |_: std::io::Error| NifError::Damaged;
 
     // The header is usually a few kilobytes. If it turns out to be cut
@@ -141,7 +159,7 @@ pub fn read_texture_paths<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>,
         let end = offset.checked_add(block.size).ok_or(NifError::Damaged)?;
         if block.is_texture_set {
             if let Some(data) = start.get(offset..end) {
-                add_texture_set(data, &mut paths)?;
+                add_texture_set(data, slots, &mut paths)?;
             } else {
                 if block.size > MAX_TEXTURE_SET {
                     return Err(NifError::Damaged);
@@ -150,7 +168,7 @@ pub fn read_texture_paths<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>,
                 reader.seek(SeekFrom::Start(position)).map_err(io)?;
                 let mut data = vec![0; block.size];
                 reader.read_exact(&mut data).map_err(io)?;
-                add_texture_set(&data, &mut paths)?;
+                add_texture_set(&data, slots, &mut paths)?;
             }
         }
         offset = end;
@@ -378,9 +396,10 @@ pub(crate) fn blocks(data: &[u8]) -> Result<(u32, Vec<BlockInfo>, Vec<String>), 
 }
 
 /// Adds the paths of one texture set block to `paths`.
-fn add_texture_set(block: &[u8], paths: &mut Vec<String>) -> Result<(), NifError> {
+fn add_texture_set(block: &[u8], slots: usize, paths: &mut Vec<String>) -> Result<(), NifError> {
     let mut block = Bytes::new(block);
     let slot_count = block.u32().ok_or(NifError::Damaged)?;
+    let slot_count = usize::try_from(slot_count).unwrap_or(usize::MAX).min(slots);
     for _ in 0..slot_count {
         let path = decode_text(sized_string(&mut block).ok_or(NifError::Damaged)?);
         if !path.is_empty() && !paths.contains(&path) {
@@ -532,6 +551,27 @@ mod tests {
         let at = mesh.windows(10).position(|w| w == b"BSFadeNode").unwrap();
         mesh[at..at + name.len()].copy_from_slice(name.as_bytes());
         mesh
+    }
+
+    #[test]
+    fn only_the_colour_and_normal_maps_count_for_the_surface() {
+        let mesh = fixture::nif(&[&[
+            r"textures\wall.dds",
+            r"textures\wall_n.dds",
+            r"textures\wall_g.dds",
+            r"textures\wall_p.dds",
+        ]]);
+        assert_eq!(
+            read_surface_textures(&mut std::io::Cursor::new(&mesh)),
+            Ok(vec![
+                r"textures\wall.dds".to_owned(),
+                r"textures\wall_n.dds".to_owned()
+            ])
+        );
+        assert_eq!(
+            read_texture_paths(&mut std::io::Cursor::new(&mesh)).map(|paths| paths.len()),
+            Ok(4)
+        );
     }
 
     #[test]

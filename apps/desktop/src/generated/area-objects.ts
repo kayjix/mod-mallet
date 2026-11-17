@@ -29,6 +29,12 @@ export interface AreaObjects {
  * One object near the point.
  */
 export interface AreaObject {
+  /**
+   * Whether the game relies on it being there: it is persistent (other
+   * things refer to it) or part of the distant view. Such an object is
+   * not offered for hiding.
+   */
+  anchored?: boolean;
   id: ObjectRef;
   /**
    * Its model, below the data directory.

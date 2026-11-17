@@ -126,4 +126,38 @@ pub struct AreaObject {
     pub rotation: [f32; 3],
     /// The size relative to the base object.
     pub scale: f32,
+    /// Whether the game relies on it being there: it is persistent (other
+    /// things refer to it) or part of the distant view. Such an object is
+    /// not offered for hiding.
+    #[serde(default)]
+    pub anchored: bool,
+}
+
+/// The game's own ground around a point of a worldspace, cell by cell, for
+/// drawing the land under the objects up close (ADR 0041).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaLand {
+    /// The worldspace, by its internal name.
+    pub world: String,
+    /// The outside cells with land, from the south-west, row by row.
+    pub cells: Vec<LandCell>,
+}
+
+/// The ground of one outside cell. Numbers are little-endian and
+/// Base64-encoded, as in [`MeshShape`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LandCell {
+    /// The cell's column.
+    pub x: i32,
+    /// The cell's row.
+    pub y: i32,
+    /// The heights of 33 rows of 33 points, 128 game units apart, as
+    /// 32-bit floats in game units: the southern row first, each from west
+    /// to east. Neighbouring cells share their edge.
+    pub heights: String,
+    /// The colours of the same points, three bytes (red, green, blue)
+    /// each, or empty.
+    pub colours: String,
 }

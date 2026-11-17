@@ -193,6 +193,14 @@ pub const MESHES_MADE_FOR_OTHER_GAME: KindInfo = KindInfo {
     args: &["count", "skinned", "madeFor", "examples"],
 };
 
+/// Loose meshes of a mod name textures that nothing in the game provides.
+pub const MESHES_TEXTURE_MISSING: KindInfo = KindInfo {
+    id: "meshes.texture-missing",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["meshes", "count", "examples"],
+};
+
 /// Replacement meshes no longer use textures that a texture mod replaces.
 pub const MESHES_RETEXTURE_BYPASSED: KindInfo = KindInfo {
     id: "meshes.retexture-bypassed",
@@ -290,6 +298,7 @@ pub const ALL: &[KindInfo] = &[
     NAVMESHES_DOOR_CUT_OFF,
     NAVMESHES_CHANGES_UNDONE,
     MESHES_MADE_FOR_OTHER_GAME,
+    MESHES_TEXTURE_MISSING,
     MESHES_RETEXTURE_BYPASSED,
     ASSETS_LOOSE_OVER_ARCHIVE,
     ASSETS_ARCHIVE_OVER_ARCHIVE,

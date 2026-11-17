@@ -39,6 +39,41 @@ export interface Pair {
 const SPOT = "spot:";
 
 /**
+ * The prefix of an object hidden on its own, outside any collision (or
+ * besides it); the value is the plugin that placed it.
+ */
+const OBJECT = "object:";
+
+/** An object's identity among the choices, when it is hidden on its own. */
+export const objectChoiceKey = (object: ObjectRef) => `${OBJECT}${object.plugin}|${object.localId}`;
+
+/** The objects hidden on their own. */
+export function freeObjects(choices: PatchChoices): ObjectRef[] {
+  return Object.entries(choices).flatMap(([key, plugin]) => {
+    if (!key.startsWith(OBJECT) || plugin === null) {
+      return [];
+    }
+    const localId = Number(key.slice(key.lastIndexOf("|") + 1));
+    return Number.isInteger(localId) ? [{ plugin, localId }] : [];
+  });
+}
+
+/** The choices with one object hidden on its own, or no longer. */
+export function chooseObject(
+  choices: PatchChoices,
+  object: ObjectRef,
+  hide: boolean,
+): PatchChoices {
+  const next = { ...choices };
+  if (hide) {
+    next[objectChoiceKey(object)] = object.plugin;
+  } else {
+    delete next[objectChoiceKey(object)];
+  }
+  return next;
+}
+
+/**
  * A spot's identity among the choices: the objects in it, which do not
  * depend on the load order (ADR 0007); null for a spot that names none.
  */
@@ -163,8 +198,23 @@ export function hiddenAt(parts: SpotPart[], plugin: string | null): ObjectRef[] 
  * which it hides the most objects, and per spot where the patch hides
  * something else there.
  */
-export function choicesOf(pairs: Pair[], installed: Set<string>): PatchChoices {
+export function choicesOf(
+  pairs: Pair[],
+  installed: Set<string>,
+  installedObjects: ObjectRef[] = [],
+): PatchChoices {
   const choices: PatchChoices = {};
+  // What no collision names was hidden on its own.
+  const named = new Set(
+    pairs.flatMap((pair) =>
+      pair.spots.flatMap((spot) => spot.parts.map((part) => keyOf(part.object))),
+    ),
+  );
+  for (const object of installedObjects) {
+    if (!named.has(keyOf(object))) {
+      choices[objectChoiceKey(object)] = object.plugin;
+    }
+  }
   const hiddenSide = (sides: { plugin: string; objects: ObjectRef[] }[]) => {
     let best: { plugin: string; hidden: number } | null = null;
     for (const side of sides) {
@@ -213,6 +263,7 @@ export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
       add(hiddenAt(spot.parts, plugin));
     }
   }
+  add(freeObjects(choices));
   return [...found.values()];
 }
 

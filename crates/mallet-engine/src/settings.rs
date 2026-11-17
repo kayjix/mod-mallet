@@ -10,6 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
 
 use mallet_core::{GameChoice, KnownGame, LocationOrigin, LocationRole, ScanLocation};
 use mallet_game_bethesda::{Game, ingest, locate};
@@ -41,6 +42,14 @@ pub struct Settings {
     /// The mods in the order the user likes them, the favourite first, by
     /// the mod manager's identity. Duels are decided by it.
     pub ranking: Vec<String>,
+    /// What the patch that hides objects is to do, as the user chose it:
+    /// by finding, by spot or by object, the plugin whose objects are
+    /// hidden, or `None` to keep both. The keys do not depend on the load
+    /// order; the desktop app makes them. `None` as a whole while the user
+    /// has chosen nothing, so that the app starts from the patch in the
+    /// game.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub patch_choices: Option<BTreeMap<String, Option<String>>>,
 }
 
 impl Settings {
@@ -178,6 +187,35 @@ pub fn load_settings(path: &Path) -> Result<Settings, EngineError> {
 /// if needed, and remembers that game as the one looked at last. The
 /// settings of the other games stay as they were.
 pub fn save_settings(path: &Path, settings: &Settings) -> Result<(), EngineError> {
+    let _one_at_a_time = CHANGING.lock().unwrap_or_else(PoisonError::into_inner);
+    write_settings(path, settings)
+}
+
+/// The settings file is changed one change at a time, so that two changes
+/// made at the same moment do not undo each other.
+static CHANGING: Mutex<()> = Mutex::new(());
+
+/// Changes the settings of the game the user looked at last with `change`
+/// and returns them as written. Reading and writing are one step: of two
+/// changes made at the same moment, from different parts of the app, both
+/// arrive.
+///
+/// # Errors
+///
+/// If the settings cannot be read or written.
+pub fn update_settings(
+    path: &Path,
+    change: impl FnOnce(&mut Settings),
+) -> Result<Settings, EngineError> {
+    let _one_at_a_time = CHANGING.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut settings = load_settings(path)?;
+    change(&mut settings);
+    write_settings(path, &settings)?;
+    Ok(settings)
+}
+
+/// [`save_settings`], for a caller that already changes the file alone.
+fn write_settings(path: &Path, settings: &Settings) -> Result<(), EngineError> {
     let game = Game::from_id(&settings.game).unwrap_or_default();
     let mut file = SettingsFile::load(path)?;
     let mut kept = settings.clone();
@@ -196,6 +234,7 @@ pub fn save_settings(path: &Path, settings: &Settings) -> Result<(), EngineError
 /// or written.
 pub fn select_game(path: &Path, game: &str) -> Result<Settings, EngineError> {
     let game = Game::from_id(game).ok_or_else(|| EngineError::UnknownGame(game.to_owned()))?;
+    let _one_at_a_time = CHANGING.lock().unwrap_or_else(PoisonError::into_inner);
     let mut file = SettingsFile::load(path)?;
     file.game = Some(game.id().to_owned());
     file.save(path)?;
@@ -522,6 +561,13 @@ mod tests {
             ignored: BTreeSet::from(["objects.overlapping:pair:a+b".to_owned()]),
             decisions: BTreeMap::from([("duel:a|b".to_owned(), 1)]),
             ranking: vec!["faces".to_owned(), "patch".to_owned()],
+            patch_choices: Some(BTreeMap::from([
+                (
+                    "objects.overlapping:pair:a+b".to_owned(),
+                    Some("b.esp".to_owned()),
+                ),
+                ("spot:objects.overlapping:pair:a+b|a.esp:1".to_owned(), None),
+            ])),
         };
 
         save_settings(&path, &settings).unwrap();
@@ -531,6 +577,42 @@ mod tests {
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("\"game-dir\""), "{text}");
         assert!(text.contains('\n'));
+    }
+
+    #[test]
+    fn choices_for_the_patch_are_kept_and_told_from_none_made() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        assert_eq!(load_settings(&path).unwrap().patch_choices, None);
+
+        // Choosing, then taking every choice back, is not the same as never
+        // having chosen.
+        update_settings(&path, |settings| {
+            settings.patch_choices = Some(BTreeMap::new());
+        })
+        .unwrap();
+        assert_eq!(
+            load_settings(&path).unwrap().patch_choices,
+            Some(BTreeMap::new())
+        );
+    }
+
+    #[test]
+    fn changes_made_at_the_same_moment_all_arrive() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        std::thread::scope(|scope| {
+            for number in 0..8 {
+                let path = &path;
+                scope.spawn(move || {
+                    update_settings(path, |settings| {
+                        settings.ignored.insert(format!("finding {number}"));
+                    })
+                    .unwrap();
+                });
+            }
+        });
+        assert_eq!(load_settings(&path).unwrap().ignored.len(), 8);
     }
 
     #[test]
@@ -566,9 +648,6 @@ mod tests {
         let settings = Settings {
             game: "skyrimse".to_owned(),
             confirmed: true,
-            ignored: BTreeSet::new(),
-            decisions: BTreeMap::new(),
-            ranking: Vec::new(),
             places: BTreeMap::from([
                 (LocationRole::GameDir, PathBuf::from("games/skyrim")),
                 (
@@ -577,6 +656,7 @@ mod tests {
                 ),
                 (LocationRole::Downloads, PathBuf::from("downloads")),
             ]),
+            ..Settings::default()
         };
         let options = settings.scan_options();
         assert_eq!(options.game_dir, Some(PathBuf::from("games/skyrim")));

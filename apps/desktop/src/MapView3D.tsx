@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useSession } from "./Actions";
 import { AreaLayer, LOOK, type Look, objectKey } from "./area-layer";
-import type { AreaObject } from "./generated/area-objects";
+import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
   colour,
@@ -21,6 +21,7 @@ import {
   project,
   type Vec3,
 } from "./gl";
+import { LandLayer } from "./land-layer";
 import { LodLayer } from "./lod-layer";
 import {
   CELL,
@@ -58,6 +59,13 @@ interface MapView3DProps {
   children?: ReactNode;
   /** How far from a picked collision the camera comes, in cells. */
   spotDistance?: number;
+  /**
+   * Shows the objects as the game would: nothing tinted, and what is
+   * hidden left out rather than drawn as a ghost.
+   */
+  plain?: boolean;
+  /** Told about the objects of each area once they are read. */
+  onArea?: (area: AreaObjects | null) => void;
 }
 
 const NO_KEYS = new Set<string>();
@@ -269,6 +277,7 @@ uniform vec3 u_water;
 uniform bool u_base;
 uniform bool u_lod;
 uniform sampler2D u_covered;
+uniform vec4 u_fine;
 out vec4 colour;
 vec2 within(vec4 rect) {
   return vec2((v_xy.x - rect.x) / rect.z, (rect.y + rect.w - v_xy.y) / rect.w);
@@ -279,6 +288,10 @@ void main() {
   }
   // Where the game's own level of detail is drawn, it shows the land.
   if (u_lod && v_kind < 2.5 && texture(u_covered, within(u_cellsRect)).r > 0.5) {
+    discard;
+  }
+  // Where the game's own ground is drawn up close (ADR 0041), it shows the land.
+  if (abs(v_kind - 1.0) > 0.5 && v_kind < 2.5 && all(greaterThan(v_xy, u_fine.xy)) && all(lessThan(v_xy, u_fine.zw))) {
     discard;
   }
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
@@ -433,6 +446,8 @@ export function MapView3D({
   objectExtra,
   children,
   spotDistance = NEAR * 0.7,
+  plain = false,
+  onArea,
 }: MapView3DProps) {
   const { t, api } = useSession();
   const frame = useRef<HTMLDivElement>(null);
@@ -451,6 +466,8 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
+  // The game's own ground under them (ADR 0041).
+  const land = useRef<LandLayer | null>(null);
   const areaAt = useRef<[number, number, number] | null>(null);
   // How far the models of the area have come, and the object picked.
   const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
@@ -476,12 +493,18 @@ export function MapView3D({
   const lookOf = useRef<(key: string) => Look>(() => LOOK.plain);
   lookOf.current = (key) =>
     hidden.has(key)
-      ? LOOK.ghost
-      : focus.has(key)
-        ? LOOK.focus
-        : marked.has(key)
-          ? LOOK.marked
-          : LOOK.plain;
+      ? plain
+        ? LOOK.gone
+        : LOOK.ghost
+      : plain
+        ? LOOK.plain
+        : focus.has(key)
+          ? LOOK.focus
+          : marked.has(key)
+            ? LOOK.marked
+            : LOOK.plain;
+  const told = useRef(onArea);
+  told.current = onArea;
 
   const fitted = useCallback(
     (): Camera => ({
@@ -513,10 +536,12 @@ export function MapView3D({
     size,
     picture,
     focus,
+    plain,
   });
   state.current = {
     ...state.current,
     focus,
+    plain,
     picked,
     hover,
     exaggeration,
@@ -558,6 +583,7 @@ export function MapView3D({
       }
       areaAt.current = [x, y, radius];
       setAreaState("loading");
+      land.current?.load(x * CELL, y * CELL, radius * CELL);
       api
         .areaObjects(world.name, x * CELL, y * CELL, radius * CELL)
         .then((found) => {
@@ -565,6 +591,7 @@ export function MapView3D({
             return;
           }
           layer.show(found, lookOf.current);
+          told.current?.(found);
           setAreaState(found.objects.length);
           redraw();
         })
@@ -639,6 +666,7 @@ export function MapView3D({
     const shownArea = near && view.distance <= NEAR * 1.5 ? (area.current?.area ?? null) : null;
     // The level of detail stays: towns such as Whiterun are only there.
     const realObjects = null;
+    const fineLand = shownArea !== null ? (land.current?.covers ?? null) : null;
     if (area.current !== null) {
       const progress = area.current.progress;
       const key = `${progress.done}/${progress.total}`;
@@ -664,6 +692,7 @@ export function MapView3D({
         cells: current.cells,
         cellsRect: [terrain.west, terrain.south, terrain.columns, terrain.rows],
         realObjects,
+        fineLand,
       });
       if (layer.drawnKey !== coveredKey.current) {
         coveredKey.current = layer.drawnKey;
@@ -682,6 +711,7 @@ export function MapView3D({
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, current.covered);
     gl.uniform1i(terrainUniform("u_covered"), 2);
+    gl.uniform4f(terrainUniform("u_fine"), ...(fineLand ?? [0, 0, 0, 0]));
     gl.uniform3fv(terrainUniform("u_low"), css("--map-low"));
     gl.uniform3fv(terrainUniform("u_high"), css("--map-high"));
     gl.uniform3fv(terrainUniform("u_water"), css("--map-water"));
@@ -719,6 +749,9 @@ export function MapView3D({
       0,
     );
 
+    if (fineLand !== null) {
+      land.current?.draw(matrix, raise);
+    }
     if (shownArea !== null && area.current !== null) {
       area.current.draw(matrix, raise, {
         mark: css("--accent"),
@@ -779,7 +812,7 @@ export function MapView3D({
     heads.current = placed;
     // The parts of collisions among the objects, by name: of the one
     // looked at, if one is.
-    if (shownArea !== null && area.current !== null) {
+    if (shownArea !== null && area.current !== null && !state.current.plain) {
       const named = state.current.focus;
       for (const shown of area.current.shown) {
         const { plugin, localId } = shown.object.id;
@@ -1002,6 +1035,11 @@ export function MapView3D({
     } catch {
       area.current = null;
     }
+    try {
+      land.current = new LandLayer(gl, api, world.name, redraw);
+    } catch {
+      land.current = null;
+    }
     areaAt.current = null;
     // The game's own level of detail, where the setup has it.
     let gone = false;
@@ -1031,6 +1069,8 @@ export function MapView3D({
       lod.current = null;
       area.current?.dispose();
       area.current = null;
+      land.current?.dispose();
+      land.current = null;
       areaAt.current = null;
       // Frees the graphics memory at once rather than when collected.
       for (const made of buffers) {
@@ -1203,7 +1243,7 @@ export function MapView3D({
   useEffect(() => {
     area.current?.restyle(lookOf.current);
     redraw();
-  }, [focus, hidden, marked, redraw]);
+  }, [focus, hidden, marked, plain, redraw]);
 
   // The drawing follows size, highlights and the controls, which it reads
   // from a ref so that drawing need not be made anew for each.

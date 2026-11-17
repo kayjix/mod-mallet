@@ -67,3 +67,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0038](0038-a-place-up-close.md) | A place up close: the objects themselves around a point | accepted |
 | [0039](0039-collisions-checked-with-the-models.md) | Collisions are checked with the models, and touches count | accepted |
 | [0040](0040-collisions-as-a-worklist.md) | Collisions as a worklist, decided spot by spot | accepted |
+| [0041](0041-the-games-own-ground-up-close.md) | The game's own ground up close | accepted |

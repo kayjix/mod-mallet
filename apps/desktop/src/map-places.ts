@@ -273,8 +273,14 @@ export const SPOT_KINDS: SpotKind[] = ["duplicate", "overlap", "touch"];
 /** A spot's kind; spots of older scans overlap. */
 export const kindOf = (spot: MapSpot): SpotKind => spot.kind ?? "overlap";
 
+/**
+ * The kinds of the collisions' worklist: a touch that crosses far counts
+ * as deep (ADR 0040).
+ */
+export type WorkKind = SpotKind | "deep";
+
 /** The colour of a kind of collision, as a CSS variable. */
-export const kindVariable = (kind: SpotKind) => `--spot-${kind}`;
+export const kindVariable = (kind: WorkKind) => `--spot-${kind}`;
 
 /** The worst kind among `spots`. */
 export function worstKind(spots: MapSpot[]): SpotKind {

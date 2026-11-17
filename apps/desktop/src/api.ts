@@ -5,6 +5,7 @@
 // that the other does not follow fails the type check.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
@@ -65,6 +66,8 @@ export interface Api {
   meshView(path: string, version: number | null): Promise<MeshView | null>;
   /** Everything placed within `radius` game units of a point. */
   areaObjects(world: string, x: number, y: number, radius: number): Promise<AreaObjects | null>;
+  /** The game's ground of the cells within `radius` game units of a point. */
+  areaLand(world: string, x: number, y: number, radius: number): Promise<AreaLand | null>;
   /** A mesh of the setup in its own units, textures named by path. */
   areaMesh(path: string): Promise<LodMesh | null>;
   /** A texture of the setup, no larger than `maxSide`. */
@@ -85,6 +88,14 @@ export interface Api {
   ranking(): Promise<string[]>;
   /** Remembers the order the user likes the mods in. */
   setRanking(ranking: string[]): Promise<string[]>;
+  /**
+   * What the user chose for the patch that hides objects, by finding, spot
+   * or object: the plugin to hide, or null to keep both. Null as a whole
+   * while nothing has been chosen.
+   */
+  patchChoices(): Promise<Record<string, string | null> | null>;
+  /** Remembers what the user chose for the patch that hides objects. */
+  setPatchChoices(choices: Record<string, string | null>): Promise<void>;
   /** The sides the user picked in duels between mods, by duel. */
   decisions(): Promise<Record<string, number>>;
   /** Remembers the side picked in a duel, or forgets it with null. */
@@ -118,6 +129,7 @@ const tauriApi: Api = {
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
+  areaLand: (world, x, y, radius) => invoke<AreaLand | null>("area_land", { world, x, y, radius }),
   areaMesh: (path) => invoke<LodMesh | null>("area_mesh", { path }),
   areaTexture: (path, maxSide) => invoke<string | null>("area_texture", { path, maxSide }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
@@ -127,6 +139,8 @@ const tauriApi: Api = {
     invoke<string | null>("lod_texture", { world, path, maxSide }),
   ranking: () => invoke<string[]>("ranking"),
   setRanking: (ranking) => invoke<string[]>("set_ranking", { ranking }),
+  patchChoices: () => invoke<Record<string, string | null> | null>("patch_choices"),
+  setPatchChoices: (choices) => invoke<void>("set_patch_choices", { choices }),
   decisions: () => invoke<Record<string, number>>("decisions"),
   setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),
   games: () => invoke<GameChoice>("games"),

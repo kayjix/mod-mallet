@@ -243,6 +243,26 @@ meshes-made-for-other-game = Meshes of a mod were made for another game
     .explanation = A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
     .remedy = Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
 
+meshes-texture-missing = Meshes of a mod use textures that are not in the game
+    .headline =
+        { $count ->
+            [one] 1 texture
+           *[other] { $count } textures
+        } missing for { $meshes ->
+            [one] 1 mesh
+           *[other] { $meshes } meshes
+        }
+    .summary =
+        { $meshes ->
+            [one] One mesh of this mod uses
+           *[other] { $meshes } meshes of this mod use
+        } { $count ->
+            [one] a texture
+           *[other] { $count } textures
+        } for their colour or surface that no mod and no archive in your game provides: { $examples }.
+    .explanation = A mesh is the 3D shape of a thing; its colour and the fine detail of its surface come from textures, separate image files that the mesh names. If a named texture is not there, the game draws the surface in a glaring purple, or dark and flat where the surface detail is missing. This usually means that a part of the mod was not installed, for example its textures in a separate download, or that the mod was made to go with another mod you do not have. Meshes a mod installs for a mod you do not use are never shown, so their missing textures do no harm.
+    .remedy = Look on the mod's page for files that belong with it, such as a texture download or a mod it needs, and install them. If the meshes are part of a patch for a mod you do not have, you can leave them.
+
 meshes-retexture-bypassed = A texture mod does not reach replaced meshes
     .headline =
         { $textureMod } does not reach { $count ->

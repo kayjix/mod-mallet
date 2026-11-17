@@ -63,7 +63,10 @@ pub(crate) const FLAG_DELETED: u32 = 0x0000_0020;
 pub(crate) const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
 
 /// Record flag of references: the object is persistent.
-const FLAG_PERSISTENT: u32 = 0x0000_0400;
+pub(crate) const FLAG_PERSISTENT: u32 = 0x0000_0400;
+
+/// Record flag of references: the object is part of the distant view.
+pub(crate) const FLAG_VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
 
 /// An object of the game counts as moved by a mod if the mod puts it at
 /// least this far, in game units, from where the game has it.

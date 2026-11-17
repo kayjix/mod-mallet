@@ -266,9 +266,13 @@ function DuelWorkspace({
   byId: Map<string, RenderedFinding>;
   previews: PreviewCache;
 }) {
-  const { t, api, mods } = useSession();
+  const { t, api, mods, spots, decideSpot } = useSession();
   const { duel } = rendered;
   const names = duelNames(duel, mods);
+  // Where the two mods' objects collide: shown in 3D on the collisions' page.
+  const placed = duel.findings
+    .flatMap((id) => spots.get(id) ?? [])
+    .filter((spot) => (spot.parts ?? []).length > 0);
   const every = useMemo(() => filesOf(rendered, byId), [rendered, byId]);
   const [technical, setTechnical] = useState(false);
   const technicalCount = every.filter((file) => isTechnical(file.path)).length;
@@ -366,7 +370,18 @@ function DuelWorkspace({
             <span className="tag">{t.topicName[selected.topic]}</span>
           </p>
         )}
-        {path === null ? (
+        {path === null && placed[0] !== undefined ? (
+          <div className="compare-stage-empty compare-spots">
+            <p>{t.compareSpots(placed.length)}</p>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => placed[0] !== undefined && decideSpot(placed[0])}
+            >
+              {t.compareToSpots}
+            </button>
+          </div>
+        ) : path === null ? (
           <p className="aside compare-stage-empty">{t.duelNoPictures}</p>
         ) : found === undefined ? (
           <p className="aside compare-stage-empty">{t.previewLoading}</p>

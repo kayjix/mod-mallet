@@ -59,7 +59,11 @@ export interface Texts {
   patchInstalled: (count: number, mod: string | null) => string;
   patchMatches: string;
   patchDiffers: (more: number, fewer: number) => string;
-  patchObsolete: (count: number) => string;
+  patchOwn: (count: number) => string;
+  compareSpots: (count: number) => string;
+  compareToSpots: string;
+  patchOwnNote: string;
+  patchShowAgain: string;
   patchUseInstalled: string;
   patchInPatch: string;
   patchPartly: (hidden: number, of: number) => string;
@@ -306,8 +310,22 @@ export interface Texts {
   mapModCells: string;
 
   // The collisions as a worklist, decided spot by spot (ADR 0040).
-  spotKinds: Record<"duplicate" | "overlap" | "touch", string>;
-  spotKindHints: Record<"duplicate" | "overlap" | "touch", string>;
+  spotKinds: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
+  spotKindHints: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
+  workTabSpots: string;
+  workMarks: string;
+  workMarksHint: string;
+  workPreviewWithout: (name: string) => string;
+  workPassage: (count: number) => string;
+  workPassageHide: (plugin: string) => string;
+  workPassageAll: (plugin: string, count: number) => string;
+  workPairMany: (first: string, second: string, spots: number) => string;
+  workShowSpots: string;
+  workPairsIntro: string;
+  workObjectLocked: string;
+  workObjectGame: string;
+  workObjectHide: string;
+  workObjectShow: string;
   workProgress: (decided: number, total: number) => string;
   workGroupBy: string;
   workByRegion: string;
@@ -418,10 +436,16 @@ export const texts: Record<Lang, Texts> = {
     patchMatches: "Your choice is what is installed.",
     patchDiffers: (more, fewer) =>
       `Your choice differs from what is installed: ${more} more, ${fewer} fewer. Create the patch and install it again to change that.`,
-    patchObsolete: (count) =>
+    compareSpots: (count) =>
       count === 1
-        ? "1 object in the installed patch no longer belongs to a collision. It drops out when you install the patch again."
-        : `${count} objects in the installed patch no longer belong to a collision. They drop out when you install the patch again.`,
+        ? "Objects of these two mods collide at 1 spot. Look at it in 3D and decide there."
+        : `Objects of these two mods collide at ${count} spots. Look at them in 3D and decide there.`,
+    compareToSpots: "Show the spots in 3D",
+    patchOwn: (count) =>
+      count === 1 ? "1 object hidden on its own" : `${count} objects hidden on their own`,
+    patchOwnNote:
+      "Picked one by one in the 3D view, or in the installed patch without a collision of this scan.",
+    patchShowAgain: "Show again",
     patchUseInstalled: "Use what is installed",
     patchInPatch: "in the patch",
     patchPartly: (hidden, of) => `${hidden} of ${of} in the patch`,
@@ -722,12 +746,39 @@ export const texts: Record<Lang, Texts> = {
     mapObjectPlacedBy: "Placed by",
     mapObjectId: "Number in that plugin",
     mapObjectModel: "Model",
-    spotKinds: { duplicate: "duplicate", overlap: "overlap", touch: "touch" },
+    spotKinds: {
+      duplicate: "duplicate",
+      overlap: "inside each other",
+      deep: "cross deeply",
+      touch: "touch",
+    },
     spotKindHints: {
       duplicate: "The same object twice in the same place.",
-      overlap: "Two objects stand inside each other.",
+      overlap: "One object stands largely inside the other.",
+      deep: "Two objects run into each other over 2 m or more; often two mods building the same thing.",
       touch: "Two objects reach into each other a little; often harmless.",
     },
+    workTabSpots: "Spots",
+    workMarks: "Markings",
+    workMarksHint: "Off: the place as the game would show it, with what you hide left out. Key V.",
+    workPreviewWithout: (name) => `Look at it without ${name}, without deciding`,
+    workPassage: (count) => `Passage: ${count} spots of these two mods close together`,
+    workPassageHide: (plugin) => `Hide ${plugin} in this passage`,
+    workPassageAll: (plugin, count) =>
+      count === 1
+        ? `Hide 1 object of ${plugin} here`
+        : `Hide all ${count} objects of ${plugin} here`,
+    workPairMany: (first, second, spots) =>
+      `${first} and ${second} collide at ${spots} spots. Usually it is better to choose one of them:`,
+    workShowSpots: "Show the spots",
+    workPairsIntro:
+      "Pairs of mods whose objects collide, the most first. Decide for a whole pair here, or go through its spots one by one.",
+    workObjectLocked:
+      "The game relies on this object: other things refer to it, or it is part of the distant view. It cannot be hidden.",
+    workObjectGame:
+      "This object belongs to the game itself. Hide it only if you are sure: a quest may need it.",
+    workObjectHide: "Hide this object",
+    workObjectShow: "Show it again",
     workProgress: (decided, total) => `${decided} of ${total} spots decided`,
     workGroupBy: "Group by",
     workByRegion: "Region",
@@ -750,7 +801,7 @@ export const texts: Record<Lang, Texts> = {
       `${first} against ${second}: ${spots === 1 ? "1 spot" : `${spots} spots`}`,
     workEverywhere: (plugin) => `Hide ${plugin} everywhere`,
     workKeepEverywhere: "Keep both everywhere",
-    workKeys: "Keys: ← → spots · 1, 2 hide · 0 keep both",
+    workKeys: "Keys: ← → spots · 1, 2 hide · 0 keep both · V markings",
     workToPatch: (objects) =>
       objects === 1 ? "To the patch (1 object)" : `To the patch (${objects} objects)`,
     workPickSpot: "Pick a spot from the list.",
@@ -761,7 +812,7 @@ export const texts: Record<Lang, Texts> = {
     workThisSpot: "this spot",
     workHideObject: "Hide this object here",
     workDecideHere: "Decide in the worklist",
-    workAfterDecide: "Then go on to the next open spot",
+    workAfterDecide: "After deciding, go on to the next open spot",
     patchPerSpot: (count) =>
       count === 1 ? "1 spot decided on its own" : `${count} spots decided on their own`,
     mapHeightValue: (times) =>
@@ -897,10 +948,16 @@ export const texts: Record<Lang, Texts> = {
     patchMatches: "Deine Auswahl entspricht dem installierten Patch.",
     patchDiffers: (more, fewer) =>
       `Deine Auswahl weicht vom installierten Patch ab: ${more} mehr, ${fewer} weniger. Erstelle den Patch und installiere ihn erneut, um das zu übernehmen.`,
-    patchObsolete: (count) =>
+    compareSpots: (count) =>
       count === 1
-        ? "1 Objekt im installierten Patch gehört zu keiner Kollision mehr. Es fällt weg, wenn du den Patch neu installierst."
-        : `${count} Objekte im installierten Patch gehören zu keiner Kollision mehr. Sie fallen weg, wenn du den Patch neu installierst.`,
+        ? "Objekte dieser beiden Mods stoßen an 1 Stelle zusammen. Sieh sie dir in 3D an und entscheide dort."
+        : `Objekte dieser beiden Mods stoßen an ${count} Stellen zusammen. Sieh sie dir in 3D an und entscheide dort.`,
+    compareToSpots: "Stellen in 3D ansehen",
+    patchOwn: (count) =>
+      count === 1 ? "1 Objekt einzeln ausgeblendet" : `${count} Objekte einzeln ausgeblendet`,
+    patchOwnNote:
+      "Einzeln in der 3D-Ansicht gewählt, oder im installierten Patch ohne Kollision dieses Scans.",
+    patchShowAgain: "Wieder zeigen",
     patchUseInstalled: "Installierten Stand übernehmen",
     patchInPatch: "im Patch",
     patchPartly: (hidden, of) => `${hidden} von ${of} im Patch`,
@@ -1203,12 +1260,40 @@ export const texts: Record<Lang, Texts> = {
     mapObjectPlacedBy: "Aufgestellt von",
     mapObjectId: "Nummer in diesem Plugin",
     mapObjectModel: "Modell",
-    spotKinds: { duplicate: "doppelt", overlap: "steckt ineinander", touch: "berührt sich" },
+    spotKinds: {
+      duplicate: "doppelt",
+      overlap: "steckt ineinander",
+      deep: "kreuzt tief",
+      touch: "berührt sich",
+    },
     spotKindHints: {
       duplicate: "Dasselbe Objekt zweimal an derselben Stelle.",
-      overlap: "Zwei Objekte stecken ineinander.",
+      overlap: "Ein Objekt steckt großteils im anderen.",
+      deep: "Zwei Objekte laufen über 2 m oder mehr ineinander; oft bauen zwei Mods dasselbe.",
       touch: "Zwei Objekte ragen ein wenig ineinander; oft harmlos.",
     },
+    workTabSpots: "Stellen",
+    workMarks: "Markierungen",
+    workMarksHint:
+      "Aus: die Stelle so, wie das Spiel sie zeigen würde, ohne das, was du ausblendest. Taste V.",
+    workPreviewWithout: (name) => `Ohne ${name} ansehen, ohne zu entscheiden`,
+    workPassage: (count) => `Passage: ${count} Stellen dieser beiden Mods dicht beieinander`,
+    workPassageHide: (plugin) => `${plugin} in dieser Passage ausblenden`,
+    workPassageAll: (plugin, count) =>
+      count === 1
+        ? `1 Objekt von ${plugin} hier ausblenden`
+        : `Alle ${count} Objekte von ${plugin} hier ausblenden`,
+    workPairMany: (first, second, spots) =>
+      `${first} und ${second} stoßen an ${spots} Stellen zusammen. Meist ist es besser, dich für eine zu entscheiden:`,
+    workShowSpots: "Stellen ansehen",
+    workPairsIntro:
+      "Mod-Paare, deren Objekte zusammenstoßen, die meisten zuerst. Entscheide hier für ein ganzes Paar oder geh seine Stellen einzeln durch.",
+    workObjectLocked:
+      "Das Spiel braucht dieses Objekt: Anderes verweist darauf, oder es gehört zur Fernansicht. Es lässt sich nicht ausblenden.",
+    workObjectGame:
+      "Dieses Objekt gehört zum Spiel selbst. Blende es nur aus, wenn du sicher bist: Eine Quest könnte es brauchen.",
+    workObjectHide: "Dieses Objekt ausblenden",
+    workObjectShow: "Wieder zeigen",
     workProgress: (decided, total) => `${decided} von ${total} Stellen entschieden`,
     workGroupBy: "Ordnen nach",
     workByRegion: "Region",
@@ -1231,7 +1316,7 @@ export const texts: Record<Lang, Texts> = {
       `${first} gegen ${second}: ${spots === 1 ? "1 Stelle" : `${spots} Stellen`}`,
     workEverywhere: (plugin) => `Überall ${plugin} ausblenden`,
     workKeepEverywhere: "Überall beide behalten",
-    workKeys: "Tasten: ← → Stellen · 1, 2 ausblenden · 0 beide behalten",
+    workKeys: "Tasten: ← → Stellen · 1, 2 ausblenden · 0 beide behalten · V Markierungen",
     workToPatch: (objects) =>
       objects === 1 ? "Zum Patch (1 Objekt)" : `Zum Patch (${objects} Objekte)`,
     workPickSpot: "Wähle links eine Stelle.",
@@ -1243,7 +1328,7 @@ export const texts: Record<Lang, Texts> = {
     workThisSpot: "diese Stelle",
     workHideObject: "Dieses Objekt hier ausblenden",
     workDecideHere: "In der Arbeitsliste entscheiden",
-    workAfterDecide: "Danach zur nächsten offenen Stelle",
+    workAfterDecide: "Nach dem Entscheiden zur nächsten offenen Stelle",
     patchPerSpot: (count) =>
       count === 1 ? "1 Stelle einzeln entschieden" : `${count} Stellen einzeln entschieden`,
     mapHeightValue: (times) =>

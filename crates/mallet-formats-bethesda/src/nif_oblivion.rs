@@ -3,8 +3,9 @@
 //! Unlike the later games' meshes, these do not say how long each block
 //! is. A block can only be found by reading every block before it, so this
 //! reader knows the layout of the block types the game's own meshes use
-//! (checked against all of them, see [`layout`]). Where it meets a block
-//! type it does not know, it stops; what lies before is still used.
+//! most, including the animations of doors and gates (checked against all
+//! of them, see [`layout`]). A block of a type it does not know, such as a
+//! particle system, is measured by where the next block it knows starts.
 //!
 //! Textures are named by `NiSourceTexture` blocks, which hang from a
 //! shape's `NiTexturingProperty`. Shapes are `NiTriShape` (triangles) and
@@ -158,7 +159,8 @@ fn texture_slot(bytes: &mut Bytes<'_>) -> Option<u32> {
     let source = bytes.u32()?;
     bytes.skip(4 + 4 + 4)?; // clamp, filter, texture coordinate set
     if bytes.u8()? != 0 {
-        bytes.skip(36)?; // texture transform
+        // Texture transform: translation, scale, rotation, method, centre.
+        bytes.skip(8 + 8 + 4 + 4 + 8)?;
     }
     Some(source)
 }
@@ -212,18 +214,24 @@ fn source_file(bytes: &mut Bytes<'_>) -> Option<String> {
     })
 }
 
+/// The points and first texture coordinates of geometry data, as stored.
+/// Left as bytes, so that skipping a block costs nothing.
+struct RawGeometry<'a> {
+    positions: &'a [u8],
+    uvs: &'a [u8],
+}
+
 /// Geometry data: points, texture coordinates. Leaves `bytes` at the
 /// part that differs between triangles and strips.
-fn geometry_data(bytes: &mut Bytes<'_>) -> Option<(Vec<f32>, Vec<f32>)> {
+fn geometry_data<'a>(bytes: &mut Bytes<'a>) -> Option<RawGeometry<'a>> {
     bytes.u32()?; // group
     let count = usize::from(bytes.u16()?);
     bytes.skip(2)?; // keep and compress flags
-    let mut positions = Vec::new();
-    if bytes.u8()? != 0 {
-        for _ in 0..count * 3 {
-            positions.push(bytes.f32()?);
-        }
-    }
+    let positions = if bytes.u8()? != 0 {
+        bytes.take(count * 12)?
+    } else {
+        &[]
+    };
     let flags = bytes.u16()?;
     if bytes.u8()? != 0 {
         skip_n(bytes, count, 12)?; // normals
@@ -235,68 +243,90 @@ fn geometry_data(bytes: &mut Bytes<'_>) -> Option<(Vec<f32>, Vec<f32>)> {
     if bytes.u8()? != 0 {
         skip_n(bytes, count, 16)?; // colours
     }
-    let mut uvs = Vec::new();
-    for set in 0..(flags & 0x3F) {
-        for _ in 0..count * 2 {
-            let value = bytes.f32()?;
-            if set == 0 {
-                uvs.push(value);
-            }
-        }
-    }
+    let sets = usize::from(flags & 0x3F);
+    let uvs = if sets > 0 {
+        let first = bytes.take(count * 8)?;
+        skip_n(bytes, count * (sets - 1), 8)?;
+        first
+    } else {
+        &[]
+    };
     bytes.u16()?; // consistency
     bytes.u32()?; // additional data
-    Some((positions, uvs))
+    Some(RawGeometry { positions, uvs })
 }
 
-/// The triangles of `NiTriShapeData`, after its geometry data.
-fn triangles(bytes: &mut Bytes<'_>) -> Option<Vec<u32>> {
+/// Numbers stored one after another.
+fn floats(raw: &[u8]) -> Vec<f32> {
+    raw.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
+        .collect()
+}
+
+/// Corner numbers stored one after another.
+fn corners(raw: &[u8]) -> impl Iterator<Item = u32> {
+    raw.as_chunks::<2>()
+        .0
+        .iter()
+        .map(|bytes| u32::from(u16::from_le_bytes(*bytes)))
+}
+
+/// The corners of the triangles of `NiTriShapeData`, after its geometry
+/// data, as stored.
+fn triangle_corners<'a>(bytes: &mut Bytes<'a>) -> Option<&'a [u8]> {
     let count = usize::from(bytes.u16()?);
     bytes.u32()?; // number of triangle points
-    let mut indices = Vec::new();
-    if bytes.u8()? != 0 {
-        for _ in 0..count * 3 {
-            indices.push(u32::from(bytes.u16()?));
-        }
-    }
+    let corners = if bytes.u8()? != 0 {
+        bytes.take(count * 6)?
+    } else {
+        &[]
+    };
     let groups = bytes.u16()?;
     for _ in 0..groups {
         let size = usize::from(bytes.u16()?);
         skip_n(bytes, size, 2)?;
     }
-    Some(indices)
+    Some(corners)
 }
 
-/// The triangles of `NiTriStripsData`, after its geometry data: each strip
-/// turned into triangles, every second one turned around.
-fn strips(bytes: &mut Bytes<'_>) -> Option<Vec<u32>> {
+/// The lengths of the strips of `NiTriStripsData`, after its geometry
+/// data, and their corners as stored.
+fn strip_corners<'a>(bytes: &mut Bytes<'a>) -> Option<(Vec<usize>, &'a [u8])> {
     bytes.u16()?; // number of triangles
     let count = usize::from(bytes.u16()?);
     let mut lengths = Vec::new();
     for _ in 0..count {
         lengths.push(usize::from(bytes.u16()?));
     }
+    let corners = if bytes.u8()? != 0 {
+        bytes.take(lengths.iter().sum::<usize>() * 2)?
+    } else {
+        &[]
+    };
+    Some((lengths, corners))
+}
+
+/// Strips turned into triangles, every second one turned around.
+fn strips(lengths: &[usize], raw: &[u8]) -> Vec<u32> {
+    let mut all = corners(raw);
     let mut indices = Vec::new();
-    if bytes.u8()? != 0 {
-        for length in lengths {
-            let mut strip = Vec::new();
-            for _ in 0..length {
-                strip.push(u32::from(bytes.u16()?));
+    for &length in lengths {
+        let strip: Vec<u32> = all.by_ref().take(length).collect();
+        for (at, corners) in strip.windows(3).enumerate() {
+            let [a, b, c] = corners else { continue };
+            if a == b || b == c || a == c {
+                continue;
             }
-            for (at, corners) in strip.windows(3).enumerate() {
-                let [a, b, c] = corners else { continue };
-                if a == b || b == c || a == c {
-                    continue;
-                }
-                if at % 2 == 0 {
-                    indices.extend([*a, *b, *c]);
-                } else {
-                    indices.extend([*a, *c, *b]);
-                }
+            if at % 2 == 0 {
+                indices.extend([*a, *b, *c]);
+            } else {
+                indices.extend([*a, *c, *b]);
             }
         }
     }
-    Some(indices)
+    indices
 }
 
 /// Skips one block of the type `kind`. `None` if the type is not known or
@@ -325,11 +355,11 @@ fn skip_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
         }
         "NiTriShapeData" => {
             geometry_data(bytes)?;
-            triangles(bytes)?;
+            triangle_corners(bytes)?;
         }
         "NiTriStripsData" => {
             geometry_data(bytes)?;
-            strips(bytes)?;
+            strip_corners(bytes)?;
         }
         "BSXFlags" => {
             text(bytes)?;
@@ -462,9 +492,219 @@ fn skip_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
                 skin_partition(bytes)?;
             }
         }
+        "bhkPackedNiTriStripsShape" => {
+            let parts = usize::from(bytes.u16()?);
+            skip_n(bytes, parts, 12)?; // filter, vertex count, material
+            // User data, unused, radius, unused, scale, both again, data.
+            bytes.skip(4 + 4 + 4 + 4 + 16 + 4 + 16 + 4)?;
+        }
+        "hkPackedNiTriStripsData" => {
+            let triangles = count32(bytes)?;
+            skip_n(bytes, triangles, 6 + 2 + 12)?; // corners, welding, normal
+            let vertices = count32(bytes)?;
+            skip_n(bytes, vertices, 12)?;
+        }
+        "bhkSimpleShapePhantom" => bytes.skip(28 + 8 + 64)?,
+        "bhkMultiSphereShape" => {
+            bytes.skip(4 + 4 + 12)?;
+            let spheres = count32(bytes)?;
+            skip_n(bytes, spheres, 16)?;
+        }
+        "bhkPrismaticConstraint" | "bhkStiffSpringConstraint" => {
+            let entities = count32(bytes)?;
+            skip_n(bytes, entities, 4)?;
+            bytes.u32()?; // priority
+            bytes.skip(if kind == "bhkPrismaticConstraint" {
+                8 * 16 + 3 * 4
+            } else {
+                2 * 16 + 4
+            })?;
+        }
+        "BSBound" => {
+            text(bytes)?;
+            bytes.skip(12 + 12)?; // centre, half size
+        }
+        "NiFogProperty" => {
+            object(bytes)?;
+            bytes.skip(2 + 4 + 12)?;
+        }
+        "NiAmbientLight" | "NiDirectionalLight" | "NiPointLight" | "NiSpotLight" => {
+            av_object(bytes)?;
+            bytes.u8()?; // switched on
+            let nodes = count32(bytes)?;
+            skip_n(bytes, nodes, 4)?;
+            bytes.skip(4 + 3 * 12)?; // dimmer, colours
+            match kind {
+                "NiPointLight" => bytes.skip(12)?,
+                "NiSpotLight" => bytes.skip(12 + 8)?,
+                _ => {}
+            }
+        }
+        _ => skip_animation_block(kind, bytes)?,
+    }
+    Some(())
+}
+
+/// Skips one block that names the animations of a mesh and what they move.
+/// `None` if the type is not known or the block does not fit.
+fn skip_sequence_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
+    match kind {
+        "NiControllerManager" => {
+            time_controller(bytes)?;
+            bytes.u8()?; // cumulative
+            let sequences = count32(bytes)?;
+            skip_n(bytes, sequences, 4)?;
+            bytes.u32()?; // object palette
+        }
+        "NiControllerSequence" => {
+            text(bytes)?;
+            let controlled = count32(bytes)?;
+            bytes.u32()?; // array grow by
+            // Interpolator, controller, priority, string palette and five
+            // offsets into it.
+            skip_n(bytes, controlled, 4 + 4 + 1 + 4 + 5 * 4)?;
+            // Weight, text keys, cycle, frequency, start, stop, manager.
+            bytes.skip(7 * 4)?;
+            text(bytes)?; // accumulation root
+            bytes.u32()?; // string palette
+        }
+        "NiDefaultAVObjectPalette" => {
+            bytes.u32()?; // scene
+            let objects = count32(bytes)?;
+            for _ in 0..objects {
+                text(bytes)?;
+                bytes.u32()?;
+            }
+        }
+        "NiStringPalette" => {
+            text(bytes)?;
+            bytes.u32()?; // length again
+        }
         _ => return None,
     }
     Some(())
+}
+
+/// Skips one block that animates a mesh: its controllers, interpolators
+/// and keys. `None` if the type is not known or the block does not fit.
+fn skip_animation_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
+    match kind {
+        "NiTransformInterpolator" => bytes.skip(12 + 16 + 4 + 4)?,
+        "NiPoint3Interpolator" => bytes.skip(12 + 4)?,
+        "NiFloatInterpolator" => bytes.skip(4 + 4)?,
+        "NiBoolInterpolator" => bytes.skip(1 + 4)?,
+        "NiTransformData" | "NiKeyframeData" => {
+            let rotations = count32(bytes)?;
+            if rotations > 0 {
+                match bytes.u32()? {
+                    4 => {
+                        // Separate keys for each axis.
+                        for _ in 0..3 {
+                            key_group(bytes, 4)?;
+                        }
+                    }
+                    1 | 2 | 5 => skip_n(bytes, rotations, 4 + 16)?,
+                    3 => skip_n(bytes, rotations, 4 + 16 + 12)?,
+                    _ => return None,
+                }
+            }
+            key_group(bytes, 12)?; // translations
+            key_group(bytes, 4)?; // scales
+        }
+        "NiFloatData" => key_group(bytes, 4)?,
+        "NiPosData" => key_group(bytes, 12)?,
+        "NiBoolData" => key_group(bytes, 1)?,
+        "NiTransformController"
+        | "NiKeyframeController"
+        | "NiAlphaController"
+        | "NiVisController"
+        | "bhkBlendController" => {
+            time_controller(bytes)?;
+            bytes.u32()?; // interpolator, or keys
+        }
+        "NiMaterialColorController" => {
+            time_controller(bytes)?;
+            bytes.skip(4 + 2)?; // interpolator, which colour
+        }
+        "NiTextureTransformController" => {
+            time_controller(bytes)?;
+            bytes.skip(4 + 1 + 4 + 4)?; // interpolator, slot, operation
+        }
+        "NiFlipController" => {
+            time_controller(bytes)?;
+            bytes.skip(4 + 4)?; // interpolator, slot
+            let sources = count32(bytes)?;
+            skip_n(bytes, sources, 4)?;
+        }
+        "NiMultiTargetTransformController" => {
+            time_controller(bytes)?;
+            let targets = usize::from(bytes.u16()?);
+            skip_n(bytes, targets, 4)?;
+        }
+        "NiBlendTransformInterpolator" => blend_interpolator(bytes)?,
+        "NiBlendPoint3Interpolator" => {
+            blend_interpolator(bytes)?;
+            bytes.skip(12)?;
+        }
+        "NiBlendFloatInterpolator" => {
+            blend_interpolator(bytes)?;
+            bytes.skip(4)?;
+        }
+        "NiBlendBoolInterpolator" => {
+            blend_interpolator(bytes)?;
+            bytes.u8()?;
+        }
+        "NiBSBoneLODController" | "NiBoneLODController" => {
+            time_controller(bytes)?;
+            bytes.u32()?; // level shown
+            let levels = count32(bytes)?;
+            bytes.u32()?; // node groups, the same number
+            for _ in 0..levels {
+                let nodes = count32(bytes)?;
+                skip_n(bytes, nodes, 4)?;
+            }
+        }
+        _ => skip_sequence_block(kind, bytes)?,
+    }
+    Some(())
+}
+
+/// Skips what every animation controller starts with: the next
+/// controller, flags, frequency, phase, start, stop and target.
+fn time_controller(bytes: &mut Bytes<'_>) -> Option<()> {
+    bytes.skip(4 + 2 + 4 * 4 + 4)
+}
+
+/// Skips what every interpolator that blends others starts with.
+fn blend_interpolator(bytes: &mut Bytes<'_>) -> Option<()> {
+    let flags = bytes.u8()?;
+    let items = usize::from(bytes.u8()?);
+    bytes.f32()?; // weight threshold
+    if flags & 1 == 0 {
+        // Counts, priorities, time, weights; then interpolator, weight,
+        // normalised weight, priority and ease spinner for each.
+        bytes.skip(4 + 4 * 4)?;
+        skip_n(bytes, items, 4 + 4 + 4 + 1 + 4)?;
+    }
+    Some(())
+}
+
+/// Skips a group of animation keys whose values take `size` bytes each.
+fn key_group(bytes: &mut Bytes<'_>, size: usize) -> Option<()> {
+    let keys = count32(bytes)?;
+    if keys == 0 {
+        return Some(());
+    }
+    let each = match bytes.u32()? {
+        // Linear and constant: time and value.
+        1 | 5 => 4 + size,
+        // Quadratic: time, value and two tangents.
+        2 => 4 + 3 * size,
+        // Tension, bias, continuity.
+        3 => 4 + size + 12,
+        _ => return None,
+    };
+    skip_n(bytes, keys, each)
 }
 
 /// Skips one partition of a skin.
@@ -498,11 +738,33 @@ fn skin_partition(bytes: &mut Bytes<'_>) -> Option<()> {
     Some(())
 }
 
-/// Where the blocks of an Oblivion mesh lie, as far as their types are
-/// known, and whether every block was found: then the mesh ends right after
-/// them, with the list of its roots.
+/// Where the blocks of an Oblivion mesh lie, and whether every block was
+/// found: then the mesh ends right after them, with the list of its roots.
+///
+/// Blocks of types this reader does not know are measured by where the
+/// next block of a known type starts: the place from which every block
+/// after it can be read and the mesh ends exactly after its roots. Of a run
+/// of such blocks, the first takes up the space and the others none. Where
+/// no such place is found, the blocks up to the first that cannot be read
+/// are returned.
 pub(crate) fn layout(data: &[u8]) -> Result<(Vec<BlockInfo>, bool), NifError> {
     let header = header(data)?;
+    let mut search = Search {
+        data,
+        kinds: &header.kinds,
+        known: header.kinds.iter().map(|kind| is_known(kind)).collect(),
+        tries: MAX_TRIES,
+        failed: HashSet::new(),
+    };
+    if let Some(spans) = search.spans_from(0, header.blocks_start) {
+        let blocks = header
+            .kinds
+            .into_iter()
+            .zip(spans)
+            .map(|(kind, (start, size))| BlockInfo { kind, start, size })
+            .collect();
+        return Ok((blocks, true));
+    }
     let mut bytes = Bytes::new(data);
     bytes.skip(header.blocks_start).ok_or(NifError::Damaged)?;
     let mut blocks = Vec::new();
@@ -521,6 +783,80 @@ pub(crate) fn layout(data: &[u8]) -> Result<(Vec<BlockInfo>, bool), NifError> {
         .is_some()
         && bytes.remaining() == 0;
     Ok((blocks, complete))
+}
+
+/// How many places one mesh may try for blocks of unknown types, all runs
+/// together, before the search gives up.
+const MAX_TRIES: usize = 300_000;
+
+/// The search for the places of blocks of unknown types; see [`layout`].
+struct Search<'a> {
+    data: &'a [u8],
+    kinds: &'a [String],
+    /// Whether the layout of each block's type is known.
+    known: Vec<bool>,
+    /// How many places may still be tried.
+    tries: usize,
+    /// Pairs of a block and a place from which the mesh cannot be read to
+    /// its end.
+    failed: HashSet<(usize, usize)>,
+}
+
+impl Search<'_> {
+    /// The start and size of each block from the block `first` on, that
+    /// block starting at `start`, such that the mesh ends right after them
+    /// with its roots. `None` if there is no such layout or the tries run
+    /// out.
+    fn spans_from(&mut self, first: usize, start: usize) -> Option<Vec<(usize, usize)>> {
+        let data = self.data;
+        let mut bytes = Bytes::new(data.get(start..)?);
+        let position = |bytes: &Bytes<'_>| data.len() - bytes.remaining();
+        let mut spans = Vec::new();
+        for (index, kind) in self.kinds.iter().enumerate().skip(first) {
+            let from = position(&bytes);
+            self.tries = self.tries.checked_sub(1)?;
+            if skip_block(kind, &mut bytes).is_some() {
+                spans.push((from, position(&bytes) - from));
+                continue;
+            }
+            if self.known.get(index).copied().unwrap_or(true) {
+                // A known block that does not fit: the place is wrong.
+                return None;
+            }
+            let next = self
+                .known
+                .iter()
+                .enumerate()
+                .skip(index)
+                .find(|(_, known)| **known)
+                .map_or(self.kinds.len(), |(next, _)| next);
+            for candidate in from + 1..=data.len() {
+                self.tries = self.tries.checked_sub(1)?;
+                if self.failed.contains(&(next, candidate)) {
+                    continue;
+                }
+                if let Some(found) = self.spans_from(next, candidate) {
+                    spans.push((from, candidate - from));
+                    spans.extend((index + 1..next).map(|_| (candidate, 0)));
+                    spans.extend(found);
+                    return Some(spans);
+                }
+                self.failed.insert((next, candidate));
+            }
+            return None;
+        }
+        let roots = count32(&mut bytes)?;
+        skip_n(&mut bytes, roots, 4)?;
+        (bytes.remaining() == 0).then_some(spans)
+    }
+}
+
+/// Whether this reader knows the layout of blocks of the type `kind`.
+/// Every known type can be read from zeros, as a block without name,
+/// entries or keys.
+fn is_known(kind: &str) -> bool {
+    const ZEROS: [u8; 512] = [0; 512];
+    skip_block(kind, &mut Bytes::new(&ZEROS)).is_some()
 }
 
 /// A reference to another block: its number, or `None` for "no block".
@@ -609,16 +945,21 @@ pub(crate) fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                     continue;
                 };
                 let mut data = Bytes::new(data);
-                let Some((positions, uvs)) = geometry_data(&mut data) else {
+                let Some(geometry) = geometry_data(&mut data) else {
                     continue;
                 };
                 let indices = match data_kind {
-                    "NiTriShapeData" => triangles(&mut data),
-                    "NiTriStripsData" => strips(&mut data),
+                    "NiTriShapeData" => {
+                        triangle_corners(&mut data).map(|raw| corners(raw).collect())
+                    }
+                    "NiTriStripsData" => {
+                        strip_corners(&mut data).map(|(lengths, raw)| strips(&lengths, raw))
+                    }
                     _ => None,
                 };
                 let Some(indices) = indices else { continue };
-                if let Some(shape) = finish(&positions, uvs, &indices, here) {
+                let positions = floats(geometry.positions);
+                if let Some(shape) = finish(&positions, floats(geometry.uvs), &indices, here) {
                     let (texture, alpha) = texture_of(&properties);
                     shapes.push(Shape {
                         texture,
@@ -854,17 +1195,69 @@ mod tests {
     }
 
     #[test]
-    fn blocks_before_an_unknown_one_are_still_used() {
+    fn a_block_of_an_unknown_type_is_measured_by_the_next_one() {
         let data = mesh(&[
+            ("NiNode", node(&[2])),
+            ("NiSomethingNew", vec![7, 7, 7, 7, 7]),
+            ("NiTriShape", shape(3, &[])),
+            ("NiTriShapeData", triangle_data()),
+            ("NiSomethingElse", vec![1, 2, 3]),
+        ]);
+        let (blocks, complete) = layout(&data).unwrap();
+        assert!(complete);
+        assert_eq!(blocks.len(), 5);
+        assert_eq!(blocks[1].size, 5);
+        assert_eq!(blocks[2].start, blocks[1].start + 5);
+        assert_eq!(blocks[4].size, 3);
+        assert_eq!(shapes(&data).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn of_a_run_of_unknown_blocks_the_first_takes_the_space() {
+        let data = mesh(&[
+            ("NiNode", node(&[3])),
+            ("NiSomethingNew", vec![7, 7, 7]),
+            ("NiSomethingElse", vec![8, 8]),
+            ("NiTriShape", shape(4, &[])),
+            ("NiTriShapeData", triangle_data()),
+        ]);
+        let (blocks, complete) = layout(&data).unwrap();
+        assert!(complete);
+        assert_eq!(blocks[1].size, 5);
+        assert_eq!(blocks[2].size, 0);
+        assert_eq!(shapes(&data).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn blocks_before_an_unknown_one_are_used_where_no_place_fits() {
+        let mut data = mesh(&[
             ("NiNode", node(&[1])),
             ("NiTriShape", shape(2, &[])),
             ("NiTriShapeData", triangle_data()),
             ("NiSomethingNew", vec![1, 2, 3]),
+            ("NiNode", node(&[])),
         ]);
+        // The mesh ends too early for the last node.
+        data.truncate(data.len() - 12);
         let (blocks, complete) = layout(&data).unwrap();
         assert!(!complete);
         assert_eq!(blocks.len(), 3);
         assert_eq!(shapes(&data).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn known_types_are_told_from_unknown_ones() {
+        for kind in [
+            "NiNode",
+            "NiTriStripsData",
+            "NiTexturingProperty",
+            "NiControllerSequence",
+            "NiTransformData",
+            "bhkPackedNiTriStripsShape",
+        ] {
+            assert!(is_known(kind), "{kind}");
+        }
+        assert!(!is_known("NiSomethingNew"));
     }
 
     #[test]

@@ -26,6 +26,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
 | `meshes.made-for-other-game` | Warning | likely | Meshes of a mod were made for another game |
+| `meshes.texture-missing` | Warning | likely | Meshes of a mod use textures that are not in the game |
 | `meshes.retexture-bypassed` | Warning | likely | A texture mod does not reach replaced meshes |
 | `assets.loose-over-archive` | Note | certain | Loose files cover files in another mod's archive |
 | `assets.archive-over-archive` | Note | certain | An archive covers files in another mod's archive |
@@ -271,6 +272,18 @@ The game keeps an invisible net on the ground of every place, which characters u
 A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
 
 **What to do:** Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
+
+## meshes.texture-missing
+
+**Meshes of a mod use textures that are not in the game**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `meshes`, `count`, `examples`
+
+A mesh is the 3D shape of a thing; its colour and the fine detail of its surface come from textures, separate image files that the mesh names. If a named texture is not there, the game draws the surface in a glaring purple, or dark and flat where the surface detail is missing. This usually means that a part of the mod was not installed, for example its textures in a separate download, or that the mod was made to go with another mod you do not have. Meshes a mod installs for a mod you do not use are never shown, so their missing textures do no harm.
+
+**What to do:** Look on the mod's page for files that belong with it, such as a texture download or a mod it needs, and install them. If the meshes are part of a patch for a mod you do not have, you can leave them.
 
 ## meshes.retexture-bypassed
 

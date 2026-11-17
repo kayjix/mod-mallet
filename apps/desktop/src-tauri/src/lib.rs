@@ -96,23 +96,15 @@ fn confirm_places(
     lang: String,
 ) -> Result<RenderedPlaces, String> {
     // What else the user decided stays as it was.
-    let previous = settings()?;
-    let settings = Settings {
-        game: previous.game,
-        confirmed: true,
-        ignored: previous.ignored,
-        decisions: previous.decisions,
-        ranking: previous.ranking,
-        places: named
+    let settings = change_settings(|settings| {
+        settings.confirmed = true;
+        settings.places = named
             .into_iter()
             .map(|(role, path)| (role, path.trim().to_owned()))
             .filter(|(_, path)| !path.is_empty())
             .map(|(role, path)| (role, PathBuf::from(path)))
-            .collect(),
-    };
-    let path = mallet_engine::default_settings_path()
-        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
-    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+            .collect();
+    })?;
     Ok(render_places(&settings, &lang))
 }
 
@@ -125,17 +117,14 @@ fn ignored() -> Result<Vec<String>, String> {
 /// Sets a finding aside, or brings it back, and returns the findings set
 /// aside afterwards. Only ever called because the user pressed a button.
 #[tauri::command(async)]
-#[allow(clippy::needless_pass_by_value)]
 fn set_ignored(id: String, ignored: bool) -> Result<Vec<String>, String> {
-    let mut settings = settings()?;
-    if ignored {
-        settings.ignored.insert(id);
-    } else {
-        settings.ignored.remove(&id);
-    }
-    let path = mallet_engine::default_settings_path()
-        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
-    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+    let settings = change_settings(|settings| {
+        if ignored {
+            settings.ignored.insert(id);
+        } else {
+            settings.ignored.remove(&id);
+        }
+    })?;
     Ok(settings.ignored.into_iter().collect())
 }
 
@@ -149,16 +138,13 @@ fn decisions() -> Result<BTreeMap<String, u8>, String> {
 /// returns all decisions afterwards. Only ever called because the user
 /// pressed a button.
 #[tauri::command(async)]
-#[allow(clippy::needless_pass_by_value)]
 fn set_decision(id: String, side: Option<u8>) -> Result<BTreeMap<String, u8>, String> {
-    let mut settings = settings()?;
-    match side {
-        Some(side) => settings.decisions.insert(id, side.min(1)),
-        None => settings.decisions.remove(&id),
-    };
-    let path = mallet_engine::default_settings_path()
-        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
-    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+    let settings = change_settings(|settings| {
+        match side {
+            Some(side) => settings.decisions.insert(id, side.min(1)),
+            None => settings.decisions.remove(&id),
+        };
+    })?;
     Ok(settings.decisions)
 }
 
@@ -171,14 +157,25 @@ fn ranking() -> Result<Vec<String>, String> {
 /// Remembers the order the user likes the mods in. Only ever called
 /// because the user changed it.
 #[tauri::command(async)]
-#[allow(clippy::needless_pass_by_value)]
 fn set_ranking(ranking: Vec<String>) -> Result<Vec<String>, String> {
-    let mut settings = settings()?;
-    settings.ranking = ranking;
-    let path = mallet_engine::default_settings_path()
-        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
-    mallet_engine::save_settings(&path, &settings).map_err(|error| error.to_string())?;
+    let settings = change_settings(|settings| settings.ranking = ranking)?;
     Ok(settings.ranking)
+}
+
+/// What the user chose for the patch that hides objects, by finding, spot
+/// or object: the plugin to hide, or `None` to keep both. `None` as a
+/// whole if the user has chosen nothing yet.
+#[tauri::command(async)]
+fn patch_choices() -> Result<Option<BTreeMap<String, Option<String>>>, String> {
+    Ok(settings()?.patch_choices)
+}
+
+/// Remembers what the user chose for the patch that hides objects. Only
+/// ever called because the user chose something.
+#[tauri::command(async)]
+fn set_patch_choices(choices: BTreeMap<String, Option<String>>) -> Result<(), String> {
+    change_settings(|settings| settings.patch_choices = Some(choices))?;
+    Ok(())
 }
 
 /// A short text that changes when a file the scan starts from changes.
@@ -308,6 +305,23 @@ fn area_objects(
     radius: f32,
 ) -> Result<Option<mallet_core::mesh::AreaObjects>, String> {
     Ok(mallet_engine::area_objects(
+        &settings()?.scan_options(),
+        &world,
+        [x, y],
+        radius,
+    ))
+}
+
+/// The game's ground of the cells around a point of a worldspace (ADR 0041).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn area_land(
+    world: String,
+    x: f32,
+    y: f32,
+    radius: f32,
+) -> Result<Option<mallet_core::mesh::AreaLand>, String> {
+    Ok(mallet_engine::area_land(
         &settings()?.scan_options(),
         &world,
         [x, y],
@@ -457,6 +471,14 @@ fn settings() -> Result<Settings, String> {
     }
 }
 
+/// Changes the settings of the game the user looks at, as one step with
+/// reading them, and returns them as written.
+fn change_settings(change: impl FnOnce(&mut Settings)) -> Result<Settings, String> {
+    let path = mallet_engine::default_settings_path()
+        .ok_or_else(|| "the system does not say where settings are kept".to_owned())?;
+    mallet_engine::update_settings(&path, change).map_err(|error| error.to_string())
+}
+
 fn render_places(settings: &Settings, lang: &str) -> RenderedPlaces {
     let planned = mallet_engine::planned_locations(&settings.scan_options());
     messages(lang).render_places(settings.confirmed, &planned)
@@ -534,10 +556,13 @@ pub fn run() -> tauri::Result<()> {
             lod_mesh,
             lod_texture,
             area_objects,
+            area_land,
             area_mesh,
             area_texture,
             ranking,
             set_ranking,
+            patch_choices,
+            set_patch_choices,
             games,
             select_game
         ])

@@ -976,9 +976,10 @@ struct Matrix {
 impl Matrix {
     /// The rotation of a placed object turned by `x`, `y` and `z` radians.
     ///
-    /// The game turns objects clockwise about each axis, first about x,
-    /// then y, then z: an object turned a quarter about z faces east
-    /// instead of north.
+    /// The game turns objects clockwise about each axis of the world,
+    /// first about z, then y, then x: an object turned a quarter about z
+    /// faces east instead of north. (Turning first about x draws tilted
+    /// rocks and beams of real setups visibly wrong.)
     fn placed(x: f64, y: f64, z: f64) -> Self {
         let about_x = |angle: f64| {
             let (sin, cos) = angle.sin_cos();
@@ -992,7 +993,7 @@ impl Matrix {
             let (sin, cos) = angle.sin_cos();
             Self::from_rows([cos, -sin, 0.0], [sin, cos, 0.0], [0.0, 0.0, 1.0])
         };
-        about_z(-z).times(about_y(-y)).times(about_x(-x))
+        about_x(-x).times(about_y(-y)).times(about_z(-z))
     }
 
     fn from_rows(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> Self {
@@ -1438,6 +1439,19 @@ mod tests {
         );
         let back = turned.apply_inverse(east);
         assert!((back.y - 1.0).abs() < 1e-9, "{back:?}");
+    }
+
+    #[test]
+    fn the_turn_about_z_comes_before_the_turn_about_x() {
+        // Turned a quarter about z, north points east; the quarter about x
+        // that follows turns about that east axis and leaves it as it is.
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let turned = Matrix::placed(quarter, 0.0, quarter);
+        let east = turned.apply(Vector::new(0.0, 1.0, 0.0));
+        assert!(
+            (east.x - 1.0).abs() < 1e-9 && east.y.abs() < 1e-9 && east.z.abs() < 1e-9,
+            "{east:?}"
+        );
     }
 
     /// A box-shaped model from `min` to `max`, as twelve triangles.

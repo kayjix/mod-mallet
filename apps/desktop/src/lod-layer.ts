@@ -49,8 +49,15 @@ uniform vec3 u_water;
 uniform bool u_showCells;
 uniform sampler2D u_cells;
 uniform vec4 u_cellsRect;
+uniform vec4 u_fine;
 out vec4 colour;
 void main() {
+  // Where the game's own ground is drawn up close (ADR 0041), its land
+  // stays out of the way; its water stays.
+  if (u_land && u_hasTexture && v_xy.x > u_fine.x && v_xy.y > u_fine.y &&
+      v_xy.x < u_fine.z && v_xy.y < u_fine.w) {
+    discard;
+  }
   vec4 sampled = u_hasTexture ? texture(u_texture, v_uv) : vec4(u_water, 1.0);
   if (u_alphaTest && sampled.a < 0.5) {
     discard;
@@ -145,6 +152,9 @@ export interface LodView {
   /** Cells (west, south, east, north) where the real objects are drawn,
    * so that the reduced ones are left out there. */
   realObjects: [number, number, number, number] | null;
+  /** Cells (west, south, east, north edges) where the game's own ground
+   * is drawn, so that the land of the blocks is left out there. */
+  fineLand?: [number, number, number, number] | null;
 }
 
 export class LodLayer {
@@ -265,6 +275,7 @@ export class LodLayer {
     gl.uniform3fv(at("u_water"), view.water);
     gl.uniform1i(at("u_showCells"), view.showCells ? 1 : 0);
     gl.uniform4f(at("u_cellsRect"), ...view.cellsRect);
+    gl.uniform4f(at("u_fine"), ...(view.fineLand ?? [0, 0, 0, 0]));
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, view.cells);
     gl.uniform1i(at("u_cells"), 1);

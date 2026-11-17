@@ -17,8 +17,10 @@ use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, group
 use crate::game::Game;
 use crate::ingest;
 use crate::objects::{
-    FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, floats, model_path, record_id,
+    FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, FLAG_VISIBLE_WHEN_DISTANT, editor_id,
+    floats, model_path, record_id,
 };
+use crate::terrain;
 
 /// Game units per cell side.
 const CELL: f32 = 4096.0;
@@ -54,6 +56,40 @@ pub struct AreaObject {
     pub rotation: [f32; 3],
     /// The size relative to the base object.
     pub scale: f32,
+    /// Whether the game relies on it being there: it is persistent (other
+    /// things refer to it) or part of the distant view.
+    pub anchored: bool,
+}
+
+/// The ground of one outside cell near the point, in the version the game
+/// uses (ADR 0041).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CellLand {
+    /// The cell's column.
+    pub x: i32,
+    /// The cell's row.
+    pub y: i32,
+    /// The heights of 33 rows of 33 points, in game units; the southern
+    /// row first, each from west to east. Neighbouring cells share their
+    /// edge.
+    pub heights: Vec<f32>,
+    /// The colours of the same points, three bytes each, if the land has
+    /// them.
+    pub colours: Option<Vec<u8>>,
+}
+
+/// The cells (west, east, south, north) around a point.
+type Cells = (i32, i32, i32, i32);
+
+/// What one pass over the plugins found around a point. Objects and land
+/// are asked for one after the other; the second asks takes its part
+/// from here instead of reading every plugin again.
+#[derive(Debug, Default)]
+struct Pass {
+    world: String,
+    cells: Cells,
+    objects: Option<HashMap<RecordId, Option<AreaObject>>>,
+    land: Option<Vec<CellLand>>,
 }
 
 /// The plugins of a setup, for reading areas of its worldspaces.
@@ -63,6 +99,8 @@ pub struct AreaReader {
     plugins: Vec<(String, PathBuf)>,
     /// The models of base objects, once read.
     models: Option<HashMap<RecordId, BaseModel>>,
+    /// The part of the last pass not yet asked for.
+    last: Option<Pass>,
 }
 
 impl AreaReader {
@@ -81,6 +119,7 @@ impl AreaReader {
         Self {
             plugins,
             models: None,
+            last: None,
         }
     }
 
@@ -96,22 +135,81 @@ impl AreaReader {
     /// The objects in the worldspace named `world` (its internal name, such
     /// as `Tamriel`) whose position lies within `radius` game units of
     /// `centre` in both directions.
-    pub fn objects(&self, world: &str, centre: [f32; 2], radius: f32) -> Vec<AreaObject> {
-        let cells = (
-            cell_of(centre[0] - radius),
-            cell_of(centre[0] + radius),
-            cell_of(centre[1] - radius),
-            cell_of(centre[1] + radius),
-        );
+    pub fn objects(&mut self, world: &str, centre: [f32; 2], radius: f32) -> Vec<AreaObject> {
+        let cells = cells_around(centre, radius);
+        let found = self.part(world, cells, |pass| pass.objects.take());
+        let within = |object: &AreaObject| {
+            (object.position[0] - centre[0]).abs() <= radius
+                && (object.position[1] - centre[1]).abs() <= radius
+        };
+        let mut objects: Vec<AreaObject> = found.into_values().flatten().filter(within).collect();
+        objects.sort_by(|a, b| a.id.cmp(&b.id));
+        objects
+    }
+
+    /// The ground of the outside cells of the worldspace named `world`
+    /// that reach within `radius` game units of `centre` in both
+    /// directions: the same cells [`AreaReader::objects`] reads. Cells
+    /// without land are left out.
+    pub fn land(&mut self, world: &str, centre: [f32; 2], radius: f32) -> Vec<CellLand> {
+        let cells = cells_around(centre, radius);
+        let mut land = self.part(world, cells, |pass| pass.land.take());
+        land.sort_by_key(|cell| (cell.y, cell.x));
+        land
+    }
+
+    /// The part `part` of a pass over `cells` of `world`: from the last
+    /// pass if it is still there, else from a new one, whose other part is
+    /// kept for the next ask.
+    fn part<T: Default>(
+        &mut self,
+        world: &str,
+        cells: Cells,
+        part: impl Fn(&mut Pass) -> Option<T>,
+    ) -> T {
+        if let Some(found) = self.take(world, cells, &part) {
+            return found;
+        }
+        let mut pass = self.pass(world, cells);
+        let found = part(&mut pass).unwrap_or_default();
+        self.last = Some(pass);
+        found
+    }
+
+    /// The part `part` of the last pass, if it read `cells` of `world` and
+    /// the part has not been taken yet.
+    fn take<T>(
+        &mut self,
+        world: &str,
+        cells: Cells,
+        part: impl FnOnce(&mut Pass) -> Option<T>,
+    ) -> Option<T> {
+        let pass = self.last.as_mut()?;
+        if pass.cells != cells || !pass.world.eq_ignore_ascii_case(world) {
+            return None;
+        }
+        let taken = part(pass);
+        if pass.objects.is_none() && pass.land.is_none() {
+            self.last = None;
+        }
+        taken
+    }
+
+    /// Reads the objects and the land of `cells` of `world` from every
+    /// plugin, later plugins replacing earlier ones.
+    fn pass(&self, world: &str, cells: Cells) -> Pass {
         let descend = |group: GroupLabel| wanted(group, cells);
         let request = plugin::Request {
             flat: &[],
             nested: &[*b"WRLD"],
-            nested_records: &[*b"WRLD", *b"REFR"],
+            nested_records: &[*b"WRLD", *b"REFR", *b"CELL", *b"LAND"],
             nested_overrides: &[],
         };
+        let (west, east, south, north) = cells;
+        let inside = |(x, y): (i32, i32)| x >= west && x <= east && y >= south && y <= north;
         let mut world_id: Option<RecordId> = None;
         let mut found: HashMap<RecordId, Option<AreaObject>> = HashMap::new();
+        let mut land: HashMap<(i32, i32), CellLand> = HashMap::new();
         for (name, path) in &self.plugins {
             let Ok(file) = File::open(path) else {
                 continue;
@@ -122,6 +220,8 @@ impl AreaReader {
                 continue;
             };
             let masters = &read.header.masters;
+            // The cells of this plugin in the world, to place its land.
+            let mut positions: HashMap<RecordId, (i32, i32)> = HashMap::new();
             for record in &read.records {
                 match &record.signature {
                     b"WRLD" => {
@@ -142,18 +242,80 @@ impl AreaReader {
                         let object = area_object(record, masters, name, id.clone());
                         found.insert(id, object);
                     }
+                    b"CELL" => {
+                        if world_id.is_some()
+                            && world_of(record, masters, name) == world_id
+                            && let Some(position) = terrain::cell_position(record)
+                        {
+                            positions.insert(record_id(record.form_id, masters, name), position);
+                        }
+                    }
+                    b"LAND" => {
+                        if world_id.is_none() || world_of(record, masters, name) != world_id {
+                            continue;
+                        }
+                        let Some(position) = record
+                            .groups
+                            .iter()
+                            .find(|group| group.group_type == group_type::CELL_CHILDREN)
+                            .and_then(|group| positions.get(&record_id(group.label, masters, name)))
+                            .copied()
+                            .filter(|position| inside(*position))
+                        else {
+                            continue;
+                        };
+                        match cell_land(record, position) {
+                            Some(cell) => {
+                                land.insert(position, cell);
+                            }
+                            None if record.flags & FLAG_DELETED != 0 => {
+                                land.remove(&position);
+                            }
+                            None => {}
+                        }
+                    }
                     _ => {}
                 }
             }
         }
-        let within = |object: &AreaObject| {
-            (object.position[0] - centre[0]).abs() <= radius
-                && (object.position[1] - centre[1]).abs() <= radius
-        };
-        let mut objects: Vec<AreaObject> = found.into_values().flatten().filter(within).collect();
-        objects.sort_by(|a, b| a.id.cmp(&b.id));
-        objects
+        Pass {
+            world: world.to_owned(),
+            cells,
+            objects: Some(found),
+            land: Some(land.into_values().collect()),
+        }
     }
+}
+
+/// The cells (west, east, south, north) within `radius` game units of
+/// `centre` in both directions.
+fn cells_around(centre: [f32; 2], radius: f32) -> Cells {
+    (
+        cell_of(centre[0] - radius),
+        cell_of(centre[0] + radius),
+        cell_of(centre[1] - radius),
+        cell_of(centre[1] + radius),
+    )
+}
+
+/// The ground a `LAND` record gives the cell at `position`; `None` if it
+/// has no heights or is deleted.
+fn cell_land(record: &Record, (x, y): (i32, i32)) -> Option<CellLand> {
+    if record.flags & FLAG_DELETED != 0 {
+        return None;
+    }
+    let heights = terrain::height_grid(record.first(b"VHGT")?)?;
+    let points = terrain::GRID * terrain::GRID;
+    let colours = record
+        .first(b"VCLR")
+        .and_then(|data| data.get(..points * 3))
+        .map(<[u8]>::to_vec);
+    Some(CellLand {
+        x,
+        y,
+        heights,
+        colours,
+    })
 }
 
 /// The cell a coordinate in game units lies in.
@@ -222,6 +384,7 @@ fn area_object(
         position: [*x, *y, *z],
         rotation: [*rx, *ry, *rz],
         scale,
+        anchored: record.flags & (FLAG_PERSISTENT | FLAG_VISIBLE_WHEN_DISTANT) != 0,
     })
 }
 
@@ -293,6 +456,113 @@ mod tests {
         assert!(!wanted(block(group_type::EXTERIOR_SUB_BLOCK, 1, -1), cells));
         // Cells and their children are always entered.
         assert!(wanted(block(group_type::CELL_CHILDREN, 99, 99), cells));
+    }
+
+    fn land(fields: Vec<(&[u8; 4], Vec<u8>)>, flags: u32) -> Record {
+        Record {
+            signature: *b"LAND",
+            form_id: 0x20,
+            flags,
+            subrecords: fields
+                .into_iter()
+                .map(|(signature, data)| plugin::Subrecord {
+                    signature: *signature,
+                    data,
+                })
+                .collect(),
+            groups: Vec::new(),
+        }
+    }
+
+    /// A flat height field at `offset` steps, with a rise of one step
+    /// towards the north in each row.
+    fn rising(offset: f32) -> Vec<u8> {
+        let mut data = offset.to_le_bytes().to_vec();
+        for _row in 0..33 {
+            for column in 0..33 {
+                data.push(u8::from(column == 0));
+            }
+        }
+        data.extend([0; 3]);
+        data
+    }
+
+    #[test]
+    fn the_land_of_a_cell_keeps_every_point() {
+        let colours = vec![7u8; 33 * 33 * 3];
+        let cell = cell_land(
+            &land(vec![(b"VHGT", rising(2.0)), (b"VCLR", colours.clone())], 0),
+            (3, -2),
+        )
+        .unwrap();
+        assert_eq!((cell.x, cell.y), (3, -2));
+        assert_eq!(cell.heights.len(), 33 * 33);
+        // The southern row: offset plus the first row's step, in units.
+        assert_eq!(cell.heights[0], 3.0 * 8.0);
+        assert_eq!(cell.heights[32], 3.0 * 8.0);
+        // The northern row has risen one step per row.
+        assert_eq!(cell.heights[32 * 33], 35.0 * 8.0);
+        assert_eq!(cell.colours, Some(colours));
+    }
+
+    #[test]
+    fn land_without_heights_or_deleted_is_none() {
+        assert!(cell_land(&land(Vec::new(), 0), (0, 0)).is_none());
+        assert!(cell_land(&land(vec![(b"VHGT", rising(0.0))], FLAG_DELETED), (0, 0)).is_none());
+        // Colours cut short are left out, the heights stay.
+        let short = land(vec![(b"VHGT", rising(0.0)), (b"VCLR", vec![1, 2, 3])], 0);
+        assert_eq!(cell_land(&short, (0, 0)).unwrap().colours, None);
+    }
+
+    #[test]
+    fn a_pass_is_taken_part_by_part_and_only_for_its_cells() {
+        let mut reader = AreaReader::default();
+        let cells = (0, 1, 0, 1);
+        reader.last = Some(Pass {
+            world: "Tamriel".to_owned(),
+            cells,
+            objects: Some(HashMap::new()),
+            land: Some(Vec::new()),
+        });
+        // Other cells or another world: read anew.
+        assert!(
+            reader
+                .take("Tamriel", (0, 2, 0, 1), |pass| pass.land.take())
+                .is_none()
+        );
+        assert!(
+            reader
+                .take("Sovngarde", cells, |pass| pass.land.take())
+                .is_none()
+        );
+        assert!(
+            reader
+                .take("tamriel", cells, |pass| pass.land.take())
+                .is_some()
+        );
+        // Each part only once; the pass is gone once both are taken.
+        assert!(
+            reader
+                .take("Tamriel", cells, |pass| pass.land.take())
+                .is_none()
+        );
+        assert!(
+            reader
+                .take("Tamriel", cells, |pass| pass.objects.take())
+                .is_some()
+        );
+        assert!(reader.last.is_none());
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn land_never_panics_on_arbitrary_fields(
+            vhgt in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..1200),
+            vclr in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..3400),
+            flags in proptest::prelude::any::<u32>(),
+        ) {
+            let _ = cell_land(&land(vec![(b"VHGT", vhgt), (b"VCLR", vclr)], flags), (0, 0));
+        }
     }
 
     #[test]

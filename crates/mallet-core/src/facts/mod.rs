@@ -49,6 +49,8 @@ pub struct Facts {
     /// Loose meshes in the variant of the format of another game, or of
     /// another edition of this one.
     pub foreign_meshes: Vec<ForeignMesh>,
+    /// The textures every loose mesh names, where they could be read.
+    pub mesh_textures: Vec<MeshTextures>,
     /// The objects mods placed in the world.
     pub objects: ObjectFacts,
     /// The shape of the land.
@@ -61,6 +63,15 @@ pub struct Facts {
     pub navmeshes: NavmeshFacts,
     /// The shapes of the models of objects that may collide.
     pub models: ModelFacts,
+}
+
+/// The textures a loose mesh names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeshTextures {
+    /// Where the mesh lies.
+    pub path: GamePath,
+    /// The textures, by the path the game looks them up under.
+    pub textures: Vec<GamePath>,
 }
 
 /// A loose mesh made for another game or another edition of the game.

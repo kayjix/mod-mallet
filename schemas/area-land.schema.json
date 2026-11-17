@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AreaLand",
+  "description": "The game's own ground around a point of a worldspace, cell by cell, for\ndrawing the land under the objects up close (ADR 0041).",
+  "type": "object",
+  "properties": {
+    "cells": {
+      "description": "The outside cells with land, from the south-west, row by row.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LandCell"
+      }
+    },
+    "world": {
+      "description": "The worldspace, by its internal name.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "world",
+    "cells"
+  ],
+  "$defs": {
+    "LandCell": {
+      "description": "The ground of one outside cell. Numbers are little-endian and\nBase64-encoded, as in [`MeshShape`].",
+      "type": "object",
+      "properties": {
+        "colours": {
+          "description": "The colours of the same points, three bytes (red, green, blue)\neach, or empty.",
+          "type": "string"
+        },
+        "heights": {
+          "description": "The heights of 33 rows of 33 points, 128 game units apart, as\n32-bit floats in game units: the southern row first, each from west\nto east. Neighbouring cells share their edge.",
+          "type": "string"
+        },
+        "x": {
+          "description": "The cell's column.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "description": "The cell's row.",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "heights",
+        "colours"
+      ]
+    }
+  }
+}

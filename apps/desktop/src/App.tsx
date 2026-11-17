@@ -47,6 +47,9 @@ const WATCH_EVERY = 5000;
 /** How often the toolbox is looked at again, in milliseconds. */
 const TOOLBOX_EVERY = 15000;
 
+/** How long the patch's choices rest before they are saved, in milliseconds. */
+const SAVE_CHOICES_AFTER = 400;
+
 export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
   const [view, setView] = useState<ViewName>("home");
@@ -63,9 +66,48 @@ export default function App({ api, startLang }: AppProps) {
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
   const games = useGames(api);
-  // The patch's choice starts from the patch in the game, once; later scans
+  // What the user chose for the patch is kept in the settings. Where nothing
+  // is kept yet, it starts from the patch in the game, once; later scans
   // keep what the user chose since.
-  const [patchChoices, setPatchChoices] = useState<PatchChoices | null>(null);
+  const [patchChoices, setPatchChoicesNow] = useState<PatchChoices | null>(null);
+  // What the settings keep: undefined until read, null if nothing.
+  const [storedChoices, setStoredChoices] = useState<PatchChoices | null | undefined>(undefined);
+  useEffect(() => {
+    api
+      .patchChoices()
+      .then(setStoredChoices)
+      .catch(() => setStoredChoices(null));
+  }, [api]);
+  // Saving waits until the choices rest a moment, and saves go out one
+  // after the other, so that the last choice is the one kept.
+  const saveTimer = useRef<number | undefined>(undefined);
+  const unsaved = useRef<PatchChoices | null>(null);
+  const saving = useRef<Promise<void>>(Promise.resolve());
+  const saveChoices = useCallback(() => {
+    window.clearTimeout(saveTimer.current);
+    const choices = unsaved.current;
+    if (choices === null) {
+      return;
+    }
+    unsaved.current = null;
+    saving.current = saving.current
+      .then(() => api.setPatchChoices(choices))
+      .catch((error: unknown) => setFailure(String(error)));
+  }, [api]);
+  const setPatchChoices = useCallback(
+    (next: PatchChoices) => {
+      setPatchChoicesNow(next);
+      unsaved.current = next;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(saveChoices, SAVE_CHOICES_AFTER);
+    },
+    [saveChoices],
+  );
+  // A choice made just before the window closes is still kept.
+  useEffect(() => {
+    window.addEventListener("pagehide", saveChoices);
+    return () => window.removeEventListener("pagehide", saveChoices);
+  }, [saveChoices]);
   const [decisions, setDecisions] = useState<Record<string, number>>({});
   useEffect(() => {
     api
@@ -103,10 +145,21 @@ export default function App({ api, startLang }: AppProps) {
   const [compareAt, setCompareAt] = useState<string | null>(null);
   const [compareFrom, setCompareFrom] = useState<ViewName>("tasks");
   useEffect(() => {
-    if (patchChoices === null && report !== null) {
-      setPatchChoices(choicesOf(pairsOf(report, ignored), installedKeys(report)));
+    if (patchChoices !== null || storedChoices === undefined) {
+      return;
     }
-  }, [patchChoices, report, ignored]);
+    if (storedChoices !== null) {
+      setPatchChoicesNow(storedChoices);
+    } else if (report !== null) {
+      setPatchChoicesNow(
+        choicesOf(
+          pairsOf(report, ignored),
+          installedKeys(report),
+          report.installedPatch?.objects ?? [],
+        ),
+      );
+    }
+  }, [patchChoices, storedChoices, report, ignored]);
   const t = texts[lang];
 
   const refreshToolbox = useCallback(() => {
@@ -307,6 +360,7 @@ export default function App({ api, startLang }: AppProps) {
       showOnMap,
       decideSpot,
       patchChoices,
+      setPatchChoices,
       showPatch,
       decisions,
       decide,
@@ -432,7 +486,6 @@ export default function App({ api, startLang }: AppProps) {
             <CompareView report={report} start={compareAt} onBack={() => setView(compareFrom)} />
           ) : current === "collisions" ? (
             <Collisions report={report} start={workSpot}>
-              <h2 className="work-more">{t.workMore}</h2>
               <Duels
                 duels={report.duels}
                 findings={report.findings}

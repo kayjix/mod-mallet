@@ -55,6 +55,10 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
+  if (v_look > 4.5) {
+    // Hidden, and shown as the game would show it: not at all.
+    discard;
+  }
   if (v_look > 3.5) {
     // Hidden by the patch: half there, every other pixel left out.
     if (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) {
@@ -79,11 +83,15 @@ const PICK_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 flat in float v_id;
+flat in float v_gone;
 uniform sampler2D u_texture;
 uniform bool u_hasTexture;
 uniform bool u_alphaTest;
 out vec4 colour;
 void main() {
+  if (v_gone > 0.5) {
+    discard;
+  }
   if (u_alphaTest && u_hasTexture && texture(u_texture, v_uv).a < 0.5) {
     discard;
   }
@@ -95,15 +103,18 @@ const PICK_VERTEX = `#version 300 es
 in vec3 a_position;
 in vec2 a_uv;
 in mat4 a_model;
+in float a_look;
 uniform mat4 u_matrix;
 uniform float u_exaggeration;
 uniform float u_base;
 out vec2 v_uv;
 flat out float v_id;
+flat out float v_gone;
 void main() {
   vec4 world = a_model * vec4(a_position, 1.0);
   v_uv = a_uv;
   v_id = u_base + float(gl_InstanceID) + 1.0;
+  v_gone = a_look > 4.5 ? 1.0 : 0.0;
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
 
@@ -209,19 +220,21 @@ function normalsOf(positions: Float32Array, indices: Uint32Array): Float32Array 
 }
 
 /**
- * Where an object stands, as the game places it: scaled, turned about x,
- * then y, then z (the game turns clockwise), and moved; column by column.
+ * Where an object stands, as the game places it: scaled, turned about the
+ * world's z, then y, then x (the game turns clockwise), and moved; column
+ * by column. The order is the one that draws tilted rocks and beams of real
+ * setups as the game does (ADR 0040).
  */
 export function placement(object: AreaObject): Float32Array {
   const [rx, ry, rz] = object.rotation.map((angle) => -angle) as [number, number, number];
   const [cx, sx] = [Math.cos(rx), Math.sin(rx)];
   const [cy, sy] = [Math.cos(ry), Math.sin(ry)];
   const [cz, sz] = [Math.cos(rz), Math.sin(rz)];
-  // Rz · Ry · Rx, row by row.
+  // Rx · Ry · Rz, row by row.
   const r = [
-    [cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx],
-    [sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx],
-    [-sy, cy * sx, cy * cx],
+    [cy * cz, -cy * sz, sy],
+    [sx * sy * cz + cx * sz, cx * cz - sx * sy * sz, -sx * cy],
+    [sx * sz - cx * sy * cz, cx * sy * sz + sx * cz, cx * cy],
   ];
   const s = object.scale;
   const at = (row: number, column: number) => (r[row]?.[column] ?? 0) * s;
@@ -248,9 +261,9 @@ export function placement(object: AreaObject): Float32Array {
 
 /**
  * How an object is drawn: plainly, as part of a collision, picked, as part
- * of the collision looked at, or as hidden by the patch.
+ * of the collision looked at, as hidden by the patch, or not at all.
  */
-export const LOOK = { plain: 0, marked: 1, selected: 2, focus: 3, ghost: 4 } as const;
+export const LOOK = { plain: 0, marked: 1, selected: 2, focus: 3, ghost: 4, gone: 5 } as const;
 export type Look = (typeof LOOK)[keyof typeof LOOK];
 
 /** What is known of a model: being fetched, its surfaces, or nothing to draw. */

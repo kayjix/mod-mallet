@@ -42,6 +42,11 @@
       "description": "One object near the point.",
       "type": "object",
       "properties": {
+        "anchored": {
+          "description": "Whether the game relies on it being there: it is persistent (other\nthings refer to it) or part of the distant view. Such an object is\nnot offered for hiding.",
+          "type": "boolean",
+          "default": false
+        },
         "id": {
           "description": "The reference: the plugin that placed it first and its number there.",
           "$ref": "#/$defs/ObjectRef"

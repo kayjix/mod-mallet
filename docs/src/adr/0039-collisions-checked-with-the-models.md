@@ -1,6 +1,6 @@
 # 0039 Collisions are checked with the models, and touches count
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): the order in which a placed object is turned
 - Date: 2026-11-17
 - Changes: ADR 0023 (placed objects compared by their boxes)
 

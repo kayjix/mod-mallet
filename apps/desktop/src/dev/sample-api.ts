@@ -784,6 +784,7 @@ let linkInstalled = false;
 const ignoredIds = new Set<string>();
 let decided: Record<string, number> = {};
 let ranked: string[] = [];
+let chosen: Record<string, string | null> | null = null;
 
 /** The game the sample looks at. */
 let activeGame = "skyrimse";
@@ -884,6 +885,7 @@ export const sampleApi: Api = {
   meshView: (path) => later(sampleCube(path)),
   // The sample has no objects up close and no level of detail.
   areaObjects: () => later(null),
+  areaLand: () => later(null),
   areaMesh: () => later(null),
   areaTexture: () => later(null),
   lodTiles: (world) => later({ world, tiles: [] }),
@@ -893,6 +895,11 @@ export const sampleApi: Api = {
   setRanking: (next) => {
     ranked = [...next];
     return later([...ranked]);
+  },
+  patchChoices: () => later(chosen === null ? null : { ...chosen }),
+  setPatchChoices: (choices) => {
+    chosen = { ...choices };
+    return later(undefined);
   },
   decisions: () => later({ ...decided }),
   setDecision: (id, side) => {

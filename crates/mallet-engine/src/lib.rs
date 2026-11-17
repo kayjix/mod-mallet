@@ -44,14 +44,14 @@ pub use actions::{
     CreatedPatch, ManagerLink, ManagerOptions, create_patch, install_manager_link, manager_link,
     patch_file, run_action,
 };
-pub use area::{area_mesh, area_objects, area_texture};
+pub use area::{area_land, area_mesh, area_objects, area_texture};
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
 pub use preview::file_preview;
 pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
-    select_game, setup_fingerprint,
+    select_game, setup_fingerprint, update_settings,
 };
 pub use toolbox::{game_art, restart_manager, toolbox};
 
@@ -478,6 +478,7 @@ fn gather_facts(
             facts.unreadable = setup.unreadable;
             facts.mesh_overrides = setup.mesh_overrides;
             facts.foreign_meshes = setup.foreign_meshes;
+            facts.mesh_textures = setup.mesh_textures;
             facts.objects = setup.objects;
             facts.terrain = setup.terrain;
             facts.markers = setup.markers;

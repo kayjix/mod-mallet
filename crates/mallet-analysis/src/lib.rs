@@ -31,6 +31,7 @@ pub mod knowledge;
 pub mod map;
 pub mod masters;
 pub mod meshes;
+pub mod missing_textures;
 pub mod navmeshes;
 pub mod objects;
 mod places;
@@ -95,6 +96,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(installer::InstallerOptions),
         Box::new(foreign_meshes::ForeignMeshes),
         Box::new(meshes::BypassedRetextures),
+        Box::new(missing_textures::MissingTextures),
         Box::new(objects::PlacedObjects),
         Box::new(navmeshes::NavmeshConflicts),
         Box::new(assets::ArchiveOverrides),

@@ -43,6 +43,7 @@ import {
   spotsNear,
   startingFilter,
   tracePlace,
+  type WorkKind,
   worstKind,
 } from "./map-places";
 
@@ -300,7 +301,7 @@ export function PlaceIcon({
   shape: Shape;
   origin: PlaceOrigin | "spot";
   /** For a collision: its kind. */
-  kind?: SpotKind;
+  kind?: WorkKind;
 }) {
   const fill = origin === "spot" ? `var(${kindVariable(kind)})` : `var(${originVariable(origin)})`;
   const hollow = origin === "removed";

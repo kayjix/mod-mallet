@@ -18,7 +18,7 @@ use mallet_core::facts::terrain::{SAMPLES_PER_CELL, TerrainCell, TerrainFacts, T
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, group_type};
 
 /// Points per side of the height grid of a cell.
-const GRID: usize = 33;
+pub(crate) const GRID: usize = 33;
 
 /// The grid points that are kept: the middle of each eighth of a side.
 const SAMPLED: [usize; SAMPLES_PER_CELL] = [2, 6, 10, 14, 18, 22, 26, 30];
@@ -267,11 +267,17 @@ impl Collector {
     }
 }
 
-/// The position and water of an outside cell; `None` for a cell inside.
-fn cell_info(record: &Record, world: RecordId) -> Option<CellInfo> {
+/// The grid position of an outside cell; `None` for a cell inside.
+pub(crate) fn cell_position(record: &Record) -> Option<(i32, i32)> {
     let position = record.first(b"XCLC")?;
     let x = i32::from_le_bytes(position.get(0..4)?.try_into().ok()?);
     let y = i32::from_le_bytes(position.get(4..8)?.try_into().ok()?);
+    Some((x, y))
+}
+
+/// The position and water of an outside cell; `None` for a cell inside.
+fn cell_info(record: &Record, world: RecordId) -> Option<CellInfo> {
+    let (x, y) = cell_position(record)?;
     let flags = record
         .first(b"DATA")
         .and_then(|data| data.first().copied())
@@ -291,6 +297,19 @@ fn cell_info(record: &Record, world: RecordId) -> Option<CellInfo> {
 
 /// The sampled heights of a `VHGT` field, in game units.
 fn heights(data: &[u8]) -> Option<Vec<i32>> {
+    let grid = height_grid(data)?;
+    let mut samples = Vec::with_capacity(SAMPLES_PER_CELL * SAMPLES_PER_CELL);
+    for row in SAMPLED {
+        for column in SAMPLED {
+            samples.push(whole(*grid.get(row * GRID + column)?)?);
+        }
+    }
+    Some(samples)
+}
+
+/// Every height of a `VHGT` field, in game units: 33 rows of 33 points,
+/// the southern row first, each from west to east.
+pub(crate) fn height_grid(data: &[u8]) -> Option<Vec<f32>> {
     let offset = float_at(data, 0)?;
     let deltas = data.get(4..4 + GRID * GRID)?;
     if !offset.is_finite() {
@@ -310,16 +329,10 @@ fn heights(data: &[u8]) -> Option<Vec<i32>> {
             } else {
                 height += delta;
             }
-            *grid.get_mut(index)? = height;
+            *grid.get_mut(index)? = height * 8.0;
         }
     }
-    let mut samples = Vec::with_capacity(SAMPLES_PER_CELL * SAMPLES_PER_CELL);
-    for row in SAMPLED {
-        for column in SAMPLED {
-            samples.push(whole(*grid.get(row * GRID + column)? * 8.0)?);
-        }
-    }
-    Some(samples)
+    Some(grid)
 }
 
 fn float_at(data: &[u8], offset: usize) -> Option<f32> {
@@ -483,6 +496,7 @@ mod tests {
             xclw in proptest::collection::vec(any::<u8>(), 0..6),
         ) {
             let _ = heights(&vhgt);
+            let _ = height_grid(&vhgt);
             let _ = cell_info(&record(b"CELL", 1, vec![(b"XCLC", xclc), (b"XCLW", xclw)]), world());
         }
     }

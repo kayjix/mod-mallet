@@ -17,17 +17,15 @@ use std::path::{Path, PathBuf};
 
 use loadorder::GameSettings;
 use mallet_core::facts::{
-    ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, NavmeshFacts, ObjectFacts, PluginFacts,
-    TerrainFacts, UnreadableFile,
+    ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, MeshTextures, NavmeshFacts, ObjectFacts,
+    PluginFacts, TerrainFacts, UnreadableFile,
 };
 use mallet_core::{GamePath, TextCache};
 use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
-use crate::{
-    DATA_DIR, archive, archives, markers, mesh_variants, navmeshes, npc, objects, terrain,
-};
+use crate::{DATA_DIR, archive, archives, loose_meshes, markers, navmeshes, npc, objects, terrain};
 
 /// What was read from the installation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -46,6 +44,8 @@ pub struct SetupFacts {
     pub mesh_overrides: Vec<MeshOverride>,
     /// Loose meshes made for another game or edition.
     pub foreign_meshes: Vec<ForeignMesh>,
+    /// The textures every loose mesh names.
+    pub mesh_textures: Vec<MeshTextures>,
     /// The objects mods placed in the world.
     pub objects: ObjectFacts,
     /// The shape of the land.
@@ -114,7 +114,7 @@ pub fn read_setup(
         }
     }
     facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
-    facts.foreign_meshes = mesh_variants::foreign_meshes(game, &loose);
+    add_loose_meshes(&mut facts, game, &loose, cache);
 
     let mut placed = objects::Collector::new(game);
     let mut land = terrain::Collector::default();
@@ -439,6 +439,19 @@ fn add_game_versions(
             }),
         }
     }
+}
+
+/// Adds what the loose meshes say about themselves: which variant of the
+/// format they are in, and which textures they name.
+fn add_loose_meshes(
+    facts: &mut SetupFacts,
+    game: Game,
+    loose: &[(GamePath, PathBuf)],
+    cache: &dyn TextCache,
+) {
+    let meshes = loose_meshes::read(game, loose, cache);
+    facts.foreign_meshes = meshes.foreign;
+    facts.mesh_textures = meshes.textures;
 }
 
 /// Adds the navigation meshes of other plugins that `plugin` changes, if

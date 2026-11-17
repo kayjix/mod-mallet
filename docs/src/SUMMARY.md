@@ -54,6 +54,7 @@
   - [0038 A place up close: the objects themselves around a point](adr/0038-a-place-up-close.md)
   - [0039 Collisions are checked with the models, and touches count](adr/0039-collisions-checked-with-the-models.md)
   - [0040 Collisions as a worklist, decided spot by spot](adr/0040-collisions-as-a-worklist.md)
+  - [0041 The game's own ground up close](adr/0041-the-games-own-ground-up-close.md)
   - [Template](adr/template.md)
 
 # Reference

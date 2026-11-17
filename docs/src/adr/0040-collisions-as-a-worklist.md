@@ -2,7 +2,8 @@
 
 - Status: accepted
 - Date: 2026-11-17
-- Changes: ADR 0025 (what the patch hides is chosen per collision finding)
+- Changes: ADR 0025 (what the patch hides is chosen per collision finding),
+  ADR 0023 and ADR 0038 (the order in which a placed object is turned)
 
 ## Context
 
@@ -15,39 +16,72 @@ once without having seen them.
 
 With the objects drawn up close (ADR 0038) and each spot known as a
 duplicate, an overlap or a touch (ADR 0039), each spot can be looked at
-and decided where it is.
+and decided where it is. Trying that on a real setup showed more:
+
+- Two mods often build the same thing twice, a bridge or a scaffold, each
+  out of several parts. Their parts cross each other over metres without
+  one standing inside the other, so ADR 0039 calls them touches, and they
+  come as many spots close together.
+- Seeing both parts lit up does not tell what the place looks like with
+  one of them gone.
+- Objects that no collision names (a third part of the same structure, or
+  an object of the game) sometimes have to go as well.
+- Placed objects turned about more than one axis were drawn, and compared,
+  turned in the wrong order: tilted rocks stood across the view, beams
+  hung out of their scaffold.
 
 ## Decision
 
-1. **The collisions view is a worklist of spots.** Each spot whose objects
-   are named is one entry, grouped by the place of the game's map it is
-   nearest (or the interior it is in), or by the pair of mods. Duplicates
-   come first, then overlaps by how deep they cross, then touches; groups
-   with the most serious spots come first. Touches are left out of the
-   list until the user asks for them. The duels between two mods
-   (ADR 0029) and the remaining findings follow below.
-2. **Picking a spot flies the 3D view there**, with its objects lit up and
-   what the patch would hide drawn as ghosts (see-through and red). The
-   user decides above the view: hide one side's objects, keep both, or
-   decide for every spot of this pair of mods at once. An object clicked
-   in the view can be hidden from its card. By default the view then goes
-   on to the next spot not yet decided. Arrow keys go through the spots,
-   digits decide.
-3. **A spot can have a choice of its own.** The patch's choices hold, as
-   before, one mod per finding, and also one per spot, named by the
-   objects in it (so the name survives a new load order, ADR 0007). A
-   spot's own choice wins over its finding's. Choosing for a whole finding
-   drops the spots' own choices. The installed patch is read back the
-   same way: per finding the side it hides most of, and per spot where it
-   hides something else.
-4. **The map tells the kinds apart:** duplicates red, overlaps orange,
-   touches grey and smaller.
-5. Nothing changes in the game until the user creates and installs the
+1. **The collisions view has two tabs.** *Spots* fills the window: a
+   worklist on the left, the spot in 3D on the right, nothing below to
+   scroll to. *Mod against mod* lists the pairs of mods with their spots,
+   the most first, to decide for a whole pair or to go through its spots,
+   followed by the duels and the remaining findings.
+2. **The worklist** groups the spots by the place of the game's map they
+   are nearest (or the interior they are in), or by the pair of mods.
+   Its kinds are duplicates, overlaps, *deep crossings* (touches over 2 m
+   or more) and touches; the first three are shown at first. Groups with
+   the most serious spots come first.
+3. **Passages**: spots of the same two mods within 14 m of each other, in
+   the same worldspace or interior, belong together. One decision hides
+   one mod's parts in the whole passage; another also hides every other
+   object of that mod around the passage, as far as the area read in 3D
+   shows it.
+4. **Looking before deciding.** Picking a spot flies the 3D view close to
+   it, its objects lit up and what the patch would hide drawn as a red
+   ghost. An eye beside each side leaves that side out without deciding.
+   *Markings* off shows the place as the game would: nothing tinted, what
+   is hidden left out. Deciding stays on the spot unless the user asks to
+   go on to the next open one. Arrow keys go through the spots, digits
+   decide, V switches the markings.
+5. **A spot can have a choice of its own**, named by the objects in it
+   (so the name survives a new load order, ADR 0007); it wins over its
+   finding's choice. Choosing for a whole finding drops the spots' own
+   choices.
+6. **Any object can be hidden on its own** from its card in the 3D view,
+   kept among the patch's choices by its plugin and number. Objects the
+   game relies on are not offered: persistent ones (other things refer to
+   them) and those that are part of the distant view. Objects of the game
+   itself are offered with a warning that a quest may need them. The
+   installed patch is read back the same way: what no collision names was
+   hidden on its own. The patch view lists such objects to show again.
+7. **The order of turning**: a placed object is turned clockwise about
+   the world's z, then y, then x. The 3D view and the comparison of
+   models (ADR 0039) use the same order.
+8. The map tells the kinds apart: duplicates red, overlaps orange, touches
+   grey and smaller. A collision on the map, and an object duel in the
+   comparison view, open in the worklist.
+9. Nothing changes in the game until the user creates and installs the
    patch on the patch view, as before.
 
 ## Consequences
 
+- With the corrected order, some collisions of tilted objects come out
+  differently in the next scan: spots appear and disappear, and some
+  touches become overlaps or the other way round.
 - A spot whose objects are not named (a few, from older readings) is not
-  in the worklist; its finding stays below.
-- The choices still live only in the window and are lost when it closes,
-  unless the patch was installed: the installed patch is read back.
+  in the worklist; its finding stays on the second tab.
+- What counts as "around a passage" depends on the area read in 3D; the
+  button appears once it is read.
+- The choices live in the window until the patch is installed; the
+  installed patch is read back.

@@ -138,7 +138,7 @@ pub(crate) fn read_overrides(
 
 /// The size and modification time of a file, as a text that changes when
 /// the file does.
-fn file_state(file: &Path) -> Option<String> {
+pub(crate) fn file_state(file: &Path) -> Option<String> {
     let metadata = std::fs::metadata(file).ok()?;
     let modified = metadata
         .modified()
@@ -175,7 +175,7 @@ fn from_cache_entry(entry: &str) -> Option<(Vec<GamePath>, Vec<GamePath>)> {
     Some((paths(textures), paths(replaced_textures)))
 }
 
-fn loose_textures(file: &Path) -> Option<Vec<GamePath>> {
+pub(crate) fn loose_textures(file: &Path) -> Option<Vec<GamePath>> {
     // Only the header and the texture blocks are read, not the geometry.
     let mut reader = BufReader::new(File::open(file).ok()?);
     Some(game_paths(&nif::read_texture_paths(&mut reader).ok()?))
@@ -197,7 +197,7 @@ fn packed_textures(
     Some(game_paths(&nif::texture_paths(&data).ok()?))
 }
 
-fn game_paths(raw: &[String]) -> Vec<GamePath> {
+pub(crate) fn game_paths(raw: &[String]) -> Vec<GamePath> {
     let mut paths: Vec<GamePath> = raw.iter().filter_map(|raw| texture_path(raw)).collect();
     paths.sort();
     paths.dedup();

@@ -237,6 +237,26 @@ meshes-made-for-other-game = Modelle einer Mod wurden für ein anderes Spiel gem
     .explanation = Ein Modell ist die 3D-Form eines Dings im Spiel. Jedes Spiel und jede Ausgabe eines Spiels liest Modelle in einer eigenen Variante des Formats. Mods für das ursprüngliche Skyrim von 2011 sind oft mit einigen unveränderten Modellen in die Special Edition gekommen. Unbewegliche Objekte erscheinen meist trotzdem, manchmal mit falschem Licht oder ohne Kollision. Kleidung, Rüstungen, Körper und Kreaturen, die sich mit einem Skelett bewegen, bringen das Spiel meist zum Absturz, sobald sie erscheinen, oder bleiben unsichtbar.
     .remedy = Sieh auf der Seite der Mod nach einer Fassung für dein Spiel und installiere stattdessen diese. Gibt es keine, lassen sich die Modelle mit Cathedral Assets Optimizer umwandeln, einem kostenlosen Werkzeug genau dafür. Installiere die umgewandelten Dateien dann als eigene Mod, die diese überschreibt.
 
+meshes-texture-missing = Modelle einer Mod verwenden Texturen, die im Spiel fehlen
+    .headline =
+        { $count ->
+            [one] 1 Textur fehlt
+           *[other] { $count } Texturen fehlen
+        } für { $meshes ->
+            [one] 1 Modell
+           *[other] { $meshes } Modelle
+        }
+    .summary =
+        { $meshes ->
+            [one] Ein Modell dieser Mod verwendet
+           *[other] { $meshes } Modelle dieser Mod verwenden
+        } für Farbe oder Oberfläche { $count ->
+            [one] eine Textur
+           *[other] { $count } Texturen
+        }, die keine Mod und kein Archiv in deinem Spiel mitbringt: { $examples }.
+    .explanation = Ein Modell ist die 3D-Form eines Dings; Farbe und feine Oberfläche bekommt es aus Texturen, eigenen Bilddateien, die das Modell nennt. Fehlt eine genannte Textur, malt das Spiel die Fläche grell lila, oder dunkel und flach, wo die Oberflächendetails fehlen. Meist ist dann ein Teil der Mod nicht installiert, zum Beispiel ihre Texturen in einem eigenen Download, oder die Mod gehört zu einer anderen Mod, die du nicht hast. Modelle, die eine Mod für eine Mod mitinstalliert, die du nicht verwendest, werden nie gezeigt; ihre fehlenden Texturen schaden dann nicht.
+    .remedy = Sieh auf der Seite der Mod nach Dateien, die dazugehören, etwa einem Textur-Download oder einer Mod, die sie braucht, und installiere sie. Gehören die Modelle zu einem Patch für eine Mod, die du nicht hast, kannst du sie lassen.
+
 meshes-retexture-bypassed = Textur-Mod erreicht ersetzte Modelle nicht
     .headline =
         { $textureMod } erreicht { $count ->

@@ -4,7 +4,10 @@ import type { RenderedReport } from "./generated/rendered-report";
 import {
   choicesOf,
   chooseFinding,
+  chooseObject,
+  freeObjects,
   keyOf,
+  objectChoiceKey,
   objectsOf,
   type Pair,
   pairsOf,
@@ -24,14 +27,9 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const pairs = useMemo(() => pairsOf(report, ignored), [report, ignored]);
   const installedObjects = report.installedPatch?.objects ?? null;
   const installed = useMemo(() => new Set((installedObjects ?? []).map(keyOf)), [installedObjects]);
-  // Objects of the installed patch that no collision of this scan contains,
-  // set aside or not: their collision is gone.
-  const obsolete = useMemo(() => {
-    const inCollisions = new Set(
-      report.map.spots.flatMap((spot) => (spot.parts ?? []).map((part) => keyOf(part.object))),
-    );
-    return [...installed].filter((key) => !inCollisions.has(key)).length;
-  }, [report, installed]);
+  // Objects hidden on their own, outside the collisions' choices.
+  const own = freeObjects(choices);
+  const ownOnly = Object.fromEntries(own.map((object) => [objectChoiceKey(object), object.plugin]));
   const [created, setCreated] = useState<{ path: string; signature: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -44,7 +42,10 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const chosen = new Set(objects.map(keyOf));
   const more = [...chosen].filter((key) => !installed.has(key)).length;
   const fewer = [...installed].filter((key) => !chosen.has(key)).length;
-  const fromInstalled = useMemo(() => choicesOf(pairs, installed), [pairs, installed]);
+  const fromInstalled = useMemo(
+    () => choicesOf(pairs, installed, installedObjects ?? []),
+    [pairs, installed, installedObjects],
+  );
   const sameAsInstalled = signatureOf(objectsOf(pairs, fromInstalled)) === signature;
 
   const create = async () => {
@@ -80,7 +81,10 @@ export function PatchView({ report }: { report: RenderedReport }) {
         <button
           type="button"
           onClick={() =>
-            setChoices(Object.fromEntries(pairs.map((pair) => [pair.id, pair.suggested])))
+            setChoices({
+              ...ownOnly,
+              ...Object.fromEntries(pairs.map((pair) => [pair.id, pair.suggested])),
+            })
           }
         >
           {t.patchSuggest}
@@ -113,7 +117,6 @@ export function PatchView({ report }: { report: RenderedReport }) {
             </strong>{" "}
             {more + fewer === 0 ? t.patchMatches : t.patchDiffers(more, fewer)}
           </p>
-          {obsolete > 0 && <p className="patch-line">{t.patchObsolete(obsolete)}</p>}
           {!sameAsInstalled && (
             <button type="button" onClick={() => setChoices(fromInstalled)}>
               {t.patchUseInstalled}
@@ -167,6 +170,29 @@ export function PatchView({ report }: { report: RenderedReport }) {
           </li>
         ))}
       </ul>
+      {own.length > 0 && (
+        <section className="patch-own">
+          <h3>{t.patchOwn(own.length)}</h3>
+          <p className="aside">{t.patchOwnNote}</p>
+          <ul className="patch-own-list">
+            {own.map((object) => (
+              <li className="patch-own-item" key={keyOf(object)}>
+                <span>
+                  {object.plugin}{" "}
+                  <code>{object.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
+                </span>
+                <button
+                  type="button"
+                  className="small"
+                  onClick={() => setChoices(chooseObject(choices, object, false))}
+                >
+                  {t.patchShowAgain}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </section>
   );
 }
