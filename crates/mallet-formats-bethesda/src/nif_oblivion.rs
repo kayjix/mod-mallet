@@ -1,4 +1,5 @@
-//! Reads the meshes of Oblivion (format versions 20.0.0.4 and 20.0.0.5).
+//! Reads the meshes of Oblivion (format versions 10.1.0.106, 10.2.0.0,
+//! 20.0.0.4 and 20.0.0.5).
 //!
 //! Unlike the later games' meshes, these do not say how long each block
 //! is. A block can only be found by reading every block before it, so this
@@ -17,8 +18,12 @@ use crate::nif::{BlockInfo, NifError};
 use crate::nif_geometry::{Shape, Transform, finish, read_rotation};
 use crate::{Bytes, decode_text};
 
-/// The versions of the format Oblivion uses.
-const VERSIONS: [u32; 2] = [0x1400_0004, 0x1400_0005];
+/// The versions of the format Oblivion uses: 10.2.0.0 for some of its
+/// older meshes, 20.0.0.4 and 20.0.0.5 for the rest.
+const VERSIONS: [u32; 4] = [0x0A01_006A, 0x0A02_0000, 0x1400_0004, 0x1400_0005];
+
+/// The first version whose header says in which order its bytes are.
+const BYTE_ORDER_SINCE: u32 = 0x1400_0003;
 
 /// The longest text inside a mesh that is read.
 const MAX_TEXT: usize = 64 * 1024;
@@ -26,25 +31,76 @@ const MAX_TEXT: usize = 64 * 1024;
 /// Most entries a list in a block is believed to have.
 const MAX_LIST: usize = 1 << 20;
 
+/// The version of the format a mesh is in, for the few fields that come
+/// and go between Oblivion's versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Format {
+    version: u32,
+}
+
+impl Format {
+    /// The newest of Oblivion's versions.
+    #[cfg(test)]
+    const NEWEST: Self = Self {
+        version: 0x1400_0005,
+    };
+
+    /// Whether each block is preceded by a number, zero in the game's
+    /// meshes.
+    const fn has_block_prefix(self) -> bool {
+        self.version < 0x0A02_0000
+    }
+
+    /// Whether this reader knows how animation sequences, blends and
+    /// morphs are laid out; they changed up to 10.2.0.0.
+    const fn knows_animations(self) -> bool {
+        self.version >= 0x0A02_0000
+    }
+
+    /// Whether geometry data starts with the number of its group.
+    const fn has_geometry_group(self) -> bool {
+        self.version >= 0x0A01_0072
+    }
+
+    /// Whether geometry data ends with a reference to additional data.
+    const fn has_additional_data(self) -> bool {
+        self.version >= 0x1400_0004
+    }
+
+    /// Whether a texture slot keeps two numbers for the `PlayStation` 2.
+    const fn has_ps2_numbers(self) -> bool {
+        self.version <= 0x0A04_0001
+    }
+}
+
+/// Reads the first line, the version and, where there is one, the byte
+/// order: the format and whether its bytes are little-endian.
+fn versions(bytes: &mut Bytes<'_>, line_len: usize) -> Option<(Format, bool)> {
+    let line = bytes.take(line_len + 1)?;
+    if !line.starts_with(b"Gamebryo File Format, Version ") {
+        return None;
+    }
+    let version = bytes.u32()?;
+    let little_endian = version < BYTE_ORDER_SINCE || bytes.u8()? == 1;
+    Some((Format { version }, little_endian))
+}
+
 /// Whether `data` starts like a mesh in one of Oblivion's versions. Only
 /// the first line and the version numbers are looked at.
 pub(crate) fn has_oblivion_version(data: &[u8]) -> bool {
     let Some(line_len) = data.iter().take(64).position(|&byte| byte == b'\n') else {
         return false;
     };
-    let mut bytes = Bytes::new(data);
-    let mut versions = || -> Option<(u32, u8)> {
-        let line = bytes.take(line_len + 1)?;
-        if !line.starts_with(b"Gamebryo File Format, Version ") {
-            return None;
-        }
-        Some((bytes.u32()?, bytes.u8()?))
-    };
-    matches!(versions(), Some((version, 1)) if VERSIONS.contains(&version))
+    matches!(
+        versions(&mut Bytes::new(data), line_len),
+        Some((format, true)) if VERSIONS.contains(&format.version)
+    )
 }
 
-/// What the header says: the types of the blocks, and where they start.
+/// What the header says: the version, the types of the blocks, and where
+/// they start.
 struct Header {
+    format: Format,
     kinds: Vec<String>,
     blocks_start: usize,
 }
@@ -57,14 +113,9 @@ fn header(data: &[u8]) -> Result<Header, NifError> {
         .take(64)
         .position(|&byte| byte == b'\n')
         .ok_or(NifError::NotAMesh)?;
-    let line = bytes.take(line_len + 1).ok_or(NifError::NotAMesh)?;
-    if !line.starts_with(b"Gamebryo File Format, Version ") {
-        return Err(NifError::NotAMesh);
-    }
-    let version = bytes.u32().ok_or_else(damaged)?;
-    let little_endian = bytes.u8().ok_or_else(damaged)? == 1;
+    let (format, little_endian) = versions(&mut bytes, line_len).ok_or(NifError::NotAMesh)?;
     let user_version = bytes.u32().ok_or_else(damaged)?;
-    if !VERSIONS.contains(&version) || !little_endian || !(10..=11).contains(&user_version) {
+    if !VERSIONS.contains(&format.version) || !little_endian || !(10..=11).contains(&user_version) {
         return Err(NifError::UnsupportedVersion);
     }
     let block_count = bytes.u32().ok_or_else(damaged)?;
@@ -88,6 +139,7 @@ fn header(data: &[u8]) -> Result<Header, NifError> {
     let groups = count32(&mut bytes).ok_or_else(damaged)?;
     skip_n(&mut bytes, groups, 4).ok_or_else(damaged)?;
     Ok(Header {
+        format,
         kinds,
         blocks_start: data.len() - bytes.remaining(),
     })
@@ -155,9 +207,12 @@ fn av_object(bytes: &mut Bytes<'_>) -> Option<(Transform, Vec<usize>)> {
 
 /// A texture slot of a texturing property: the reference to its source,
 /// as stored.
-fn texture_slot(bytes: &mut Bytes<'_>) -> Option<u32> {
+fn texture_slot(bytes: &mut Bytes<'_>, format: Format) -> Option<u32> {
     let source = bytes.u32()?;
     bytes.skip(4 + 4 + 4)?; // clamp, filter, texture coordinate set
+    if format.has_ps2_numbers() {
+        bytes.skip(2 + 2)?;
+    }
     if bytes.u8()? != 0 {
         // Texture transform: translation, scale, rotation, method, centre.
         bytes.skip(8 + 8 + 4 + 4 + 8)?;
@@ -167,7 +222,7 @@ fn texture_slot(bytes: &mut Bytes<'_>) -> Option<u32> {
 
 /// The texture in the first slot of a texturing property, the colour map,
 /// as a reference as stored (`u32::MAX` for none).
-fn texturing(bytes: &mut Bytes<'_>) -> Option<u32> {
+fn texturing(bytes: &mut Bytes<'_>, format: Format) -> Option<u32> {
     object(bytes)?;
     bytes.u32()?; // apply mode
     let count = bytes.u32()?;
@@ -175,7 +230,7 @@ fn texturing(bytes: &mut Bytes<'_>) -> Option<u32> {
     // Base, dark, detail, gloss, glow and bump map.
     for slot in 0..6 {
         if bytes.u8()? != 0 {
-            let source = texture_slot(bytes)?;
+            let source = texture_slot(bytes, format)?;
             if slot == 0 {
                 base = source;
             }
@@ -187,13 +242,13 @@ fn texturing(bytes: &mut Bytes<'_>) -> Option<u32> {
     // Up to four decals, as many as the count allows.
     for decal in 0..4u32 {
         if count > 6 + decal && bytes.u8()? != 0 {
-            texture_slot(bytes)?;
+            texture_slot(bytes, format)?;
         }
     }
     let shader_textures = count32(bytes)?;
     for _ in 0..shader_textures {
         if bytes.u8()? != 0 {
-            texture_slot(bytes)?;
+            texture_slot(bytes, format)?;
             bytes.u32()?; // map
         }
     }
@@ -223,8 +278,10 @@ struct RawGeometry<'a> {
 
 /// Geometry data: points, texture coordinates. Leaves `bytes` at the
 /// part that differs between triangles and strips.
-fn geometry_data<'a>(bytes: &mut Bytes<'a>) -> Option<RawGeometry<'a>> {
-    bytes.u32()?; // group
+fn geometry_data<'a>(bytes: &mut Bytes<'a>, format: Format) -> Option<RawGeometry<'a>> {
+    if format.has_geometry_group() {
+        bytes.u32()?;
+    }
     let count = usize::from(bytes.u16()?);
     bytes.skip(2)?; // keep and compress flags
     let positions = if bytes.u8()? != 0 {
@@ -252,7 +309,9 @@ fn geometry_data<'a>(bytes: &mut Bytes<'a>) -> Option<RawGeometry<'a>> {
         &[]
     };
     bytes.u16()?; // consistency
-    bytes.u32()?; // additional data
+    if format.has_additional_data() {
+        bytes.u32()?;
+    }
     Some(RawGeometry { positions, uvs })
 }
 
@@ -332,7 +391,20 @@ fn strips(lengths: &[usize], raw: &[u8]) -> Vec<u32> {
 /// Skips one block of the type `kind`. `None` if the type is not known or
 /// the block does not fit the data.
 #[allow(clippy::too_many_lines)]
-fn skip_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
+fn skip_block(kind: &str, format: Format, bytes: &mut Bytes<'_>) -> Option<()> {
+    if !format.knows_animations()
+        && matches!(
+            kind,
+            "NiControllerSequence"
+                | "NiGeomMorpherController"
+                | "NiBlendTransformInterpolator"
+                | "NiBlendPoint3Interpolator"
+                | "NiBlendFloatInterpolator"
+                | "NiBlendBoolInterpolator"
+        )
+    {
+        return None;
+    }
     match kind {
         "NiNode" | "RootCollisionNode" | "AvoidNode" | "NiBSAnimationNode" | "NiBSParticleNode"
         | "NiBillboardNode" => {
@@ -354,11 +426,11 @@ fn skip_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
             }
         }
         "NiTriShapeData" => {
-            geometry_data(bytes)?;
+            geometry_data(bytes, format)?;
             triangle_corners(bytes)?;
         }
         "NiTriStripsData" => {
-            geometry_data(bytes)?;
+            geometry_data(bytes, format)?;
             strip_corners(bytes)?;
         }
         "BSXFlags" => {
@@ -392,7 +464,7 @@ fn skip_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
             bytes.skip(56)?;
         }
         "NiTexturingProperty" => {
-            texturing(bytes)?;
+            texturing(bytes, format)?;
         }
         "NiSourceTexture" => {
             source_file(bytes)?;
@@ -636,6 +708,23 @@ fn skip_animation_block(kind: &str, bytes: &mut Bytes<'_>) -> Option<()> {
             let sources = count32(bytes)?;
             skip_n(bytes, sources, 4)?;
         }
+        "NiGeomMorpherController" => {
+            time_controller(bytes)?;
+            bytes.skip(2 + 4 + 1)?; // flags, data, always update
+            let interpolators = count32(bytes)?;
+            skip_n(bytes, interpolators, 4)?;
+            let unknown = count32(bytes)?;
+            skip_n(bytes, unknown, 4)?;
+        }
+        "NiMorphData" => {
+            let morphs = count32(bytes)?;
+            let vertices = count32(bytes)?;
+            bytes.u8()?; // relative targets
+            for _ in 0..morphs {
+                text(bytes)?;
+                skip_n(bytes, vertices, 12)?;
+            }
+        }
         "NiMultiTargetTransformController" => {
             time_controller(bytes)?;
             let targets = usize::from(bytes.u16()?);
@@ -751,8 +840,13 @@ pub(crate) fn layout(data: &[u8]) -> Result<(Vec<BlockInfo>, bool), NifError> {
     let header = header(data)?;
     let mut search = Search {
         data,
+        format: header.format,
         kinds: &header.kinds,
-        known: header.kinds.iter().map(|kind| is_known(kind)).collect(),
+        known: header
+            .kinds
+            .iter()
+            .map(|kind| is_known(kind, header.format))
+            .collect(),
         tries: MAX_TRIES,
         failed: HashSet::new(),
     };
@@ -769,8 +863,11 @@ pub(crate) fn layout(data: &[u8]) -> Result<(Vec<BlockInfo>, bool), NifError> {
     bytes.skip(header.blocks_start).ok_or(NifError::Damaged)?;
     let mut blocks = Vec::new();
     for kind in header.kinds {
+        if header.format.has_block_prefix() && bytes.u32().is_none() {
+            return Ok((blocks, false));
+        }
         let start = data.len() - bytes.remaining();
-        if skip_block(&kind, &mut bytes).is_none() {
+        if skip_block(&kind, header.format, &mut bytes).is_none() {
             return Ok((blocks, false));
         }
         let size = data.len() - bytes.remaining() - start;
@@ -792,6 +889,7 @@ const MAX_TRIES: usize = 300_000;
 /// The search for the places of blocks of unknown types; see [`layout`].
 struct Search<'a> {
     data: &'a [u8],
+    format: Format,
     kinds: &'a [String],
     /// Whether the layout of each block's type is known.
     known: Vec<bool>,
@@ -813,9 +911,12 @@ impl Search<'_> {
         let position = |bytes: &Bytes<'_>| data.len() - bytes.remaining();
         let mut spans = Vec::new();
         for (index, kind) in self.kinds.iter().enumerate().skip(first) {
-            let from = position(&bytes);
             self.tries = self.tries.checked_sub(1)?;
-            if skip_block(kind, &mut bytes).is_some() {
+            if self.format.has_block_prefix() {
+                bytes.u32()?;
+            }
+            let from = position(&bytes);
+            if skip_block(kind, self.format, &mut bytes).is_some() {
                 spans.push((from, position(&bytes) - from));
                 continue;
             }
@@ -851,12 +952,12 @@ impl Search<'_> {
     }
 }
 
-/// Whether this reader knows the layout of blocks of the type `kind`.
-/// Every known type can be read from zeros, as a block without name,
-/// entries or keys.
-fn is_known(kind: &str) -> bool {
+/// Whether this reader knows the layout of blocks of the type `kind` in
+/// `format`. Every known type can be read from zeros, as a block without
+/// name, entries or keys.
+fn is_known(kind: &str, format: Format) -> bool {
     const ZEROS: [u8; 512] = [0; 512];
-    skip_block(kind, &mut Bytes::new(&ZEROS)).is_some()
+    skip_block(kind, format, &mut Bytes::new(&ZEROS)).is_some()
 }
 
 /// A reference to another block: its number, or `None` for "no block".
@@ -892,6 +993,7 @@ pub(crate) fn texture_paths(data: &[u8]) -> Result<Vec<String>, NifError> {
 /// in blocks that could not be reached are left out.
 pub(crate) fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
     let (blocks, _) = layout(data)?;
+    let format = header(data)?.format;
     let block = |index: usize| -> Option<(&str, &[u8])> {
         let info = blocks.get(index)?;
         Some((
@@ -905,7 +1007,7 @@ pub(crate) fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
         for &property in properties {
             match block(property) {
                 Some(("NiTexturingProperty", bytes)) => {
-                    texture = texturing(&mut Bytes::new(bytes))
+                    texture = texturing(&mut Bytes::new(bytes), format)
                         .and_then(reference)
                         .and_then(block)
                         .filter(|(kind, _)| *kind == "NiSourceTexture")
@@ -945,7 +1047,7 @@ pub(crate) fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                     continue;
                 };
                 let mut data = Bytes::new(data);
-                let Some(geometry) = geometry_data(&mut data) else {
+                let Some(geometry) = geometry_data(&mut data, format) else {
                     continue;
                 };
                 let indices = match data_kind {
@@ -1046,7 +1148,14 @@ mod tests {
     /// Geometry data of `count` points along x, with one set of texture
     /// coordinates.
     fn geometry(count: u16) -> Vec<u8> {
-        let mut out = 0u32.to_le_bytes().to_vec(); // group
+        geometry_in(count, Format::NEWEST)
+    }
+
+    fn geometry_in(count: u16, format: Format) -> Vec<u8> {
+        let mut out = Vec::new();
+        if format.has_geometry_group() {
+            out.extend(0u32.to_le_bytes());
+        }
         out.extend(count.to_le_bytes());
         out.extend([0, 0, 1]);
         for index in 0..count {
@@ -1060,12 +1169,18 @@ mod tests {
             floats(&mut out, &[0.5, 0.5]);
         }
         out.extend(0u16.to_le_bytes()); // consistency
-        out.extend((-1i32).to_le_bytes()); // additional data
+        if format.has_additional_data() {
+            out.extend((-1i32).to_le_bytes());
+        }
         out
     }
 
     fn triangle_data() -> Vec<u8> {
-        let mut out = geometry(3);
+        triangle_data_in(Format::NEWEST)
+    }
+
+    fn triangle_data_in(format: Format) -> Vec<u8> {
+        let mut out = geometry_in(3, format);
         out.extend(1u16.to_le_bytes());
         out.extend(3u32.to_le_bytes());
         out.push(1);
@@ -1089,6 +1204,10 @@ mod tests {
     }
 
     fn texturing(source: i32) -> Vec<u8> {
+        texturing_in(source, Format::NEWEST)
+    }
+
+    fn texturing_in(source: i32, format: Format) -> Vec<u8> {
         let mut out = Vec::new();
         object(&mut out);
         out.extend(2u32.to_le_bytes()); // apply mode
@@ -1096,6 +1215,9 @@ mod tests {
         out.push(1); // base texture
         out.extend(source.to_le_bytes());
         out.extend([0u8; 12]);
+        if format.has_ps2_numbers() {
+            out.extend([0u8; 4]);
+        }
         out.push(0); // no transform
         out.extend([0u8; 5]); // dark, detail, gloss, glow, bump
         out.push(0); // first decal
@@ -1115,9 +1237,26 @@ mod tests {
 
     /// An Oblivion mesh with the given blocks and its root at block 0.
     fn mesh(blocks: &[(&str, Vec<u8>)]) -> Vec<u8> {
-        let mut out = b"Gamebryo File Format, Version 20.0.0.4\n".to_vec();
-        out.extend(0x1400_0004u32.to_le_bytes());
-        out.push(1);
+        mesh_in(
+            Format {
+                version: 0x1400_0004,
+            },
+            blocks,
+        )
+    }
+
+    /// A mesh in `format` with the given blocks and its root at block 0.
+    fn mesh_in(format: Format, blocks: &[(&str, Vec<u8>)]) -> Vec<u8> {
+        let name = match format.version {
+            0x0A01_006A => "10.1.0.106",
+            0x0A02_0000 => "10.2.0.0",
+            _ => "20.0.0.4",
+        };
+        let mut out = format!("Gamebryo File Format, Version {name}\n").into_bytes();
+        out.extend(format.version.to_le_bytes());
+        if format.version >= BYTE_ORDER_SINCE {
+            out.push(1);
+        }
         out.extend(11u32.to_le_bytes());
         out.extend(u32::try_from(blocks.len()).unwrap().to_le_bytes());
         out.extend(11u32.to_le_bytes());
@@ -1138,6 +1277,9 @@ mod tests {
         }
         out.extend(0u32.to_le_bytes()); // groups
         for (_, data) in blocks {
+            if format.has_block_prefix() {
+                out.extend(0u32.to_le_bytes());
+            }
             out.extend(data);
         }
         refs(&mut out, &[0]);
@@ -1152,6 +1294,34 @@ mod tests {
             ("NiTexturingProperty", texturing(4)),
             ("NiSourceTexture", source(r"textures\furniture\table.dds")),
         ])
+    }
+
+    #[test]
+    fn the_older_formats_oblivion_loads_are_read_as_well() {
+        for version in [0x0A01_006A, 0x0A02_0000] {
+            let format = Format { version };
+            let data = mesh_in(
+                format,
+                &[
+                    ("NiNode", node(&[1])),
+                    ("NiTriShape", shape(2, &[3])),
+                    ("NiTriShapeData", triangle_data_in(format)),
+                    ("NiTexturingProperty", texturing_in(4, format)),
+                    ("NiSourceTexture", source(r"textures\rocks\rock.dds")),
+                ],
+            );
+            assert!(has_oblivion_version(&data), "{version:x}");
+            let (blocks, complete) = layout(&data).unwrap();
+            assert!(complete, "{version:x}");
+            assert_eq!(blocks.len(), 5);
+            let found = shapes(&data).unwrap();
+            assert_eq!(found.len(), 1);
+            assert_eq!(found[0].indices, [0, 1, 2]);
+            assert_eq!(
+                found[0].texture.as_deref(),
+                Some(r"textures\rocks\rock.dds")
+            );
+        }
     }
 
     #[test]
@@ -1255,9 +1425,15 @@ mod tests {
             "NiTransformData",
             "bhkPackedNiTriStripsShape",
         ] {
-            assert!(is_known(kind), "{kind}");
+            assert!(is_known(kind, Format::NEWEST), "{kind}");
         }
-        assert!(!is_known("NiSomethingNew"));
+        assert!(!is_known("NiSomethingNew", Format::NEWEST));
+        // Animations are laid out otherwise before 10.2.0.0.
+        let old = Format {
+            version: 0x0A01_006A,
+        };
+        assert!(!is_known("NiControllerSequence", old));
+        assert!(is_known("NiNode", old));
     }
 
     #[test]
