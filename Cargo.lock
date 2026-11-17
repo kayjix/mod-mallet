@@ -2337,7 +2337,7 @@ dependencies = [
  "mallet-core",
  "mallet-format-fomod",
  "mallet-formats-bethesda",
- "mallet-game-skyrimse",
+ "mallet-game-bethesda",
  "mallet-knowledge",
  "mallet-source-vortex",
  "mallet-store",
@@ -2371,7 +2371,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mallet-game-skyrimse"
+name = "mallet-game-bethesda"
 version = "0.0.0"
 dependencies = [
  "dirs 7.0.0",

@@ -1,5 +1,5 @@
 [package]
-name = "mallet-game-skyrimse"
+name = "mallet-game-bethesda"
 description = "Mod Mallet's adapter for The Elder Scrolls V: Skyrim Special Edition."
 version.workspace = true
 edition.workspace = true

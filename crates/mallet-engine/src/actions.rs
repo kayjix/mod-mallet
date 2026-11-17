@@ -182,7 +182,7 @@ pub fn create_patch(
     if objects.is_empty() {
         return Err(EngineError::NothingToHide);
     }
-    let text = mallet_game_skyrimse::swap::swap_ini(objects);
+    let text = mallet_game_bethesda::swap::swap_ini(objects);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
             path: dir.to_path_buf(),
@@ -191,7 +191,7 @@ pub fn create_patch(
     }
     crate::patch::write_zip(
         &path,
-        mallet_game_skyrimse::swap::SWAP_FILE,
+        mallet_game_bethesda::swap::SWAP_FILE,
         text.as_bytes(),
     )
     .map_err(|source| EngineError::Write {

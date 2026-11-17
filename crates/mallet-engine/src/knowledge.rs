@@ -53,7 +53,7 @@ pub(crate) fn read(
         options.local_dir.as_deref(),
         &path,
         plugins,
-        &mallet_game_skyrimse::locate::shipped_plugins(game_dir),
+        &mallet_game_bethesda::locate::shipped_plugins(game_dir),
     ) {
         Ok(knowledge) => {
             tracing::info!(

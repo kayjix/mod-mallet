@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
-use mallet_game_skyrimse::{locate, skse_log, tools};
+use mallet_game_bethesda::{locate, skse_log, tools};
 use mallet_source_vortex::app;
 use mallet_source_vortex::link::{self, Link};
 use mallet_unpack::Unpacker;

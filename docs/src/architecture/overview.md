@@ -44,7 +44,7 @@ only when the user asks for it
 ```mermaid
 flowchart LR
     subgraph ingest [1 Ingest: adapters, the only code that reads files]
-        game[mallet-game-skyrimse]
+        game[mallet-game-bethesda]
         vortex[mallet-source-vortex]
     end
     facts[/Facts/]

@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use mallet_core::{FilePreview, GamePath, ModSource, NoModSource, PreviewVersion};
-use mallet_game_skyrimse::files::{self, Origin};
-use mallet_game_skyrimse::locate;
+use mallet_game_bethesda::files::{self, Origin};
+use mallet_game_bethesda::locate;
 use mallet_source_vortex::VortexDeployment;
 
 use crate::ScanOptions;

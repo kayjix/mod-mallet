@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use mallet_core::encoding::base64;
 use mallet_core::mesh::{MeshShape, MeshView};
-use mallet_game_skyrimse::files::{self, Origin};
-use mallet_game_skyrimse::locate;
+use mallet_game_bethesda::files::{self, Origin};
+use mallet_game_bethesda::locate;
 
 use crate::ScanOptions;
 

@@ -22,7 +22,7 @@ flowchart TD
     engine --> knowledge
 
     analysis[mallet-analysis] --> core
-    game[mallet-game-skyrimse] --> core
+    game[mallet-game-bethesda] --> core
     game --> formats[mallet-formats-bethesda]
     fomod[mallet-format-fomod] --> core
     unpack[mallet-unpack]
@@ -41,7 +41,7 @@ flowchart TD
 | `mallet-messages` | Texts in every language; renders findings. | `mallet-core` |
 | `mallet-store` | SQLite cache: the last report, and texts that are slow to obtain. | `mallet-core` |
 | `mallet-formats-bethesda` | Reads the structure of plugins, archives and meshes, the formats shared by Bethesda's games. No knowledge of what a record means. | nothing |
-| `mallet-game-skyrimse` | Finds Skyrim SE on the machine, reads its installation, and knows what its records mean. | `mallet-core`, `mallet-formats-bethesda` |
+| `mallet-game-bethesda` | Finds Skyrim SE on the machine, reads its installation, and knows what its records mean. | `mallet-core`, `mallet-formats-bethesda` |
 | `mallet-format-fomod` | Reads FOMOD installer descriptions into the installer model of `mallet-core`. | `mallet-core` |
 | `mallet-unpack` | Reads single files out of mod archives by running a 7-Zip that is on the machine. | nothing |
 | `mallet-source-vortex` | Reads Vortex's deployment manifest and saved state; implements `ModSource`; asks a running Vortex to act, through the extension in `integrations/vortex-extension`. | `mallet-core` |

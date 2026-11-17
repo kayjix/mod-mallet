@@ -28,7 +28,7 @@ const RULES: &[(&str, &[&str])] = &[
     ("mallet-format-fomod", &["mallet-core"]),
     ("mallet-unpack", &[]),
     (
-        "mallet-game-skyrimse",
+        "mallet-game-bethesda",
         &["mallet-core", "mallet-formats-bethesda"],
     ),
     ("mallet-source-vortex", &["mallet-core"]),

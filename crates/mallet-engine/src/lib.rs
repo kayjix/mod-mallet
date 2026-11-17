@@ -34,7 +34,7 @@ use mallet_core::{
     Facts, GameInfo, GamePath, InstalledPatch, LocationOrigin, LocationRole, ModInfo, ModSource,
     NoCache, NoModSource, ScanLocation, ScanReport, TextCache, report,
 };
-use mallet_game_skyrimse::{GAME_ID, GAME_NAME, ingest, locate, skse_log};
+use mallet_game_bethesda::{GAME_ID, GAME_NAME, ingest, locate, skse_log};
 use mallet_source_vortex::{VortexDeployment, VortexError};
 use mallet_store::{Store, StoreError};
 
@@ -227,7 +227,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         map,
         object_swapper: game_dir
             .join("Data")
-            .join(mallet_game_skyrimse::swap::SWAPPER_PLUGIN)
+            .join(mallet_game_bethesda::swap::SWAPPER_PLUGIN)
             .is_file(),
         installed_patch,
         duels,
@@ -237,9 +237,9 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
 /// The patch Mod Mallet wrote earlier, as the game sees it now: the swap
 /// file in the data directory, and the mod it came with.
 fn installed_patch(game_dir: &Path, mods: &dyn ModSource) -> Option<InstalledPatch> {
-    let file = mallet_game_skyrimse::swap::SWAP_FILE;
+    let file = mallet_game_bethesda::swap::SWAP_FILE;
     let text = std::fs::read_to_string(game_dir.join("Data").join(file)).ok()?;
-    let objects = mallet_game_skyrimse::swap::hidden_objects(&text);
+    let objects = mallet_game_bethesda::swap::hidden_objects(&text);
     tracing::info!(
         objects = objects.len(),
         "found Mod Mallet's patch in the game"
@@ -260,7 +260,7 @@ pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapI
     let game_dir = options.game_dir.clone().or_else(locate::game_dir)?;
     let started = Instant::now();
     let image =
-        mallet_game_skyrimse::lod::world_image(&game_dir.join("Data"), world, MAP_PIXELS_PER_CELL)?;
+        mallet_game_bethesda::lod::world_image(&game_dir.join("Data"), world, MAP_PIXELS_PER_CELL)?;
     let png = png::encode_rgb(image.width(), image.height(), &image.rgb)
         .map_err(|error| tracing::warn!(%error, "map picture not encoded"))
         .ok()?;

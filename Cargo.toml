@@ -23,7 +23,7 @@ mallet-core = { path = "crates/mallet-core" }
 mallet-engine = { path = "crates/mallet-engine" }
 mallet-format-fomod = { path = "crates/mallet-format-fomod" }
 mallet-formats-bethesda = { path = "crates/mallet-formats-bethesda" }
-mallet-game-skyrimse = { path = "crates/mallet-game-skyrimse" }
+mallet-game-bethesda = { path = "crates/mallet-game-bethesda" }
 mallet-knowledge = { path = "crates/mallet-knowledge" }
 mallet-messages = { path = "crates/mallet-messages" }
 mallet-source-vortex = { path = "crates/mallet-source-vortex" }

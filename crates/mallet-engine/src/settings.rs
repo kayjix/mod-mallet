@@ -12,7 +12,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use mallet_core::{LocationOrigin, LocationRole, ScanLocation};
-use mallet_game_skyrimse::{ingest, locate};
+use mallet_game_bethesda::{ingest, locate};
 use mallet_unpack::Unpacker;
 use serde::{Deserialize, Serialize};
 
