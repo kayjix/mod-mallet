@@ -7,6 +7,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
+import type { LodMesh } from "./generated/lod-mesh";
+import type { LodTiles } from "./generated/lod-tiles";
 import type { MapImage } from "./generated/map-image";
 import type { MeshView } from "./generated/mesh-view";
 import type { RenderedLink } from "./generated/rendered-link";
@@ -60,6 +62,18 @@ export interface Api {
   filePreview(path: string): Promise<FilePreview | null>;
   /** A version of a mesh, ready to draw; the one in the game unless `version` names another. */
   meshView(path: string, version: number | null): Promise<MeshView | null>;
+  /** The blocks of the game's level of detail a worldspace has. */
+  lodTiles(world: string): Promise<LodTiles>;
+  /** The land of a block of level of detail, or with `objects` its objects. */
+  lodMesh(
+    world: string,
+    level: number,
+    x: number,
+    y: number,
+    objects: boolean,
+  ): Promise<LodMesh | null>;
+  /** A texture of the level of detail, no larger than `maxSide`. */
+  lodTexture(world: string, path: string, maxSide: number): Promise<string | null>;
   /** The mods in the order the user likes them, the favourite first. */
   ranking(): Promise<string[]>;
   /** Remembers the order the user likes the mods in. */
@@ -95,6 +109,11 @@ const tauriApi: Api = {
   mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
+  lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
+  lodMesh: (world, level, x, y, objects) =>
+    invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),
+  lodTexture: (world, path, maxSide) =>
+    invoke<string | null>("lod_texture", { world, path, maxSide }),
   ranking: () => invoke<string[]>("ranking"),
   setRanking: (ranking) => invoke<string[]>("set_ranking", { ranking }),
   decisions: () => invoke<Record<string, number>>("decisions"),

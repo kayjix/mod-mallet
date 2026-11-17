@@ -420,6 +420,7 @@ mod tests {
                 flat: &[],
                 nested: &MARKER_GROUP,
                 nested_records: &MARKER_RECORDS,
+                nested_headers: &[],
             },
         )
         .unwrap()

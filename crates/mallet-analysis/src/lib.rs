@@ -23,11 +23,13 @@ pub mod assets;
 pub mod duels;
 pub mod extender;
 pub mod faces;
+pub mod generated;
 pub mod installer;
 pub mod knowledge;
 pub mod map;
 pub mod masters;
 pub mod meshes;
+pub mod navmeshes;
 pub mod objects;
 mod places;
 pub mod setup;
@@ -85,11 +87,13 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(setup::SetupProblems),
         Box::new(extender::ExtenderPlugins),
         Box::new(masters::MissingMasters),
+        Box::new(generated::GeneratedPlugins),
         Box::new(knowledge::KnownRules),
         Box::new(faces::NpcFaces),
         Box::new(installer::InstallerOptions),
         Box::new(meshes::BypassedRetextures),
         Box::new(objects::PlacedObjects),
+        Box::new(navmeshes::NavmeshConflicts),
         Box::new(assets::ArchiveOverrides),
     ]
 }

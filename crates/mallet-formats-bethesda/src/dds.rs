@@ -53,6 +53,10 @@ pub enum Format {
     Bc3,
     /// 16 bytes per block in one of eight modes; see `crate::bc7`.
     Bc7,
+    /// Not compressed: four bytes per pixel, red, green, blue, alpha.
+    Rgba8,
+    /// Not compressed: four bytes per pixel, blue, green, red, alpha.
+    Bgra8,
 }
 
 impl Format {
@@ -60,7 +64,13 @@ impl Format {
         match self {
             Self::Bc1 => 8,
             Self::Bc3 | Self::Bc7 => 16,
+            // A "block" of an uncompressed texture is one pixel.
+            Self::Rgba8 | Self::Bgra8 => 4,
         }
+    }
+
+    fn compressed(self) -> bool {
+        !matches!(self, Self::Rgba8 | Self::Bgra8)
     }
 }
 
@@ -120,6 +130,18 @@ fn header(bytes: &[u8]) -> Result<(Size, Format, usize), DdsError> {
             };
             (format, HEADER_SIZE + DX10_HEADER_SIZE)
         }
+        // No compression code: plain pixels, described by bit masks. Only
+        // 32-bit pixels with red in the first or the third byte are read.
+        [0, 0, 0, 0] if uncompressed_32(bytes) => {
+            let red_mask = u32_at(bytes, 92).ok_or(DdsError::NotDds)?;
+            match red_mask {
+                0x0000_00ff => (Format::Rgba8, HEADER_SIZE),
+                0x00ff_0000 => (Format::Bgra8, HEADER_SIZE),
+                other => {
+                    return Err(DdsError::Unsupported(format!("red mask {other:#x}")));
+                }
+            }
+        }
         other => {
             return Err(DdsError::Unsupported(
                 String::from_utf8_lossy(other).into_owned(),
@@ -149,8 +171,20 @@ pub fn size(bytes: &[u8]) -> Result<Size, DdsError> {
     header(bytes).map(|(size, _, _)| size)
 }
 
+/// Whether the header describes plain pixels of 32 bits: the pixel format
+/// says "RGB" and 32 bits per pixel.
+fn uncompressed_32(bytes: &[u8]) -> bool {
+    const RGB: u32 = 0x40;
+    u32_at(bytes, 80).is_some_and(|flags| flags & RGB != 0) && u32_at(bytes, 88) == Some(32)
+}
+
 /// The number of bytes of a level of `width × height` pixels.
 fn level_bytes(width: u32, height: u32, format: Format) -> usize {
+    if !format.compressed() {
+        return (width.max(1) as usize)
+            .saturating_mul(height.max(1) as usize)
+            .saturating_mul(4);
+    }
     let blocks_wide = width.div_ceil(4).max(1) as usize;
     let blocks_high = height.div_ceil(4).max(1) as usize;
     blocks_wide
@@ -193,6 +227,34 @@ pub fn decode(level: &Level, data: &[u8]) -> Rgb {
     let height = level.height as usize;
     let mut pixels = vec![0u8; width.saturating_mul(height).saturating_mul(3)];
     let mut alpha = vec![255u8; width.saturating_mul(height)];
+    if !level.format.compressed() {
+        let order = if level.format == Format::Bgra8 {
+            [2, 1, 0]
+        } else {
+            [0, 1, 2]
+        };
+        for (index, pixel) in data
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .take(width * height)
+            .enumerate()
+        {
+            let channel = |at: usize| pixel.get(at).copied().unwrap_or(0);
+            if let Some(target) = pixels.get_mut(index * 3..index * 3 + 3) {
+                target.copy_from_slice(&order.map(channel));
+            }
+            if let Some(target) = alpha.get_mut(index) {
+                *target = channel(3);
+            }
+        }
+        return Rgb {
+            width: level.width,
+            height: level.height,
+            pixels,
+            alpha,
+        };
+    }
     let blocks_wide = width.div_ceil(4).max(1);
     for (index, block) in data.chunks_exact(level.format.block_size()).enumerate() {
         let (texels, opacity) = match level.format {
@@ -208,6 +270,8 @@ pub fn decode(level: &Level, data: &[u8]) -> Rgb {
                     decoded.map(|[_, _, _, a]| a),
                 )
             }
+            // Read above, pixel by pixel.
+            Format::Rgba8 | Format::Bgra8 => ([[0; 3]; 16], [255; 16]),
         };
         let block_x = (index % blocks_wide) * 4;
         let block_y = (index / blocks_wide) * 4;
@@ -395,6 +459,37 @@ mod tests {
             h = (h / 2).max(1);
         }
         bytes
+    }
+
+    /// An uncompressed 32-bit texture of 2 × 2 with two levels; red in the
+    /// first byte unless `bgra`.
+    fn plain(bgra: bool) -> Vec<u8> {
+        let mut bytes = vec![0u8; HEADER_SIZE];
+        bytes[..4].copy_from_slice(b"DDS ");
+        bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
+        bytes[16..20].copy_from_slice(&2u32.to_le_bytes());
+        bytes[28..32].copy_from_slice(&2u32.to_le_bytes());
+        bytes[80..84].copy_from_slice(&0x41u32.to_le_bytes());
+        bytes[88..92].copy_from_slice(&32u32.to_le_bytes());
+        let red: u32 = if bgra { 0x00ff_0000 } else { 0x0000_00ff };
+        bytes[92..96].copy_from_slice(&red.to_le_bytes());
+        for _ in 0..4 {
+            bytes.extend([10, 20, 30, 128]);
+        }
+        bytes.extend([1, 2, 3, 255]);
+        bytes
+    }
+
+    #[test]
+    fn uncompressed_pixels_are_read_in_either_byte_order() {
+        let rgba = decode_level(&plain(false), 0).unwrap();
+        assert_eq!((rgba.width, rgba.height), (2, 2));
+        assert_eq!(&rgba.pixels[..3], &[10, 20, 30]);
+        assert_eq!(rgba.alpha[0], 128);
+        let bgra = decode_level(&plain(true), 0).unwrap();
+        assert_eq!(&bgra.pixels[..3], &[30, 20, 10]);
+        let smallest = decode_level(&plain(false), 1).unwrap();
+        assert_eq!(smallest.pixels, vec![1, 2, 3]);
     }
 
     #[test]

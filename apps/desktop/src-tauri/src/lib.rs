@@ -298,6 +298,48 @@ fn map_image(world: String) -> Result<Option<mallet_core::MapImage>, String> {
     ))
 }
 
+/// The blocks of the game's level of detail a worldspace has (ADR 0037).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn lod_tiles(world: String) -> Result<mallet_core::mesh::LodTiles, String> {
+    Ok(mallet_engine::lod_tiles(
+        &settings()?.scan_options(),
+        &world,
+    ))
+}
+
+/// The land of one block of level of detail, or its objects.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn lod_mesh(
+    world: String,
+    level: u32,
+    x: i32,
+    y: i32,
+    objects: bool,
+) -> Result<Option<mallet_core::mesh::LodMesh>, String> {
+    Ok(mallet_engine::lod_mesh(
+        &settings()?.scan_options(),
+        &world,
+        level,
+        x,
+        y,
+        objects,
+    ))
+}
+
+/// A texture the level of detail uses, as a PNG `data:` address.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn lod_texture(world: String, path: String, max_side: u32) -> Result<Option<String>, String> {
+    Ok(mallet_engine::lod_texture(
+        &settings()?.scan_options(),
+        &world,
+        &path,
+        max_side,
+    ))
+}
+
 /// Every version of a file of the setup, as pictures where it is a texture.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -453,6 +495,9 @@ pub fn run() -> tauri::Result<()> {
             decisions,
             set_decision,
             mesh_view,
+            lod_tiles,
+            lod_mesh,
+            lod_texture,
             ranking,
             set_ranking,
             games,

@@ -63,3 +63,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0034](0034-installer-options-ticked-in-advance.md) | Missing installer options are ticked in advance | accepted |
 | [0035](0035-loots-messages-are-quoted.md) | LOOT's messages are quoted | accepted |
 | [0036](0036-one-adapter-for-the-bethesda-family.md) | One adapter for the Bethesda family, settings per game | accepted |
+| [0037](0037-the-map-draws-the-games-own-lod.md) | The map draws the game's own level of detail | accepted |

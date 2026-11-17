@@ -82,6 +82,15 @@ pub const PLUGINS_MASTER_MISSING: KindInfo = KindInfo {
     args: &["plugin", "count", "masters"],
 };
 
+/// A plugin that a tool generated from the load order was made before the
+/// load order last changed.
+pub const PLUGINS_GENERATED_OUTDATED: KindInfo = KindInfo {
+    id: "plugins.generated-outdated",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["plugin", "tool", "count", "examples"],
+};
+
 /// The LOOT masterlist says an active plugin needs a file that is not in
 /// the game.
 pub const PLUGINS_REQUIREMENT_MISSING: KindInfo = KindInfo {
@@ -222,12 +231,24 @@ pub const SETUP_LOAD_ORDER_UNKNOWN: KindInfo = KindInfo {
     args: &["reason"],
 };
 
+/// A later plugin replaces navigation meshes that an earlier plugin
+/// changed, without having been made with it. A note, not a warning: large
+/// setups have dozens of these, and most only show as a character taking a
+/// detour.
+pub const NAVMESHES_CHANGES_UNDONE: KindInfo = KindInfo {
+    id: "navmeshes.changes-undone",
+    severity: Severity::Info,
+    confidence: Confidence::Likely,
+    args: &["winner", "loser", "count", "places"],
+};
+
 /// Every kind, in the order the reference documentation lists them.
 pub const ALL: &[KindInfo] = &[
     EXTENDER_PLUGIN_INCOMPATIBLE,
     EXTENDER_PLUGIN_NOT_LOADED,
     EXTENDER_PLUGIN_NO_VERSION_DATA,
     PLUGINS_MASTER_MISSING,
+    PLUGINS_GENERATED_OUTDATED,
     PLUGINS_REQUIREMENT_MISSING,
     PLUGINS_INCOMPATIBLE,
     PLUGINS_NEEDS_CLEANING,
@@ -239,6 +260,7 @@ pub const ALL: &[KindInfo] = &[
     PLUGINS_CONTAINED,
     OBJECTS_DUPLICATED,
     OBJECTS_OVERLAPPING,
+    NAVMESHES_CHANGES_UNDONE,
     MESHES_RETEXTURE_BYPASSED,
     ASSETS_LOOSE_OVER_ARCHIVE,
     ASSETS_ARCHIVE_OVER_ARCHIVE,

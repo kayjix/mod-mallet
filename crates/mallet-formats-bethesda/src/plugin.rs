@@ -180,6 +180,11 @@ pub struct Request<'a> {
     /// Of the records inside the `nested` groups, the types that are kept.
     /// Records of other types are skipped without being unpacked.
     pub nested_records: &'a [Signature],
+    /// Of the records inside the `nested` groups, the types that are kept
+    /// with their header only: their fields are not unpacked, and their
+    /// `subrecords` stay empty. For large records whose identity and place
+    /// are all that is needed.
+    pub nested_headers: &'a [Signature],
 }
 
 impl Record {
@@ -264,7 +269,10 @@ pub fn read_request_where<R: Read + Seek>(
                 plugin.damaged += 1;
             }
             let scope = if nested {
-                Scope::Nested(request.nested_records)
+                Scope::Nested {
+                    records: request.nested_records,
+                    headers: request.nested_headers,
+                }
             } else {
                 Scope::Flat
             };
@@ -365,8 +373,12 @@ fn read_plugin_header<R: Read>(reader: &mut R) -> Result<(PluginHeader, usize), 
 enum Scope<'a> {
     /// Every record, and no nested group.
     Flat,
-    /// The records of these types, in this group and all nested ones.
-    Nested(&'a [Signature]),
+    /// The records of these types, in this group and all nested ones:
+    /// `records` with their fields, `headers` without.
+    Nested {
+        records: &'a [Signature],
+        headers: &'a [Signature],
+    },
 }
 
 /// What stays the same while the groups of a plugin are read.
@@ -417,7 +429,7 @@ fn read_group(
                 return;
             };
             let group = GroupLabel { group_type, label };
-            if let Scope::Nested(_) = scope
+            if let Scope::Nested { .. } = scope
                 && descend(group)
             {
                 if groups.len() < MAX_GROUP_DEPTH {
@@ -436,12 +448,14 @@ fn read_group(
             plugin.damaged += 1;
             return;
         };
-        if let Scope::Nested(kept) = scope
-            && !kept.contains(&signature)
+        let subrecords = if let Scope::Nested { records, headers } = scope
+            && !records.contains(&signature)
         {
-            continue;
-        }
-        let subrecords = if flags & FLAG_COMPRESSED == 0 {
+            if !headers.contains(&signature) {
+                continue;
+            }
+            Some(Vec::new())
+        } else if flags & FLAG_COMPRESSED == 0 {
             Some(read_subrecords(data))
         } else {
             decompress(data).map(|data| read_subrecords(&data))
@@ -646,9 +660,32 @@ mod tests {
                 flat: &[NPC],
                 nested: &[*b"CELL", *b"WRLD"],
                 nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+                nested_headers: &[],
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn records_asked_for_by_header_are_kept_without_their_fields() {
+        let plugin = read_request(
+            &mut Cursor::new(places()),
+            &Request {
+                flat: &[],
+                nested: &[*b"WRLD"],
+                nested_records: &[],
+                nested_headers: &[*b"LAND"],
+            },
+        )
+        .unwrap();
+        assert_eq!(plugin.damaged, 0);
+
+        let [land] = plugin.records.as_slice() else {
+            panic!("expected the land only, got {:?}", plugin.records);
+        };
+        assert_eq!((land.signature, land.form_id), (*b"LAND", 0x0100_0803));
+        assert_eq!(land.subrecords, Vec::new());
+        assert_eq!(land.groups.len(), 5);
     }
 
     #[test]
@@ -716,6 +753,7 @@ mod tests {
                 flat: &[NPC],
                 nested: &[*b"CELL", *b"WRLD"],
                 nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+                nested_headers: &[],
             },
             &|group| group.group_type != group_type::CELL_TEMPORARY_CHILDREN,
         )
@@ -982,6 +1020,7 @@ mod tests {
                     flat: &[NPC],
                     nested: &[*b"CELL", *b"WRLD"],
                     nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+                    nested_headers: &[],
                 },
             );
         }
@@ -1019,6 +1058,7 @@ mod tests {
                     flat: &[NPC],
                     nested: &[*b"CELL", *b"WRLD"],
                     nested_records: &[*b"REFR", *b"CELL", *b"WRLD"],
+                    nested_headers: &[],
                 },
             );
         }

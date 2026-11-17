@@ -17,14 +17,15 @@ use std::path::{Path, PathBuf};
 
 use loadorder::GameSettings;
 use mallet_core::facts::{
-    ArchiveFacts, MarkerFacts, MeshOverride, ObjectFacts, PluginFacts, TerrainFacts, UnreadableFile,
+    ArchiveFacts, MarkerFacts, MeshOverride, NavmeshFacts, ObjectFacts, PluginFacts, TerrainFacts,
+    UnreadableFile,
 };
 use mallet_core::{GamePath, TextCache};
 use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
-use crate::{DATA_DIR, archive, archives, markers, npc, objects, terrain};
+use crate::{DATA_DIR, archive, archives, markers, navmeshes, npc, objects, terrain};
 
 /// What was read from the installation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -47,6 +48,8 @@ pub struct SetupFacts {
     pub terrain: TerrainFacts,
     /// The places of the world map.
     pub markers: MarkerFacts,
+    /// The navigation meshes of other plugins that mods change.
+    pub navmeshes: NavmeshFacts,
 }
 
 /// Why an installation could not be read at all.
@@ -132,6 +135,7 @@ pub fn read_setup(
                     });
                 }
                 placed.add(&name, &plugin);
+                add_navmeshes(&mut facts.navmeshes, reading, &name, &plugin);
                 map_markers.add(&name, &file, official, &plugin);
                 if let Some(contribution) = cached_land {
                     land.merge(contribution);
@@ -249,6 +253,7 @@ impl<'a> MarkerReader<'a> {
                 flat: &[],
                 nested: &markers::MARKER_GROUP,
                 nested_records: &markers::MARKER_RECORDS,
+                nested_headers: &[],
             },
             &markers::may_hold_markers,
         )
@@ -429,6 +434,14 @@ fn add_game_versions(
     }
 }
 
+/// Adds the navigation meshes of other plugins that `plugin` changes, if
+/// it was read with its places.
+fn add_navmeshes(facts: &mut NavmeshFacts, reading: Reading, name: &str, plugin: &plugin::Plugin) {
+    if reading == Reading::Everything {
+        facts.changes.extend(navmeshes::changes(name, plugin));
+    }
+}
+
 /// Reads only the placed objects of a plugin.
 fn read_references(path: &Path) -> Result<plugin::Plugin, String> {
     let file = File::open(path).map_err(|error| error.to_string())?;
@@ -436,6 +449,7 @@ fn read_references(path: &Path) -> Result<plugin::Plugin, String> {
         flat: &[],
         nested: &objects::PLACE_GROUPS,
         nested_records: &[*b"REFR"],
+        nested_headers: &[],
     };
     plugin::read_request(&mut BufReader::new(file), &request).map_err(|error| error.to_string())
 }
@@ -458,6 +472,11 @@ fn read_plugin(path: &Path, reading: Reading) -> Result<plugin::Plugin, String> 
             &objects::PLACE_RECORDS
         } else {
             &objects::LAND_RECORDS
+        },
+        nested_headers: if reading == Reading::Everything {
+            &navmeshes::HEADERS
+        } else {
+            &[]
         },
     };
     plugin::read_request(&mut BufReader::new(file), &request).map_err(|error| error.to_string())

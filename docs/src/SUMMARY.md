@@ -50,6 +50,7 @@
   - [0034 Missing installer options are ticked in advance](adr/0034-installer-options-ticked-in-advance.md)
   - [0035 LOOT's messages are quoted](adr/0035-loots-messages-are-quoted.md)
   - [0036 One adapter for the Bethesda family, settings per game](adr/0036-one-adapter-for-the-bethesda-family.md)
+  - [0037 The map draws the game's own level of detail](adr/0037-the-map-draws-the-games-own-lod.md)
   - [Template](adr/template.md)
 
 # Reference

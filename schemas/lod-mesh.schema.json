@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LodMesh",
+  "description": "The surfaces of one block of level of detail, in game units. Numbers\nare little-endian and Base64-encoded, as in [`MeshShape`].",
+  "type": "object",
+  "properties": {
+    "shapes": {
+      "description": "Its surfaces.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LodShape"
+      }
+    }
+  },
+  "required": [
+    "shapes"
+  ],
+  "$defs": {
+    "LodShape": {
+      "description": "One surface of a block of level of detail.",
+      "type": "object",
+      "properties": {
+        "alphaTest": {
+          "description": "Whether the transparent parts of the texture are left out.",
+          "type": "boolean"
+        },
+        "indices": {
+          "description": "The triangles: three 32-bit point numbers each.",
+          "type": "string"
+        },
+        "positions": {
+          "description": "The points: three 32-bit floats each.",
+          "type": "string"
+        },
+        "texture": {
+          "description": "The colour texture, below the data directory, to be fetched once\nfor every surface that uses it. A surface of land without one is\nwater.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uvs": {
+          "description": "The texture coordinates: two 32-bit floats per point, or empty.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "positions",
+        "uvs",
+        "indices",
+        "alphaTest"
+      ]
+    }
+  }
+}

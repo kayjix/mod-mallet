@@ -293,6 +293,7 @@ export interface Texts {
   mapHeight: string;
   mapHeightValue: (times: number) => string;
   mapBase: string;
+  mapLod: string;
   mapModCells: string;
   mapTopView: string;
   mapPlaces: string;
@@ -666,6 +667,7 @@ export const texts: Record<Lang, Texts> = {
     mapReliefHint: "Drag to move · right-drag to turn · wheel to zoom",
     mapHeight: "Height",
     mapBase: "On a base",
+    mapLod: "Game detail",
     mapHeightValue: (times) =>
       times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
     mapModCells: "Cells of mods",
@@ -1087,6 +1089,7 @@ export const texts: Record<Lang, Texts> = {
     mapReliefHint: "Ziehen verschiebt · rechts ziehen dreht · Mausrad zoomt",
     mapHeight: "Höhe",
     mapBase: "Auf Sockel",
+    mapLod: "Spieldetail",
     mapHeightValue: (times) =>
       times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
     mapModCells: "Zellen von Mods",

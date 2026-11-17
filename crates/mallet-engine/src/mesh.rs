@@ -38,12 +38,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
 
     let mut textures: HashMap<String, Option<String>> = HashMap::new();
     let mut texture = |raw: &str| -> Option<String> {
-        let normalized = raw.replace('\\', "/").to_ascii_lowercase();
-        let normalized = if normalized.starts_with("textures/") {
-            normalized
-        } else {
-            format!("textures/{normalized}")
-        };
+        let normalized = texture_path(raw);
         textures
             .entry(normalized.clone())
             .or_insert_with(|| picture(game, &game_dir, local_dir, &normalized))
@@ -94,7 +89,21 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
     })
 }
 
-fn floats(values: &[f32]) -> Vec<u8> {
+/// A texture as a mesh names it, as a path below the data directory:
+/// meshes write `textures\a.dds`, `a.dds` or `Data\Textures\a.dds`.
+pub(crate) fn texture_path(raw: &str) -> String {
+    let lower = raw.replace('\\', "/").to_ascii_lowercase();
+    let lower = lower.trim_start_matches('/');
+    let lower = lower.strip_prefix("data/").unwrap_or(lower);
+    if lower.starts_with("textures/") {
+        lower.to_owned()
+    } else {
+        format!("textures/{lower}")
+    }
+}
+
+/// Numbers as their little-endian bytes.
+pub(crate) fn floats(values: &[f32]) -> Vec<u8> {
     values
         .iter()
         .flat_map(|value| value.to_le_bytes())

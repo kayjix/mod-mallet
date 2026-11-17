@@ -1,6 +1,6 @@
 # 0011 No renderer of our own
 
-- Status: accepted; changed by [ADR 0029](0029-duels-and-a-3d-view-of-single-things.md) for single objects and heads, and by [ADR 0031](0031-places-on-the-map-and-a-3d-relief.md) for a relief of the land
+- Status: accepted; changed by [ADR 0029](0029-duels-and-a-3d-view-of-single-things.md) for single objects and heads, by [ADR 0031](0031-places-on-the-map-and-a-3d-relief.md) for a relief of the land, and by [ADR 0037](0037-the-map-draws-the-games-own-lod.md) for the game's own level of detail
 - Date: 2026-11-15
 
 ## Context

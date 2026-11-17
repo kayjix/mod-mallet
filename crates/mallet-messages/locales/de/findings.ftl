@@ -35,6 +35,16 @@ plugins-master-missing = Ein Plugin baut auf einem Plugin auf, das nicht install
     .explanation = Ein Plugin kann auf anderen Plugins aufbauen, seinen Mastern, und nennt sie in seiner Datei. Das Spiel lädt die Master zuerst. Fehlt einer davon, schließt sich das Spiel beim Start ohne Meldung, meist direkt nach dem Logo. Das passiert typischerweise, wenn ein Patch für zwei Mods installiert ist, eine der beiden aber nicht, oder wenn eine Mod entfernt wurde und ihre Patches geblieben sind.
     .remedy = Installiere die Mod, die das fehlende Plugin enthält, oder deaktiviere die Mod, zu der dieses Plugin gehört. Ist das Plugin ein Patch, den ein Installer angeboten hat, gehe diesen Installer noch einmal durch und wähle den Patch ab.
 
+plugins-generated-outdated = Ein erzeugtes Plugin ist älter als die Ladereihenfolge
+    .headline = { $plugin } wurde für eine ältere Ladereihenfolge erzeugt
+    .summary =
+        { $tool } hat { $plugin } erzeugt, bevor sich die Ladereihenfolge geändert hat. { $count ->
+            [one] Ein Plugin, aus dem es erzeugt wurde, lädt jetzt
+           *[other] { $count } Plugins, aus denen es erzeugt wurde, laden jetzt
+        } an einer anderen Stelle: { $examples }.
+    .explanation = Manche Werkzeuge schauen sich alle deine Plugins an und schreiben aus dem, was sie finden, ein eigenes Plugin: DynDOLOD für die Fernsicht, Synthesis und Wrye Bash für Patches, die die Änderungen vieler Mods zusammenführen. So ein Plugin ist eine Momentaufnahme. Ändert sich danach die Ladereihenfolge, weil eine Mod dazukam, entfernt oder neu sortiert wurde, enthält die Momentaufnahme noch den alten Stand. Objekte in der Ferne passen dann womöglich nicht zu dem, was du aus der Nähe siehst, und Änderungen neu sortierter Mods können verloren gehen.
+    .remedy = Lass das Werkzeug, das das Plugin erzeugt hat, noch einmal laufen und ersetze seine alte Ausgabe durch die neue. Hältst du die Ausgabe als Mod in deinem Mod-Manager, installiere die neue Ausgabe in dieselbe Mod.
+
 plugins-requirement-missing = Ein Plugin braucht eine Datei, die im Spiel fehlt
     .headline =
         { $plugin }: { $count ->
@@ -163,6 +173,20 @@ objects-overlapping = Objekte zweier Mods stehen ineinander
         } größtenteils ineinander stehen. Zum Beispiel: { $examples }. Angegeben ist jeweils der Ort: ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
     .explanation = Zwei Mods, die denselben Ort verändern, stellen jeweils eigene Gebäude, Bäume oder andere Objekte dorthin, ohne voneinander zu wissen. Wo sie sich treffen, wächst ein Baum durch ein Dach, zwei Häuser verschmelzen zu einem oder ein Weg führt in eine Wand. Mod Mallet vergleicht den Kasten um das Modell eines Objekts, nicht das Modell selbst. Ein Objekt mit viel freiem Raum, etwa ein Torbogen, kann deshalb gemeldet werden, obwohl sichtbar nichts zusammenstößt.
     .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch. Gibt es keinen, sieh dir die genannten Orte im Spiel an. Steht dort etwas im Weg, entscheide, welche der beiden Mods du für diesen Ort behalten willst.
+
+navmeshes-changes-undone = Eine Mod macht rückgängig, wo eine andere Mod Figuren laufen lässt
+    .headline =
+        { $winner } macht { $count ->
+            [one] 1 Laufweg
+           *[other] { $count } Laufwege
+        } von { $loser } rückgängig
+    .summary =
+        { $loser } und { $winner } ändern beide, wo Figuren { $count ->
+            [one] an einem Ort
+           *[other] an { $count } Orten
+        } laufen können. Das Spiel verwendet nur die Fassung von { $winner }, die nicht mit { $loser } erstellt wurde. Zum Beispiel: { $places }. Angegeben ist ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+    .explanation = Das Spiel legt auf den Boden jedes Ortes ein unsichtbares Netz, über das Figuren ihren Weg finden: sein Navigationsnetz. Eine Mod, die ein Haus oder eine Mauer baut, ändert dieses Netz, damit die Leute darum herumgehen. Ein Navigationsnetz wird immer als Ganzes ersetzt. Ändern zwei Mods dasselbe, zählt nur die Fassung der späteren Mod. Menschen und Tiere laufen dann durch die Gebäude der früheren Mod, bleiben an ihren Mauern hängen oder finden den Weg in das, was sie hinzugefügt hat, nicht mehr. Begleiter zeigen es oft als Erste.
+    .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch und installiere ihn, wenn es einen gibt. Ohne Patch behalte für diese Orte nur eine der beiden Mods, oder sieh sie dir im Spiel an, um zu beurteilen, ob es dort stört.
 
 meshes-retexture-bypassed = Textur-Mod erreicht ersetzte Modelle nicht
     .headline =

@@ -6,6 +6,7 @@
 pub mod installer;
 pub mod knowledge;
 pub mod markers;
+pub mod navmeshes;
 pub mod objects;
 pub mod terrain;
 
@@ -14,6 +15,7 @@ use crate::GamePath;
 pub use installer::InstallerFacts;
 pub use knowledge::KnowledgeFacts;
 pub use markers::MarkerFacts;
+pub use navmeshes::NavmeshFacts;
 pub use objects::ObjectFacts;
 pub use terrain::TerrainFacts;
 
@@ -50,6 +52,8 @@ pub struct Facts {
     pub knowledge: KnowledgeFacts,
     /// The places of the world map.
     pub markers: MarkerFacts,
+    /// The navigation meshes of other plugins that mods change.
+    pub navmeshes: NavmeshFacts,
 }
 
 /// A loose mesh that replaces a mesh from an archive, with the textures

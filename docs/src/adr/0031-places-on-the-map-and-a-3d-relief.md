@@ -1,6 +1,6 @@
 # 0031 The map shows the places of the game and of mods, also as a 3D relief
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0037](0037-the-map-draws-the-games-own-lod.md), which draws the game's level of detail where there is one
 - Date: 2026-11-16
 - Changes: ADR 0011 (no renderer of our own) and ADR 0029, for the land
 

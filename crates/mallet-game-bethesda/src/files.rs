@@ -34,7 +34,7 @@ pub struct FileVersion {
 
 /// A path as the game compares them: lower case, `/` between folders,
 /// without a leading `data/`.
-fn normalize(path: &str) -> String {
+pub(crate) fn normalize(path: &str) -> String {
     let lower = path.replace('\\', "/").to_ascii_lowercase();
     let trimmed = lower.trim_start_matches('/');
     trimmed.strip_prefix("data/").unwrap_or(trimmed).to_owned()

@@ -11,6 +11,7 @@ import {
   project,
   type Vec3,
 } from "./gl";
+import { LodLayer } from "./lod-layer";
 import {
   CELL,
   drawLabels,
@@ -238,12 +239,18 @@ uniform vec3 u_low;
 uniform vec3 u_high;
 uniform vec3 u_water;
 uniform bool u_base;
+uniform bool u_lod;
+uniform sampler2D u_covered;
 out vec4 colour;
 vec2 within(vec4 rect) {
   return vec2((v_xy.x - rect.x) / rect.z, (rect.y + rect.w - v_xy.y) / rect.w);
 }
 void main() {
   if (v_kind < 0.5 && !u_base) {
+    discard;
+  }
+  // Where the game's own level of detail is drawn, it shows the land.
+  if (u_lod && v_kind < 2.5 && texture(u_covered, within(u_cellsRect)).r > 0.5) {
     discard;
   }
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
@@ -343,6 +350,8 @@ void main() {
 /** The resources of one WebGL context. */
 interface Scene {
   gl: WebGL2RenderingContext;
+  /** One pixel per cell: where the game's level of detail is drawn. */
+  covered: WebGLTexture;
   terrain: WebGLProgram;
   pins: WebGLProgram;
   terrainVao: WebGLVertexArrayObject;
@@ -392,7 +401,7 @@ export function MapView3D({
   onPick,
   onHover,
 }: MapView3DProps) {
-  const { t } = useSession();
+  const { t, api } = useSession();
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -402,6 +411,10 @@ export function MapView3D({
   const [exaggeration, setExaggeration] = useState(1);
   // The land on a block with walls, so that it cannot be seen from below.
   const [withBase, setWithBase] = useState(true);
+  // The game's own level of detail: its land and towns, finer up close.
+  const [withLod, setWithLod] = useState(true);
+  const lod = useRef<LodLayer | null>(null);
+  const coveredKey = useRef<string | null>(null);
   const [failed, setFailed] = useState(false);
   const mesh = useMemo(() => buildMesh(terrain), [terrain]);
 
@@ -430,6 +443,7 @@ export function MapView3D({
     exaggeration,
     showCells,
     withBase,
+    withLod,
     size,
     picture,
   });
@@ -440,6 +454,7 @@ export function MapView3D({
     exaggeration,
     showCells,
     withBase,
+    withLod,
     size,
     picture,
   };
@@ -500,10 +515,30 @@ export function MapView3D({
       perspective(FIELD_OF_VIEW, width / height, view.distance * 0.02, view.distance * 6 + 400),
       lookAt(eye, view.target, [0, 0, 1]),
     );
-    const { exaggeration: raise, showCells: tinted, withBase } = state.current;
+    const { exaggeration: raise, showCells: tinted, withBase, withLod } = state.current;
     const span = Math.max(1, terrain.highest - terrain.lowest);
 
     gl.enable(gl.DEPTH_TEST);
+    const style = getComputedStyle(target);
+    const css = (name: string) => colour(style.getPropertyValue(name));
+    // The game's blocks first; they tell which cells the coarse land leaves.
+    const layer = withLod ? lod.current : null;
+    if (layer !== null) {
+      layer.draw({
+        matrix,
+        eye,
+        exaggeration: raise,
+        water: css("--map-water"),
+        showCells: tinted,
+        cells: current.cells,
+        cellsRect: [terrain.west, terrain.south, terrain.columns, terrain.rows],
+      });
+      if (layer.drawnKey !== coveredKey.current) {
+        coveredKey.current = layer.drawnKey;
+        uploadCovered(gl, current.covered, terrain, layer.drawnTiles);
+      }
+    }
+    const lodDrawn = layer !== null && layer.drawnTiles.length > 0;
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
     gl.useProgram(current.terrain);
     const terrainUniform = (name: string) => gl.getUniformLocation(current.terrain, name);
@@ -511,8 +546,10 @@ export function MapView3D({
     gl.uniform1f(terrainUniform("u_exaggeration"), raise);
     gl.uniform1f(terrainUniform("u_lowest"), terrain.lowest);
     gl.uniform1f(terrainUniform("u_span"), span);
-    const style = getComputedStyle(target);
-    const css = (name: string) => colour(style.getPropertyValue(name));
+    gl.uniform1i(terrainUniform("u_lod"), lodDrawn ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, current.covered);
+    gl.uniform1i(terrainUniform("u_covered"), 2);
     gl.uniform3fv(terrainUniform("u_low"), css("--map-low"));
     gl.uniform3fv(terrainUniform("u_high"), css("--map-high"));
     gl.uniform3fv(terrainUniform("u_water"), css("--map-water"));
@@ -728,8 +765,10 @@ export function MapView3D({
         gl.UNSIGNED_BYTE,
         new Uint8Array([0, 0, 0, 0]),
       );
+      const covered = gl.createTexture();
       made = {
         gl,
+        covered,
         terrain: terrainProgram,
         pins: pinProgram,
         terrainVao,
@@ -751,7 +790,32 @@ export function MapView3D({
     }
     scene.current = made;
     redraw();
+    // The game's own level of detail, where the setup has it.
+    let gone = false;
+    api
+      .lodTiles(world.name)
+      .then((found) => {
+        if (gone || found.tiles.length === 0) {
+          return;
+        }
+        try {
+          const layer = new LodLayer(gl, api, world.name, found.tiles, redraw);
+          if (layer.usable) {
+            lod.current = layer;
+            coveredKey.current = null;
+            redraw();
+          } else {
+            layer.dispose();
+          }
+        } catch {
+          // The relief of the height samples stays.
+        }
+      })
+      .catch(() => {});
     return () => {
+      gone = true;
+      lod.current?.dispose();
+      lod.current = null;
       // Frees the graphics memory at once rather than when collected.
       for (const made of buffers) {
         gl.deleteBuffer(made);
@@ -760,12 +824,13 @@ export function MapView3D({
         gl.deleteVertexArray(made);
       }
       gl.deleteTexture(made.cells);
+      gl.deleteTexture(made.covered);
       gl.deleteTexture(made.picture);
       gl.deleteProgram(made.terrain);
       gl.deleteProgram(made.pins);
       scene.current = null;
     };
-  }, [mesh, terrain, redraw]);
+  }, [mesh, terrain, redraw, api, world.name]);
 
   // The game's picture of the land, laid over it.
   useEffect(() => {
@@ -922,7 +987,7 @@ export function MapView3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these trigger a redraw.
   useEffect(() => {
     redraw();
-  }, [size, picked, hover, showCells, withBase, exaggeration, redraw]);
+  }, [size, picked, hover, showCells, withBase, withLod, exaggeration, redraw]);
 
   // Whatever changes the canvas's size, it is drawn anew at its new size.
   useEffect(() => {
@@ -1187,10 +1252,49 @@ export function MapView3D({
           />
           {t.mapBase}
         </label>
+        <label className="relief-control">
+          <input
+            type="checkbox"
+            checked={withLod}
+            onChange={(event) => setWithLod(event.target.checked)}
+          />
+          {t.mapLod}
+        </label>
         <span className="relief-hint">{t.mapReliefHint}</span>
       </div>
     </div>
   );
+}
+
+/** Marks the cells of `tiles` in the one-pixel-per-cell texture `target`. */
+function uploadCovered(
+  gl: WebGL2RenderingContext,
+  target: WebGLTexture,
+  terrain: MapTerrain,
+  tiles: { level: number; x: number; y: number }[],
+) {
+  const { columns, rows } = terrain;
+  const pixels = new Uint8Array(columns * rows);
+  const north = terrain.south + rows - 1;
+  for (const tile of tiles) {
+    for (let x = tile.x; x < tile.x + tile.level; x++) {
+      for (let y = tile.y; y < tile.y + tile.level; y++) {
+        const column = x - terrain.west;
+        const row = north - y;
+        if (column >= 0 && row >= 0 && column < columns && row < rows) {
+          pixels[row * columns + column] = 255;
+        }
+      }
+    }
+  }
+  gl.bindTexture(gl.TEXTURE_2D, target);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, columns, rows, 0, gl.RED, gl.UNSIGNED_BYTE, pixels);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
 
 /** The height of the land at a point (in cells), in game units. */

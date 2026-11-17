@@ -494,6 +494,7 @@ mod tests {
                 flat: &flat,
                 nested: &PLACE_GROUPS,
                 nested_records: &PLACE_RECORDS,
+                nested_headers: &[],
             },
         )
         .unwrap()

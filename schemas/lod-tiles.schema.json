@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LodTiles",
+  "description": "The level-of-detail tiles of a worldspace that the setup has: the\nblocks of land the game shows from a distance (ADR 0037).",
+  "type": "object",
+  "properties": {
+    "tiles": {
+      "description": "The tiles, coarsest first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LodTile"
+      }
+    },
+    "world": {
+      "description": "The worldspace, by its internal name.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "world",
+    "tiles"
+  ],
+  "$defs": {
+    "LodTile": {
+      "description": "One block of level of detail.",
+      "type": "object",
+      "properties": {
+        "level": {
+          "description": "How many cells the block covers in each direction: 4, 8, 16 or 32.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "objects": {
+          "description": "Whether the block has objects: towns, castles, bridges, rocks.",
+          "type": "boolean"
+        },
+        "terrain": {
+          "description": "Whether the block has land.",
+          "type": "boolean"
+        },
+        "x": {
+          "description": "The cell column at its south-west corner.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "description": "The cell row at its south-west corner.",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "level",
+        "x",
+        "y",
+        "terrain",
+        "objects"
+      ]
+    }
+  }
+}

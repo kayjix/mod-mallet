@@ -41,6 +41,16 @@ plugins-master-missing = A plugin builds on a plugin that is not installed
     .explanation = A plugin can build on other plugins, its masters, and names them in its file. The game loads the masters first. If one of them is not there, the game closes without a message while it starts, usually right after the logo. This typically happens when a patch for two mods is installed and one of the two is not, or when a mod was removed and its patches stayed behind.
     .remedy = Install the mod that contains the missing plugin, or disable the mod this plugin belongs to. If the plugin is a patch that an installer offered, run that installer again and untick the patch.
 
+plugins-generated-outdated = A generated plugin is older than the load order
+    .headline = { $plugin } was made for an older load order
+    .summary =
+        { $tool } made { $plugin } before the load order changed. { $count ->
+            [one] One plugin it was made from now loads
+           *[other] { $count } plugins it was made from now load
+        } in a different place: { $examples }.
+    .explanation = Some tools look at all your plugins and write a plugin of their own from what they find: DynDOLOD for distant land, Synthesis and Wrye Bash for patches that merge the changes of many mods. Such a plugin is a snapshot. When the load order changes afterwards, because a mod was added, removed or sorted again, the snapshot still holds what was true before. Distant objects may then not match what you see up close, and changes of mods that were sorted again may be lost.
+    .remedy = Run the tool that made the plugin again, and replace its old output with the new one. If you keep the output as a mod in your mod manager, install the new output into the same mod.
+
 plugins-requirement-missing = A plugin needs a file that is not in the game
     .headline =
         { $plugin }: { $count ->
@@ -169,6 +179,20 @@ objects-overlapping = Objects of two mods stand inside each other
         }. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
     .explanation = Two mods that change the same place each put their own buildings, trees or other objects there, without knowing of each other. Where they meet, a tree grows through a roof, two houses merge into one, or a path runs into a wall. Mod Mallet compares the box around each object's model, not the model itself, so an object with a lot of empty space, such as an arch, can be reported although nothing visibly collides.
     .remedy = Look on the pages of both mods for a compatibility patch. If there is none, look at the places named above in the game. If something is in the way, decide which of the two mods you want to keep for this place.
+
+navmeshes-changes-undone = A mod undoes where another mod lets characters walk
+    .headline =
+        { $winner } undoes { $count ->
+            [one] 1 walking path
+           *[other] { $count } walking paths
+        } of { $loser }
+    .summary =
+        { $loser } and { $winner } both change where characters can walk { $count ->
+            [one] in one place
+           *[other] in { $count } places
+        }. The game uses only the version of { $winner }, which was not made with { $loser }. For example: { $places }. An interior is given by its internal name, outside by worldspace and cell.
+    .explanation = The game keeps an invisible net on the ground of every place, which characters use to find their way: its navigation mesh. A mod that builds a house or a wall changes that net so that people walk around it. A navigation mesh is replaced as a whole, so when two mods change the same one, only the later mod's version counts. People and creatures then walk through the earlier mod's buildings, get stuck at its walls, or no longer find the way into what it added. Followers are often the first to show it.
+    .remedy = Look on the pages of both mods for a compatibility patch, and install it if there is one. Without a patch, keep only one of the two mods for these places, or look at them in the game to judge whether it matters there.
 
 meshes-retexture-bypassed = A texture mod does not reach replaced meshes
     .headline =

@@ -6,3 +6,6 @@ allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
 allow-dbg-in-tests = true
 allow-print-in-tests = true
+
+# Names of modding tools that are written as their authors write them.
+doc-valid-idents = ["DynDOLOD", "xLODGen", ".."]

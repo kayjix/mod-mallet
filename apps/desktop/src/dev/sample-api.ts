@@ -882,6 +882,10 @@ export const sampleApi: Api = {
   // The sample has no pictures; the page shows its placeholder.
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
+  // The sample has no level of detail; the map draws its height relief.
+  lodTiles: (world) => later({ world, tiles: [] }),
+  lodMesh: () => later(null),
+  lodTexture: () => later(null),
   ranking: () => later([...ranked]),
   setRanking: (next) => {
     ranked = [...next];

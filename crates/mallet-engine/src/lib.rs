@@ -17,6 +17,7 @@
 mod actions;
 mod installers;
 mod knowledge;
+mod lod;
 mod logging;
 mod mesh;
 mod patch;
@@ -42,6 +43,7 @@ pub use actions::{
     CreatedPatch, ManagerLink, ManagerOptions, create_patch, install_manager_link, manager_link,
     patch_file, run_action,
 };
+pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
 pub use preview::file_preview;
@@ -459,6 +461,7 @@ fn gather_facts(
             facts.objects = setup.objects;
             facts.terrain = setup.terrain;
             facts.markers = setup.markers;
+            facts.navmeshes = setup.navmeshes;
             tracing::info!(
                 placed = facts.objects.placed.len(),
                 bases = facts.objects.bases.len(),
