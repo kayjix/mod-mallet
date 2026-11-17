@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { type Session, useSession } from "./Actions";
 import type { DuelSide, ModDuel, RenderedDuel, RenderedFinding } from "./generated/rendered-report";
-import { type PatchChoices, pairFor } from "./patch";
+import { chooseFinding, type PatchChoices, pairFor } from "./patch";
 
 /** How many open duels are shown at first; the largest come first. */
 const OPEN_LIMIT = 8;
@@ -94,7 +94,7 @@ export async function resolveDuel(
       ),
     );
     if (pair !== null && target !== undefined) {
-      next = { ...next, [pair.id]: target.plugin };
+      next = chooseFinding(next, pair, target.plugin);
       hidden += target.objects.length;
     }
   }

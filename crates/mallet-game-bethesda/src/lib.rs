@@ -34,6 +34,7 @@ pub mod locate;
 pub mod lod;
 pub mod lod_library;
 pub mod markers;
+pub mod mesh_variants;
 pub mod meshes;
 pub mod models;
 pub mod navmeshes;

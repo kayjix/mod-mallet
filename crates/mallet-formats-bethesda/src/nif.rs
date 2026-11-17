@@ -158,6 +158,65 @@ pub fn read_texture_paths<R: Read + Seek>(reader: &mut R) -> Result<Vec<String>,
     Ok(paths)
 }
 
+/// Which variant of the format a mesh is in, from its header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Variant {
+    /// Bethesda's own version number of the format: 34 for Fallout 3 and
+    /// New Vegas, 83 for Skyrim (2011), 100 for Skyrim Special Edition,
+    /// 130 for Fallout 4.
+    pub bethesda_version: u32,
+    /// Whether the mesh bends with a skeleton, as bodies, clothes and
+    /// armour do.
+    pub skinned: bool,
+}
+
+/// The block types that bind a mesh to a skeleton.
+const SKIN_TYPES: [&str; 3] = [
+    "NiSkinInstance",
+    "BSDismemberSkinInstance",
+    "BSSkin::Instance",
+];
+
+/// Reads which variant of the format a mesh is in. `data` is the start of
+/// the file and must hold its header, up to the list of block types; a
+/// few kilobytes nearly always do. Oblivion's meshes, of an older version,
+/// are [`NifError::UnsupportedVersion`].
+pub fn variant(data: &[u8]) -> Result<Variant, NifError> {
+    let mut bytes = Bytes::new(data);
+    let damaged = || NifError::Damaged;
+    let line_len = data
+        .iter()
+        .take(64)
+        .position(|&byte| byte == b'\n')
+        .ok_or(NifError::NotAMesh)?;
+    let line = bytes.take(line_len + 1).ok_or(NifError::NotAMesh)?;
+    if !line.starts_with(MAGIC) {
+        return Err(NifError::NotAMesh);
+    }
+    let version = bytes.u32().ok_or_else(damaged)?;
+    let little_endian = bytes.u8().ok_or_else(damaged)? == 1;
+    let _user_version = bytes.u32().ok_or_else(damaged)?;
+    let _block_count = bytes.u32().ok_or_else(damaged)?;
+    let bethesda_version = bytes.u32().ok_or_else(damaged)?;
+    if version != VERSION_20_2_0_7 || !little_endian || bethesda_version > NEWEST_BETHESDA_VERSION {
+        return Err(NifError::UnsupportedVersion);
+    }
+    for _ in 0..header_texts(bethesda_version) {
+        let len = usize::from(bytes.u8().ok_or_else(damaged)?);
+        bytes.skip(len).ok_or_else(damaged)?;
+    }
+    let type_count = bytes.u16().ok_or_else(damaged)?;
+    let mut skinned = false;
+    for _ in 0..type_count {
+        let name = sized_string(&mut bytes).ok_or_else(damaged)?;
+        skinned |= SKIN_TYPES.iter().any(|skin| skin.as_bytes() == name);
+    }
+    Ok(Variant {
+        bethesda_version,
+        skinned,
+    })
+}
+
 /// Where the blocks of a mesh lie.
 struct Layout {
     /// Where the first block starts.
@@ -459,10 +518,65 @@ mod tests {
         assert_eq!(texture_paths(&mesh), Err(NifError::Damaged));
     }
 
+    /// `mesh` with its Bethesda version replaced.
+    fn with_bethesda_version(mut mesh: Vec<u8>, version: u32) -> Vec<u8> {
+        let after_line = mesh.iter().position(|&byte| byte == b'\n').unwrap() + 1;
+        let at = after_line + 4 + 1 + 4 + 4;
+        mesh[at..at + 4].copy_from_slice(&version.to_le_bytes());
+        mesh
+    }
+
+    /// `mesh` with its first block type renamed to `name`, which must be
+    /// as long as the old name.
+    fn with_first_type(mut mesh: Vec<u8>, name: &str) -> Vec<u8> {
+        let at = mesh.windows(10).position(|w| w == b"BSFadeNode").unwrap();
+        mesh[at..at + name.len()].copy_from_slice(name.as_bytes());
+        mesh
+    }
+
+    #[test]
+    fn the_variant_of_a_mesh_is_read_from_its_header() {
+        let mesh = fixture::nif(&[WALL]);
+        assert_eq!(
+            variant(&mesh),
+            Ok(Variant {
+                bethesda_version: 100,
+                skinned: false
+            })
+        );
+        let old = with_bethesda_version(mesh, 83);
+        assert_eq!(variant(&old).map(|found| found.bethesda_version), Ok(83));
+    }
+
+    #[test]
+    fn a_mesh_with_a_skin_is_skinned() {
+        // "NiSkinInstance" is longer than "BSFadeNode"; a type name of the
+        // same length stands in for the test of the comparison.
+        let mesh = fixture::nif(&[WALL]);
+        let at = mesh.windows(10).position(|w| w == b"BSFadeNode").unwrap();
+        let mut skinned = mesh[..at - 4].to_vec();
+        skinned.extend(14u32.to_le_bytes());
+        skinned.extend(b"NiSkinInstance");
+        skinned.extend(&mesh[at + 10..]);
+        assert_eq!(variant(&skinned).map(|found| found.skinned), Ok(true));
+        assert_eq!(
+            variant(&with_first_type(mesh, "BSFadeNodX")).map(|found| found.skinned),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn a_header_that_ends_early_is_damaged() {
+        let mesh = fixture::nif(&[WALL]);
+        assert_eq!(variant(&mesh[..60]), Err(NifError::Damaged));
+        assert_eq!(variant(b"not a mesh"), Err(NifError::NotAMesh));
+    }
+
     proptest! {
         #[test]
         fn never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..512)) {
             let _ = texture_paths(&data);
+            let _ = variant(&data);
         }
 
         #[test]

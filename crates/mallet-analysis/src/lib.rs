@@ -24,6 +24,7 @@ mod contact;
 pub mod duels;
 pub mod extender;
 pub mod faces;
+pub mod foreign_meshes;
 pub mod generated;
 pub mod installer;
 pub mod knowledge;
@@ -92,6 +93,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(knowledge::KnownRules),
         Box::new(faces::NpcFaces),
         Box::new(installer::InstallerOptions),
+        Box::new(foreign_meshes::ForeignMeshes),
         Box::new(meshes::BypassedRetextures),
         Box::new(objects::PlacedObjects),
         Box::new(navmeshes::NavmeshConflicts),

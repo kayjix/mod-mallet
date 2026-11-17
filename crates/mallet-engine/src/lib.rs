@@ -477,6 +477,7 @@ fn gather_facts(
             facts.plugins = setup.plugins;
             facts.unreadable = setup.unreadable;
             facts.mesh_overrides = setup.mesh_overrides;
+            facts.foreign_meshes = setup.foreign_meshes;
             facts.objects = setup.objects;
             facts.terrain = setup.terrain;
             facts.markers = setup.markers;

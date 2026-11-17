@@ -225,6 +225,24 @@ navmeshes-changes-undone = A mod undoes where another mod lets characters walk
     .explanation = The game keeps an invisible net on the ground of every place, which characters use to find their way: its navigation mesh. A mod that builds a house or a wall changes that net so that people walk around it. A navigation mesh is replaced as a whole, so when two mods change the same one, only the later mod's version counts. People and creatures then walk through the earlier mod's buildings, get stuck at its walls, or no longer find the way into what it added. Followers are often the first to show it.
     .remedy = Look on the pages of both mods for a compatibility patch, and install it if there is one. Without a patch, keep only one of the two mods for these places, or look at them in the game to judge whether it matters there.
 
+meshes-made-for-other-game = Meshes of a mod were made for another game
+    .headline =
+        { $count ->
+            [one] 1 mesh
+           *[other] { $count } meshes
+        } made for { $madeFor }
+    .summary =
+        { $count ->
+            [one] One mesh of this mod is
+           *[other] { $count } meshes of this mod are
+        } in the format of { $madeFor }, not of the game you play{ $skinned ->
+            [0] .
+            [one] . One of them bends with a skeleton, like clothes or armour, which is the kind most likely to crash the game.
+           *[other] . { $skinned } of them bend with a skeleton, like clothes or armour, which is the kind most likely to crash the game.
+        } For example: { $examples }.
+    .explanation = A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
+    .remedy = Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
+
 meshes-retexture-bypassed = A texture mod does not reach replaced meshes
     .headline =
         { $textureMod } does not reach { $count ->

@@ -23,6 +23,8 @@ import {
   drawLabels,
   isMajor,
   isShown,
+  kindOf,
+  kindVariable,
   type Label,
   metres as metresBetween,
   nearest,
@@ -33,12 +35,15 @@ import {
   type PlaceFilter,
   readLand,
   type Shape,
+  SPOT_KINDS,
+  type SpotKind,
   samePick,
   shapeOf,
   spotPosition,
   spotsNear,
   startingFilter,
   tracePlace,
+  worstKind,
 } from "./map-places";
 
 interface MapViewProps {
@@ -74,7 +79,7 @@ const cellOf = (coordinate: number) => Math.floor(coordinate / CELL);
  * collide. Drawn flat or as a relief in 3D.
  */
 export function MapView({ map, headlines, focus }: MapViewProps) {
-  const { t, api } = useSession();
+  const { t } = useSession();
   const focusWorld =
     focus?.location.type === "exterior"
       ? map.worlds.findIndex((world) => world.name === (focus.location as { world: string }).world)
@@ -113,34 +118,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
     setHover(null);
   };
 
-  // The game's own picture of the land, when its terrain textures are there.
-  const [picture, setPicture] = useState<Picture | null>(null);
-  const worldName = world?.name;
-  useEffect(() => {
-    setPicture(null);
-    if (worldName === undefined) {
-      return;
-    }
-    let outdated = false;
-    api
-      .mapImage(worldName)
-      .then((meta) => {
-        if (meta === null || outdated) {
-          return;
-        }
-        const image = new Image();
-        image.onload = () => {
-          if (!outdated) {
-            setPicture({ meta, image });
-          }
-        };
-        image.src = meta.image;
-      })
-      .catch(() => {});
-    return () => {
-      outdated = true;
-    };
-  }, [api, worldName]);
+  const picture = useWorldPicture(world?.name);
 
   const markers = world?.markers ?? [];
   const shownMarkers = useMemo(
@@ -272,14 +250,59 @@ function Legend({ cells }: { cells: boolean }) {
           <span className="swatch" data-level="4" /> {t.mapLegendMany}
         </>
       )}
-      <span className="swatch swatch-spot" /> {t.mapLegendSpot}
+      {SPOT_KINDS.map((kind) => (
+        <span key={kind} className="legend-item">
+          <span className="swatch swatch-spot" data-kind={kind} /> {t.spotKinds[kind]}
+        </span>
+      ))}
     </div>
   );
 }
 
+/** The game's own picture of a worldspace's land, when its terrain textures are there. */
+export function useWorldPicture(worldName: string | undefined): Picture | null {
+  const { api } = useSession();
+  const [picture, setPicture] = useState<Picture | null>(null);
+  useEffect(() => {
+    setPicture(null);
+    if (worldName === undefined) {
+      return;
+    }
+    let outdated = false;
+    api
+      .mapImage(worldName)
+      .then((meta) => {
+        if (meta === null || outdated) {
+          return;
+        }
+        const image = new Image();
+        image.onload = () => {
+          if (!outdated) {
+            setPicture({ meta, image });
+          }
+        };
+        image.src = meta.image;
+      })
+      .catch(() => {});
+    return () => {
+      outdated = true;
+    };
+  }, [api, worldName]);
+  return picture?.meta.world === worldName ? picture : null;
+}
+
 /** A place's outline as a small picture, for lists and the legend. */
-export function PlaceIcon({ shape, origin }: { shape: Shape; origin: PlaceOrigin | "spot" }) {
-  const fill = origin === "spot" ? "var(--accent)" : `var(${originVariable(origin)})`;
+export function PlaceIcon({
+  shape,
+  origin,
+  kind = "overlap",
+}: {
+  shape: Shape;
+  origin: PlaceOrigin | "spot";
+  /** For a collision: its kind. */
+  kind?: SpotKind;
+}) {
+  const fill = origin === "spot" ? `var(${kindVariable(kind)})` : `var(${originVariable(origin)})`;
   const hollow = origin === "removed";
   const common = {
     fill: hollow ? "none" : fill,
@@ -407,7 +430,7 @@ function PlacesPanel({ markers, spots, filter, onChange }: PlacesPanelProps) {
 interface Palette {
   levels: string[];
   dim: string;
-  spot: string;
+  spots: Record<SpotKind, string>;
   line: string;
   edge: string;
   places: Record<PlaceOrigin, string>;
@@ -428,7 +451,11 @@ function palette(element: Element): Palette {
   return {
     levels: [colour("--heat-1"), colour("--heat-2"), colour("--heat-3"), colour("--heat-4")],
     dim: colour("--map-dim"),
-    spot: colour("--accent"),
+    spots: {
+      duplicate: colour(kindVariable("duplicate")),
+      overlap: colour(kindVariable("overlap")),
+      touch: colour(kindVariable("touch")),
+    },
     line: colour("--text"),
     edge: colour("--place-edge"),
     places: {
@@ -815,9 +842,10 @@ function Grid({
           continue;
         }
         const { x, y } = toScreen(at);
+        const kind = kindOf(spot);
         context.beginPath();
-        context.arc(x, y, 5, 0, Math.PI * 2);
-        context.fillStyle = colours.spot;
+        context.arc(x, y, kind === "touch" ? 3.5 : 5, 0, Math.PI * 2);
+        context.fillStyle = colours.spots[kind];
         context.fill();
         context.strokeStyle = colours.line;
         context.stroke();
@@ -831,8 +859,10 @@ function Grid({
         const px = view.x + (x - bounds.minX + 0.5) * view.size;
         const py = view.y + (bounds.maxY - y + 0.5) * view.size;
         context.beginPath();
-        context.arc(px, py, Math.max(3, view.size * 0.3), 0, Math.PI * 2);
-        context.fillStyle = colours.spot;
+        const kind = worstKind(found);
+        const scale = kind === "touch" ? 0.2 : 0.3;
+        context.arc(px, py, Math.max(kind === "touch" ? 2 : 3, view.size * scale), 0, Math.PI * 2);
+        context.fillStyle = colours.spots[kind];
         context.fill();
         context.strokeStyle = colours.line;
         context.stroke();
@@ -1058,7 +1088,7 @@ interface DetailProps {
 
 /** What is known about the picked place, collision or cell. */
 function Detail({ world, owners, owner, markers, spots, headlines, shown, onPick }: DetailProps) {
-  const { t } = useSession();
+  const { t, decideSpot } = useSession();
   const placeName = (marker: MapMarker) => marker.name || t.placesKind[marker.kind];
   const nearby = (position: readonly number[], except?: MapMarker) =>
     nearest(markers, position, 3, except);
@@ -1147,7 +1177,7 @@ function Detail({ world, owners, owner, markers, spots, headlines, shown, onPick
                     className="place-link"
                     onClick={() => onPick({ type: "spot", spot })}
                   >
-                    <PlaceIcon shape="circle" origin="spot" />
+                    <PlaceIcon shape="circle" origin="spot" kind={kindOf(spot)} />
                     <span>{spot.objects}</span>
                     <span className="aside">{t.placesDistance(metres)}</span>
                   </button>
@@ -1169,7 +1199,7 @@ function Detail({ world, owners, owner, markers, spots, headlines, shown, onPick
     return (
       <aside className="map-detail">
         <h3 className="place-title">
-          <PlaceIcon shape="circle" origin="spot" />
+          <PlaceIcon shape="circle" origin="spot" kind={kindOf(spot)} />
           {spot.objects}
         </h3>
         <p className="aside">{headlines.get(spot.finding) ?? spot.finding}</p>
@@ -1194,6 +1224,11 @@ function Detail({ world, owners, owner, markers, spots, headlines, shown, onPick
           ))}
         </ul>
         {console(spot.console)}
+        {(spot.parts ?? []).length > 0 && (
+          <button type="button" className="primary" onClick={() => decideSpot(spot)}>
+            {t.workDecideHere}
+          </button>
+        )}
       </aside>
     );
   }

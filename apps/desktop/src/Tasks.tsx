@@ -19,7 +19,7 @@ import {
 import type { MapSpot, RenderedAction, RenderedFinding } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
 import { Previews } from "./Preview";
-import { pairFor } from "./patch";
+import { chooseFinding, pairFor } from "./patch";
 
 /** A group with more findings than this starts folded. */
 const OPEN_GROUP_LIMIT = 4;
@@ -232,7 +232,7 @@ function Choices({ rendered, action }: { rendered: RenderedFinding; action: Acti
   const chosen = pair === null ? null : (patchChoices[pair.id] ?? null);
   const choose = (plugin: string | null) => {
     if (pair !== null) {
-      setPatchChoices({ ...patchChoices, [pair.id]: plugin });
+      setPatchChoices(chooseFinding(patchChoices, pair, plugin));
     }
   };
 

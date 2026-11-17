@@ -25,6 +25,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `objects.touching` | Note | hint | Objects of two mods cut into each other |
 | `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
+| `meshes.made-for-other-game` | Warning | likely | Meshes of a mod were made for another game |
 | `meshes.retexture-bypassed` | Warning | likely | A texture mod does not reach replaced meshes |
 | `assets.loose-over-archive` | Note | certain | Loose files cover files in another mod's archive |
 | `assets.archive-over-archive` | Note | certain | An archive covers files in another mod's archive |
@@ -258,6 +259,18 @@ The game keeps an invisible net on the ground of every place, which characters u
 The game keeps an invisible net on the ground of every place, which characters use to find their way: its navigation mesh. A mod that builds a house or a wall changes that net so that people walk around it. A navigation mesh is replaced as a whole, so when two mods change the same one, only the later mod's version counts. People and creatures then walk through the earlier mod's buildings, get stuck at its walls, or no longer find the way into what it added. Followers are often the first to show it.
 
 **What to do:** Look on the pages of both mods for a compatibility patch, and install it if there is one. Without a patch, keep only one of the two mods for these places, or look at them in the game to judge whether it matters there.
+
+## meshes.made-for-other-game
+
+**Meshes of a mod were made for another game**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `count`, `skinned`, `madeFor`, `examples`
+
+A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
+
+**What to do:** Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
 
 ## meshes.retexture-bypassed
 

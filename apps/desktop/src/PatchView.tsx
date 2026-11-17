@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
 import type { RenderedReport } from "./generated/rendered-report";
-import { choicesOf, keyOf, objectsOf, type Pair, pairsOf, signatureOf } from "./patch";
+import {
+  choicesOf,
+  chooseFinding,
+  keyOf,
+  objectsOf,
+  type Pair,
+  pairsOf,
+  signatureOf,
+} from "./patch";
 
 /** Base Object Swapper's page, for when it is missing. */
 const SWAPPER_PAGE = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
@@ -37,7 +45,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const more = [...chosen].filter((key) => !installed.has(key)).length;
   const fewer = [...installed].filter((key) => !chosen.has(key)).length;
   const fromInstalled = useMemo(() => choicesOf(pairs, installed), [pairs, installed]);
-  const sameAsInstalled = pairs.every((pair) => choice(pair) === (fromInstalled[pair.id] ?? null));
+  const sameAsInstalled = signatureOf(objectsOf(pairs, fromInstalled)) === signature;
 
   const create = async () => {
     setCreating(true);
@@ -131,6 +139,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
             <span className="patch-headline">
               {pair.headline}
               {installedObjects !== null && <InstalledMark pair={pair} installed={installed} />}
+              <PerSpot pair={pair} choices={choices} />
             </span>
             <fieldset className="segmented" aria-label={pair.headline}>
               {pair.sides.map((side) => (
@@ -139,7 +148,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
                   key={side.plugin}
                   aria-pressed={choice(pair) === side.plugin}
                   disabled={side.objects.length === 0}
-                  onClick={() => setChoices({ ...choices, [pair.id]: side.plugin })}
+                  onClick={() => setChoices(chooseFinding(choices, pair, side.plugin))}
                 >
                   {t.patchHide(side.plugin, side.objects.length)}
                   {pair.suggested === side.plugin && (
@@ -150,7 +159,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
               <button
                 type="button"
                 aria-pressed={choice(pair) === null}
-                onClick={() => setChoices({ ...choices, [pair.id]: null })}
+                onClick={() => setChoices(chooseFinding(choices, pair, null))}
               >
                 {t.patchKeepBoth}
               </button>
@@ -160,6 +169,13 @@ export function PatchView({ report }: { report: RenderedReport }) {
       </ul>
     </section>
   );
+}
+
+/** How many spots of a collision were decided on their own. */
+function PerSpot({ pair, choices }: { pair: Pair; choices: Record<string, string | null> }) {
+  const { t } = useSession();
+  const own = pair.spots.filter((spot) => spot.key in choices).length;
+  return own === 0 ? null : <span className="patch-mark partly">{t.patchPerSpot(own)}</span>;
 }
 
 /** How much of a collision the installed patch already hides. */

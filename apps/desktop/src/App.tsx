@@ -3,6 +3,7 @@ import "./App.css";
 import { type Session, SessionContext, useSession } from "./Actions";
 import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, type Filter, modsByName } from "./arrange";
+import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { Duels } from "./Duels";
 import { type Games, isPlayable, useGames } from "./games";
@@ -57,6 +58,8 @@ export default function App({ api, startLang }: AppProps) {
   const [changed, setChanged] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [focus, setFocus] = useState<MapSpot | null>(null);
+  // The spot to open the collisions' worklist with.
+  const [workSpot, setWorkSpot] = useState<MapSpot | null>(null);
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
   const games = useGames(api);
@@ -265,6 +268,11 @@ export default function App({ api, startLang }: AppProps) {
     setView("map");
   }, []);
 
+  const decideSpot = useCallback((spot: MapSpot) => {
+    setWorkSpot(spot);
+    setView("collisions");
+  }, []);
+
   const session = useMemo<Session>(
     () => ({
       api,
@@ -277,6 +285,7 @@ export default function App({ api, startLang }: AppProps) {
       mods: modsByName(report?.mods ?? []),
       spots: spotsByFinding(report),
       showOnMap,
+      decideSpot,
       patchChoices: patchChoices ?? {},
       setPatchChoices,
       showPatch,
@@ -296,6 +305,7 @@ export default function App({ api, startLang }: AppProps) {
       setIgnored,
       report,
       showOnMap,
+      decideSpot,
       patchChoices,
       showPatch,
       decisions,
@@ -333,6 +343,7 @@ export default function App({ api, startLang }: AppProps) {
           view={current}
           onView={(next) => {
             setFocus(null);
+            setWorkSpot(null);
             setView(next);
           }}
           disabled={askFirst}
@@ -420,14 +431,15 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "compare" ? (
             <CompareView report={report} start={compareAt} onBack={() => setView(compareFrom)} />
           ) : current === "collisions" ? (
-            <>
+            <Collisions report={report} start={workSpot}>
+              <h2 className="work-more">{t.workMore}</h2>
               <Duels
                 duels={report.duels}
                 findings={report.findings}
                 topics={["objects", "contained"]}
               />
               <TaskList findings={report.findings} filter="collisions" exclude={inDuels(report)} />
-            </>
+            </Collisions>
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (

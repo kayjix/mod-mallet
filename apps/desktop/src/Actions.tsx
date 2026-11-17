@@ -24,6 +24,8 @@ export interface Session {
   spots: Map<string, MapSpot[]>;
   /** Switches to the map and shows a spot there. */
   showOnMap: (spot: MapSpot) => void;
+  /** Switches to the collisions' worklist and opens a spot there. */
+  decideSpot: (spot: MapSpot) => void;
   /** What the patch is to hide, per collision; shared by all views. */
   patchChoices: PatchChoices;
   /** Replaces the patch's choice. */

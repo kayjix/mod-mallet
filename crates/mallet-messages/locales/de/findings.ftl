@@ -219,6 +219,24 @@ navmeshes-changes-undone = Eine Mod macht rückgängig, wo eine andere Mod Figur
     .explanation = Das Spiel legt auf den Boden jedes Ortes ein unsichtbares Netz, über das Figuren ihren Weg finden: sein Navigationsnetz. Eine Mod, die ein Haus oder eine Mauer baut, ändert dieses Netz, damit die Leute darum herumgehen. Ein Navigationsnetz wird immer als Ganzes ersetzt. Ändern zwei Mods dasselbe, zählt nur die Fassung der späteren Mod. Menschen und Tiere laufen dann durch die Gebäude der früheren Mod, bleiben an ihren Mauern hängen oder finden den Weg in das, was sie hinzugefügt hat, nicht mehr. Begleiter zeigen es oft als Erste.
     .remedy = Sieh auf den Seiten beider Mods nach einem Kompatibilitäts-Patch und installiere ihn, wenn es einen gibt. Ohne Patch behalte für diese Orte nur eine der beiden Mods, oder sieh sie dir im Spiel an, um zu beurteilen, ob es dort stört.
 
+meshes-made-for-other-game = Modelle einer Mod wurden für ein anderes Spiel gemacht
+    .headline =
+        { $count ->
+            [one] 1 Modell
+           *[other] { $count } Modelle
+        } für { $madeFor }
+    .summary =
+        { $count ->
+            [one] Ein Modell dieser Mod liegt
+           *[other] { $count } Modelle dieser Mod liegen
+        } im Format von { $madeFor } vor, nicht in dem des Spiels, das du spielst{ $skinned ->
+            [0] .
+            [one] . Eines davon bewegt sich mit einem Skelett, wie Kleidung oder Rüstung – solche bringen das Spiel am ehesten zum Absturz.
+           *[other] . { $skinned } davon bewegen sich mit einem Skelett, wie Kleidung oder Rüstung – solche bringen das Spiel am ehesten zum Absturz.
+        } Zum Beispiel: { $examples }.
+    .explanation = Ein Modell ist die 3D-Form eines Dings im Spiel. Jedes Spiel und jede Ausgabe eines Spiels liest Modelle in einer eigenen Variante des Formats. Mods für das ursprüngliche Skyrim von 2011 sind oft mit einigen unveränderten Modellen in die Special Edition gekommen. Unbewegliche Objekte erscheinen meist trotzdem, manchmal mit falschem Licht oder ohne Kollision. Kleidung, Rüstungen, Körper und Kreaturen, die sich mit einem Skelett bewegen, bringen das Spiel meist zum Absturz, sobald sie erscheinen, oder bleiben unsichtbar.
+    .remedy = Sieh auf der Seite der Mod nach einer Fassung für dein Spiel und installiere stattdessen diese. Gibt es keine, lassen sich die Modelle mit Cathedral Assets Optimizer umwandeln, einem kostenlosen Werkzeug genau dafür. Installiere die umgewandelten Dateien dann als eigene Mod, die diese überschreibt.
+
 meshes-retexture-bypassed = Textur-Mod erreicht ersetzte Modelle nicht
     .headline =
         { $textureMod } erreicht { $count ->

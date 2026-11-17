@@ -263,3 +263,20 @@ export function tracePlace(
     context.arc(x, y, r, 0, Math.PI * 2);
   }
 }
+
+/** What kind a collision is (ADR 0039). */
+export type SpotKind = NonNullable<MapSpot["kind"]>;
+
+/** The kinds of collisions, the worst first. */
+export const SPOT_KINDS: SpotKind[] = ["duplicate", "overlap", "touch"];
+
+/** A spot's kind; spots of older scans overlap. */
+export const kindOf = (spot: MapSpot): SpotKind => spot.kind ?? "overlap";
+
+/** The colour of a kind of collision, as a CSS variable. */
+export const kindVariable = (kind: SpotKind) => `--spot-${kind}`;
+
+/** The worst kind among `spots`. */
+export function worstKind(spots: MapSpot[]): SpotKind {
+  return SPOT_KINDS.find((kind) => spots.some((spot) => kindOf(spot) === kind)) ?? "overlap";
+}

@@ -46,6 +46,9 @@ pub struct Facts {
     pub installers: Vec<InstallerFacts>,
     /// Loose meshes that replace a mesh from an archive.
     pub mesh_overrides: Vec<MeshOverride>,
+    /// Loose meshes in the variant of the format of another game, or of
+    /// another edition of this one.
+    pub foreign_meshes: Vec<ForeignMesh>,
     /// The objects mods placed in the world.
     pub objects: ObjectFacts,
     /// The shape of the land.
@@ -58,6 +61,17 @@ pub struct Facts {
     pub navmeshes: NavmeshFacts,
     /// The shapes of the models of objects that may collide.
     pub models: ModelFacts,
+}
+
+/// A loose mesh made for another game or another edition of the game.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForeignMesh {
+    /// Where the mesh lies.
+    pub path: GamePath,
+    /// The Bethesda version of its format, such as 83 for Skyrim (2011).
+    pub bethesda_version: u32,
+    /// Whether it bends with a skeleton, as bodies, clothes and armour do.
+    pub skinned: bool,
 }
 
 /// A loose mesh that replaces a mesh from an archive, with the textures

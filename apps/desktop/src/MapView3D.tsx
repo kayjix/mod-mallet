@@ -1,6 +1,14 @@
-import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type PointerEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSession } from "./Actions";
-import { AreaLayer, objectKey } from "./area-layer";
+import { AreaLayer, LOOK, type Look, objectKey } from "./area-layer";
 import type { AreaObject } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
@@ -40,7 +48,19 @@ interface MapView3DProps {
   hover: Picked | null;
   onPick: (picked: Picked | null) => void;
   onHover: (hover: Picked | null) => void;
+  /** The objects of the collision looked at, by {@link objectKey}: drawn lit up. */
+  focus?: Set<string>;
+  /** The objects the patch would hide, by {@link objectKey}: drawn as ghosts. */
+  hidden?: Set<string>;
+  /** More for the card of a picked object, such as what to do with it. */
+  objectExtra?: (object: AreaObject) => ReactNode;
+  /** Shown over the relief. */
+  children?: ReactNode;
+  /** How far from a picked collision the camera comes, in cells. */
+  spotDistance?: number;
 }
+
+const NO_KEYS = new Set<string>();
 
 /**
  * Where the camera is: it looks at `target` (in cells, height in cells as
@@ -408,6 +428,11 @@ export function MapView3D({
   hover,
   onPick,
   onHover,
+  focus = NO_KEYS,
+  hidden = NO_KEYS,
+  objectExtra,
+  children,
+  spotDistance = NEAR * 0.7,
 }: MapView3DProps) {
   const { t, api } = useSession();
   const frame = useRef<HTMLDivElement>(null);
@@ -438,6 +463,25 @@ export function MapView3D({
   const lastView = useRef<{ matrix: Mat4; raise: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const mesh = useMemo(() => buildMesh(terrain), [terrain]);
+  // How each object of the area is drawn, by its key.
+  const marked = useMemo(
+    () =>
+      new Set(
+        spots.flatMap((spot) =>
+          (spot.parts ?? []).map((part) => objectKey(part.object.plugin, part.object.localId)),
+        ),
+      ),
+    [spots],
+  );
+  const lookOf = useRef<(key: string) => Look>(() => LOOK.plain);
+  lookOf.current = (key) =>
+    hidden.has(key)
+      ? LOOK.ghost
+      : focus.has(key)
+        ? LOOK.focus
+        : marked.has(key)
+          ? LOOK.marked
+          : LOOK.plain;
 
   const fitted = useCallback(
     (): Camera => ({
@@ -468,9 +512,11 @@ export function MapView3D({
     withObjects,
     size,
     picture,
+    focus,
   });
   state.current = {
     ...state.current,
+    focus,
     picked,
     hover,
     exaggeration,
@@ -518,12 +564,7 @@ export function MapView3D({
           if (found === null || area.current !== layer) {
             return;
           }
-          const marked = new Set(
-            spots.flatMap((spot) =>
-              (spot.parts ?? []).map((part) => objectKey(part.object.plugin, part.object.localId)),
-            ),
-          );
-          layer.show(found, marked);
+          layer.show(found, lookOf.current);
           setAreaState(found.objects.length);
           redraw();
         })
@@ -679,7 +720,11 @@ export function MapView3D({
     );
 
     if (shownArea !== null && area.current !== null) {
-      area.current.draw(matrix, raise, css("--accent"));
+      area.current.draw(matrix, raise, {
+        mark: css("--accent"),
+        focus: css("--spot-focus"),
+        ghost: css("--spot-ghost"),
+      });
     }
     lastView.current = { matrix, raise };
 
@@ -732,10 +777,13 @@ export function MapView3D({
       }
     }
     heads.current = placed;
-    // The parts of collisions among the objects, by name.
+    // The parts of collisions among the objects, by name: of the one
+    // looked at, if one is.
     if (shownArea !== null && area.current !== null) {
+      const named = state.current.focus;
       for (const shown of area.current.shown) {
-        if (!shown.marked) {
+        const { plugin, localId } = shown.object.id;
+        if (named.size === 0 ? !shown.marked : !named.has(objectKey(plugin, localId))) {
           continue;
         }
         const [x, y, z] = shown.centre;
@@ -1117,10 +1165,10 @@ export function MapView3D({
       pins.push({
         picked: { type: "spot", spot },
         position: [at[0] / CELL, at[1] / CELL, z],
-        colour: css("--accent"),
+        colour: css(`--spot-${spot.kind ?? "overlap"}`),
         shape: 2,
         hollow: false,
-        size: 13,
+        size: spot.kind === "touch" ? 9 : 13,
         label: "",
         major: false,
       });
@@ -1149,6 +1197,13 @@ export function MapView3D({
     current.headCount = pins.length;
     redraw();
   }, [markers, spots, mesh, terrain, redraw]);
+
+  // The objects are drawn anew when what is looked at or hidden changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.
+  useEffect(() => {
+    area.current?.restyle(lookOf.current);
+    redraw();
+  }, [focus, hidden, marked, redraw]);
 
   // The drawing follows size, highlights and the controls, which it reads
   // from a ref so that drawing need not be made anew for each.
@@ -1225,9 +1280,9 @@ export function MapView3D({
       ...camera.current,
       target: [position[0] / CELL, position[1] / CELL, (position[2] / CELL) * raise],
       // A collision is looked at up close, with the objects themselves.
-      distance: Math.min(camera.current.distance, picked.type === "spot" ? NEAR * 0.7 : 28),
+      distance: Math.min(camera.current.distance, picked.type === "spot" ? spotDistance : 28),
     });
-  }, [picked, fly]);
+  }, [picked, fly, spotDistance]);
 
   const pickAt = (clientX: number, clientY: number): Picked | null => {
     const rect = overlay.current?.getBoundingClientRect();
@@ -1456,8 +1511,10 @@ export function MapView3D({
               <code>{pickedObject.model}</code>
             </dd>
           </dl>
+          {objectExtra?.(pickedObject)}
         </div>
       )}
+      {children}
       <div className="relief-controls">
         <label className="relief-control">
           {t.mapHeight}

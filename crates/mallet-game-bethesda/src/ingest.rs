@@ -17,15 +17,17 @@ use std::path::{Path, PathBuf};
 
 use loadorder::GameSettings;
 use mallet_core::facts::{
-    ArchiveFacts, MarkerFacts, MeshOverride, NavmeshFacts, ObjectFacts, PluginFacts, TerrainFacts,
-    UnreadableFile,
+    ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, NavmeshFacts, ObjectFacts, PluginFacts,
+    TerrainFacts, UnreadableFile,
 };
 use mallet_core::{GamePath, TextCache};
 use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
-use crate::{DATA_DIR, archive, archives, markers, navmeshes, npc, objects, terrain};
+use crate::{
+    DATA_DIR, archive, archives, markers, mesh_variants, navmeshes, npc, objects, terrain,
+};
 
 /// What was read from the installation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -42,6 +44,8 @@ pub struct SetupFacts {
     pub unreadable: Vec<UnreadableFile>,
     /// Loose meshes that replace a mesh from an archive.
     pub mesh_overrides: Vec<MeshOverride>,
+    /// Loose meshes made for another game or edition.
+    pub foreign_meshes: Vec<ForeignMesh>,
     /// The objects mods placed in the world.
     pub objects: ObjectFacts,
     /// The shape of the land.
@@ -110,6 +114,7 @@ pub fn read_setup(
         }
     }
     facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
+    facts.foreign_meshes = mesh_variants::foreign_meshes(game, &loose);
 
     let mut placed = objects::Collector::new(game);
     let mut land = terrain::Collector::default();

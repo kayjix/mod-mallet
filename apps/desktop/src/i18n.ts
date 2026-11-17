@@ -304,6 +304,42 @@ export interface Texts {
   mapObjectId: string;
   mapObjectModel: string;
   mapModCells: string;
+
+  // The collisions as a worklist, decided spot by spot (ADR 0040).
+  spotKinds: Record<"duplicate" | "overlap" | "touch", string>;
+  spotKindHints: Record<"duplicate" | "overlap" | "touch", string>;
+  workProgress: (decided: number, total: number) => string;
+  workGroupBy: string;
+  workByRegion: string;
+  workByMods: string;
+  workHideDecided: string;
+  workInterior: (cell: string) => string;
+  workDepth: (metres: number) => string;
+  workHidden: (plugin: string) => string;
+  workKept: string;
+  workOpen: string;
+  workSpotOf: (index: number, total: number) => string;
+  workHide: (name: string) => string;
+  workCannotHide: string;
+  workReset: string;
+  workPrevious: string;
+  workNext: string;
+  workNextOpen: string;
+  workPair: (first: string, second: string, spots: number) => string;
+  workEverywhere: (plugin: string) => string;
+  workKeepEverywhere: string;
+  workKeys: string;
+  workToPatch: (objects: number) => string;
+  workPickSpot: string;
+  workInside: string;
+  workEmpty: string;
+  workMore: string;
+  workGhost: string;
+  workThisSpot: string;
+  workHideObject: string;
+  workDecideHere: string;
+  workAfterDecide: string;
+  patchPerSpot: (count: number) => string;
   mapTopView: string;
   mapPlaces: string;
   placesShowAll: string;
@@ -686,6 +722,48 @@ export const texts: Record<Lang, Texts> = {
     mapObjectPlacedBy: "Placed by",
     mapObjectId: "Number in that plugin",
     mapObjectModel: "Model",
+    spotKinds: { duplicate: "duplicate", overlap: "overlap", touch: "touch" },
+    spotKindHints: {
+      duplicate: "The same object twice in the same place.",
+      overlap: "Two objects stand inside each other.",
+      touch: "Two objects reach into each other a little; often harmless.",
+    },
+    workProgress: (decided, total) => `${decided} of ${total} spots decided`,
+    workGroupBy: "Group by",
+    workByRegion: "Region",
+    workByMods: "Mod pair",
+    workHideDecided: "Hide decided spots",
+    workInterior: (cell) => `Inside: ${cell}`,
+    workDepth: (metres) =>
+      `${metres.toLocaleString("en", { maximumFractionDigits: 1 })} m inside each other`,
+    workHidden: (plugin) => `${plugin} hidden`,
+    workKept: "both kept",
+    workOpen: "open",
+    workSpotOf: (index, total) => `Spot ${index} of ${total}`,
+    workHide: (name) => `Hide ${name}`,
+    workCannotHide: "Other things refer to it, so it cannot be hidden safely.",
+    workReset: "Undecide",
+    workPrevious: "Previous",
+    workNext: "Next",
+    workNextOpen: "Next open",
+    workPair: (first, second, spots) =>
+      `${first} against ${second}: ${spots === 1 ? "1 spot" : `${spots} spots`}`,
+    workEverywhere: (plugin) => `Hide ${plugin} everywhere`,
+    workKeepEverywhere: "Keep both everywhere",
+    workKeys: "Keys: ← → spots · 1, 2 hide · 0 keep both",
+    workToPatch: (objects) =>
+      objects === 1 ? "To the patch (1 object)" : `To the patch (${objects} objects)`,
+    workPickSpot: "Pick a spot from the list.",
+    workInside: "This spot is inside a building or cave; there is no 3D view of it yet.",
+    workEmpty: "No collisions to decide.",
+    workMore: "Mod against mod",
+    workGhost: "Red and see-through: what the patch would hide.",
+    workThisSpot: "this spot",
+    workHideObject: "Hide this object here",
+    workDecideHere: "Decide in the worklist",
+    workAfterDecide: "Then go on to the next open spot",
+    patchPerSpot: (count) =>
+      count === 1 ? "1 spot decided on its own" : `${count} spots decided on their own`,
     mapHeightValue: (times) =>
       times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
     mapModCells: "Cells of mods",
@@ -1125,6 +1203,49 @@ export const texts: Record<Lang, Texts> = {
     mapObjectPlacedBy: "Aufgestellt von",
     mapObjectId: "Nummer in diesem Plugin",
     mapObjectModel: "Modell",
+    spotKinds: { duplicate: "doppelt", overlap: "steckt ineinander", touch: "berührt sich" },
+    spotKindHints: {
+      duplicate: "Dasselbe Objekt zweimal an derselben Stelle.",
+      overlap: "Zwei Objekte stecken ineinander.",
+      touch: "Zwei Objekte ragen ein wenig ineinander; oft harmlos.",
+    },
+    workProgress: (decided, total) => `${decided} von ${total} Stellen entschieden`,
+    workGroupBy: "Ordnen nach",
+    workByRegion: "Region",
+    workByMods: "Mod-Paar",
+    workHideDecided: "Entschiedene ausblenden",
+    workInterior: (cell) => `Innen: ${cell}`,
+    workDepth: (metres) =>
+      `${metres.toLocaleString("de", { maximumFractionDigits: 1 })} m ineinander`,
+    workHidden: (plugin) => `${plugin} ausgeblendet`,
+    workKept: "beide bleiben",
+    workOpen: "offen",
+    workSpotOf: (index, total) => `Stelle ${index} von ${total}`,
+    workHide: (name) => `${name} ausblenden`,
+    workCannotHide: "Anderes verweist darauf; es lässt sich nicht gefahrlos ausblenden.",
+    workReset: "Zurücksetzen",
+    workPrevious: "Zurück",
+    workNext: "Weiter",
+    workNextOpen: "Nächste offene",
+    workPair: (first, second, spots) =>
+      `${first} gegen ${second}: ${spots === 1 ? "1 Stelle" : `${spots} Stellen`}`,
+    workEverywhere: (plugin) => `Überall ${plugin} ausblenden`,
+    workKeepEverywhere: "Überall beide behalten",
+    workKeys: "Tasten: ← → Stellen · 1, 2 ausblenden · 0 beide behalten",
+    workToPatch: (objects) =>
+      objects === 1 ? "Zum Patch (1 Objekt)" : `Zum Patch (${objects} Objekte)`,
+    workPickSpot: "Wähle links eine Stelle.",
+    workInside:
+      "Diese Stelle liegt in einem Gebäude oder einer Höhle; dafür gibt es noch keine 3D-Ansicht.",
+    workEmpty: "Keine Kollisionen zu entscheiden.",
+    workMore: "Mod gegen Mod",
+    workGhost: "Rot und durchscheinend: was der Patch ausblenden würde.",
+    workThisSpot: "diese Stelle",
+    workHideObject: "Dieses Objekt hier ausblenden",
+    workDecideHere: "In der Arbeitsliste entscheiden",
+    workAfterDecide: "Danach zur nächsten offenen Stelle",
+    patchPerSpot: (count) =>
+      count === 1 ? "1 Stelle einzeln entschieden" : `${count} Stellen einzeln entschieden`,
     mapHeightValue: (times) =>
       times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
     mapModCells: "Zellen von Mods",

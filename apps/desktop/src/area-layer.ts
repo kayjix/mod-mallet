@@ -8,7 +8,7 @@
 import type { Api } from "./api";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
-import type { Mat4 } from "./gl";
+import type { Mat4, Vec3 } from "./gl";
 import { CELL } from "./map-places";
 
 /** How many meshes are fetched at once. */
@@ -44,6 +44,8 @@ uniform sampler2D u_texture;
 uniform bool u_hasTexture;
 uniform bool u_alphaTest;
 uniform vec3 u_mark;
+uniform vec3 u_focus;
+uniform vec3 u_ghost;
 out vec4 colour;
 void main() {
   vec4 sampled = u_hasTexture ? texture(u_texture, v_uv) : vec4(0.7, 0.7, 0.7, 1.0);
@@ -53,7 +55,16 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
-  if (v_look > 1.5) {
+  if (v_look > 3.5) {
+    // Hidden by the patch: half there, every other pixel left out.
+    if (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) {
+      discard;
+    }
+    shaded = mix(shaded, u_ghost, 0.6);
+  } else if (v_look > 2.5) {
+    // Part of the collision looked at.
+    shaded = mix(shaded, u_focus, 0.6);
+  } else if (v_look > 1.5) {
     // Picked: lit up.
     shaded = mix(shaded, vec3(1.0), 0.45);
   } else if (v_look > 0.5) {
@@ -152,6 +163,7 @@ interface Instance {
   object: AreaObject;
   matrix: Float32Array;
   marked: boolean;
+  look: Look;
 }
 
 /** The key by which collisions name an object. */
@@ -234,10 +246,12 @@ export function placement(object: AreaObject): Float32Array {
   ]);
 }
 
-/** How an object is drawn: plainly, as part of a collision, or picked. */
-const PLAIN = 0;
-const MARKED = 1;
-const SELECTED = 2;
+/**
+ * How an object is drawn: plainly, as part of a collision, picked, as part
+ * of the collision looked at, or as hidden by the patch.
+ */
+export const LOOK = { plain: 0, marked: 1, selected: 2, focus: 3, ghost: 4 } as const;
+export type Look = (typeof LOOK)[keyof typeof LOOK];
 
 /** What is known of a model: being fetched, its surfaces, or nothing to draw. */
 interface Model {
@@ -273,14 +287,13 @@ export class AreaLayer {
     this.picking = linked(gl, PICK_VERTEX, PICK_FRAGMENT);
   }
 
-  /** Shows `area`; objects whose key is in `marked` are tinted. */
-  show(area: AreaObjects, marked: Set<string>) {
+  /** Shows `area`, each object drawn as `look` says by its key (see {@link objectKey}). */
+  show(area: AreaObjects, look: (key: string) => Look) {
     this.area = area;
-    this.instances = area.objects.map((object) => ({
-      object,
-      matrix: placement(object),
-      marked: marked.has(objectKey(object.id.plugin, object.id.localId)),
-    }));
+    this.instances = area.objects.map((object) => {
+      const shown = look(objectKey(object.id.plugin, object.id.localId));
+      return { object, matrix: placement(object), marked: shown !== LOOK.plain, look: shown };
+    });
     for (const model of new Set(area.objects.map((object) => object.model))) {
       if (!this.models.has(model) && !this.queue.includes(model)) {
         this.queue.push(model);
@@ -298,6 +311,17 @@ export class AreaLayer {
       this.place(model);
     }
     this.pump();
+  }
+
+  /** Draws the objects anew as `look` says. */
+  restyle(look: (key: string) => Look) {
+    for (const instance of this.instances) {
+      instance.look = look(objectKey(instance.object.id.plugin, instance.object.id.localId));
+      instance.marked = instance.look !== LOOK.plain;
+    }
+    for (const model of this.models.keys()) {
+      this.place(model);
+    }
   }
 
   /** Picks the object with `key` (see {@link objectKey}), or none. */
@@ -322,13 +346,23 @@ export class AreaLayer {
   }
 
   /** The objects shown with where their middle stands, in game units. */
-  get shown(): { object: AreaObject; marked: boolean; centre: [number, number, number] }[] {
+  get shown(): {
+    object: AreaObject;
+    marked: boolean;
+    look: Look;
+    centre: [number, number, number];
+  }[] {
     return this.instances.map((instance) => {
       const [x, y, z] = this.models.get(instance.object.model)?.centre ?? [0, 0, 0];
       const m = instance.matrix;
       const at = (row: number) =>
         (m[row] ?? 0) * x + (m[4 + row] ?? 0) * y + (m[8 + row] ?? 0) * z + (m[12 + row] ?? 0);
-      return { object: instance.object, marked: instance.marked, centre: [at(0), at(1), at(2)] };
+      return {
+        object: instance.object,
+        marked: instance.marked,
+        look: instance.look,
+        centre: [at(0), at(1), at(2)],
+      };
     });
   }
 
@@ -382,7 +416,7 @@ export class AreaLayer {
     own.forEach((instance, index) => {
       data.set(instance.matrix, index * 17);
       const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-      data[index * 17 + 16] = key === this.selected ? SELECTED : instance.marked ? MARKED : PLAIN;
+      data[index * 17 + 16] = key === this.selected ? LOOK.selected : instance.look;
     });
     if (model.instances === null) {
       model.instances = gl.createBuffer();
@@ -513,7 +547,7 @@ export class AreaLayer {
   }
 
   /** Draws the objects with `matrix` (cells, heights as drawn). */
-  draw(matrix: Mat4, exaggeration: number, markColour: [number, number, number]) {
+  draw(matrix: Mat4, exaggeration: number, colours: { mark: Vec3; focus: Vec3; ghost: Vec3 }) {
     if (this.disposed || this.instances.length === 0) {
       return;
     }
@@ -523,7 +557,9 @@ export class AreaLayer {
     const at = (name: string) => gl.getUniformLocation(this.program, name);
     gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
     gl.uniform1f(at("u_exaggeration"), exaggeration);
-    gl.uniform3f(at("u_mark"), ...markColour);
+    gl.uniform3f(at("u_mark"), ...colours.mark);
+    gl.uniform3f(at("u_focus"), ...colours.focus);
+    gl.uniform3f(at("u_ghost"), ...colours.ghost);
     gl.uniform1i(at("u_texture"), 0);
     const hasTexture = at("u_hasTexture");
     const alphaTest = at("u_alphaTest");

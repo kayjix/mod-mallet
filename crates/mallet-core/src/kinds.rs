@@ -184,6 +184,15 @@ pub const OBJECTS_TOUCHING: KindInfo = KindInfo {
     args: &["first", "second", "count", "examples"],
 };
 
+/// Loose meshes of a mod are in the format of another game or of another
+/// edition of this one.
+pub const MESHES_MADE_FOR_OTHER_GAME: KindInfo = KindInfo {
+    id: "meshes.made-for-other-game",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["count", "skinned", "madeFor", "examples"],
+};
+
 /// Replacement meshes no longer use textures that a texture mod replaces.
 pub const MESHES_RETEXTURE_BYPASSED: KindInfo = KindInfo {
     id: "meshes.retexture-bypassed",
@@ -280,6 +289,7 @@ pub const ALL: &[KindInfo] = &[
     OBJECTS_TOUCHING,
     NAVMESHES_DOOR_CUT_OFF,
     NAVMESHES_CHANGES_UNDONE,
+    MESHES_MADE_FOR_OTHER_GAME,
     MESHES_RETEXTURE_BYPASSED,
     ASSETS_LOOSE_OVER_ARCHIVE,
     ASSETS_ARCHIVE_OVER_ARCHIVE,
