@@ -1,30 +1,28 @@
-/* The window's frame (ADR 0048): the way back to all games, the game in
-   use in the sidebar, and the overview of a game. */
+/* The window's frame (ADR 0048): the start page with all games, the game
+   in use in the sidebar, and the overview of a game. */
 
 /* ---- the sidebar ---------------------------------------------------------- */
 
-.nav-back {
-  justify-self: start;
-  margin: 18px 4px 6px;
+/* The name leads to the start page. */
+.brand-home {
   padding: 2px 6px;
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--side-muted);
-  font-size: 0.82rem;
-  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
-.nav-back:hover:not(:disabled),
-.nav-back[aria-current="page"] {
-  background: rgb(255 255 255 / 6%);
-  color: var(--side-text);
+.brand-home:hover:not(:disabled),
+.brand-home[aria-current="page"] {
+  background: rgb(255 255 255 / 8%);
 }
 
 .side-game {
   display: grid;
   gap: 8px;
-  margin: 0 4px 14px;
+  margin: 22px 4px 14px;
   padding: 8px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 10px;
@@ -77,6 +75,88 @@
   margin-right: 6px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* ---- the start page -------------------------------------------------------- */
+
+.home-hero {
+  display: flex;
+  align-items: flex-end;
+  min-height: 240px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--side-bg), var(--brand)) center / cover;
+}
+
+.home-hero-text {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  background: linear-gradient(to top, rgb(7 19 23 / 92%), rgb(7 19 23 / 0%));
+  color: #f8f9fa;
+}
+
+.home-hero-text .brand-tagline {
+  color: #c9dde0;
+}
+
+.home-hero-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.home-hero-row .score-ring {
+  flex: none;
+  width: 84px;
+  height: 84px;
+}
+
+.home-hero-words {
+  display: grid;
+  gap: 2px;
+}
+
+.home-hero-words h2 {
+  font-size: 1.7rem;
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.home-hero-actions button:not(.primary) {
+  border-color: rgb(255 255 255 / 35%);
+  background: rgb(255 255 255 / 10%);
+  color: #f8f9fa;
+}
+
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--space-3);
+}
+
+.home-stat {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}
+
+.home-stat:hover {
+  border-color: var(--brand);
+}
+
+.home-stat-value {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-stat-label {
+  color: var(--muted);
 }
 
 /* ---- all games ------------------------------------------------------------- */

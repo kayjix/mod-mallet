@@ -6,7 +6,6 @@ import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
 
 export interface JourneyTexts {
-  navAllGames: string;
   navOverview: string;
   navAssets: string;
   /** What clicking the game in the sidebar does. */
@@ -14,11 +13,18 @@ export interface JourneyTexts {
 
   allGamesTitle: string;
   allGamesNote: string;
-  openGame: string;
+  switchTo: string;
+  toOverview: string;
+  lastScanAt: (when: string) => string;
+  soon: string;
+  startTasks: string;
+  startSpots: string;
+  startAssets: string;
+  startPatch: string;
+  /** What the name in the sidebar does. */
+  brandHint: string;
   inUse: string;
   notScanned: string;
-  scoreAt: (score: number, when: string) => string;
-  laterGames: string;
 
   scanFirst: string;
   tasksOpen: (count: number) => string;
@@ -46,18 +52,23 @@ export interface JourneyTexts {
 }
 
 const en: JourneyTexts = {
-  navAllGames: "All games",
   navOverview: "Overview",
   navAssets: "Assets",
   gameCardHint: "The overview of this game",
 
   allGamesTitle: "Games",
   allGamesNote: "Pick the game to work on. Each game has its own scan, tasks and patch.",
-  openGame: "Open",
+  switchTo: "Switch to this game",
+  toOverview: "To the overview",
+  lastScanAt: (when) => `scanned ${when}`,
+  soon: "soon",
+  startTasks: "Things to do",
+  startSpots: "Collision spots to decide",
+  startAssets: "Pairs of mods to compare",
+  startPatch: "Objects hidden by the patch",
+  brandHint: "Start: all games",
   inUse: "In use",
   notScanned: "Not scanned yet",
-  scoreAt: (score, when) => `Health ${score} · ${when}`,
-  laterGames: "Not read yet",
 
   scanFirst: "Scan this game to see how it stands and what there is to do.",
   tasksOpen: (count) => (count === 1 ? "1 thing to do" : `${count} things to do`),
@@ -88,7 +99,6 @@ const en: JourneyTexts = {
 };
 
 const de: JourneyTexts = {
-  navAllGames: "Alle Spiele",
   navOverview: "Übersicht",
   navAssets: "Assets",
   gameCardHint: "Die Übersicht dieses Spiels",
@@ -96,11 +106,17 @@ const de: JourneyTexts = {
   allGamesTitle: "Spiele",
   allGamesNote:
     "Wähle das Spiel, an dem du arbeiten willst. Jedes Spiel hat seinen eigenen Scan, seine Aufgaben und seinen Patch.",
-  openGame: "Öffnen",
+  switchTo: "Zu diesem Spiel wechseln",
+  toOverview: "Zur Übersicht",
+  lastScanAt: (when) => `geprüft ${when}`,
+  soon: "bald",
+  startTasks: "Aufgaben",
+  startSpots: "Kollisionsstellen offen",
+  startAssets: "Mod-Paare zu vergleichen",
+  startPatch: "Objekte vom Patch ausgeblendet",
+  brandHint: "Start: alle Spiele",
   inUse: "In Arbeit",
   notScanned: "Noch nicht geprüft",
-  scoreAt: (score, when) => `Zustand ${score} · ${when}`,
-  laterGames: "Noch nicht gelesen",
 
   scanFirst: "Prüfe dieses Spiel, um zu sehen, wie es steht und was zu tun ist.",
   tasksOpen: (count) => (count === 1 ? "1 Sache zu tun" : `${count} Sachen zu tun`),

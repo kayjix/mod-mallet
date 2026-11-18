@@ -497,7 +497,14 @@ export default function App({ api, startLang }: AppProps) {
               onCancel={askFirst ? undefined : () => go("overview")}
             />
           ) : current === "games" ? (
-            <AllGames games={games} report={report} health={health} onOpen={() => go("overview")} />
+            <AllGames
+              games={games}
+              report={report}
+              health={health}
+              scanning={scanning}
+              onScan={scan}
+              onOpen={go}
+            />
           ) : current === "overview" ? (
             <Overview
               games={games}
@@ -657,17 +664,18 @@ function Sidebar({
     <aside className="sidebar">
       <div className="brand">
         <Mallet />
-        <span className="brand-name">Mod Mallet</span>
+        {/* The name leads to the start page with all games; the logo is only for fun. */}
+        <button
+          type="button"
+          className="brand-name brand-home"
+          aria-current={view === "games" ? "page" : undefined}
+          title={j.brandHint}
+          disabled={disabled}
+          onClick={() => onView("games")}
+        >
+          Mod Mallet
+        </button>
       </div>
-      <button
-        type="button"
-        className="nav-back"
-        aria-current={view === "games" ? "page" : undefined}
-        disabled={disabled}
-        onClick={() => onView("games")}
-      >
-        ‹ {j.navAllGames}
-      </button>
       {gameCard}
       <nav>{game.map(navButton)}</nav>
       <nav className="nav-bottom">{beside.map(navButton)}</nav>

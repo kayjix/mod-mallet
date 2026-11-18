@@ -321,7 +321,7 @@ function HealthPanel({ health, onOpen }: { health: Health; onOpen: (view: Target
 }
 
 /** The score as a ring that fills up to it. */
-function ScoreRing({ score }: { score: number }) {
+export function ScoreRing({ score }: { score: number }) {
   const o = useOverviewTexts();
   const radius = 42;
   const length = 2 * Math.PI * radius;

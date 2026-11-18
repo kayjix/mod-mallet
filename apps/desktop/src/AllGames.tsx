@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./Actions";
+import { openTaskCount } from "./arrange";
 import { type Games, isPlayable } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
 import type { Health } from "./health";
 import { useJourneyTexts } from "./journey-texts";
+import { openFileDuels, ScoreRing } from "./Overview";
+import { useOverviewTexts } from "./overview-texts";
 import "./journey.css";
+import "./overview.css";
 
 /**
  * The pictures of the games, by game. They come from the mod manager's
@@ -33,58 +37,139 @@ export function useGameArt(ids: string[]): Record<string, string> {
   return art;
 }
 
+/** Where the start page leads. */
+export type StartTarget = "overview" | "tasks" | "collisions" | "assets" | "patch";
+
 interface AllGamesProps {
   games: Games;
   /** The last scan of the game in use, if any. */
   report: RenderedReport | null;
   /** Its health, if it was scanned. */
   health: Health | null;
-  /** Goes to the overview of the game in use. */
-  onOpen: () => void;
+  scanning: boolean;
+  onScan: () => void;
+  /** Goes to a page of the game in use. */
+  onOpen: (view: StartTarget) => void;
 }
 
 /**
- * The games Mod Mallet knows: the one place to pick the game to work on
- * (ADR 0048). Opening the game in use goes to its overview; opening
- * another starts the window over for it.
+ * The start page, reached by the name in the sidebar (ADR 0048): the game
+ * in use at a glance with the way to what there is to do, and every game
+ * Mod Mallet knows, to switch to another. The game's own overview says
+ * more; this page says enough to choose.
  */
-export function AllGames({ games, report, health, onOpen }: AllGamesProps) {
-  const { t, lang } = useSession();
+export function AllGames({ games, report, health, scanning, onScan, onOpen }: AllGamesProps) {
+  const { t, lang, ignored, decisions } = useSession();
   const j = useJourneyTexts();
+  const o = useOverviewTexts();
   const art = useGameArt(t.games.map((game) => game.id));
   const activeId = games.choice?.active;
+  const active = t.games.find((game) => game.id === activeId);
+  const hero = activeId === undefined ? undefined : art[activeId];
   const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
-  const readable = t.games.filter((game) => known.has(game.id));
-  const later = t.games.filter((game) => !known.has(game.id));
+  const installed = report?.installedPatch?.objects.length;
+
+  const tiles: { target: StartTarget; value: string; label: string }[] =
+    report === null || health === null
+      ? []
+      : [
+          {
+            target: "tasks",
+            value: String(openTaskCount(report.findings, ignored)),
+            label: j.startTasks,
+          },
+          { target: "collisions", value: String(health.spots.open), label: j.startSpots },
+          {
+            target: "assets",
+            value: String(openFileDuels(report, decisions)),
+            label: j.startAssets,
+          },
+          {
+            target: "patch",
+            value: installed === undefined ? "–" : String(installed),
+            label: installed === undefined ? j.patchNone : j.startPatch,
+          },
+        ];
 
   return (
     <div className="stack">
+      <section
+        className="panel home-hero"
+        style={hero === undefined ? undefined : { backgroundImage: `url(${hero})` }}
+      >
+        <div className="home-hero-text">
+          <span className="brand-tagline">{t.tagline}</span>
+          <div className="home-hero-row">
+            {health !== null && <ScoreRing score={health.score} />}
+            <div className="home-hero-words">
+              <h2>{active?.name}</h2>
+              {report !== null && (
+                <span>
+                  {report.game.version ?? t.versionUnknown}
+                  {report.game.extenderVersion != null &&
+                    ` · ${games.active?.scriptExtender ?? t.scriptExtender} ${report.game.extenderVersion}`}
+                  {" · "}
+                  {j.lastScanAt(
+                    new Date(report.scannedAt * 1000).toLocaleString(lang, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }),
+                  )}
+                </span>
+              )}
+              {health !== null && <strong>{o.verdict[health.verdict]}</strong>}
+            </div>
+          </div>
+          <div className="home-hero-actions">
+            {report === null ? (
+              <button type="button" className="primary" disabled={scanning} onClick={onScan}>
+                {scanning ? t.scanning : t.scan}
+              </button>
+            ) : (
+              <button type="button" className="primary" onClick={() => onOpen("overview")}>
+                {j.toOverview}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {tiles.length > 0 && (
+        <div className="home-stats">
+          {tiles.map((tile) => (
+            <button
+              type="button"
+              className="panel home-stat"
+              key={tile.target}
+              onClick={() => onOpen(tile.target)}
+            >
+              <strong className="home-stat-value">{tile.value}</strong>
+              <span className="home-stat-label">{tile.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <section className="panel">
         <div className="panel-head">
           <h2>{j.allGamesTitle}</h2>
           <span className="aside">{j.allGamesNote}</span>
         </div>
         <ul className="game-grid">
-          {readable.map((game) => {
+          {t.games.map((game) => {
             const picture = art[game.id];
             const isActive = game.id === activeId;
             const knownGame = known.get(game.id);
             const playable = isPlayable(knownGame);
-            const support = knownGame?.support === "basic" ? t.gameBasic : null;
-            let state: string;
-            if (!playable) {
-              state = t.gameNotInstalled;
-            } else if (isActive && report !== null && health !== null) {
-              const when = new Date(report.scannedAt * 1000).toLocaleString(lang, {
-                dateStyle: "short",
-                timeStyle: "short",
-              });
-              state = j.scoreAt(health.score, when);
-            } else if (isActive) {
-              state = j.notScanned;
-            } else {
-              state = "";
-            }
+            const state = isActive
+              ? null
+              : knownGame === undefined
+                ? `${j.soon}${game.quip === undefined ? "" : ` – ${game.quip}`}`
+                : !playable
+                  ? t.gameNotInstalled
+                  : knownGame.support === "basic"
+                    ? t.gameBasic
+                    : null;
             return (
               <li
                 className="game-card"
@@ -102,21 +187,17 @@ export function AllGames({ games, report, health, onOpen }: AllGamesProps) {
                 <div className="game-text">
                   <strong>{game.name}</strong>
                   {isActive && <span className="game-in-use">{j.inUse}</span>}
-                  {state !== "" && <span className="aside">{state}</span>}
-                  {support !== null && <span className="aside">{support}</span>}
-                  {playable && (
+                  {isActive && report === null && <span className="aside">{j.notScanned}</span>}
+                  {state !== null && <span className="aside">{state}</span>}
+                  {playable && !isActive && (
                     <button
                       type="button"
-                      className={isActive ? "game-open primary" : "game-open"}
+                      className="game-open"
                       onClick={() => {
-                        if (isActive) {
-                          onOpen();
-                        } else {
-                          games.select(game.id).catch(() => {});
-                        }
+                        games.select(game.id).catch(() => {});
                       }}
                     >
-                      {j.openGame}
+                      {j.switchTo}
                     </button>
                   )}
                 </div>
@@ -124,14 +205,6 @@ export function AllGames({ games, report, health, onOpen }: AllGamesProps) {
             );
           })}
         </ul>
-        {later.length > 0 && (
-          <p className="aside games-later">
-            {j.laterGames}:{" "}
-            {later
-              .map((game) => (game.quip === undefined ? game.name : `${game.name} – ${game.quip}`))
-              .join(" · ")}
-          </p>
-        )}
       </section>
     </div>
   );

@@ -105,8 +105,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 
 ```text
 ┌──────────────────────────┐
-│ ◆ Mod Mallet             │
-│ ‹ All games              │  ← Home; the only way to switch games
+│ ◆ Mod Mallet             │  ← the name opens the start page
 │ ┌──────────────────────┐ │
 │ │ [art] Skyrim SE      │ │  ← the game in use (click: Overview)
 │ │ [ Scan ]  14:02 ·live│ │
@@ -126,7 +125,9 @@ Toolbox, Settings: beside the game's pages, always reachable
 └──────────────────────────┘
 ```
 
-- The select of games goes. *All games* is the one place to switch.
+- The select of games goes. The start page, opened by the name *Mod
+  Mallet* at the top, is the one place to switch games. The logo beside
+  it stays a toy.
 - The game's card shows its name and art; version and script extender
   move to the overview.
 - Badges count what the page itself lists first, so the numbers agree:
@@ -141,7 +142,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 
 | Page | Its one job | The ways to do it (at most two) | It does not |
 |---|---|---|---|
-| **All games** | Pick the game to work on | a card per game; a game not installed says so | show a game's findings |
+| **Start** (all games) | Choose what to do and which game | the game in use with its state and the way to what is open; a card per game to switch | list findings, decide anything |
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
 | **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
 | **Collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
@@ -196,25 +197,34 @@ The rule for the collision decisions in particular:
 
 ### The pages in turn
 
-#### All games
+#### Start (all games)
 
 ```text
-┌─ All games ──────────────────────────────────────────────────────┐
-│ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐      │
-│ │   [art]    │ │   [art]    │ │   [art]    │ │   [art]    │      │
-│ │ Skyrim SE  │ │ Fallout 4  │ │ Oblivion   │ │ Skyrim VR  │      │
-│ │ ● in use   │ │ basic      │ │ basic      │ │ not        │      │
-│ │ 72 · today │ │ not scanned│ │ 91 · 3 days│ │ installed  │      │
-│ │  [ Open ]  │ │  [ Open ]  │ │  [ Open ]  │ │            │      │
-│ └────────────┘ └────────────┘ └────────────┘ └────────────┘      │
-│ Games Mod Mallet does not read yet: Starfield – soon             │
-└──────────────────────────────────────────────────────────────────┘
+┌─ [art of the game in use] ────────────────────────────────────────┐
+│ ╭──╮ Skyrim Special Edition                                       │
+│ │72│ 1.6.1170 · SKSE 2.2.6 · scanned today 14:02                  │
+│ ╰──╯ Playable, but the quality suffers                            │
+│ [ To the overview ]                                               │
+├────────────────┬────────────────┬────────────────┬────────────────┤
+│ 12 things      │ 37 collision   │ 4 pairs of     │ 214 objects    │
+│ to do          │ spots open     │ mods to compare│ hidden by patch│
+├────────────────┴────────────────┴────────────────┴────────────────┤
+│ Games                                                             │
+│ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │
+│ │   [art]    │ │   [art]    │ │   [art]    │ │   [art]    │       │
+│ │ Skyrim SE  │ │ Fallout 4  │ │ Oblivion   │ │ Starfield  │       │
+│ │ ● in use   │ │ basic      │ │ basic      │ │ soon – …   │       │
+│ │            │ │ [switch]   │ │ [switch]   │ │            │       │
+│ └────────────┘ └────────────┘ └────────────┘ └────────────┘       │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-A card shows the health score and the time of the last scan where a scan of
-that game is kept; *Open* makes it the game in use and goes to its
-overview. The window opens on the overview of the game in use, not here;
-the first run and *‹ All games* lead here.
+The user asked for the old home page back: the game in use at a glance,
+with the way to what is open, and every game with its picture and state,
+to switch to another. The start page is that page, reached by the name
+*Mod Mallet* at the top of the sidebar. The game's overview stays the
+place for the reasons behind the score. The window opens on the overview
+of the game in use; the start page is one click away.
 
 #### Overview of a game
 
