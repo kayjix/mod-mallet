@@ -1258,6 +1258,22 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
   );
   if (docks) {
     bridge("Water Mod.esp", 0xa11, 0x6000, 0.08, 1, 0xa21);
+    // A long pier of Water Mod that touches its dock and runs on far beyond
+    // the spot, as a town's walls run on from its gate.
+    for (let index = 1; index <= 40; index++) {
+      place(
+        "Water Mod.esp",
+        0x6100 + index,
+        "sample\\plank.nif",
+        [
+          cx + (4 + index) * 76 * Math.cos(0.08),
+          cy - (4 + index) * 76 * Math.sin(0.08),
+          ground + 61,
+        ],
+        0.08,
+        "Pier",
+      );
+    }
   } else {
     bridge("Texture Pack.esp", 0x900 + cellX * 16 + cellY, 0x6000, 0.55, 3);
   }

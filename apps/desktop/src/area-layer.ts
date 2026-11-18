@@ -440,10 +440,21 @@ export class AreaLayer {
    * placed as the game places them, meeting within a hand's breadth, as far
    * as the area shows them. A bridge or a scaffold built of parts.
    */
-  connected(object: AreaObject, margin = TOUCHING): AreaObject[] {
+  connected(
+    object: AreaObject,
+    margin = TOUCHING,
+    /** Only parts placed within `radius` game units of `x`, `y`, if given. */
+    near?: { x: number; y: number; radius: number },
+  ): AreaObject[] {
     const plugin = object.id.plugin.toLowerCase();
+    const isNear = (other: AreaObject) =>
+      near === undefined ||
+      other === object ||
+      Math.hypot(other.position[0] - near.x, other.position[1] - near.y) <= near.radius;
     const candidates = this.instances
-      .filter((instance) => instance.object.id.plugin.toLowerCase() === plugin)
+      .filter(
+        (instance) => instance.object.id.plugin.toLowerCase() === plugin && isNear(instance.object),
+      )
       .flatMap((instance) => {
         const model = this.models.get(instance.object.model);
         if (model === undefined || !Array.isArray(model.surfaces)) {

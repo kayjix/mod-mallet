@@ -333,14 +333,27 @@ function MapStep({
 /** A plugin's name without its extension, to name a side. */
 const short = (plugin: string) => plugin.replace(/\.(esp|esm|esl)$/i, "");
 
-/** Where a spot is, for the stage. */
-function placeOf(spot: MapSpot): { place: StagePlace; centre: [number, number, number] } {
+/**
+ * Where a spot is, for the stage. A city inside its walls (RiftenWorld)
+ * stands on the land of its parent world, whose reading takes in the
+ * city's objects too: the stage reads the parent, as the collisions' stage
+ * does.
+ */
+function placeOf(
+  spot: MapSpot,
+  worlds: RenderedReport["map"]["worlds"],
+): { place: StagePlace; centre: [number, number, number] } {
   const { location } = spot;
   if (location.type === "interior") {
     return { place: { type: "interior", cell: location.cell }, centre: spot.position ?? [0, 0, 0] };
   }
   return {
-    place: { type: "exterior", world: location.world },
+    place: {
+      type: "exterior",
+      world:
+        worlds.find((world) => (world.children ?? []).includes(location.world))?.name ??
+        location.world,
+    },
     centre: spot.position ?? [(location.x + 0.5) * CELL, (location.y + 0.5) * CELL, 0],
   };
 }
@@ -405,7 +418,7 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
     parts.filter((part) => part.object.plugin === sides[0]),
     parts.filter((part) => part.object.plugin === sides[1]),
   ];
-  const { place, centre } = placeOf(current.spot);
+  const { place, centre } = placeOf(current.spot, report.map.worlds);
 
   /** A side's structure, or the spot's own parts of it until the structure is known. */
   const structureOf = (side: 0 | 1) =>

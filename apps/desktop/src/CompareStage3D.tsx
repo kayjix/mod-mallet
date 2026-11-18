@@ -38,6 +38,16 @@ const MIN_PITCH = -0.2;
 const MAX_PITCH = 1.55;
 const MIN_DISTANCE = 0.005;
 const START_DISTANCE = 0.25;
+/** How close two parts must come to count as one structure, in game units (about 6 cm). */
+const STRUCTURE_MARGIN = 4;
+/**
+ * How far from the spot a structure reaches, in game units (about 30 m):
+ * the walls of a whole town touch each other, but the user decides the
+ * gate, not the town.
+ */
+const STRUCTURE_REACH = 2048;
+/** The angle the camera looks down at the structures from, above the horizon. */
+const FRAMING_PITCH = 0.8;
 
 /** The first mod's colour and the second's: blue and orange (Okabe–Ito). */
 const FIRST: Vec3 = [0, 0.447, 0.698];
@@ -85,7 +95,19 @@ export function CompareStage3D({
   const [failed, setFailed] = useState(false);
   const structures = useRef<[Set<string>, Set<string>]>([new Set(), new Set()]);
   const [counts, setCounts] = useState<[number, number]>([0, 0]);
-  const known = useRef({ signature: "", framed: false, done: -1 });
+  // What is known of the structures, and whether the camera framed them
+  // yet: roughly while models are still read, or for good.
+  const known = useRef<{ signature: string; framed: "no" | "rough" | "done"; done: number }>({
+    signature: "",
+    framed: "no",
+    done: -1,
+  });
+  /** Whether the user moved the camera, which framing then leaves alone. */
+  const moved = useRef(false);
+  const centreNow = useRef(centre);
+  centreNow.current = centre;
+  /** The width of one of the three views over its height. */
+  const aspectNow = useRef(0.7);
   const camera = useRef<Camera>({
     target: [centre[0] / CELL, centre[1] / CELL, centre[2] / CELL],
     distance: START_DISTANCE,
@@ -123,7 +145,9 @@ export function CompareStage3D({
     const grow = (from: AreaObject[]) => {
       const found = new Map<string, AreaObject>();
       for (const seed of from) {
-        for (const part of current.connected(seed)) {
+        const [x, y] = centreNow.current;
+        const near = { x, y, radius: STRUCTURE_REACH };
+        for (const part of current.connected(seed, STRUCTURE_MARGIN, near)) {
           found.set(objectKey(part.id.plugin, part.id.localId), part);
         }
       }
@@ -132,20 +156,24 @@ export function CompareStage3D({
     const first = grow(seedObjects(area, firstSeeds));
     const second = grow(seedObjects(area, secondSeeds));
     const now = `${signature(first)}|${signature(second)}`;
-    if (now === known.current.signature) {
-      return;
+    if (now !== known.current.signature) {
+      known.current.signature = now;
+      structures.current = [
+        new Set(first.map((part) => objectKey(part.id.plugin, part.id.localId))),
+        new Set(second.map((part) => objectKey(part.id.plugin, part.id.localId))),
+      ];
+      setCounts([first.length, second.length]);
+      told.current?.([first, second]);
     }
-    known.current.signature = now;
-    structures.current = [
-      new Set(first.map((part) => objectKey(part.id.plugin, part.id.localId))),
-      new Set(second.map((part) => objectKey(part.id.plugin, part.id.localId))),
-    ];
-    setCounts([first.length, second.length]);
-    told.current?.([first, second]);
-    // Once every model is read, the camera frames both structures.
-    if (progress.done === progress.total && !known.current.framed) {
-      known.current.framed = true;
-      camera.current = framing([...first, ...second], camera.current);
+    // The camera frames both structures roughly as soon as they are known,
+    // and once more when every model is read, unless the user moved it.
+    const wanted = progress.done === progress.total ? "done" : "rough";
+    if (!moved.current && known.current.framed !== "done" && known.current.framed !== wanted) {
+      const box = boxOf(current, structures.current);
+      if (box !== null) {
+        known.current.framed = wanted;
+        camera.current = framing(box, camera.current, aspectNow.current);
+      }
     }
   }, []);
 
@@ -174,6 +202,7 @@ export function CompareStage3D({
       view.target[2] + Math.sin(view.pitch) * view.distance,
     ];
     const third = gl.drawingBufferWidth / 3;
+    aspectNow.current = width / 3 / tall;
     const matrix: Mat4 = multiply(
       perspective(FIELD_OF_VIEW, width / 3 / tall, view.distance * 0.02, view.distance * 8 + 2),
       lookAt(eye, view.target, [0, 0, 1]),
@@ -248,7 +277,8 @@ export function CompareStage3D({
     const gl = canvas.current?.getContext("webgl2") ?? null;
     setState("loading");
     structures.current = [new Set(), new Set()];
-    known.current = { signature: "", framed: false, done: -1 };
+    known.current = { signature: "", framed: "no", done: -1 };
+    moved.current = false;
     setCounts([0, 0]);
     camera.current = {
       target: [cx / CELL, cy / CELL, cz / CELL],
@@ -327,6 +357,7 @@ export function CompareStage3D({
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
+    moved.current = true;
     const from = start.camera;
     if (!start.move) {
       camera.current = {
@@ -361,6 +392,7 @@ export function CompareStage3D({
     }
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      moved.current = true;
       camera.current = {
         ...camera.current,
         distance: Math.min(
@@ -376,13 +408,11 @@ export function CompareStage3D({
 
   const fit = () => {
     const current = layer.current;
-    const [first, second] = structures.current;
-    const parts = (current?.area?.objects ?? []).filter((object) => {
-      const key = objectKey(object.id.plugin, object.id.localId);
-      return first.has(key) || second.has(key);
-    });
-    camera.current = framing(parts, camera.current);
-    redraw();
+    const box = current === null ? null : boxOf(current, structures.current);
+    if (box !== null) {
+      camera.current = framing(box, camera.current, aspectNow.current);
+      redraw();
+    }
   };
 
   const labels = [r.viewNow, r.viewOnly(names[0]), r.viewOnly(names[1])];
@@ -472,21 +502,51 @@ function lookFor(
   };
 }
 
-/** The camera turned as before, looking at the middle of `parts` from far enough to see them all. */
-function framing(parts: AreaObject[], from: Camera): Camera {
-  if (parts.length === 0) {
-    return from;
+/** A box in game units: lowest and highest corner. */
+type Box = [Vec3, Vec3];
+
+/**
+ * The box around both structures' parts, from where their models' middles
+ * stand, widened a little for the models' size; none before they are known.
+ */
+function boxOf(layer: AreaLayer, [first, second]: [Set<string>, Set<string>]): Box | null {
+  const low: Vec3 = [Infinity, Infinity, Infinity];
+  const high: Vec3 = [-Infinity, -Infinity, -Infinity];
+  for (const { object, centre } of layer.shown) {
+    const key = objectKey(object.id.plugin, object.id.localId);
+    if (!first.has(key) && !second.has(key)) {
+      continue;
+    }
+    for (const axis of [0, 1, 2] as const) {
+      low[axis] = Math.min(low[axis], centre[axis]);
+      high[axis] = Math.max(high[axis], centre[axis]);
+    }
   }
-  const total = (axis: 0 | 1 | 2) =>
-    parts.reduce((sum, part) => sum + part.position[axis], 0) / parts.length;
-  const middle: Vec3 = [total(0), total(1), total(2)];
-  const reach = Math.max(
-    150,
-    ...parts.map((part) => Math.hypot(part.position[0] - middle[0], part.position[1] - middle[1])),
-  );
+  if (!Number.isFinite(low[0])) {
+    return null;
+  }
+  const pad = 120;
+  return [
+    [low[0] - pad, low[1] - pad, low[2] - pad],
+    [high[0] + pad, high[1] + pad, high[2] + pad],
+  ];
+}
+
+/**
+ * The camera turned as before, looking down at an angle at the middle of
+ * `box` from far enough that all of it fits into a view `aspect` wide
+ * for each unit high.
+ */
+function framing([low, high]: Box, from: Camera, aspect: number): Camera {
+  const middle: Vec3 = [(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, (low[2] + high[2]) / 2];
+  const radius = Math.hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) / 2;
+  const half = FIELD_OF_VIEW / 2;
+  const across = Math.atan(Math.tan(half) * Math.max(0.2, aspect));
+  const distance = (radius / Math.sin(Math.min(half, across))) * 1.05;
   return {
     ...from,
     target: [middle[0] / CELL, middle[1] / CELL, middle[2] / CELL],
-    distance: Math.max(MIN_DISTANCE, ((reach + 150) / CELL) * 2.4),
+    distance: Math.max(MIN_DISTANCE, distance / CELL),
+    pitch: FRAMING_PITCH,
   };
 }
