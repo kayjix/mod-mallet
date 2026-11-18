@@ -262,6 +262,28 @@ export function placement(object: AreaObject): Float32Array {
 /** How close two parts' boxes must come to hang together, in game units (about 20 cm). */
 export const TOUCHING = 14;
 
+/**
+ * Folders of models that are not built: trees, plants, grass, rocks and the
+ * rest of the landscape, clutter lying about, effects and lights. Their
+ * parts stand next to a building and touch it, but do not belong to it.
+ */
+const NOT_BUILT =
+  /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|clutter|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
+
+/** Whether a model is something built: architecture rather than nature or clutter. */
+export function isBuilt(model: string): boolean {
+  return !NOT_BUILT.test(model);
+}
+
+/** Below this longest side, in game units (about 35 cm), a part is clutter, not building. */
+const SMALL = 24;
+
+/** The longest side of a model's box at `scale`, in game units. */
+function sizeOf(box: [[number, number, number], [number, number, number]], scale: number): number {
+  const [low, high] = box;
+  return Math.max(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * scale;
+}
+
 /** What the card of a picked object can do with the view it was picked in. */
 export interface PartTools {
   /** The parts of the same plugin that hang together with it, boxes within `margin` game units. */
@@ -447,9 +469,11 @@ export class AreaLayer {
     near?: { x: number; y: number; radius: number },
   ): AreaObject[] {
     const plugin = object.id.plugin.toLowerCase();
+    const isStart = (other: AreaObject) =>
+      other.id.plugin === object.id.plugin && other.id.localId === object.id.localId;
     const isNear = (other: AreaObject) =>
       near === undefined ||
-      other === object ||
+      isStart(other) ||
       Math.hypot(other.position[0] - near.x, other.position[1] - near.y) <= near.radius;
     const candidates = this.instances
       .filter(
@@ -458,6 +482,14 @@ export class AreaLayer {
       .flatMap((instance) => {
         const model = this.models.get(instance.object.model);
         if (model === undefined || !Array.isArray(model.surfaces)) {
+          return [];
+        }
+        // Trees, plants, rocks and small clutter stand next to a building
+        // and touch it, but are no part of it; the part picked always is.
+        if (
+          !isStart(instance.object) &&
+          (!isBuilt(instance.object.model) || sizeOf(model.box, instance.object.scale) < SMALL)
+        ) {
           return [];
         }
         return [{ object: instance.object, box: placedBox(model.box, instance.matrix) }];

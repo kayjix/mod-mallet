@@ -1187,6 +1187,8 @@ const SAMPLE_MODELS: Record<string, [number, number, number]> = {
   "sample\\pillar.nif": [6, 6, 30],
   "sample\\barrel.nif": [16, 16, 22],
   "sample\\rock.nif": [45, 35, 25],
+  "landscape\\trees\\sampletree.nif": [20, 20, 120],
+  "sample\\cup.nif": [5, 5, 6],
 };
 
 /**
@@ -1285,6 +1287,17 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
     0,
     "Barrel",
   );
+  // A tree of Old Town whose crown touches its bridge, and a cup on a
+  // plank: they touch the bridge but are no part of it.
+  place(
+    "Old Town.esp",
+    0x5101,
+    "landscape\\trees\\sampletree.nif",
+    [cx - 152, cy + 30, ground + 100],
+    0,
+    "Tree",
+  );
+  place("Old Town.esp", 0x5102, "sample\\cup.nif", [cx + 76, cy, ground + 70], 0, "Cup");
   for (let index = 0; index < 6; index++) {
     const angle = (index / 6) * Math.PI * 2;
     place(
