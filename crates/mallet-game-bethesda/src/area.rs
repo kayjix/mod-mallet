@@ -8,7 +8,7 @@
 //! interior cell are read by [`AreaReader::interior`] (ADR 0042). Nothing
 //! is written.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -217,6 +217,8 @@ impl AreaReader {
         let (west, east, south, north) = cells;
         let inside = |(x, y): (i32, i32)| x >= west && x <= east && y >= south && y <= north;
         let mut world_id: Option<RecordId> = None;
+        // The worldspaces that use this one's land, such as its cities.
+        let mut children: HashSet<RecordId> = HashSet::new();
         let mut found: HashMap<RecordId, Option<AreaObject>> = HashMap::new();
         let mut land: HashMap<(i32, i32), CellLand> = HashMap::new();
         for (name, path) in &self.plugins {
@@ -238,13 +240,19 @@ impl AreaReader {
                             && editor_id(record).is_some_and(|id| id.eq_ignore_ascii_case(world))
                         {
                             world_id = Some(record_id(record.form_id, masters, name));
+                        } else if world_id.is_some()
+                            && land_parent(record, masters, name) == world_id
+                        {
+                            // A city inside its walls stands on this world's
+                            // land; its objects are part of the place.
+                            children.insert(record_id(record.form_id, masters, name));
                         }
                     }
                     b"REFR" => {
                         let Some(in_world) = world_of(record, masters, name) else {
                             continue;
                         };
-                        if world_id.as_ref() != Some(&in_world) {
+                        if world_id.as_ref() != Some(&in_world) && !children.contains(&in_world) {
                             continue;
                         }
                         let id = record_id(record.form_id, masters, name);
@@ -354,6 +362,14 @@ fn wanted(group: GroupLabel, cells: (i32, i32, i32, i32)) -> bool {
         && x >= west.div_euclid(size)
         && y <= north.div_euclid(size)
         && y >= south.div_euclid(size)
+}
+
+/// The worldspace whose land the worldspace `record` uses (its parent,
+/// `WNAM`, if its parent flags, `PNAM`, say so), if any.
+fn land_parent(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
+    let flags = u16::from_le_bytes(record.first(b"PNAM")?.get(..2)?.try_into().ok()?);
+    let parent = u32::from_le_bytes(record.first(b"WNAM")?.get(..4)?.try_into().ok()?);
+    (flags & 0x01 != 0 && parent != 0).then(|| record_id(parent, masters, plugin_name))
 }
 
 /// The worldspace a placed object is in, if it is outside.
@@ -584,5 +600,58 @@ mod tests {
         assert_eq!(cell_of(4096.0), 1);
         assert_eq!(cell_of(-1.0), -1);
         assert_eq!(cell_of(f32::NAN), 0);
+    }
+
+    #[test]
+    fn a_city_uses_its_parents_land_only_if_its_flags_say_so() {
+        let world = |fields: Vec<(&[u8; 4], Vec<u8>)>| Record {
+            signature: *b"WRLD",
+            form_id: 0x1A26F,
+            flags: 0,
+            subrecords: fields
+                .into_iter()
+                .map(|(signature, data)| plugin::Subrecord {
+                    signature: *signature,
+                    data,
+                })
+                .collect(),
+            groups: Vec::new(),
+        };
+        let masters = vec!["Skyrim.esm".to_owned()];
+        let tamriel = RecordId {
+            plugin: "skyrim.esm".to_owned(),
+            local_id: 0x3C,
+        };
+        let city = world(vec![
+            (b"WNAM", 0x3Cu32.to_le_bytes().to_vec()),
+            (b"PNAM", 0x5Fu16.to_le_bytes().to_vec()),
+        ]);
+        assert_eq!(land_parent(&city, &masters, "Mod.esp"), Some(tamriel));
+        let own_land = world(vec![
+            (b"WNAM", 0x3Cu32.to_le_bytes().to_vec()),
+            (b"PNAM", 0x04u16.to_le_bytes().to_vec()),
+        ]);
+        assert_eq!(land_parent(&own_land, &masters, "Mod.esp"), None);
+        assert_eq!(land_parent(&world(Vec::new()), &masters, "Mod.esp"), None);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn a_parent_never_panics_on_arbitrary_fields(
+            wnam in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..6),
+            pnam in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..3),
+        ) {
+            let record = Record {
+                signature: *b"WRLD",
+                form_id: 1,
+                flags: 0,
+                subrecords: vec![
+                    plugin::Subrecord { signature: *b"WNAM", data: wnam },
+                    plugin::Subrecord { signature: *b"PNAM", data: pnam },
+                ],
+                groups: Vec::new(),
+            };
+            let _ = land_parent(&record, &[], "Mod.esp");
+        }
     }
 }

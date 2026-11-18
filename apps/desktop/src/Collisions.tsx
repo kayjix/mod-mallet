@@ -1365,15 +1365,27 @@ function Stage({
   const { t } = useSession();
   const location = item.spot.location;
   const worldName = location.type === "exterior" ? location.world : undefined;
-  const world = report.map.worlds.find((candidate) => candidate.name === worldName);
-  const picture = useWorldPicture(world?.terrain ? worldName : undefined);
+  // A city inside its walls is drawn on the map of the world whose land it
+  // uses, with its objects.
+  const world = report.map.worlds.find(
+    (candidate) =>
+      candidate.name === worldName ||
+      (worldName !== undefined && (candidate.children ?? []).includes(worldName)),
+  );
+  const picture = useWorldPicture(world?.terrain ? world.name : undefined);
   const [hover, setHover] = useState<Picked | null>(null);
   const worldSpots = useMemo(
     () =>
       ordered
         .map((candidate) => candidate.spot)
-        .filter((spot) => spot.location.type === "exterior" && spot.location.world === worldName),
-    [ordered, worldName],
+        .filter(
+          (spot) =>
+            spot.location.type === "exterior" &&
+            world !== undefined &&
+            (spot.location.world === world.name ||
+              (world.children ?? []).includes(spot.location.world)),
+        ),
+    [ordered, world],
   );
   const markers = useMemo(
     () => (world?.markers ?? []).filter((marker) => marker.origin !== "removed"),
