@@ -81,6 +81,9 @@ Options:
       --downloads-dir <DIR>
           The directory Vortex keeps downloaded mod archives in. Detected if omitted
 
+      --staging-dir <DIR>
+          The folder Vortex keeps every mod's files in. Taken from the deployment manifest if omitted. Only the names of its files are read
+
       --unpacker <FILE>
           The 7-Zip program used to look into mod archives. Detected if omitted
 

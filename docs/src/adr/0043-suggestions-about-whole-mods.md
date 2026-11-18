@@ -1,6 +1,6 @@
 # 0043 Suggestions about whole mods
 
-- Status: accepted
+- Status: accepted, amended by [0049](0049-the-files-every-mod-brings.md)
 - Date: 2026-11-18
 
 ## Context
@@ -110,8 +110,8 @@ None is a fault. All are suggestions the user may ignore.
   folder, and the mod manager is only asked who deployed a file. A texture
   pack replaced almost entirely by a later one therefore goes unnoticed.
   Seeing it needs the list of every mod's files from the mod manager's
-  staging folder, a further question to the mod manager (ADR 0009) that is
-  left for later.
+  staging folder, a further question to the mod manager (ADR 0009); ADR
+  0049 adds it.
 - Records other than placed objects and characters (items, quests,
   scripts) are not compared. The texts say so, and a mod made mostly of
   those has few compared parts or is judged by the ones that are.

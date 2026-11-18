@@ -26,6 +26,7 @@ mod patch;
 mod png;
 mod preview;
 mod settings;
+mod staging;
 mod toolbox;
 
 use std::path::{Path, PathBuf};
@@ -81,6 +82,10 @@ pub struct ScanOptions {
     pub manager_live_state: Option<PathBuf>,
     /// The directory in which the mod manager keeps downloaded archives.
     pub downloads_dir: Option<PathBuf>,
+    /// The folder in which the mod manager keeps every mod's files, of
+    /// which only the names are read. Taken from the deployment manifest
+    /// if `None`.
+    pub staging_dir: Option<PathBuf>,
     /// The 7-Zip program used to look into mod archives.
     pub unpacker: Option<PathBuf>,
     /// The LOOT masterlist, whose rules about plugins are checked.
@@ -546,6 +551,7 @@ fn load_mod_source(
         return Ok((Box::new(NoModSource), Vec::new(), Vec::new()));
     };
     let deployment = VortexDeployment::parse(&manifest, &game_dir.to_string_lossy())?;
+    let deployment = staging::read(options, deployment, store, locations);
     tracing::info!(
         files = deployment.file_count(),
         mods = deployment.mod_count(),

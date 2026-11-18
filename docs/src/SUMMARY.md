@@ -63,6 +63,7 @@
   - [0046 Why the game relies on an object, and when it may be hidden all the same](adr/0046-why-the-game-relies-on-an-object.md)
   - [0047 The ground painted as the game paints it](adr/0047-the-ground-painted-as-the-game-paints-it.md)
   - [0048 One job per page, and a home for each thing](adr/0048-one-job-per-page.md)
+  - [0049 The files every mod brings](adr/0049-the-files-every-mod-brings.md)
   - [Template](adr/template.md)
 
 # Reference

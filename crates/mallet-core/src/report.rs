@@ -52,6 +52,9 @@ pub enum LocationRole {
     Masterlist,
     /// A folder crash loggers write their reports to.
     CrashLogs,
+    /// The folder the mod manager keeps every installed mod's files in,
+    /// deployed or not. Only the names of the files are read.
+    ModStaging,
 }
 
 /// How Mod Mallet came to look at a place.
@@ -71,6 +74,8 @@ pub enum LocationOrigin {
     /// It was read from the entry GOG Galaxy writes into the Windows
     /// registry.
     Gog,
+    /// It is named in the mod manager's record of the files it deployed.
+    Manager,
 }
 
 /// How far Mod Mallet can look at a setup of a game.

@@ -123,6 +123,11 @@ struct ScanArgs {
     #[arg(long, value_name = "DIR")]
     downloads_dir: Option<PathBuf>,
 
+    /// The folder Vortex keeps every mod's files in. Taken from the
+    /// deployment manifest if omitted. Only the names of its files are read.
+    #[arg(long, value_name = "DIR")]
+    staging_dir: Option<PathBuf>,
+
     /// The 7-Zip program used to look into mod archives. Detected if
     /// omitted.
     #[arg(long, value_name = "FILE")]
@@ -221,6 +226,7 @@ where
                 manager_state: args.manager_state,
                 manager_live_state: None,
                 downloads_dir: args.downloads_dir,
+                staging_dir: args.staging_dir,
                 unpacker: args.unpacker,
                 masterlist: args.masterlist,
             };

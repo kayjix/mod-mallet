@@ -75,3 +75,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0046](0046-why-the-game-relies-on-an-object.md) | Why the game relies on an object, and when it may be hidden all the same | accepted |
 | [0047](0047-the-ground-painted-as-the-game-paints-it.md) | The ground painted as the game paints it | accepted |
 | [0048](0048-one-job-per-page.md) | One job per page, and a home for each thing | accepted |
+| [0049](0049-the-files-every-mod-brings.md) | The files every mod brings, from the mod manager's staging folder | accepted |

@@ -27,6 +27,15 @@ pub trait ModSource {
     /// The mod that put the file at `path` into the game, if the manager
     /// deployed it.
     fn provider_of(&self, path: &GamePath) -> Option<ModRef>;
+
+    /// Every file the manager keeps for `mod_ref`, deployed or not, by the
+    /// path the game would see it under. `None` if the manager does not
+    /// say. A file the manager kept back, because the file of another mod
+    /// wins, is among them.
+    fn staged_files(&self, mod_ref: &ModRef) -> Option<Vec<GamePath>> {
+        let _ = mod_ref;
+        None
+    }
 }
 
 /// The [`ModSource`] of a setup that no known mod manager looks after.

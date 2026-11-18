@@ -145,6 +145,8 @@ impl Setup {
             manager_state: Some(self.manager_state_path()),
             manager_live_state: None,
             downloads_dir: Some(self.downloads_dir()),
+            // Nor at its staging folder, which the manifests name.
+            staging_dir: Some(self.game_dir().with_file_name("staging")),
             unpacker: None,
             masterlist: None,
         }

@@ -398,10 +398,7 @@ impl Analysis for MostlyOverridden {
             }
         }
 
-        // Loose files reach the game: the mod manager put them there.
-        for file in &context.facts.loose_files {
-            count(context.mods.provider_of(file), None);
-        }
+        count_loose_files(context, &mut count);
 
         parts
             .into_iter()
@@ -422,6 +419,42 @@ impl Analysis for MostlyOverridden {
                 )
             })
             .collect()
+    }
+}
+
+/// Counts the loose files of each mod. Every file a mod brings, where the
+/// mod manager lists them, counts by whether the manager deployed this
+/// mod's copy or another mod's (ADR 0049). A file no mod deployed says
+/// nothing, since the manager may have been told to leave it out. Where the
+/// manager does not list them, the deployed files reach the game by being
+/// there.
+fn count_loose_files(
+    context: &Context<'_>,
+    count: &mut impl FnMut(Option<ModRef>, Option<String>),
+) {
+    let mut deployed: BTreeMap<ModRef, usize> = BTreeMap::new();
+    for file in &context.facts.loose_files {
+        if let Some(owner) = context.mods.provider_of(file) {
+            *deployed.entry(owner).or_default() += 1;
+        }
+    }
+    for (owner, deployed_count) in deployed {
+        match context.mods.staged_files(&owner) {
+            Some(files) => {
+                for file in files {
+                    match context.mods.provider_of(&file) {
+                        Some(winner) if winner == owner => count(Some(owner.clone()), None),
+                        Some(winner) => count(Some(owner.clone()), Some(winner.name)),
+                        None => {}
+                    }
+                }
+            }
+            None => {
+                for _ in 0..deployed_count {
+                    count(Some(owner.clone()), None);
+                }
+            }
+        }
     }
 }
 
@@ -796,6 +829,74 @@ mod tests {
         // small mod's changes on, and it needs the small mod besides.
         let facts = overridden(&["Skyrim.esm", "Small.esp"]);
         let mods = mods();
+        assert_eq!(MostlyOverridden.run(&Context::new(&facts, &mods)), []);
+    }
+
+    /// A mod manager that also lists the files each mod brings.
+    struct Staging {
+        deployed: Mods,
+        staged: Vec<(&'static str, Vec<GamePath>)>,
+    }
+
+    impl mallet_core::ModSource for Staging {
+        fn provider_of(&self, path: &GamePath) -> Option<ModRef> {
+            self.deployed.provider_of(path)
+        }
+
+        fn staged_files(&self, mod_ref: &ModRef) -> Option<Vec<GamePath>> {
+            self.staged
+                .iter()
+                .find(|(name, _)| *name == mod_ref.name)
+                .map(|(_, files)| files.clone())
+        }
+    }
+
+    #[test]
+    fn loose_files_the_manager_kept_back_do_not_reach_the_game() {
+        // An old texture pack brings 30 textures; a newer one wins for 29
+        // of them, so the manager deployed only one of the old pack's.
+        let texture = |index: usize| format!("data/textures/rock{index}.dds");
+        let paths: Vec<String> = (0..30).map(texture).collect();
+        let facts = Facts {
+            loose_files: paths.iter().map(|path| GamePath::new(path)).collect(),
+            ..Facts::default()
+        };
+        let deployed: Vec<(&'static str, &'static str)> = paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                let path: &'static str = Box::leak(path.clone().into_boxed_str());
+                (path, if index == 0 { "Old Rocks" } else { "New Rocks" })
+            })
+            .collect();
+        let staging = Staging {
+            deployed: Mods(deployed),
+            staged: vec![
+                (
+                    "Old Rocks",
+                    paths.iter().map(|path| GamePath::new(path)).collect(),
+                ),
+                (
+                    "New Rocks",
+                    paths
+                        .iter()
+                        .skip(1)
+                        .map(|path| GamePath::new(path))
+                        .collect(),
+                ),
+            ],
+        };
+        let findings = MostlyOverridden.run(&Context::new(&facts, &staging));
+        let [finding] = findings.as_slice() else {
+            panic!("expected one suggestion, got {findings:?}");
+        };
+        assert_eq!(finding.args["mod"], ArgValue::from("Old Rocks"));
+        assert_eq!(finding.args["total"], ArgValue::Number(30));
+        assert_eq!(finding.args["surviving"], ArgValue::Number(1));
+        assert_eq!(finding.args["overriders"], ArgValue::from("New Rocks (29)"));
+
+        // Without the lists, the deployed files are all that is known.
+        let mods = Mods(staging.deployed.0.clone());
         assert_eq!(MostlyOverridden.run(&Context::new(&facts, &mods)), []);
     }
 

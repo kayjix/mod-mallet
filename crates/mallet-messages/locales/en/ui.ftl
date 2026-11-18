@@ -25,11 +25,13 @@ location-downloads = Vortex's downloaded mod archives
 location-unpacker = Program for looking into mod archives
 location-masterlist = LOOT's list of known plugin problems (masterlist)
 location-crash-logs = Folder of crash reports
+location-mod-staging = Vortex's folder of installed mods (only the names of their files)
 origin-given = named by you
 origin-registry = from the entry the game's launcher wrote into the Windows registry
 origin-standard = at its standard place
 origin-steam = found in one of your Steam libraries
 origin-gog = from the entry GOG Galaxy wrote into the Windows registry
+origin-manager = named in Vortex's list of deployed files
 location-not-found = not found
 
 report-game = { $name } { $version }

@@ -39,6 +39,41 @@ pub fn data_manifest_path(game_dir: &Path) -> PathBuf {
     game_dir.join("Data").join(MANIFEST_FILE)
 }
 
+/// The files below one mod's folder in Vortex's staging folder, as paths
+/// relative to it with backslashes, the way the deployment manifest names
+/// them. Only the folder listings are read, no file is opened. Entries
+/// that cannot be read are left out.
+///
+/// # Errors
+///
+/// If the folder itself cannot be listed.
+pub fn list_mod_folder(folder: &Path) -> std::io::Result<Vec<String>> {
+    let mut files = Vec::new();
+    let mut pending = vec![(std::fs::read_dir(folder)?, String::new())];
+    while let Some((entries, prefix)) = pending.pop() {
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = if prefix.is_empty() {
+                name
+            } else {
+                format!(r"{prefix}\{name}")
+            };
+            if kind.is_dir() {
+                if let Ok(inner) = std::fs::read_dir(entry.path()) {
+                    pending.push((inner, path));
+                }
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    files.sort_unstable();
+    Ok(files)
+}
+
 /// Why a deployment manifest could not be used.
 #[derive(Debug, thiserror::Error)]
 pub enum VortexError {
@@ -62,6 +97,8 @@ pub enum VortexError {
 struct RawManifest {
     target_path: String,
     #[serde(default)]
+    staging_path: Option<String>,
+    #[serde(default)]
     files: Vec<RawFile>,
 }
 
@@ -81,6 +118,13 @@ pub struct VortexDeployment {
     by_path: HashMap<GamePath, usize>,
     /// The name Vortex shows for a mod, by folder name.
     names: HashMap<String, String>,
+    /// Where Vortex keeps the mods' folders, as the manifest names it.
+    staging_path: Option<String>,
+    /// Where the deployed files lie below the game directory, such as
+    /// `data`.
+    base: Option<GamePath>,
+    /// Every file of each mod's folder, deployed or not, by folder name.
+    staged: HashMap<String, Vec<GamePath>>,
 }
 
 impl VortexDeployment {
@@ -106,7 +150,11 @@ impl VortexDeployment {
                 })?
         };
 
-        let mut deployment = Self::default();
+        let mut deployment = Self {
+            staging_path: raw.staging_path.filter(|path| !path.is_empty()),
+            base: Some(base.clone()),
+            ..Self::default()
+        };
         let mut mod_index: HashMap<String, usize> = HashMap::new();
         for file in raw.files {
             let index = if let Some(index) = mod_index.get(&file.source) {
@@ -128,6 +176,32 @@ impl VortexDeployment {
     #[must_use]
     pub fn with_names(mut self, names: HashMap<String, String>) -> Self {
         self.names = names;
+        self
+    }
+
+    /// The folder Vortex keeps every mod's files in, as the manifest names
+    /// it.
+    pub fn staging_path(&self) -> Option<&str> {
+        self.staging_path.as_deref()
+    }
+
+    /// The folder names of the mods that contributed at least one file.
+    pub fn mod_folders(&self) -> &[String] {
+        &self.mods
+    }
+
+    /// Adds the files of the mods' folders, deployed or not: by folder
+    /// name, the paths below each folder as [`list_mod_folder`] lists them.
+    #[must_use]
+    pub fn with_staged_files(mut self, staged: HashMap<String, Vec<String>>) -> Self {
+        self.staged = staged
+            .into_iter()
+            .map(|(folder, files)| {
+                let base = self.base.clone().unwrap_or_else(|| GamePath::new(""));
+                let files = files.iter().map(|file| base.join(file)).collect();
+                (folder, files)
+            })
+            .collect();
         self
     }
 
@@ -165,6 +239,13 @@ impl ModSource for VortexDeployment {
     fn provider_of(&self, path: &GamePath) -> Option<ModRef> {
         let folder = self.mods.get(*self.by_path.get(path)?)?;
         Some(self.mod_ref(folder))
+    }
+
+    fn staged_files(&self, mod_ref: &ModRef) -> Option<Vec<GamePath>> {
+        if mod_ref.source != SOURCE_ID {
+            return None;
+        }
+        self.staged.get(&mod_ref.id).cloned()
     }
 }
 

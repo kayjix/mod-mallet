@@ -73,6 +73,7 @@ impl Settings {
             manager_state: place(LocationRole::ManagerState),
             manager_live_state: None,
             downloads_dir: place(LocationRole::Downloads),
+            staging_dir: place(LocationRole::ModStaging),
             unpacker: place(LocationRole::Unpacker),
             masterlist: place(LocationRole::Masterlist),
         }
@@ -328,6 +329,7 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
             origin,
             manifest.is_file(),
         ));
+        locations.push(crate::staging::planned(options, manifest.is_file()));
     }
 
     if let Some((state, origin)) = installers::planned_state(options) {

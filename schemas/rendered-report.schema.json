@@ -566,6 +566,11 @@
           "description": "It was read from the entry GOG Galaxy writes into the Windows\nregistry.",
           "type": "string",
           "const": "gog"
+        },
+        {
+          "description": "It is named in the mod manager's record of the files it deployed.",
+          "type": "string",
+          "const": "manager"
         }
       ]
     },
@@ -616,6 +621,11 @@
           "description": "A folder crash loggers write their reports to.",
           "type": "string",
           "const": "crash-logs"
+        },
+        {
+          "description": "The folder the mod manager keeps every installed mod's files in,\ndeployed or not. Only the names of the files are read.",
+          "type": "string",
+          "const": "mod-staging"
         }
       ]
     },

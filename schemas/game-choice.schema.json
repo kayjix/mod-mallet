@@ -109,6 +109,11 @@
           "description": "It was read from the entry GOG Galaxy writes into the Windows\nregistry.",
           "type": "string",
           "const": "gog"
+        },
+        {
+          "description": "It is named in the mod manager's record of the files it deployed.",
+          "type": "string",
+          "const": "manager"
         }
       ]
     }

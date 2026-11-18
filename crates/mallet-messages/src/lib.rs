@@ -577,6 +577,7 @@ impl Messages {
             LocationRole::DeploymentManifest => "location-deployment-manifest",
             LocationRole::Masterlist => "location-masterlist",
             LocationRole::CrashLogs => "location-crash-logs",
+            LocationRole::ModStaging => "location-mod-staging",
         };
         let origin = match location.origin {
             LocationOrigin::Given => "origin-given",
@@ -584,6 +585,7 @@ impl Messages {
             LocationOrigin::Standard => "origin-standard",
             LocationOrigin::Steam => "origin-steam",
             LocationOrigin::Gog => "origin-gog",
+            LocationOrigin::Manager => "origin-manager",
         };
         RenderedLocation {
             location: location.clone(),
