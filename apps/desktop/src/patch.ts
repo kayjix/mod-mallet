@@ -3,12 +3,19 @@
 //
 // For each collision the user picks the mod whose objects disappear: for
 // the whole finding at once, or spot by spot where one spot needs another
-// answer than the rest. The choice lives in the window, starts from the
-// patch that is installed, and is turned into a patch only on the patch
-// view.
+// answer than the rest. The choices are made in Collisions and kept in
+// the settings of the game; until there are any, they start from the
+// patch that is installed. The patch page lists them by pair of mods and
+// turns them into a patch (ADR 0048).
 
 import { isCollision } from "./arrange";
-import type { MapSpot, ObjectRef, RenderedReport, SpotPart } from "./generated/rendered-report";
+import type {
+  MapSpot,
+  ObjectRef,
+  RenderedFinding,
+  RenderedReport,
+  SpotPart,
+} from "./generated/rendered-report";
 
 /**
  * The chosen mod per collision finding (by its id) or per spot (by
@@ -27,6 +34,8 @@ export interface PairSpot {
 export interface Pair {
   id: string;
   headline: string;
+  /** The two mods, by the names the mod manager shows for them. */
+  mods: [string, string];
   /** The two plugins, each with the objects of it that can be hidden. */
   sides: { plugin: string; objects: ObjectRef[] }[];
   /** The plugin suggested for hiding, if any. */
@@ -85,7 +94,12 @@ export function spotKey(spot: MapSpot): string | null {
 }
 
 /** The pair of one collision finding, from its spots; null if nothing in it can be hidden. */
-export function pairFor(id: string, headline: string, found: MapSpot[]): Pair | null {
+export function pairFor(
+  id: string,
+  headline: string,
+  found: MapSpot[],
+  mods: [string, string] = ["", ""],
+): Pair | null {
   const sides = new Map<string, ObjectRef[]>();
   const votes = new Map<string, number>();
   const spots: PairSpot[] = [];
@@ -109,6 +123,7 @@ export function pairFor(id: string, headline: string, found: MapSpot[]): Pair | 
   return {
     id,
     headline,
+    mods,
     sides: [...sides.entries()].map(([plugin, objects]) => ({ plugin, objects })),
     suggested,
     spots,
@@ -127,6 +142,7 @@ export function pairsOf(report: RenderedReport, ignored: Set<string>): Pair[] {
         rendered.finding.id,
         rendered.headline,
         spots.get(rendered.finding.id) ?? [],
+        modsOf(rendered),
       );
       return pair === null ? [] : [pair];
     });
@@ -270,4 +286,111 @@ export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
 /** The objects of the patch in the game, by key. */
 export function installedKeys(report: RenderedReport): Set<string> {
   return new Set((report.installedPatch?.objects ?? []).map(keyOf));
+}
+
+/**
+ * The two mods a collision finding is about, by the names the mod manager
+ * shows; a contained plugin names them as the plugin and its container.
+ */
+function modsOf(rendered: RenderedFinding): [string, string] {
+  const { args } = rendered.finding;
+  const name = (value: string | number | undefined) => (value === undefined ? "" : String(value));
+  return [name(args.first ?? args.plugin), name(args.second ?? args.container)];
+}
+
+/** What was decided about one pair of mods, over all its collision findings. */
+export interface PairDecision {
+  /** The two mods, in a fixed order. */
+  mods: [string, string];
+  /** The collision findings about the two. */
+  pairs: Pair[];
+  /**
+   * What was decided for the pair as a whole, per finding decided so: the
+   * plugin whose objects go, or null to keep both. Empty if only spots
+   * were decided.
+   */
+  wholes: (string | null)[];
+  /** The keys of the spots decided on their own. */
+  spots: string[];
+  /** The objects the decisions about the pair hide. */
+  hidden: ObjectRef[];
+}
+
+/** The choices without the objects hidden on their own. */
+function withoutFreeObjects(choices: PatchChoices): PatchChoices {
+  return Object.fromEntries(Object.entries(choices).filter(([key]) => !key.startsWith(OBJECT)));
+}
+
+/**
+ * The decisions, one per pair of mods that has any, in the order of the
+ * mods' names.
+ */
+export function decisionsOf(pairs: Pair[], choices: PatchChoices): PairDecision[] {
+  const byMods = new Map<string, Pair[]>();
+  for (const pair of pairs) {
+    const key = [...pair.mods].sort().join("\u0000");
+    byMods.set(key, [...(byMods.get(key) ?? []), pair]);
+  }
+  const collisionChoices = withoutFreeObjects(choices);
+  const decisions: PairDecision[] = [];
+  for (const group of byMods.values()) {
+    const wholes = group
+      .filter((pair) => pair.id in choices)
+      .map((pair) => choices[pair.id] ?? null);
+    const spots = group.flatMap((pair) =>
+      pair.spots.filter((spot) => spot.key in choices).map((spot) => spot.key),
+    );
+    const first = group[0];
+    if (first === undefined || (wholes.length === 0 && spots.length === 0)) {
+      continue;
+    }
+    const [a, b] = [...first.mods].sort();
+    decisions.push({
+      mods: [a ?? "", b ?? ""],
+      pairs: group,
+      wholes,
+      spots,
+      hidden: objectsOf(group, collisionChoices),
+    });
+  }
+  return decisions.sort((x, y) => x.mods.join(" ").localeCompare(y.mods.join(" ")));
+}
+
+/** The choices without anything decided about one pair of mods. */
+export function undoDecision(choices: PatchChoices, decision: PairDecision): PatchChoices {
+  const next = { ...choices };
+  for (const pair of decision.pairs) {
+    delete next[pair.id];
+    for (const spot of pair.spots) {
+      delete next[spot.key];
+    }
+  }
+  return next;
+}
+
+/** The spots of collisions nothing is decided for yet, and in how many pairs of mods. */
+export function openSpots(pairs: Pair[], choices: PatchChoices): { keys: string[]; pairs: number } {
+  const keys: string[] = [];
+  const open = new Set<string>();
+  for (const pair of pairs) {
+    for (const spot of pair.spots) {
+      if (decisionAt(choices, pair.id, spot.key) === undefined) {
+        keys.push(spot.key);
+        open.add([...pair.mods].sort().join("\u0000"));
+      }
+    }
+  }
+  return { keys, pairs: open.size };
+}
+
+/** The spots of a report by their key among the choices. */
+export function spotsByKey(report: RenderedReport): Map<string, MapSpot> {
+  const found = new Map<string, MapSpot>();
+  for (const spot of report.map.spots) {
+    const key = spotKey(spot);
+    if (key !== null) {
+      found.set(key, spot);
+    }
+  }
+  return found;
 }
