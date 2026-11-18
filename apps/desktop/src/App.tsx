@@ -337,6 +337,8 @@ export default function App({ api, startLang }: AppProps) {
     [go],
   );
 
+  const showToolbox = useCallback(() => go("toolbox"), [go]);
+
   const showModOnMap = useCallback(
     (mod: string) => {
       go("map");
@@ -386,6 +388,7 @@ export default function App({ api, startLang }: AppProps) {
       pairAt,
       showModOnMap,
       mapMod,
+      showToolbox,
     }),
     [
       api,
@@ -410,6 +413,7 @@ export default function App({ api, startLang }: AppProps) {
       pairAt,
       showModOnMap,
       mapMod,
+      showToolbox,
     ],
   );
   const counts = useMemo(
