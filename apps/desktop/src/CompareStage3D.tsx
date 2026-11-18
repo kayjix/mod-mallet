@@ -7,12 +7,13 @@ import { type PointerEvent, useCallback, useEffect, useRef, useState } from "rea
 import { useSession } from "./Actions";
 import { AreaLayer, isFlora, LOOK, type Look, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
-import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
+import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
 import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
 import { useReviewTexts } from "./review-texts";
 import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
+import { drawPathSign, PathIcon, useWalkTexts } from "./walkways";
 
 export type { StageGroup, StageSegment } from "./segments";
 
@@ -38,6 +39,11 @@ export interface CompareStage3DProps {
   names: [string, string];
   /** What the patch hides now, by {@link objectKey}. */
   hidden: Set<string>;
+  /**
+   * The pieces of path characters walk on, by {@link objectKey}: those
+   * objects carry a path sign wherever they are drawn (ADR 0051).
+   */
+  walked?: Map<string, number> | null;
   /** Told about the two structures whenever they are known better. */
   onStructures?: (structures: [AreaObject[], AreaObject[]]) => void;
   /** Told about the segments whenever they are known better. */
@@ -88,6 +94,7 @@ export function CompareStage3D({
   focus = null,
   names,
   hidden,
+  walked = null,
   onStructures,
   onSegments,
   onPick,
@@ -99,6 +106,7 @@ export function CompareStage3D({
   ];
   const { api } = useSession();
   const r = useReviewTexts();
+  const w = useWalkTexts();
   const canvas = useRef<HTMLCanvasElement>(null);
   const layer = useRef<AreaLayer | null>(null);
   const land = useRef<LandLayer | null>(null);
@@ -158,6 +166,10 @@ export function CompareStage3D({
   const flora = useRef<Set<string>>(new Set());
   const hiddenNow = useRef(hidden);
   hiddenNow.current = hidden;
+  const walkedNow = useRef(walked);
+  walkedNow.current = walked;
+  /** The path signs over the three views, drawn in 2D after each frame. */
+  const signs = useRef<HTMLCanvasElement>(null);
   const seedsNow = useRef(seeds);
   seedsNow.current = seeds;
 
@@ -238,6 +250,66 @@ export function CompareStage3D({
     }
   }, []);
 
+  /**
+   * The path sign over each object characters walk on, in each view where
+   * it is drawn, while the markings are on.
+   */
+  const drawSigns = (third: number, tall: number, matrix: Mat4) => {
+    const element = signs.current;
+    const context = element?.getContext("2d") ?? null;
+    if (element === null || context === null) {
+      return;
+    }
+    const ratio = window.devicePixelRatio || 1;
+    const wanted = [Math.round(third * 3 * ratio), Math.round(tall * ratio)];
+    if (element.width !== wanted[0] || element.height !== wanted[1]) {
+      element.width = wanted[0] ?? element.width;
+      element.height = wanted[1] ?? element.height;
+    }
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, third * 3, tall);
+    const walkedHere = walkedNow.current;
+    const current = layer.current;
+    if (walkedHere == null || walkedHere.size === 0 || current === null || !markingsNow.current) {
+      return;
+    }
+    const looks = [lookNow.current(0), lookNow.current(1), lookNow.current(2)] as const;
+    for (const { object, centre } of current.shown) {
+      const key = objectKey(object.id.plugin, object.id.localId);
+      if (!walkedHere.has(key)) {
+        continue;
+      }
+      for (const index of [0, 1, 2] as const) {
+        if (looks[index](key) === LOOK.gone) {
+          continue;
+        }
+        const at = project(
+          matrix,
+          [centre[0] / CELL, centre[1] / CELL, centre[2] / CELL],
+          third,
+          tall,
+        );
+        if (
+          at !== null &&
+          at.depth <= 1 &&
+          at.x >= 0 &&
+          at.x <= third &&
+          at.y >= 0 &&
+          at.y <= tall
+        ) {
+          context.save();
+          context.beginPath();
+          context.rect(third * index, 0, third, tall);
+          context.clip();
+          drawPathSign(context, third * index + at.x, at.y, 18);
+          context.restore();
+        }
+      }
+    }
+  };
+  const drawSignsNow = useRef(drawSigns);
+  drawSignsNow.current = drawSigns;
+
   const draw = useCallback(() => {
     pending.current = null;
     const element = canvas.current;
@@ -277,6 +349,7 @@ export function CompareStage3D({
       }
     }
     gl.disable(gl.SCISSOR_TEST);
+    drawSignsNow.current(width / 3, tall, matrix);
   }, [findStructures]);
 
   const redraw = useCallback(() => {
@@ -383,7 +456,7 @@ export function CompareStage3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.
   useEffect(() => {
     redraw();
-  }, [markings, trees, hidden, height, redraw]);
+  }, [markings, trees, hidden, walked, height, redraw]);
 
   // The canvas follows the width of its frame.
   useEffect(() => {
@@ -558,6 +631,7 @@ export function CompareStage3D({
           onPointerUp={onPointerUp}
           onContextMenu={(event) => event.preventDefault()}
         />
+        <canvas ref={signs} className="stage3-walk" />
         <div className="stage3-labels" aria-hidden="true">
           {labels.map((label, index) => (
             <span key={label} className="stage3-label" data-view={index}>
@@ -612,6 +686,12 @@ export function CompareStage3D({
       {markings && (
         <p className="stage3-legend aside">
           <span className="stage3-key" data-key="hidden" /> {r.legendHidden}
+          {walked != null && walked.size > 0 && (
+            <>
+              {" · "}
+              <PathIcon /> {w.legend}
+            </>
+          )}
         </p>
       )}
       {others.length > 0 && (

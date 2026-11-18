@@ -1153,18 +1153,28 @@ export const sampleApi: Api = {
   areaTexture: () => later(null),
   objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
   // In the sample, a path of the game runs over the first object to hide.
+  // Characters walk on the planks of Water Mod's dock at the docks (made
+  // up): hiding them would leave them on thin air.
   hiddenWalkways: (worldOrCell, _x, _y, objects) =>
     later({
       place: worldOrCell,
       found: objects,
-      walkways: objects.slice(0, 1).map((object) => ({
-        object,
-        navmesh: "skyrim.esm:00A1B2",
-        plugin: "Skyrim.esm",
-        used: true,
-        cell: `${worldOrCell} 3,-2`,
-        triangles: 12,
-      })),
+      walkways: objects
+        .filter(
+          (object) =>
+            object.plugin === "Water Mod.esp" &&
+            (object.localId === 0xa11 ||
+              object.localId === 0xa21 ||
+              (object.localId >= 0x6000 && object.localId <= 0x6008)),
+        )
+        .map((object) => ({
+          object,
+          navmesh: "skyrim.esm:00A1B2",
+          plugin: "Skyrim.esm",
+          used: true,
+          cell: `${worldOrCell} 6,1`,
+          triangles: 6,
+        })),
     }),
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),

@@ -36,6 +36,14 @@ import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
 import { type Suggestion, suggestionOf } from "./suggest";
 import { FindingRow } from "./Tasks";
+import {
+  PathIcon,
+  PathMark,
+  useWalkedOn,
+  useWalkTexts,
+  type WalkQuery,
+  walkedOn,
+} from "./walkways";
 import "./review.css";
 
 /** The steps, in their order. */
@@ -425,7 +433,10 @@ function CollisionsStep({
 }) {
   const { api, lang, ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
+  const w = useWalkTexts();
   const [history, setHistory] = useState<PatchChoices[]>([]);
+  // The places the bulk left open because characters walk on what would go.
+  const [walkedPlaces, setWalkedPlaces] = useState<string[]>([]);
   // The check of every place in the background: how far, and whether to stop.
   const [measuring, setMeasuring] = useState<{ done: number; total: number } | null>(null);
   const stopMeasuring = useRef(false);
@@ -482,6 +493,23 @@ function CollisionsStep({
       outdated = true;
     };
   }, [api, askingKey]);
+  // The paths characters walk on over the same parts (ADR 0051), asked as
+  // the stage reads the place: outside in the parent worldspace, near the
+  // place's middle.
+  const stagePlace =
+    cluster?.spots[0] === undefined ? null : placeOf(cluster.spots[0].item.spot, report.map.worlds);
+  const walked = useWalkedOn(
+    askingKey,
+    stagePlace === null
+      ? null
+      : stagePlace.place.type === "exterior"
+        ? stagePlace.place.world
+        : stagePlace.place.cell,
+    stagePlace === null || stagePlace.place.type === "interior" || cluster === undefined
+      ? null
+      : [cluster.centre[0], cluster.centre[1]],
+    asking?.queries ?? [],
+  );
   const decidedPlaces = clusters.filter((candidate) => openIn(candidate) === 0).length;
   const undo = (
     <button
@@ -579,9 +607,13 @@ function CollisionsStep({
     if (part.game) {
       return "game";
     }
-    const tie = anchors?.byPart.get(objectKey(part.id.plugin, part.id.localId));
+    const key = objectKey(part.id.plugin, part.id.localId);
+    const tie = anchors?.byPart.get(key);
     if (tie?.verdict === "locked" || (tie === undefined && part.hideable === false)) {
       return "locked";
+    }
+    if ((walked?.get(key) ?? 0) > 0) {
+      return "walked";
     }
     return tie?.verdict === "careful" ? "careful" : "go";
   };
@@ -589,7 +621,14 @@ function CollisionsStep({
   const effectOf = (side: 0 | 1, chosen: StageSegment[]) => {
     const parts = partsOf(chosen, side === 0 ? 1 : 0);
     const by = (fate: Fate) => parts.filter((part) => fateOf(part) === fate);
-    return { parts, go: by("go"), careful: by("careful"), locked: by("locked"), game: by("game") };
+    return {
+      parts,
+      go: by("go"),
+      careful: by("careful"),
+      walked: by("walked"),
+      locked: by("locked"),
+      game: by("game"),
+    };
   };
   /** Keeps the choices; deciding the whole place moves on to the next open one. */
   const apply = (next: PatchChoices, moveOn: boolean) => {
@@ -610,7 +649,8 @@ function CollisionsStep({
   };
   /**
    * Keeps `side` in `chosen`: the other side's parts that may go are
-   * hidden, the careful ones only when `anyway`; what the game needs stays.
+   * hidden, the careful ones and those characters walk on only when
+   * `anyway`; what the game needs stays.
    */
   const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean, anyway = false) => {
     const loser = sides[side === 0 ? 1 : 0];
@@ -620,7 +660,7 @@ function CollisionsStep({
       spots,
       partsOf(chosen, side).map((part) => part.id),
     );
-    for (const part of anyway ? [...effect.go, ...effect.careful] : effect.go) {
+    for (const part of anyway ? [...effect.go, ...effect.careful, ...effect.walked] : effect.go) {
       next = chooseObject(next, part.id, true);
     }
     // Every spot of the segments is decided, also where the losing side's
@@ -747,6 +787,7 @@ function CollisionsStep({
     let taken = 0;
     let stuck = 0;
     let asking = 0;
+    const onWalkways: string[] = [];
     for (const candidate of clear) {
       const found = survey.get(candidate.key) ?? [];
       const suggestion = suggestionOf(found);
@@ -788,6 +829,19 @@ function CollisionsStep({
         const tie = byKey.get(key);
         return tie === undefined ? !notHideable.has(key) : tie.verdict === "free";
       });
+      // Where characters walk on what would go, the place is the user's
+      // to decide (ADR 0051).
+      const where = placeOf(spot, report.map.worlds).place;
+      const paths = await walkedOn(
+        api,
+        where.type === "exterior" ? where.world : where.cell,
+        where.type === "exterior" ? [candidate.centre[0], candidate.centre[1]] : null,
+        go.map((object) => ({ id: object.id, position: object.position })),
+      ).catch(() => new Map<string, number>());
+      if (paths.size > 0) {
+        onWalkways.push(candidate.key);
+        continue;
+      }
       if (go.length === 0) {
         // Tied-in parts are hidden only when the user says so, place by place.
         const tied = losing.some(
@@ -819,7 +873,16 @@ function CollisionsStep({
       setPatchChoices(next);
     }
     const open = clusters.filter((candidate) => openIn(candidate) > 0).length;
-    setNote(r.takeAllDone(taken, Math.max(0, open - taken - stuck - asking), stuck, asking));
+    setWalkedPlaces(onWalkways);
+    setNote(
+      r.takeAllDone(
+        taken,
+        Math.max(0, open - taken - stuck - asking - onWalkways.length),
+        stuck,
+        asking,
+        onWalkways.length,
+      ),
+    );
   };
   /** What a side brings to the comparison: one item, or parts in segments. */
   const levelOf = (side: 0 | 1) => {
@@ -851,7 +914,11 @@ function CollisionsStep({
     }
     return (
       <button type="button" className="small" aria-pressed={isHidden} onClick={() => toggle(part)}>
-        {isHidden ? r.partShow : fate === "careful" ? r.partHideAnyway : r.partHide}
+        {isHidden
+          ? r.partShow
+          : fate === "careful" || fate === "walked"
+            ? r.partHideAnyway
+            : r.partHide}
       </button>
     );
   };
@@ -874,7 +941,14 @@ function CollisionsStep({
       return;
     }
     toggle(part);
-    setNote(isHidden ? r.pickedShown(part.name) : r.pickedHidden(part.name));
+    const triangles = walked?.get(objectKey(object.id.plugin, object.id.localId)) ?? 0;
+    setNote(
+      isHidden
+        ? r.pickedShown(part.name)
+        : triangles > 0
+          ? w.pickedWalked(part.name, triangles)
+          : r.pickedHidden(part.name),
+    );
   };
   /**
    * A segment's decision with the objects decided otherwise: of the side
@@ -902,10 +976,11 @@ function CollisionsStep({
       ? `${describe(decided)} ${r.withExceptions(exceptions)}`
       : describe(decided);
   };
-  const asked = anchors !== null && anchors.key === askingKey;
+  const asked = anchors !== null && anchors.key === askingKey && walked !== null;
   const effects = [effectOf(0, shownSegments), effectOf(1, shownSegments)] as const;
   /** Whether keeping `side` can hide anything of the other side at all. */
-  const canGo = (effect: (typeof effects)[number]) => effect.go.length + effect.careful.length > 0;
+  const canGo = (effect: (typeof effects)[number]) =>
+    effect.go.length + effect.careful.length + effect.walked.length > 0;
 
   return (
     <div className="review-collision">
@@ -992,6 +1067,7 @@ function CollisionsStep({
         focus={focusKeys}
         names={names}
         hidden={hidden}
+        walked={walked}
         onSegments={(found) => {
           setSegments(found);
           onSurvey(cluster.key, found);
@@ -1017,6 +1093,31 @@ function CollisionsStep({
         <p className="review-note" role="status">
           {note}
         </p>
+      )}
+      {walkedPlaces.length > 0 && (
+        <div className="walk-warning walk-doubtful">
+          <PathIcon />
+          <span>{w.doubtfulTitle(walkedPlaces.length)}</span>
+          {walkedPlaces.map((key) => {
+            const index = clusters.findIndex((candidate) => candidate.key === key);
+            const other = clusters[index];
+            if (other === undefined) {
+              return null;
+            }
+            return (
+              <button
+                type="button"
+                key={key}
+                className="small"
+                aria-pressed={index === at}
+                onClick={() => onCursor(key)}
+              >
+                {r.clusterOf(index + 1, clusters.length)}: {short(other.plugins[0])} ⟷{" "}
+                {short(other.plugins[1])}
+              </button>
+            );
+          })}
+        </div>
       )}
       {gameParts > 0 && <p className="aside">{r.gameParts(gameParts)}</p>}
       <div className="review-choices">
@@ -1067,6 +1168,7 @@ function CollisionsStep({
               loser={names[side === 0 ? 1 : 0]}
               effect={effects[side]}
               anchors={anchors.byPart}
+              walked={walked}
               decor={new Set(shownSegments.flatMap((segment) => segment.decor))}
               onAnyway={() => keep(side, shownSegments, true, true)}
             />
@@ -1158,6 +1260,14 @@ function CollisionsStep({
                           {partsOf([segment], side).map((part) => (
                             <li key={objectKey(part.id.plugin, part.id.localId)}>
                               <span>{part.name}</span>
+                              {(walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0) >
+                                0 && (
+                                <PathMark
+                                  triangles={
+                                    walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0
+                                  }
+                                />
+                              )}
                               {partToggle(part)}
                             </li>
                           ))}
@@ -1204,8 +1314,11 @@ interface Part {
   hideable?: boolean;
 }
 
-/** What becomes of a part the patch would hide. */
-type Fate = "go" | "careful" | "locked" | "game";
+/**
+ * What becomes of a part the patch would hide; `walked`: characters walk on
+ * it, and it goes only when the user says so (ADR 0051).
+ */
+type Fate = "go" | "careful" | "walked" | "locked" | "game";
 
 /**
  * The parts of a place that a decision might hide, not the game's own, to
@@ -1214,17 +1327,24 @@ type Fate = "go" | "careful" | "locked" | "game";
 function partsToAsk(
   cluster: Cluster,
   segments: StageSegment[],
-): { place: string; refs: { plugin: string; localId: number }[]; keys: string[] } | null {
+): {
+  place: string;
+  refs: { plugin: string; localId: number }[];
+  keys: string[];
+  /** The same parts with where they stand, where the stage knows it. */
+  queries: WalkQuery[];
+} | null {
   const first = cluster.spots[0];
   if (first === undefined) {
     return null;
   }
   const { location } = first.item.spot;
   const place = location.type === "interior" ? location.cell : location.world;
-  const found = new Map<string, { plugin: string; localId: number }>();
+  const found = new Map<string, WalkQuery>();
   const add = (id: { plugin: string; localId: number }) => {
-    if (!isGameObject({ id })) {
-      found.set(objectKey(id.plugin, id.localId), { plugin: id.plugin, localId: id.localId });
+    const key = objectKey(id.plugin, id.localId);
+    if (!isGameObject({ id }) && !found.has(key)) {
+      found.set(key, { id: { plugin: id.plugin, localId: id.localId } });
     }
   };
   for (const segment of segments) {
@@ -1232,8 +1352,8 @@ function partsToAsk(
       // Objects of the game a mod moved are asked about too (ADR 0032).
       if (!isGameObject(part) || !isGamePlugin(part.plugin)) {
         found.set(objectKey(part.id.plugin, part.id.localId), {
-          plugin: part.id.plugin,
-          localId: part.id.localId,
+          id: { plugin: part.id.plugin, localId: part.id.localId },
+          position: part.position,
         });
       }
     }
@@ -1244,7 +1364,8 @@ function partsToAsk(
     }
   }
   const keys = [...found.keys()].sort();
-  return { place, refs: keys.flatMap((key) => found.get(key) ?? []), keys };
+  const queries = keys.flatMap((key) => found.get(key) ?? []);
+  return { place, refs: queries.map((query) => query.id), keys, queries };
 }
 
 /**
@@ -1289,26 +1410,47 @@ function KeepEffect({
   loser,
   effect,
   anchors,
+  walked,
   decor,
   onAnyway,
 }: {
   winner: string;
   loser: string;
-  effect: { parts: Part[]; go: Part[]; careful: Part[]; locked: Part[]; game: Part[] };
+  effect: {
+    parts: Part[];
+    go: Part[];
+    careful: Part[];
+    walked: Part[];
+    locked: Part[];
+    game: Part[];
+  };
   anchors: Map<string, ObjectAnchors>;
+  /** The pieces of path characters walk on, by part. */
+  walked: Map<string, number> | null;
   /** The parts that are decor resting on others, by key. */
   decor: Set<string>;
   onAnyway: () => void;
 }) {
   const isDecor = (part: Part) => decor.has(objectKey(part.id.plugin, part.id.localId));
   const resting = effect.go.filter(isDecor);
-  const restingStays = [...effect.careful, ...effect.locked, ...effect.game].filter(isDecor);
+  const restingStays = [
+    ...effect.careful,
+    ...effect.walked,
+    ...effect.locked,
+    ...effect.game,
+  ].filter(isDecor);
   const r = useReviewTexts();
+  const w = useWalkTexts();
+  const pieces = effect.walked.reduce(
+    (sum, part) => sum + (walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0),
+    0,
+  );
+  const anyway = effect.careful.length + effect.walked.length;
   const staying = [...effect.careful, ...effect.locked];
   if (effect.parts.length === 0) {
     return null;
   }
-  const nothing = effect.go.length + effect.careful.length === 0;
+  const nothing = effect.go.length + anyway === 0;
   return (
     <div className="review-effect" data-nothing={nothing}>
       <p>
@@ -1340,9 +1482,24 @@ function KeepEffect({
           </ul>
         </details>
       )}
-      {effect.careful.length > 0 && (
+      {effect.walked.length > 0 && (
+        <p className="walk-warning">
+          <PathIcon />
+          <span>
+            {w.keepWarning(
+              loser,
+              counted(effect.walked.map((part) => part.name)),
+              effect.walked.length,
+              pieces,
+            )}
+          </span>
+        </p>
+      )}
+      {anyway > 0 && (
         <button type="button" className="small" onClick={onAnyway}>
-          {r.hideAnyway(loser, effect.careful.length)}
+          {effect.walked.length > 0
+            ? w.hideAnyway(loser, anyway)
+            : r.hideAnyway(loser, effect.careful.length)}
         </button>
       )}
     </div>

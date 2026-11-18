@@ -39,6 +39,7 @@ import {
 } from "./patch";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { TaskList } from "./Tasks";
+import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
 
 /** One plugin's objects at a spot. */
 interface Side {
@@ -1113,6 +1114,43 @@ function Spot(props: SpotProps) {
   }, [nearby, letGo]);
   const previewObjects = aroundPreview === null ? [] : (around.get(aroundPreview)?.objects ?? []);
   const [first, second] = modSides;
+  // The paths characters walk on over the parts a choice here would hide
+  // (ADR 0051), asked where the stage reads the place: a city inside its
+  // walls in the worldspace whose land it stands on.
+  const w = useWalkTexts();
+  const { location } = spot;
+  const walkPlace =
+    location.type === "interior"
+      ? location.cell
+      : (props.report.map.worlds.find(
+          (world) =>
+            world.name === location.world || (world.children ?? []).includes(location.world),
+        )?.name ?? location.world);
+  const at = spotPosition(spot);
+  const walkQueries = useMemo<WalkQuery[]>(
+    () =>
+      item.sides
+        .filter((side) => side.hideable)
+        .flatMap((side) => side.parts.map((part) => ({ id: part.object }))),
+    [item],
+  );
+  const walked = useWalkedOn(
+    item.key,
+    walkPlace,
+    location.type === "interior" || at === null ? null : [at[0], at[1]],
+    walkQueries,
+  );
+  /** The parts of a side characters walk on, and how many pieces of path lie on them. */
+  const walkedOf = (side: Side) => {
+    const parts = side.parts.filter(
+      (part) => (walked?.get(objectKey(part.object.plugin, part.object.localId)) ?? 0) > 0,
+    );
+    const pieces = parts.reduce(
+      (sum, part) => sum + (walked?.get(objectKey(part.object.plugin, part.object.localId)) ?? 0),
+      0,
+    );
+    return { parts, pieces };
+  };
 
   return (
     <>
@@ -1170,6 +1208,12 @@ function Spot(props: SpotProps) {
                     <span className="work-choice-text">
                       <span className="work-choice-verb">
                         {side.hideable ? t.workHideVerb : t.workNeeded}
+                        {side.hideable && walkedOf(side).parts.length > 0 && (
+                          <>
+                            {" "}
+                            <PathIcon />
+                          </>
+                        )}
                       </span>
                       <strong className="work-choice-title">{name}</strong>
                       <span className="aside">
@@ -1202,6 +1246,18 @@ function Spot(props: SpotProps) {
             )}
           </div>
         </div>
+        {item.sides
+          .filter((side) => side.hideable && walkedOf(side).parts.length > 0)
+          .map((side) => {
+            const { parts, pieces } = walkedOf(side);
+            const names = [...new Set(parts.map((part) => part.name))].join(", ");
+            return (
+              <p key={side.plugin} className="walk-warning">
+                <PathIcon />
+                <span>{w.spotWarning(names, shortName(side.plugin), pieces)}</span>
+              </p>
+            );
+          })}
         {item.sides.some((side) => !side.hideable) && (
           <div className="work-section">
             <span className="work-section-label">{t.anchorWhy}</span>

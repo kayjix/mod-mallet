@@ -178,6 +178,21 @@ a colour of its own.
     and leads to the filtered list. Only open spots are pinned. When a
     pinned spot is decided, wherever that happens, its pin is cleared and
     a short note says so: the pin was there to find the spot again.
+14. **Paths over what would go (ADR 0051).** At Falskaar's harbour, hiding
+    JK's Skyrim's ship hull would leave 109 pieces of the path on its deck
+    over nothing. Before deciding, the review asks which parts of the place
+    carry paths the game uses, together with the game's ties, once per
+    place and part for the window's life, outside in squares of one cell so
+    that each part lies near the point asked from. A part characters walk
+    on is treated like a tied-in part: a keep button leaves it standing and
+    says so, with the pieces of path and the remedy (keep this side, keep
+    both), and *hide anyway* hides it knowingly. Such parts carry a path
+    sign (a dashed path on a yellow disc) in the three views and in the
+    list of objects; a click on one in the views hides it with the same
+    warning. *Take every clear suggestion* leaves a place open where
+    characters walk on what would go, and lists it to go through by hand.
+    The collisions' spot panel asks the same for the parts of each side a
+    choice there would hide, and warns under the choices.
 
 ## Consequences
 

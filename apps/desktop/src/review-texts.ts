@@ -66,7 +66,13 @@ export interface ReviewTexts {
   measuring: (done: number, total: number) => string;
   measureStop: string;
   takeAll: (count: number) => string;
-  takeAllDone: (taken: number, doubtful: number, stuck: number, asking: number) => string;
+  takeAllDone: (
+    taken: number,
+    doubtful: number,
+    stuck: number,
+    asking: number,
+    walked: number,
+  ) => string;
   compared: string;
   levelItem: (mod: string, name: string) => string;
   levelParts: (mod: string, parts: number, segments: number) => string;
@@ -207,12 +213,12 @@ const en: ReviewTexts = {
     count === 1
       ? "Take the clear suggestion (1 place)"
       : `Take every clear suggestion (${count} places)`,
-  takeAllDone: (taken, doubtful, stuck, asking) =>
+  takeAllDone: (taken, doubtful, stuck, asking, walked) =>
     `${taken} ${taken === 1 ? "place" : "places"} decided as suggested. Left to go through: ${doubtful} without a clear suggestion${
       asking > 0
         ? `, ${asking} where only parts tied into the game could go (you decide those)`
         : ""
-    }${stuck > 0 ? `, ${stuck} where nothing can go` : ""}. Undo takes the whole batch back.`,
+    }${walked > 0 ? `, ${walked} where characters walk on what would go` : ""}${stuck > 0 ? `, ${stuck} where nothing can go` : ""}. Undo takes the whole batch back.`,
   compared: "Compared:",
   levelItem: (mod, name) => `${mod}: a single item, ${name}`,
   levelParts: (mod, parts, segments) =>
@@ -366,12 +372,12 @@ const de: ReviewTexts = {
     count === 1
       ? "Den klaren Vorschlag übernehmen (1 Bereich)"
       : `Alle klaren Vorschläge übernehmen (${count} Bereiche)`,
-  takeAllDone: (taken, doubtful, stuck, asking) =>
+  takeAllDone: (taken, doubtful, stuck, asking, walked) =>
     `${taken} ${taken === 1 ? "Bereich" : "Bereiche"} nach Vorschlag entschieden. Zum Durchgehen bleiben ${doubtful} ohne klaren Vorschlag${
       asking > 0
         ? `, ${asking}, in denen nur ins Spiel Eingebundenes weg könnte (das entscheidest du)`
         : ""
-    }${stuck > 0 ? `, ${stuck}, in denen nichts weg kann` : ""}. Rückgängig nimmt alle auf einmal zurück.`,
+    }${walked > 0 ? `, ${walked}, in denen Figuren auf dem laufen, was weg würde` : ""}${stuck > 0 ? `, ${stuck}, in denen nichts weg kann` : ""}. Rückgängig nimmt alle auf einmal zurück.`,
   compared: "Verglichen:",
   levelItem: (mod, name) => `${mod}: ein einzelnes Teil, ${name}`,
   levelParts: (mod, parts, segments) =>
