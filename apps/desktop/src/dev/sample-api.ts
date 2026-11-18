@@ -646,6 +646,7 @@ function sampleMap(): RenderedReport["map"] {
       placed([3, 3, 0.8, 0.5], spot(3, 3, "Tree / Roof")),
       placed([6, 1, 0.4, 0.4], duplicate(6, 1, "Dock / Dock", 0xa10)),
       placed([6, 1, 0.6, 0.7], duplicate(6, 1, "Boat / Boat", 0xa20)),
+      placed([7, 2, 0.5, 0.5], duplicate(7, 2, "Bridge / Lantern post", 0xb12)),
     ],
   };
 }
@@ -1272,9 +1273,10 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
   };
   // The docks of the sample's duplicates: Old Town and Water Mod place the same.
   const docks = cellX === 6 && cellY === 1;
+  const lantern = cellX === 7 && cellY === 2;
   bridge(
     "Old Town.esp",
-    docks ? 0xa10 : 0x800 + cellX * 16 + cellY,
+    docks ? 0xa10 : lantern ? 0xb12 : 0x800 + cellX * 16 + cellY,
     0x5000,
     0,
     0,
@@ -1323,6 +1325,17 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
         "Pier",
       );
     }
+  } else if (lantern) {
+    // A whole bridge of Old Town against a single lantern post of Water
+    // Mod: a clear case for the suggestion by size.
+    place(
+      "Water Mod.esp",
+      0xb13,
+      "sample\\pillar.nif",
+      [cx + 30, cy + 10, ground + 40],
+      0,
+      "Lantern post",
+    );
   } else {
     bridge("Texture Pack.esp", 0x900 + cellX * 16 + cellY, 0x6000, 0.55, 3);
   }

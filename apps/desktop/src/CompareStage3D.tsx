@@ -12,6 +12,9 @@ import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
 import { useReviewTexts } from "./review-texts";
+import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
+
+export type { StageGroup, StageSegment } from "./segments";
 
 /** Where the structures stand: in a worldspace, or in an interior cell. */
 export type StagePlace = { type: "exterior"; world: string } | { type: "interior"; cell: string };
@@ -45,22 +48,6 @@ export interface CompareStage3DProps {
   height?: number;
 }
 
-/** One spot of the stage, with the parts its structures start from. */
-export interface StageGroup {
-  key: string;
-  seeds: [ObjectRef[], ObjectRef[]];
-}
-
-/**
- * A segment: the structures of the two mods that hang together around one
- * or more spots, and those spots (ADR 0050).
- */
-export interface StageSegment {
-  /** The spots, by their groups' keys. */
-  groups: string[];
-  parts: [AreaObject[], AreaObject[]];
-}
-
 /** How long finding the segments rests between two tries while models arrive, in milliseconds. */
 const FIND_EVERY = 400;
 
@@ -71,14 +58,6 @@ const MIN_PITCH = -0.2;
 const MAX_PITCH = 1.55;
 const MIN_DISTANCE = 0.005;
 const START_DISTANCE = 0.25;
-/** How close two parts must come to count as one structure, in game units (about 6 cm). */
-const STRUCTURE_MARGIN = 4;
-/**
- * How far from the spot a structure reaches, in game units (about 30 m):
- * the walls of a whole town touch each other, but the user decides the
- * gate, not the town.
- */
-const STRUCTURE_REACH = 2048;
 /** The angle the camera looks down at the structures from, above the horizon. */
 const FRAMING_PITCH = 0.8;
 
@@ -91,14 +70,6 @@ interface Camera {
   distance: number;
   yaw: number;
   pitch: number;
-}
-
-/** The objects of `area` that a structure starts from. */
-function seedObjects(area: AreaObjects, seeds: ObjectRef[]): AreaObject[] {
-  const wanted = new Set(seeds.map((seed) => objectKey(seed.plugin, seed.localId)));
-  return area.objects.filter((object) =>
-    wanted.has(objectKey(object.id.plugin, object.id.localId)),
-  );
 }
 
 /** A structure's parts by key, for comparing two findings of it. */
@@ -221,40 +192,14 @@ export function CompareStage3D({
     }
     known.current.done = progress.done;
     known.current.at = Date.now();
-    const [x, y] = centreNow.current;
-    const near = { x, y, radius: reachNow.current };
-    // What grows from each seed, once per seed.
-    const grown = new Map<string, AreaObject[]>();
-    const growFrom = (seed: AreaObject) => {
-      const key = objectKey(seed.id.plugin, seed.id.localId);
-      let parts = grown.get(key);
-      if (parts === undefined) {
-        parts = current.connected(seed, STRUCTURE_MARGIN, near);
-        for (const part of parts) {
-          // A part reached from another seed of the same kind grows the same.
-          grown.set(objectKey(part.id.plugin, part.id.localId), parts);
-        }
-        grown.set(key, parts);
-      }
-      return parts;
-    };
-    const grow = (from: AreaObject[]) => {
-      const found = new Map<string, AreaObject>();
-      for (const seed of from) {
-        for (const part of growFrom(seed)) {
-          found.set(objectKey(part.id.plugin, part.id.localId), part);
-        }
-      }
-      return [...found.values()];
-    };
-    const perGroup = groupsNow.current.map((group) => ({
-      key: group.key,
-      parts: [grow(seedObjects(area, group.seeds[0])), grow(seedObjects(area, group.seeds[1]))] as [
-        AreaObject[],
-        AreaObject[],
-      ],
-    }));
-    const segments = segmentsOf(perGroup);
+
+    const segments = findSegments(
+      current,
+      area,
+      groupsNow.current,
+      centreNow.current,
+      reachNow.current,
+    );
     const first = [
       ...new Map(
         segments
@@ -688,53 +633,6 @@ export function CompareStage3D({
       )}
     </div>
   );
-}
-
-/**
- * The spots' structures joined where they share a part: each join is one
- * segment, with the spots it covers and the parts of both mods.
- */
-function segmentsOf(
-  perGroup: { key: string; parts: [AreaObject[], AreaObject[]] }[],
-): StageSegment[] {
-  const owner = new Map<string, number>();
-  const root = perGroup.map((_, index) => index);
-  const find = (index: number): number => {
-    let at = index;
-    while (root[at] !== at) {
-      at = root[at] ?? at;
-    }
-    return at;
-  };
-  perGroup.forEach((group, index) => {
-    for (const part of [...group.parts[0], ...group.parts[1]]) {
-      const key = objectKey(part.id.plugin, part.id.localId);
-      const before = owner.get(key);
-      if (before === undefined) {
-        owner.set(key, index);
-      } else {
-        root[find(index)] = find(before);
-      }
-    }
-  });
-  const joined = new Map<number, StageSegment>();
-  perGroup.forEach((group, index) => {
-    const at = find(index);
-    const segment = joined.get(at) ?? { groups: [], parts: [[], []] };
-    segment.groups.push(group.key);
-    for (const side of [0, 1] as const) {
-      const known = new Set(
-        segment.parts[side].map((part) => objectKey(part.id.plugin, part.id.localId)),
-      );
-      for (const part of group.parts[side]) {
-        if (!known.has(objectKey(part.id.plugin, part.id.localId))) {
-          segment.parts[side].push(part);
-        }
-      }
-    }
-    joined.set(at, segment);
-  });
-  return [...joined.values()];
 }
 
 /** The camera's matrix (cells, heights as drawn) for a view `aspect` wide per unit high. */

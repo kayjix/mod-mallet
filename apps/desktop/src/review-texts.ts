@@ -50,6 +50,23 @@ export interface ReviewTexts {
   stateMixed: (open: number) => string;
   showSegment: string;
   keepHere: (name: string) => string;
+  suggestedTag: string;
+  suggestReason: (
+    winner: string,
+    winnerParts: number,
+    winnerRoom: string,
+    loser: string,
+    loserParts: number,
+    loserRoom: string,
+    single: string | null,
+  ) => string;
+  segmentSuggested: (name: string) => string;
+  suggestHint: string;
+  measureAll: (count: number) => string;
+  measuring: (done: number, total: number) => string;
+  measureStop: string;
+  takeAll: (count: number) => string;
+  takeAllDone: (taken: number, doubtful: number, stuck: number, asking: number) => string;
   compared: string;
   levelItem: (mod: string, name: string) => string;
   levelParts: (mod: string, parts: number, segments: number) => string;
@@ -170,6 +187,30 @@ const en: ReviewTexts = {
     open > 0 ? `partly decided, ${open} open` : "decided differently by section",
   showSegment: "Show",
   keepHere: (name) => `Keep ${name}'s here`,
+  suggestedTag: "suggested",
+  suggestReason: (winner, winnerParts, winnerRoom, loser, loserParts, loserRoom, single) =>
+    `${winner} builds ${winnerParts} ${winnerParts === 1 ? "part" : "parts"} here (about ${winnerRoom} m³); ${
+      single !== null
+        ? `${loser} has a single one, ${single} (about ${loserRoom} m³)`
+        : `${loser} only ${loserParts} (about ${loserRoom} m³)`
+    }. Keeping ${winner}'s is suggested.`,
+  segmentSuggested: (name) => `suggested: ${name}`,
+  suggestHint:
+    "A suggestion where one side takes at least 20 times the room of the other, measured by its parts.",
+  measureAll: (count) =>
+    count === 1 ? "Measure the 1 open place" : `Measure the ${count} open places`,
+  measuring: (done, total) => `Measuring places… ${done} of ${total}`,
+  measureStop: "Stop",
+  takeAll: (count) =>
+    count === 1
+      ? "Take the clear suggestion (1 place)"
+      : `Take every clear suggestion (${count} places)`,
+  takeAllDone: (taken, doubtful, stuck, asking) =>
+    `${taken} ${taken === 1 ? "place" : "places"} decided as suggested. Left to go through: ${doubtful} without a clear suggestion${
+      asking > 0
+        ? `, ${asking} where only parts tied into the game could go (you decide those)`
+        : ""
+    }${stuck > 0 ? `, ${stuck} where nothing can go` : ""}. Undo takes the whole batch back.`,
   compared: "Compared:",
   levelItem: (mod, name) => `${mod}: a single item, ${name}`,
   levelParts: (mod, parts, segments) =>
@@ -303,6 +344,30 @@ const de: ReviewTexts = {
     open > 0 ? `teils entschieden, ${open} offen` : "je Abschnitt verschieden entschieden",
   showSegment: "Zeigen",
   keepHere: (name) => `Hier ${name} behalten`,
+  suggestedTag: "Vorschlag",
+  suggestReason: (winner, winnerParts, winnerRoom, loser, loserParts, loserRoom, single) =>
+    `${winner} baut hier ${winnerParts} ${winnerParts === 1 ? "Teil" : "Teile"} (etwa ${winnerRoom} m³); ${
+      single !== null
+        ? `${loser} hat ein einzelnes, ${single} (etwa ${loserRoom} m³)`
+        : `${loser} nur ${loserParts} (etwa ${loserRoom} m³)`
+    }. Vorschlag: ${winner} behalten.`,
+  segmentSuggested: (name) => `Vorschlag: ${name}`,
+  suggestHint:
+    "Ein Vorschlag, wo eine Seite mindestens 20-mal so viel Raum einnimmt wie die andere, gemessen an ihren Teilen.",
+  measureAll: (count) =>
+    count === 1 ? "Den 1 offenen Bereich ausmessen" : `Die ${count} offenen Bereiche ausmessen`,
+  measuring: (done, total) => `Messe Bereiche … ${done} von ${total}`,
+  measureStop: "Anhalten",
+  takeAll: (count) =>
+    count === 1
+      ? "Den klaren Vorschlag übernehmen (1 Bereich)"
+      : `Alle klaren Vorschläge übernehmen (${count} Bereiche)`,
+  takeAllDone: (taken, doubtful, stuck, asking) =>
+    `${taken} ${taken === 1 ? "Bereich" : "Bereiche"} nach Vorschlag entschieden. Zum Durchgehen bleiben ${doubtful} ohne klaren Vorschlag${
+      asking > 0
+        ? `, ${asking}, in denen nur ins Spiel Eingebundenes weg könnte (das entscheidest du)`
+        : ""
+    }${stuck > 0 ? `, ${stuck}, in denen nichts weg kann` : ""}. Rückgängig nimmt alle auf einmal zurück.`,
   compared: "Verglichen:",
   levelItem: (mod, name) => `${mod}: ein einzelnes Teil, ${name}`,
   levelParts: (mod, parts, segments) =>

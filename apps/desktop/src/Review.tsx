@@ -2,9 +2,9 @@
 // structure by structure. It owns nothing: it shows the homes' own rows
 // and writes the same choices the homes write.
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
-import { objectKey } from "./area-layer";
+import { AreaLayer, LOOK, objectKey } from "./area-layer";
 import { isCollision, stepOf } from "./arrange";
 import {
   CompareStage3D,
@@ -25,6 +25,8 @@ import { rememberObjects } from "./pair-report";
 import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
+import { findSegments } from "./segments";
+import { type Suggestion, suggestionOf } from "./suggest";
 import { FindingRow } from "./Tasks";
 import "./review.css";
 
@@ -133,6 +135,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
   useEffect(() => remember(game, stored), [game, stored]);
   // The place the collisions step shows, kept here so that the report can lead there.
   const [clusterAt, setClusterAt] = useState<string | null>(null);
+  // The segments of the places measured so far, by place, for the suggestions by size.
+  const [survey, setSurvey] = useState<Map<string, StageSegment[]>>(new Map());
   const index = REVIEW_STEPS.indexOf(stored.step);
   const previous = REVIEW_STEPS[index - 1];
   const following = REVIEW_STEPS[index + 1];
@@ -216,6 +220,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
           <CollisionsStep
             report={report}
             game={game}
+            survey={survey}
+            onSurvey={(key, found) => setSurvey((before) => new Map(before).set(key, found))}
             clusters={clusters}
             cursor={clusterAt}
             onCursor={setClusterAt}
@@ -395,19 +401,26 @@ function placeOf(
 function CollisionsStep({
   report,
   game,
+  survey,
+  onSurvey,
   clusters,
   cursor,
   onCursor,
 }: {
   report: RenderedReport;
   game: string;
+  survey: Map<string, StageSegment[]>;
+  onSurvey: (key: string, segments: StageSegment[]) => void;
   clusters: Cluster[];
   cursor: string | null;
   onCursor: (key: string) => void;
 }) {
-  const { api, ignored, patchChoices, setPatchChoices, spots } = useSession();
+  const { api, lang, ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
   const [history, setHistory] = useState<PatchChoices[]>([]);
+  // The check of every place in the background: how far, and whether to stop.
+  const [measuring, setMeasuring] = useState<{ done: number; total: number } | null>(null);
+  const stopMeasuring = useRef(false);
   const [segments, setSegments] = useState<StageSegment[]>([]);
   // Why the game may rely on the parts of the place (ADR 0046), by key, for
   // the parts asked last; null while asking.
@@ -490,16 +503,7 @@ function CollisionsStep({
   }
   const sides = cluster.plugins;
   const names: [string, string] = [short(sides[0]), short(sides[1])];
-  const groups: StageGroup[] = cluster.spots.map(({ item, key }) => {
-    const parts = item.spot.parts ?? [];
-    return {
-      key,
-      seeds: [
-        parts.filter((part) => part.object.plugin === sides[0]).map((part) => part.object),
-        parts.filter((part) => part.object.plugin === sides[1]).map((part) => part.object),
-      ],
-    };
-  });
+  const groups = groupsOf(cluster);
   const { place } = placeOf(first.item.spot, report.map.worlds);
   const reach = cluster.radius + 2048;
   const radius = Math.min(2 * CELL, Math.max(CELL, cluster.radius + 2048));
@@ -508,7 +512,7 @@ function CollisionsStep({
   const shownSegments: StageSegment[] =
     segments.length > 0
       ? segments
-      : cluster.spots.map(({ key }) => ({ groups: [key], parts: [[], []] }));
+      : cluster.spots.map(({ key }) => ({ groups: [key], parts: [[], []], volumes: [0, 0] }));
   const spotsOf = (segment: StageSegment) =>
     segment.groups.flatMap((key) => {
       const spot = bySpot.get(key);
@@ -636,6 +640,174 @@ function CollisionsStep({
     (part) => part.game,
   ).length;
   const placeKept = keptSideOf(placeDecided);
+  // The suggested side of this place, by size (ADR 0050): from the stage's
+  // segments, else from the check of every place.
+  const measured = segments.length > 0 ? segments : (survey.get(cluster.key) ?? []);
+  const suggested = suggestionOf(measured);
+  const roomText = (cubic: number) =>
+    cubic < 10
+      ? cubic.toLocaleString(lang, { maximumFractionDigits: cubic < 1 ? 2 : 1 })
+      : Math.round(cubic).toLocaleString(lang);
+  const suggestReason = (suggestion: Suggestion) => {
+    const winner = suggestion.side;
+    const loser = winner === 0 ? 1 : 0;
+    return r.suggestReason(
+      names[winner],
+      suggestion.parts[winner],
+      roomText(suggestion.volumes[winner]),
+      names[loser],
+      suggestion.parts[loser],
+      roomText(suggestion.volumes[loser]),
+      suggestion.single,
+    );
+  };
+  /** The open places with a clear suggestion from the check of every place. */
+  const clear = clusters.filter(
+    (candidate) => openIn(candidate) > 0 && suggestionOf(survey.get(candidate.key) ?? []) !== null,
+  );
+  const unmeasured = clusters.filter(
+    (candidate) => openIn(candidate) > 0 && !survey.has(candidate.key),
+  ).length;
+  /** Measures every open place not measured yet, in the background, one after the other. */
+  const measureAll = async () => {
+    const todo = clusters.filter(
+      (candidate) => openIn(candidate) > 0 && !survey.has(candidate.key),
+    );
+    const gl = document.createElement("canvas").getContext("webgl2");
+    if (gl === null || todo.length === 0) {
+      return;
+    }
+    stopMeasuring.current = false;
+    setMeasuring({ done: 0, total: todo.length });
+    const layer = new AreaLayer(gl, api, () => {});
+    try {
+      for (const [index, candidate] of todo.entries()) {
+        if (stopMeasuring.current) {
+          break;
+        }
+        const found = await measure(layer, candidate);
+        if (found !== null) {
+          onSurvey(candidate.key, found);
+        }
+        setMeasuring({ done: index + 1, total: todo.length });
+      }
+    } finally {
+      layer.dispose();
+      setMeasuring(null);
+    }
+  };
+  /** One place measured: its area read, its models read, its segments found. */
+  const measure = async (layer: AreaLayer, candidate: Cluster) => {
+    const spot = candidate.spots[0]?.item.spot;
+    if (spot === undefined) {
+      return null;
+    }
+    const where = placeOf(spot, report.map.worlds).place;
+    const reachHere = candidate.radius + 2048;
+    const radiusHere = Math.min(2 * CELL, Math.max(CELL, candidate.radius + 2048));
+    const area = await (where.type === "exterior"
+      ? api.areaObjects(where.world, candidate.centre[0], candidate.centre[1], radiusHere)
+      : api.interiorObjects(where.cell)
+    ).catch(() => null);
+    if (area === null) {
+      return null;
+    }
+    layer.show(area, () => LOOK.plain);
+    // The models arrive one after the other; at most twenty seconds per place.
+    for (let wait = 0; wait < 200; wait++) {
+      const progress = layer.progress;
+      if (progress.done === progress.total || stopMeasuring.current) {
+        break;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    return findSegments(layer, area, groupsOf(candidate), candidate.centre, reachHere);
+  };
+  /**
+   * Takes every clear suggestion at once, as honestly as the keep buttons:
+   * of the side given up only the parts that may go are hidden; what is
+   * tied in or needed stays; a place where nothing can go stays open. One
+   * undo takes the whole batch back.
+   */
+  const takeAll = async () => {
+    let next = patchChoices;
+    let taken = 0;
+    let stuck = 0;
+    let asking = 0;
+    for (const candidate of clear) {
+      const found = survey.get(candidate.key) ?? [];
+      const suggestion = suggestionOf(found);
+      const spot = candidate.spots[0]?.item.spot;
+      if (suggestion === null || spot === undefined) {
+        continue;
+      }
+      const losingSide = suggestion.side === 0 ? 1 : 0;
+      const loser = candidate.plugins[losingSide];
+      const losing = found
+        .flatMap((segment) => segment.parts[losingSide])
+        .filter((object) => !isGameObject(object));
+      const keeping = found.flatMap((segment) => segment.parts[suggestion.side]);
+      const notHideable = new Set(
+        candidate.spots.flatMap(({ item }) =>
+          (item.spot.parts ?? [])
+            .filter((part) => !part.hideable)
+            .map((part) => objectKey(part.object.plugin, part.object.localId)),
+        ),
+      );
+      const place = spot.location.type === "interior" ? spot.location.cell : spot.location.world;
+      const ties =
+        losing.length === 0
+          ? []
+          : ((await api
+              .objectAnchors(
+                place,
+                losing.map((object) => ({
+                  plugin: object.id.plugin,
+                  localId: object.id.localId,
+                })),
+              )
+              .catch(() => null)) ?? []);
+      const byKey = new Map(
+        ties.map((tie) => [objectKey(tie.object.plugin, tie.object.localId), tie]),
+      );
+      const go = losing.filter((object) => {
+        const key = objectKey(object.id.plugin, object.id.localId);
+        const tie = byKey.get(key);
+        return tie === undefined ? !notHideable.has(key) : tie.verdict === "free";
+      });
+      if (go.length === 0) {
+        // Tied-in parts are hidden only when the user says so, place by place.
+        const tied = losing.some(
+          (object) =>
+            byKey.get(objectKey(object.id.plugin, object.id.localId))?.verdict === "careful",
+        );
+        if (tied) {
+          asking += 1;
+        } else {
+          stuck += 1;
+        }
+        continue;
+      }
+      next = revealObjects(
+        next,
+        spots,
+        keeping.map((object) => object.id),
+      );
+      for (const object of go) {
+        next = chooseObject(next, object.id, true);
+      }
+      for (const { key } of candidate.spots) {
+        next = chooseSpot(next, key, loser);
+      }
+      taken += 1;
+    }
+    if (taken > 0) {
+      setHistory([...history, patchChoices]);
+      setPatchChoices(next);
+    }
+    const open = clusters.filter((candidate) => openIn(candidate) > 0).length;
+    setNote(r.takeAllDone(taken, Math.max(0, open - taken - stuck - asking), stuck, asking));
+  };
   /** What a side brings to the comparison: one item, or parts in segments. */
   const levelOf = (side: 0 | 1) => {
     const parts = partsOf(shownSegments, side);
@@ -724,6 +896,44 @@ function CollisionsStep({
 
   return (
     <div className="review-collision">
+      <div className="review-suggest-bar">
+        {measuring !== null ? (
+          <>
+            <span>{r.measuring(measuring.done, measuring.total)}</span>
+            <button
+              type="button"
+              className="small quiet"
+              onClick={() => {
+                stopMeasuring.current = true;
+              }}
+            >
+              {r.measureStop}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="small"
+            disabled={unmeasured === 0}
+            onClick={() => {
+              measureAll().catch(() => setMeasuring(null));
+            }}
+          >
+            {r.measureAll(unmeasured)}
+          </button>
+        )}
+        <button
+          type="button"
+          className="small primary"
+          disabled={clear.length === 0 || measuring !== null}
+          onClick={() => {
+            takeAll().catch(() => {});
+          }}
+        >
+          {r.takeAll(clear.length)}
+        </button>
+        <span className="aside">{r.suggestHint}</span>
+      </div>
       <nav className="review-structures" aria-label={r.clusterOf(at + 1, clusters.length)}>
         <button
           type="button"
@@ -771,6 +981,7 @@ function CollisionsStep({
         hidden={hidden}
         onSegments={(found) => {
           setSegments(found);
+          onSurvey(cluster.key, found);
           // Their names, for the report of parts hidden on their own.
           rememberObjects(
             game,
@@ -780,6 +991,11 @@ function CollisionsStep({
         }}
         onPick={pick}
       />
+      {suggested !== null && (
+        <p className="review-suggest">
+          <span className="suggested-mark">{r.suggestedTag}</span> {suggestReason(suggested)}
+        </p>
+      )}
       <p className="review-compared">
         <strong>{r.compared}</strong> {levelOf(0)} ⟷ {levelOf(1)}
         <span className="aside"> · {r.pickHint}</span>
@@ -800,6 +1016,7 @@ function CollisionsStep({
         >
           {placeKept === 0 ? "✓ " : ""}
           {r.keepHere(names[0])}
+          {suggested?.side === 0 && ` · ${r.suggestedTag}`}
         </button>
         <button
           type="button"
@@ -810,6 +1027,7 @@ function CollisionsStep({
         >
           {placeKept === 1 ? "✓ " : ""}
           {r.keepHere(names[1])}
+          {suggested?.side === 1 && ` · ${r.suggestedTag}`}
         </button>
         <button
           type="button"
@@ -864,6 +1082,11 @@ function CollisionsStep({
                 <span className="review-state" data-decided={decided.type !== "open"}>
                   {describeSegment(segment, decided)}
                 </span>
+                {suggestionOf([segment]) !== null && (
+                  <span className="suggested-mark">
+                    {r.segmentSuggested(names[suggestionOf([segment])?.side ?? 0])}
+                  </span>
+                )}
                 <span className="spacer" />
                 <button
                   type="button"
@@ -928,6 +1151,21 @@ function CollisionsStep({
       </section>
     </div>
   );
+}
+
+/** The spots of a place, each with the parts its structures start from. */
+function groupsOf(cluster: Cluster): StageGroup[] {
+  const sides = cluster.plugins;
+  return cluster.spots.map(({ item, key }) => {
+    const parts = item.spot.parts ?? [];
+    return {
+      key,
+      seeds: [
+        parts.filter((part) => part.object.plugin === sides[0]).map((part) => part.object),
+        parts.filter((part) => part.object.plugin === sides[1]).map((part) => part.object),
+      ],
+    };
+  });
 }
 
 /** The worldspace or cell of a spot, as the report remembers objects by. */

@@ -471,3 +471,17 @@
   gap: 8px;
   font-size: 0.85rem;
 }
+
+/* Suggestions by size, and taking them all at once. */
+.review-suggest-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.review-suggest {
+  margin: 0;
+  font-size: 0.88rem;
+}

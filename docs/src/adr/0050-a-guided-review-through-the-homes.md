@@ -139,6 +139,24 @@ a colour of its own.
     decisions, no more than 15 % and no more than 30 objects are left. It
     says so gently and leaves uninstalling to the user. This is counted in
     the window from the patch's choices; findings stay what the scan read.
+12. **A suggestion by size.** At JK's Nightgate Inn against Cutting Room
+    Floor a building of 270 parts stood against one lantern post. Each
+    place and segment gets a suggested side by geometry alone, apart from
+    LOOT's word and the suggestions about whole mods: the room each side
+    takes (the sum of its parts' model boxes as placed, each side at least
+    one unit) and its parts. A side is suggested when it takes at least 20
+    times the room of the other, however many parts either has (one huge
+    bridge against a fence of thirty posts keeps the bridge), or has at
+    least 20 times the parts with at least 5 times the room. Otherwise
+    there is no suggestion and the place is the user's to look at. The
+    suggested keep button says so, with one line of reason (parts and
+    cubic metres of each side). *Measure the open places* reads every open
+    place in the background, one after the other, as the stage would; then
+    *take every clear suggestion* decides them as honestly as the keep
+    buttons (only parts that may go are hidden; tied-in and needed parts
+    stay, and a place where only those could go stays open), and one
+    *undo* takes the whole batch back. The ratios are a first guess, to be
+    tuned on the user's places.
 
 ## Consequences
 

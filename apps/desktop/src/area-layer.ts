@@ -596,6 +596,21 @@ export class AreaLayer {
     return [...found, ...touching].map((candidate) => candidate.object);
   }
 
+  /**
+   * The room an object's model box takes as placed, in cubic game units
+   * (each side at least one unit, so that flat parts count); null until
+   * its model is read.
+   */
+  volumeOf(object: AreaObject): number | null {
+    const model = this.models.get(object.model);
+    if (model === undefined || !Array.isArray(model.surfaces)) {
+      return null;
+    }
+    const [low, high] = model.box;
+    const side = (axis: 0 | 1 | 2) => Math.max(1, (high[axis] - low[axis]) * object.scale);
+    return side(0) * side(1) * side(2);
+  }
+
   /** How many of the area's models are there, of how many. */
   get progress(): { done: number; total: number } {
     const wanted = new Set(this.instances.map((instance) => instance.object.model));
