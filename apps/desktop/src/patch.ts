@@ -339,6 +339,64 @@ export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
   return [...found.values()];
 }
 
+/** What the choices hide, by {@link matchKey}, from the spots of the collisions. */
+const hiddenCache = new WeakMap<PatchChoices, Set<string>>();
+
+export function hiddenKeysOf(spots: Map<string, MapSpot[]>, choices: PatchChoices): Set<string> {
+  const known = hiddenCache.get(choices);
+  if (known !== undefined) {
+    return known;
+  }
+  const found = new Set(freeObjects(choices).map(matchKey));
+  for (const [finding, list] of spots) {
+    for (const spot of list) {
+      const parts = spot.parts ?? [];
+      const decided = decisionAt(choices, finding, spotKey(spot), parts);
+      if (typeof decided === "string") {
+        for (const object of hiddenAt(parts, decided)) {
+          found.add(matchKey(object));
+        }
+      }
+    }
+  }
+  hiddenCache.set(choices, found);
+  return found;
+}
+
+/**
+ * The choices with `objects` shown again, however they were hidden: on
+ * their own, or at a spot whose choice hides them (that spot then keeps
+ * both).
+ */
+export function revealObjects(
+  choices: PatchChoices,
+  spots: Map<string, MapSpot[]>,
+  objects: ObjectRef[],
+): PatchChoices {
+  const wanted = new Set(objects.map(matchKey));
+  const next: PatchChoices = {};
+  for (const [key, value] of Object.entries(choices)) {
+    const own = freeObjects({ [key]: value })[0];
+    if (own === undefined || !wanted.has(matchKey(own))) {
+      next[key] = value;
+    }
+  }
+  for (const [finding, list] of spots) {
+    for (const spot of list) {
+      const key = spotKey(spot);
+      const parts = spot.parts ?? [];
+      const decided = key === null ? undefined : decisionAt(next, finding, key, parts);
+      if (key === null || typeof decided !== "string") {
+        continue;
+      }
+      if (hiddenAt(parts, decided).some((object) => wanted.has(matchKey(object)))) {
+        next[key] = null;
+      }
+    }
+  }
+  return next;
+}
+
 /** The objects of the patch in the game, by key. */
 export function installedKeys(report: RenderedReport): Set<string> {
   return new Set((report.installedPatch?.objects ?? []).map(matchKey));

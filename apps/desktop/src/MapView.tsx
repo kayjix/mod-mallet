@@ -212,8 +212,8 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             hover={hover}
             onPick={setPicked}
             onHover={setHover}
-            objectExtra={(object, group) => (
-              <MapObjectActions object={object} group={group} place={world.name} />
+            objectExtra={(object, tools) => (
+              <MapObjectActions object={object} tools={tools} place={world.name} />
             )}
           />
         ) : (

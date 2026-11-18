@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useSession } from "./Actions";
-import { AreaLayer, LOOK, type Look, objectKey } from "./area-layer";
+import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
@@ -55,7 +55,9 @@ interface MapView3DProps {
   /** The objects the patch would hide, by {@link objectKey}: drawn as ghosts. */
   hidden?: Set<string>;
   /** More for the card of a picked object, such as what to do with it. */
-  objectExtra?: (object: AreaObject, group: AreaObject[]) => ReactNode;
+  objectExtra?: (object: AreaObject, tools: PartTools) => ReactNode;
+  /** Told about each object picked in the view, or none. */
+  onObject?: (object: AreaObject | null) => void;
   /** Shown over the relief. */
   children?: ReactNode;
   /** How far from a picked collision the camera comes, in cells. */
@@ -449,6 +451,7 @@ export function MapView3D({
   focus = NO_KEYS,
   hidden = NO_KEYS,
   objectExtra,
+  onObject,
   children,
   spotDistance = NEAR * 0.7,
   plain = false,
@@ -481,8 +484,6 @@ export function MapView3D({
   const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
   const progressKey = useRef("");
   const [pickedObject, setPickedObject] = useState<AreaObject | null>(null);
-  // The parts of the same plugin that hang together with the picked object.
-  const [group, setGroup] = useState<AreaObject[]>([]);
   const areaTimer = useRef<number | null>(null);
   const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
   const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
@@ -1461,7 +1462,7 @@ export function MapView3D({
       if (found === null && !start.turn) {
         const object = objectAt(event.clientX, event.clientY);
         setPickedObject(object);
-        setGroup(object === null ? [] : (area.current?.connected(object) ?? [object]));
+        onObject?.(object);
         area.current?.select(
           object === null ? [] : [objectKey(object.id.plugin, object.id.localId)],
         );
@@ -1562,7 +1563,6 @@ export function MapView3D({
               aria-label={t.viewerClose}
               onClick={() => {
                 setPickedObject(null);
-                setGroup([]);
                 area.current?.select([]);
                 redraw();
               }}
@@ -1588,21 +1588,15 @@ export function MapView3D({
               <code>{pickedObject.model}</code>
             </dd>
           </dl>
-          {group.length > 1 && (
-            <button
-              type="button"
-              className="small relief-object-action"
-              onClick={() => {
-                area.current?.select(
-                  group.map((part) => objectKey(part.id.plugin, part.id.localId)),
-                );
-                redraw();
-              }}
-            >
-              {t.mapObjectGroup(group.length)}
-            </button>
-          )}
-          {objectExtra?.(pickedObject, group)}
+          {objectExtra?.(pickedObject, {
+            connected: (margin) => area.current?.connected(pickedObject, margin) ?? [pickedObject],
+            mark: (objects) => {
+              area.current?.select(
+                objects.map((part) => objectKey(part.id.plugin, part.id.localId)),
+              );
+              redraw();
+            },
+          })}
         </div>
       )}
       {children}

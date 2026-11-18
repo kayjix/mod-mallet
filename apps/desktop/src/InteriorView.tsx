@@ -4,7 +4,7 @@
 
 import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
-import { AreaLayer, LOOK, type Look, objectKey } from "./area-layer";
+import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
 import { interiorTexts } from "./interior-texts";
@@ -25,7 +25,9 @@ export interface InteriorViewProps {
    */
   plain: boolean;
   /** More for the card of a picked object, such as what to do with it. */
-  objectExtra?: (object: AreaObject, group: AreaObject[]) => ReactNode;
+  objectExtra?: (object: AreaObject, tools: PartTools) => ReactNode;
+  /** Told about each object picked in the view, or none. */
+  onObject?: (object: AreaObject | null) => void;
   /** Told about the objects of the cell once they are read, `null` if they cannot be. */
   onArea?: (area: AreaObjects | null) => void;
   /** Shown over the view. */
@@ -66,6 +68,7 @@ export function InteriorView({
   hidden,
   plain,
   objectExtra,
+  onObject,
   onArea,
   children,
 }: InteriorViewProps) {
@@ -79,8 +82,6 @@ export function InteriorView({
   const [area, setArea] = useState<AreaObjects | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [picked, setPicked] = useState<AreaObject | null>(null);
-  // The parts of the same plugin that hang together with the picked object.
-  const [group, setGroup] = useState<AreaObject[]>([]);
   const [seeInside, setSeeInside] = useState(true);
   const [failed, setFailed] = useState(false);
   const camera = useRef<Camera>({
@@ -360,7 +361,7 @@ export function InteriorView({
     if (start !== null && !start.moved && !start.turn) {
       const object = objectAt(start.x, start.y);
       setPicked(object);
-      setGroup(object === null ? [] : (layer.current?.connected(object) ?? [object]));
+      onObject?.(object);
       layer.current?.select(
         object === null ? [] : [objectKey(object.id.plugin, object.id.localId)],
       );
@@ -472,7 +473,6 @@ export function InteriorView({
               aria-label={t.viewerClose}
               onClick={() => {
                 setPicked(null);
-                setGroup([]);
                 layer.current?.select([]);
                 redraw();
               }}
@@ -498,7 +498,15 @@ export function InteriorView({
               <code>{picked.model}</code>
             </dd>
           </dl>
-          {objectExtra?.(picked, group)}
+          {objectExtra?.(picked, {
+            connected: (margin) => layer.current?.connected(picked, margin) ?? [picked],
+            mark: (objects) => {
+              layer.current?.select(
+                objects.map((part) => objectKey(part.id.plugin, part.id.localId)),
+              );
+              redraw();
+            },
+          })}
         </div>
       )}
       {children}

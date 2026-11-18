@@ -260,7 +260,15 @@ export function placement(object: AreaObject): Float32Array {
 }
 
 /** How close two parts' boxes must come to hang together, in game units (about 20 cm). */
-const TOUCHING = 14;
+export const TOUCHING = 14;
+
+/** What the card of a picked object can do with the view it was picked in. */
+export interface PartTools {
+  /** The parts of the same plugin that hang together with it, boxes within `margin` game units. */
+  connected: (margin: number) => AreaObject[];
+  /** Lights these objects up in the view. */
+  mark: (objects: AreaObject[]) => void;
+}
 
 /** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
 interface PlacedBox {
@@ -432,7 +440,7 @@ export class AreaLayer {
    * placed as the game places them, meeting within a hand's breadth, as far
    * as the area shows them. A bridge or a scaffold built of parts.
    */
-  connected(object: AreaObject): AreaObject[] {
+  connected(object: AreaObject, margin = TOUCHING): AreaObject[] {
     const plugin = object.id.plugin.toLowerCase();
     const candidates = this.instances
       .filter((instance) => instance.object.id.plugin.toLowerCase() === plugin)
@@ -459,7 +467,7 @@ export class AreaLayer {
         break;
       }
       for (const other of [...left]) {
-        if (boxesMeet(from.box, other.box, TOUCHING)) {
+        if (boxesMeet(from.box, other.box, margin)) {
           found.push(other);
           left.delete(other);
         }

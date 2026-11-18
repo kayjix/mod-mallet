@@ -1,21 +1,26 @@
 // What can be done with one object picked in a 3D view (ADR 0040, 0046):
 // hide it on its own through the patch, with the reasons the game may rely
-// on it, or, where it is part of a collision, decide that collision on the
-// collisions' page.
+// on it; show it again however it was hidden; take the parts of the same
+// mod that hang together with it along; or, where it is part of a
+// collision, decide that collision on the collisions' page.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
 import type { Api } from "./api";
-import { objectKey } from "./area-layer";
+import { objectKey, type PartTools, TOUCHING } from "./area-layer";
+import { collisionsTexts } from "./collisions-texts";
 import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
-import { chooseObject, objectChoiceKey } from "./patch";
+import { chooseObject, hiddenKeysOf, matchKey, objectChoiceKey, revealObjects } from "./patch";
 
 /** The plugins of the games themselves, whose objects quests may need. */
 const GAME_PLUGIN =
   /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
+
+/** Game units in a centimetre, for how close parts must come to hang together. */
+const UNITS_PER_CENTIMETRE = 0.7;
 
 /** Whether an object belongs to the game itself rather than to a mod. */
 export const isGameObject = (object: { id: ObjectRef }) => GAME_PLUGIN.test(object.id.plugin);
@@ -93,84 +98,179 @@ export function AnchorReasons({ anchors }: { anchors: ObjectAnchors }) {
   );
 }
 
+/** What the current choices hide, by {@link matchKey}. */
+function useHidden(): Set<string> {
+  const { spots, patchChoices } = useSession();
+  return useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+}
+
 /**
- * Hiding an object on its own, or showing it again, after what ties it:
- * nothing for an object the game cannot do without, a warning for one it
- * may miss, nothing for one already hidden otherwise (`hiddenOtherwise`).
+ * The parts of the same mod that hang together with an object, as far as
+ * the view shows them: how close they must come, marked in the view, and
+ * hidden or shown again together.
+ */
+function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools }) {
+  const { lang, spots, patchChoices, setPatchChoices } = useSession();
+  const own = collisionsTexts[lang];
+  const hidden = useHidden();
+  // How close parts must come, in centimetres.
+  const [gap, setGap] = useState(Math.round(TOUCHING / UNITS_PER_CENTIMETRE));
+  const { connected, mark } = tools;
+  const group = useMemo(() => connected(gap * UNITS_PER_CENTIMETRE), [connected, gap]);
+  const others = group.filter((part) => part !== object);
+  if (others.length === 0 && gap <= 20) {
+    return (
+      <div className="parts-together">
+        <p className="aside">{own.partsAlone}</p>
+        <GapSlider gap={gap} onGap={setGap} />
+      </div>
+    );
+  }
+  const allHidden = group.every((part) => hidden.has(matchKey(part.id)));
+  const hideable = group.filter((part) => !part.anchored);
+  return (
+    <div className="parts-together">
+      <p className="aside">{own.partsTogether(group.length)}</p>
+      <GapSlider gap={gap} onGap={setGap} />
+      <span className="relief-object-buttons">
+        <button type="button" className="small" onClick={() => mark(group)}>
+          {own.partsMark}
+        </button>
+        {allHidden ? (
+          <button
+            type="button"
+            className="small primary"
+            onClick={() =>
+              setPatchChoices(
+                revealObjects(
+                  patchChoices,
+                  spots,
+                  group.map((part) => part.id),
+                ),
+              )
+            }
+          >
+            {own.partsShow(group.length)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="small"
+            disabled={hideable.length === 0}
+            onClick={() => {
+              let next = patchChoices;
+              for (const part of hideable) {
+                next = chooseObject(next, part.id, true);
+              }
+              setPatchChoices(next);
+            }}
+          >
+            {own.partsHide(hideable.length)}
+          </button>
+        )}
+      </span>
+      <p className="aside parts-hint">
+        {hideable.length < group.length ? own.partsSomeTied(group.length - hideable.length) : ""}
+        {own.partsHint}
+      </p>
+    </div>
+  );
+}
+
+function GapSlider({ gap, onGap }: { gap: number; onGap: (gap: number) => void }) {
+  const { lang } = useSession();
+  const own = collisionsTexts[lang];
+  return (
+    <label className="parts-gap">
+      {own.partsGap(gap)}
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={gap}
+        onChange={(event) => onGap(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+/**
+ * Hiding an object on its own, or showing it again however it was hidden,
+ * after what ties it: nothing for an object the game cannot do without, a
+ * warning for one it may miss. With the view's tools, the parts that hang
+ * together with it as well.
  */
 export function FreeObjectActions({
   object,
   place,
-  group = [],
-  hiddenOtherwise = false,
+  tools,
 }: {
   object: AreaObject;
   /** The worldspace or interior cell it is in. */
   place: string | null;
-  /** The parts that hang together with it, itself among them. */
-  group?: AreaObject[];
-  hiddenOtherwise?: boolean;
+  tools?: PartTools;
 }) {
-  const { t, patchChoices, setPatchChoices } = useSession();
+  const { t, lang, spots, patchChoices, setPatchChoices } = useSession();
+  const own = collisionsTexts[lang];
   const anchors = useAnchors(place, object.id);
+  const hidden = useHidden();
   // Without an answer, the two flags of the placed object decide as before.
   const locked = anchors === null ? object.anchored : anchors?.verdict === "locked";
   const careful = anchors?.verdict === "careful";
-  // The parts of the group that may be hidden, and whether all are.
-  const hideable = group.filter((part) => !part.anchored || part === object);
-  const allOwn =
-    hideable.length > 1 && hideable.every((part) => objectChoiceKey(part.id) in patchChoices);
-  const groupButton = hideable.length > 1 && (
-    <button
-      type="button"
-      className="small"
-      onClick={() => {
-        let next = patchChoices;
-        for (const part of hideable) {
-          next = chooseObject(next, part.id, !allOwn);
-        }
-        setPatchChoices(next);
-      }}
-    >
-      {allOwn ? t.workGroupShow(hideable.length) : t.workGroupHide(hideable.length)}
-    </button>
-  );
-  const own = objectChoiceKey(object.id) in patchChoices;
-  if (anchors === undefined) {
-    return <p className="aside relief-object-action">{t.anchorAsking}</p>;
+  const isHidden = hidden.has(matchKey(object.id));
+  const byItself = objectChoiceKey(object.id) in patchChoices;
+  const together = tools === undefined ? null : <PartsTogether object={object} tools={tools} />;
+  if (isHidden) {
+    return (
+      <div className="relief-object-action">
+        <p className="aside">{byItself ? own.hiddenByItself : own.hiddenByDecision}</p>
+        <button
+          type="button"
+          className="small primary"
+          onClick={() => setPatchChoices(revealObjects(patchChoices, spots, [object.id]))}
+        >
+          {t.workObjectShow}
+        </button>
+        {together}
+      </div>
+    );
   }
-  if (locked && !own) {
+  if (anchors === undefined) {
+    return (
+      <div className="relief-object-action">
+        <p className="aside">{t.anchorAsking}</p>
+        {together}
+      </div>
+    );
+  }
+  if (locked) {
     return (
       <div className="relief-object-action">
         <p className="aside">{t.anchorLocked}</p>
         {anchors !== null && <AnchorReasons anchors={anchors} />}
+        {together}
       </div>
     );
   }
-  if (hiddenOtherwise && !own) {
-    return null;
-  }
   return (
     <div className="relief-object-action">
-      {careful && !own && anchors !== null && (
+      {careful && anchors !== null && (
         <>
           <p className="aside relief-object-warning">{t.anchorCareful}</p>
           <AnchorReasons anchors={anchors} />
         </>
       )}
-      {isGameObject(object) && !own && (
-        <p className="aside relief-object-warning">{t.workObjectGame}</p>
-      )}
-      <span className="relief-object-buttons">
-        <button
-          type="button"
-          className={own ? "small" : "small primary"}
-          onClick={() => setPatchChoices(chooseObject(patchChoices, object.id, !own))}
-        >
-          {own ? t.workObjectShow : careful ? t.anchorHideAnyway : t.workObjectHide}
-        </button>
-        {groupButton}
-      </span>
+      {isGameObject(object) && <p className="aside relief-object-warning">{t.workObjectGame}</p>}
+      <button
+        type="button"
+        className="small primary"
+        onClick={() => setPatchChoices(chooseObject(patchChoices, object.id, true))}
+      >
+        {careful ? t.anchorHideAnyway : t.workObjectHide}
+      </button>
+      <p className="aside parts-hint">{own.hideHint}</p>
+      {together}
     </div>
   );
 }
@@ -188,9 +288,10 @@ export function NeededPart({
   object: ObjectRef;
   name: string;
 }) {
-  const { t, patchChoices, setPatchChoices } = useSession();
+  const { t, spots, patchChoices, setPatchChoices } = useSession();
   const anchors = useAnchors(place, object);
-  const own = objectChoiceKey(object) in patchChoices;
+  const hidden = useHidden();
+  const isHidden = hidden.has(matchKey(object));
   return (
     <div className="needed-part">
       <strong>{name}</strong>
@@ -199,13 +300,19 @@ export function NeededPart({
       ) : anchors === null ? null : (
         <AnchorReasons anchors={anchors} />
       )}
-      {anchors != null && anchors.verdict !== "locked" && (
+      {anchors != null && (anchors.verdict !== "locked" || isHidden) && (
         <button
           type="button"
           className="small"
-          onClick={() => setPatchChoices(chooseObject(patchChoices, object, !own))}
+          onClick={() =>
+            setPatchChoices(
+              isHidden
+                ? revealObjects(patchChoices, spots, [object])
+                : chooseObject(patchChoices, object, true),
+            )
+          }
         >
-          {own ? t.workObjectShow : t.anchorHideAnyway}
+          {isHidden ? t.workObjectShow : t.anchorHideAnyway}
         </button>
       )}
     </div>
@@ -213,7 +320,7 @@ export function NeededPart({
 }
 
 /** The spot of a collision an object is part of, if any. */
-function spotOf(spots: Map<string, MapSpot[]>, object: AreaObject): MapSpot | null {
+export function spotOf(spots: Map<string, MapSpot[]>, object: AreaObject): MapSpot | null {
   const key = objectKey(object.id.plugin, object.id.localId);
   for (const found of spots.values()) {
     for (const spot of found) {
@@ -232,11 +339,11 @@ function spotOf(spots: Map<string, MapSpot[]>, object: AreaObject): MapSpot | nu
 /** On the map: decide the object's collision on the collisions' page, or hide it on its own. */
 export function MapObjectActions({
   object,
-  group,
+  tools,
   place,
 }: {
   object: AreaObject;
-  group: AreaObject[];
+  tools: PartTools;
   place: string;
 }) {
   const { t, spots, decideSpot } = useSession();
@@ -252,7 +359,7 @@ export function MapObjectActions({
           {t.workDecideHere}
         </button>
       )}
-      <FreeObjectActions object={object} group={group} place={place} />
+      <FreeObjectActions object={object} tools={tools} place={place} />
     </>
   );
 }

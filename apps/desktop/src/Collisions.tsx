@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CopyButton, useSession } from "./Actions";
-import { objectKey } from "./area-layer";
+import { objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
 import { collisionsTexts } from "./collisions-texts";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
@@ -22,7 +22,7 @@ import { InteriorView } from "./InteriorView";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
-import { FreeObjectActions, NeededPart } from "./object-actions";
+import { FreeObjectActions, NeededPart, spotOf } from "./object-actions";
 import {
   chooseFinding,
   chooseObject,
@@ -1397,10 +1397,25 @@ function Stage({
     }
     return keys;
   }, [hiddenObjects, parts, preview, previewObjects]);
-  const hiddenKeys = useMemo(() => new Set(hiddenObjects.map(matchKey)), [hiddenObjects]);
+
+  // An object of another collision picked in the view opens that collision.
+  const { spots: spotsByFinding } = useSession();
+  const openSpotOf = (object: AreaObject | null) => {
+    if (object === null) {
+      return;
+    }
+    const key = objectKey(object.id.plugin, object.id.localId);
+    if (parts.some((part) => objectKey(part.object.plugin, part.object.localId) === key)) {
+      return;
+    }
+    const spot = spotOf(spotsByFinding, object);
+    if (spot !== null) {
+      onPick(spot);
+    }
+  };
 
   // What can be done with an object picked in the view.
-  const extra = (object: AreaObject, group: AreaObject[]) => {
+  const extra = (object: AreaObject, tools: PartTools) => {
     const key = objectKey(object.id.plugin, object.id.localId);
     const part = parts.find(
       (candidate) => objectKey(candidate.object.plugin, candidate.object.localId) === key,
@@ -1421,9 +1436,8 @@ function Stage({
     return (
       <FreeObjectActions
         object={object}
-        group={group}
+        tools={tools}
         place={location.type === "interior" ? location.cell : location.world}
-        hiddenOtherwise={hiddenKeys.has(matchKey(object.id))}
       />
     );
   };
@@ -1438,6 +1452,7 @@ function Stage({
         hidden={ghosts}
         plain={!marks}
         objectExtra={extra}
+        onObject={openSpotOf}
         onArea={onArea}
       >
         {marks && (
@@ -1483,6 +1498,7 @@ function Stage({
       focus={focus}
       hidden={ghosts}
       objectExtra={extra}
+      onObject={openSpotOf}
       spotDistance={CLOSE}
       plain={!marks}
       onArea={onArea}
