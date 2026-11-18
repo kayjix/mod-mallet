@@ -50,6 +50,22 @@ export interface ReviewTexts {
   stateMixed: (open: number) => string;
   showSegment: string;
   keepHere: (name: string) => string;
+  compared: string;
+  levelItem: (mod: string, name: string) => string;
+  levelParts: (mod: string, parts: number, segments: number) => string;
+  pickHint: string;
+  partsTitle: (count: number) => string;
+  partHide: string;
+  partShow: string;
+  partHideAnyway: string;
+  partGame: string;
+  partLocked: string;
+  singlyHidden: (count: number) => string;
+  withExceptions: (count: number) => string;
+  pickedHidden: (name: string) => string;
+  pickedShown: (name: string) => string;
+  pickedStays: (name: string) => string;
+  pickedOther: (name: string, mod: string) => string;
   checkingTies: string;
   keepEffect: (loser: string, go: number, total: number) => string;
   nothingCanGo: (loser: string) => string;
@@ -154,6 +170,23 @@ const en: ReviewTexts = {
     open > 0 ? `partly decided, ${open} open` : "decided differently by section",
   showSegment: "Show",
   keepHere: (name) => `Keep ${name}'s here`,
+  compared: "Compared:",
+  levelItem: (mod, name) => `${mod}: a single item, ${name}`,
+  levelParts: (mod, parts, segments) =>
+    `${mod}: ${parts} parts in ${segments} ${segments === 1 ? "section" : "sections"}`,
+  pickHint: "click an object in the views to hide it or show it again",
+  partsTitle: (count) => `The ${count} objects one by one`,
+  partHide: "Hide",
+  partShow: "Show again",
+  partHideAnyway: "Hide anyway",
+  partGame: "the game's own, stays",
+  partLocked: "the game needs it, stays",
+  singlyHidden: (count) => (count === 1 ? "1 hidden on its own" : `${count} hidden on their own`),
+  withExceptions: (count) => (count === 1 ? "(1 exception)" : `(${count} exceptions)`),
+  pickedHidden: (name) => `${name} is hidden now.`,
+  pickedShown: (name) => `${name} is shown again.`,
+  pickedStays: (name) => `${name} stays: the game needs it.`,
+  pickedOther: (name, mod) => `${name} belongs to ${mod}, not to the two mods compared here.`,
   checkingTies: "Looking at what the game needs here…",
   keepEffect: (loser, go, total) =>
     go === total
@@ -270,6 +303,24 @@ const de: ReviewTexts = {
     open > 0 ? `teils entschieden, ${open} offen` : "je Abschnitt verschieden entschieden",
   showSegment: "Zeigen",
   keepHere: (name) => `Hier ${name} behalten`,
+  compared: "Verglichen:",
+  levelItem: (mod, name) => `${mod}: ein einzelnes Teil, ${name}`,
+  levelParts: (mod, parts, segments) =>
+    `${mod}: ${parts} Teile in ${segments} ${segments === 1 ? "Abschnitt" : "Abschnitten"}`,
+  pickHint: "ein Objekt in den Ansichten anklicken blendet es aus oder wieder ein",
+  partsTitle: (count) => `Die ${count} Objekte einzeln`,
+  partHide: "Ausblenden",
+  partShow: "Wieder zeigen",
+  partHideAnyway: "Trotzdem ausblenden",
+  partGame: "gehört zum Spiel, bleibt",
+  partLocked: "das Spiel braucht es, bleibt",
+  singlyHidden: (count) =>
+    count === 1 ? "1 einzeln ausgeblendet" : `${count} einzeln ausgeblendet`,
+  withExceptions: (count) => (count === 1 ? "(1 Ausnahme)" : `(${count} Ausnahmen)`),
+  pickedHidden: (name) => `${name} ist jetzt ausgeblendet.`,
+  pickedShown: (name) => `${name} ist wieder sichtbar.`,
+  pickedStays: (name) => `${name} bleibt: das Spiel braucht es.`,
+  pickedOther: (name, mod) => `${name} gehört zu ${mod}, nicht zu den beiden verglichenen Mods.`,
   checkingTies: "Prüfe, was das Spiel hier braucht …",
   keepEffect: (loser, go, total) =>
     go === total

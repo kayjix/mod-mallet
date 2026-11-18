@@ -20,6 +20,7 @@ import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
 import { Overview, openFileDuels } from "./Overview";
+import { reportFile } from "./PairReport";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
 import { choicesOf, installedKeys, type PatchChoices, pairsOf, withoutMisspelt } from "./patch";
@@ -370,10 +371,34 @@ export default function App({ api, startLang }: AppProps) {
     [go],
   );
 
+  // Creating the patch also writes the report of what it does next to it
+  // (ADR 0050), from the decisions as they are at that moment.
+  const reportNow = useRef({ report, ignored, patchChoices, lang });
+  reportNow.current = { report, ignored, patchChoices, lang };
+  const game = games.choice?.active ?? "";
+  const sessionApi = useMemo<Api>(
+    () => ({
+      ...api,
+      createPatch: async (objects) => {
+        const path = await api.createPatch(objects);
+        const now = reportNow.current;
+        if (now.report !== null) {
+          await api
+            .savePatchReport(
+              reportFile(now.report, now.ignored, now.patchChoices ?? {}, game, now.lang),
+            )
+            .catch(() => {});
+        }
+        return path;
+      },
+    }),
+    [api, game],
+  );
   const session = useMemo<Session>(
     () => ({
-      api,
+      api: sessionApi,
       lang,
+      game,
       t,
       rescan: scan,
       linkChanged: refreshLink,
@@ -398,8 +423,9 @@ export default function App({ api, startLang }: AppProps) {
       showToolbox,
     }),
     [
-      api,
+      sessionApi,
       lang,
+      game,
       t,
       scan,
       refreshLink,

@@ -9,6 +9,8 @@ import type { PatchChoices } from "./patch";
 export interface Session {
   api: Api;
   lang: Lang;
+  /** The game in use, by its identity; empty until known. */
+  game: string;
   t: Texts;
   /** Scans again, for after an action was finished in the mod manager. */
   rescan: () => void;

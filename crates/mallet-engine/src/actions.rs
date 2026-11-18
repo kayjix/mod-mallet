@@ -213,6 +213,34 @@ pub fn create_patch(
     })
 }
 
+/// The file name of the report written next to the patch.
+const PATCH_REPORT: &str = "Mod Mallet Patch - report.txt";
+
+/// Writes `text`, the report of what the patch hides and why, into Mod
+/// Mallet's own folder next to the patch, replacing the one written before
+/// (ADR 0050). Nothing else is touched.
+///
+/// # Errors
+///
+/// If Mod Mallet's folder is not known, or the file cannot be written.
+pub fn save_patch_report(text: &str, options: &ManagerOptions) -> Result<PathBuf, EngineError> {
+    let path = patch_file(options)
+        .ok_or(EngineError::ManagerNotFound)?
+        .with_file_name(PATCH_REPORT);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+    }
+    std::fs::write(&path, text).map_err(|source| EngineError::Write {
+        path: path.clone(),
+        source,
+    })?;
+    tracing::info!(path = %path.display(), "patch report written");
+    Ok(path)
+}
+
 /// Writes the patch that hides `objects` and asks Vortex to install it.
 fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcome {
     let swaps = mallet_game_bethesda::Game::from_id(options.vortex_game())

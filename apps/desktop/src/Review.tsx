@@ -13,12 +13,15 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { DuelLine } from "./Duels";
+import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, RenderedFinding, RenderedReport } from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
+import { PairReport } from "./PairReport";
+import { rememberObjects } from "./pair-report";
 import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
@@ -212,6 +215,7 @@ export function Review({ report, game, onOpen }: ReviewProps) {
         {stored.step === "collisions" && (
           <CollisionsStep
             report={report}
+            game={game}
             clusters={clusters}
             cursor={clusterAt}
             onCursor={setClusterAt}
@@ -219,6 +223,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
         )}
         {stored.step === "report" && (
           <ReportStep
+            report={report}
+            game={game}
             clusters={clusters}
             open={open}
             onCluster={(key) => {
@@ -388,11 +394,13 @@ function placeOf(
  */
 function CollisionsStep({
   report,
+  game,
   clusters,
   cursor,
   onCursor,
 }: {
   report: RenderedReport;
+  game: string;
   clusters: Cluster[];
   cursor: string | null;
   onCursor: (key: string) => void;
@@ -408,6 +416,8 @@ function CollisionsStep({
     byPart: Map<string, ObjectAnchors>;
   } | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
+  // What the last click in the views did.
+  const [note, setNote] = useState<string | null>(null);
   const found = clusters.findIndex((cluster) => cluster.key === cursor);
   const at = Math.max(0, found >= 0 ? found : clusters.findIndex((cluster) => openIn(cluster) > 0));
   const cluster = clusters[at];
@@ -416,6 +426,7 @@ function CollisionsStep({
   useEffect(() => {
     setSegments([]);
     setFocus(null);
+    setNote(null);
   }, [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
   // The parts of the place that a decision might hide, to ask the game's ties of.
@@ -625,6 +636,87 @@ function CollisionsStep({
     (part) => part.game,
   ).length;
   const placeKept = keptSideOf(placeDecided);
+  /** What a side brings to the comparison: one item, or parts in segments. */
+  const levelOf = (side: 0 | 1) => {
+    const parts = partsOf(shownSegments, side);
+    const segmentCount = shownSegments.filter((segment) => segment.parts[side].length > 0).length;
+    return parts.length === 1
+      ? r.levelItem(names[side], parts[0]?.name ?? "")
+      : r.levelParts(names[side], parts.length, Math.max(1, segmentCount));
+  };
+  /** Hides one object on its own, or shows it again (ADR 0040). */
+  const toggle = (part: Part) => {
+    const key = objectKey(part.id.plugin, part.id.localId);
+    apply(
+      hidden.has(key)
+        ? revealObjects(patchChoices, spots, [part.id])
+        : chooseObject(patchChoices, part.id, true),
+      false,
+    );
+  };
+  /** One object of a segment: hidden or kept, or why it stays. */
+  const partToggle = (part: Part) => {
+    const isHidden = hidden.has(objectKey(part.id.plugin, part.id.localId));
+    const fate = fateOf(part);
+    if (fate === "game") {
+      return <span className="aside">{r.partGame}</span>;
+    }
+    if (fate === "locked" && !isHidden) {
+      return <span className="aside">{r.partLocked}</span>;
+    }
+    return (
+      <button type="button" className="small" aria-pressed={isHidden} onClick={() => toggle(part)}>
+        {isHidden ? r.partShow : fate === "careful" ? r.partHideAnyway : r.partHide}
+      </button>
+    );
+  };
+  /** An object clicked in the views: of the two mods, it is hidden or shown again. */
+  const pick = (object: AreaObject) => {
+    const part: Part = {
+      id: object.id,
+      game: isGameObject(object),
+      name: object.name ?? object.model.split(/[\\/]/).pop() ?? object.model,
+    };
+    const plugin = object.id.plugin.toLowerCase();
+    if (!sides.some((side) => side.toLowerCase() === plugin)) {
+      setNote(r.pickedOther(part.name, short(object.id.plugin)));
+      return;
+    }
+    const isHidden = hidden.has(objectKey(object.id.plugin, object.id.localId));
+    const fate = fateOf(part);
+    if (!isHidden && (fate === "game" || fate === "locked")) {
+      setNote(r.pickedStays(part.name));
+      return;
+    }
+    toggle(part);
+    setNote(isHidden ? r.pickedShown(part.name) : r.pickedHidden(part.name));
+  };
+  /**
+   * A segment's decision with the objects decided otherwise: of the side
+   * hidden, parts that stay though they could go; of the side kept, parts
+   * hidden; where nothing is decided, the parts hidden on their own.
+   */
+  const describeSegment = (segment: StageSegment, decided: Decided) => {
+    const isHidden = (part: Part) => hidden.has(objectKey(part.id.plugin, part.id.localId));
+    const all = [...partsOf([segment], 0), ...partsOf([segment], 1)];
+    let exceptions = 0;
+    if (decided.type === "hidden") {
+      const loser = decided.plugin.toLowerCase();
+      exceptions = all.filter((part) =>
+        part.id.plugin.toLowerCase() === loser
+          ? !isHidden(part) && fateOf(part) === "go"
+          : isHidden(part),
+      ).length;
+    } else if (decided.type === "kept") {
+      exceptions = all.filter(isHidden).length;
+    } else if (decided.type === "open") {
+      const single = all.filter(isHidden).length;
+      return single > 0 ? `${r.stateOpen} · ${r.singlyHidden(single)}` : r.stateOpen;
+    }
+    return exceptions > 0
+      ? `${describe(decided)} ${r.withExceptions(exceptions)}`
+      : describe(decided);
+  };
   const asked = anchors !== null && anchors.key === askingKey;
   const effects = [effectOf(0, shownSegments), effectOf(1, shownSegments)] as const;
   /** Whether keeping `side` can hide anything of the other side at all. */
@@ -677,8 +769,26 @@ function CollisionsStep({
         focus={focusKeys}
         names={names}
         hidden={hidden}
-        onSegments={setSegments}
+        onSegments={(found) => {
+          setSegments(found);
+          // Their names, for the report of parts hidden on their own.
+          rememberObjects(
+            game,
+            worldOfSpot(first.item.spot),
+            found.flatMap((segment) => [...segment.parts[0], ...segment.parts[1]]),
+          );
+        }}
+        onPick={pick}
       />
+      <p className="review-compared">
+        <strong>{r.compared}</strong> {levelOf(0)} ⟷ {levelOf(1)}
+        <span className="aside"> · {r.pickHint}</span>
+      </p>
+      {note !== null && (
+        <p className="review-note" role="status">
+          {note}
+        </p>
+      )}
       {gameParts > 0 && <p className="aside">{r.gameParts(gameParts)}</p>}
       <div className="review-choices">
         <button
@@ -752,7 +862,7 @@ function CollisionsStep({
                   )}
                 </span>
                 <span className="review-state" data-decided={decided.type !== "open"}>
-                  {describe(decided)}
+                  {describeSegment(segment, decided)}
                 </span>
                 <span className="spacer" />
                 <button
@@ -789,6 +899,28 @@ function CollisionsStep({
                 >
                   {r.keepBoth}
                 </button>
+                <details className="review-segment-parts">
+                  <summary className="more">
+                    {r.partsTitle(segment.parts[0].length + segment.parts[1].length)}
+                  </summary>
+                  <div className="review-segment-sides">
+                    {([0, 1] as const).map((side) => (
+                      <div key={side}>
+                        <strong className="stage3-swatch" data-side={side}>
+                          {names[side]}
+                        </strong>
+                        <ul>
+                          {partsOf([segment], side).map((part) => (
+                            <li key={objectKey(part.id.plugin, part.id.localId)}>
+                              <span>{part.name}</span>
+                              {partToggle(part)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </li>
             );
           })}
@@ -796,6 +928,11 @@ function CollisionsStep({
       </section>
     </div>
   );
+}
+
+/** The worldspace or cell of a spot, as the report remembers objects by. */
+function worldOfSpot(spot: MapSpot): string {
+  return spot.location.type === "interior" ? spot.location.cell : spot.location.world;
 }
 
 /** A part a decision might hide, with what is known of it. */
@@ -942,11 +1079,15 @@ function KeepEffect({
  * involved, and what is left open, in this step and in the others.
  */
 function ReportStep({
+  report,
+  game,
   clusters,
   open,
   onCluster,
   onStep,
 }: {
+  report: RenderedReport;
+  game: string;
   clusters: Cluster[];
   open: Record<ReviewStep, number | null>;
   onCluster: (key: string) => void;
@@ -1034,6 +1175,7 @@ function ReportStep({
           ))}
         </ul>
       </section>
+      <PairReport report={report} game={game} />
     </div>
   );
 }

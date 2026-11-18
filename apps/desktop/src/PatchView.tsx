@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
 import type { MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
+import { PairReport } from "./PairReport";
 import {
   choicesOf,
   chooseObject,
@@ -245,6 +246,8 @@ export function PatchView({ report }: { report: RenderedReport }) {
           onShow={(object) => setChoices(chooseObject(choices, object, false))}
         />
       )}
+
+      <PairReport report={report} game={session.game} />
     </section>
   );
 }

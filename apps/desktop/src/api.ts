@@ -49,6 +49,8 @@ export interface Api {
   openPage(url: string): Promise<void>;
   /** Writes the patch that hides `objects`; resolves to where it is. */
   createPatch(objects: ObjectRef[]): Promise<string>;
+  /** Writes the report of what the patch hides next to it, and returns where it is. */
+  savePatchReport(text: string): Promise<string>;
   /** Shows one of Mod Mallet's own folders in the file explorer. */
   openFolder(which: "patches" | "logs"): Promise<void>;
   /** Where the app writes its log. */
@@ -135,6 +137,7 @@ const tauriApi: Api = {
   setupFingerprint: () => invoke<string>("setup_fingerprint"),
   openPage: (url) => invoke<void>("open_page", { url }),
   createPatch: (objects) => invoke<string>("create_patch", { objects }),
+  savePatchReport: (text) => invoke<string>("save_patch_report", { text }),
   openFolder: (which) => invoke<void>("open_folder", { which }),
   logFile: () => invoke<string | null>("log_file"),
   toolbox: (lang) => invoke<RenderedToolbox>("toolbox", { lang }),

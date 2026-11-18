@@ -113,6 +113,32 @@ a colour of its own.
    installation, the load order, the map) are marked as seen, and the
    step the user was on is remembered, both in the window's storage per
    game; losing them costs a click, never a decision.
+9. **Three levels, all visible.** At JK's Bee and Barb against JKs Skyrim
+   a whole structure stood against a single item; hiding the item is
+   harmless, hiding a segment is not. So the step says what each side
+   brings ("JKs Skyrim: a single item, a woodpile"; "JK's Bee and Barb: 40
+   parts in 2 sections"), and every segment opens, on request, into its
+   objects one by one, each to hide or to show again; a click on an object
+   in any of the three views does the same. These are objects hidden on
+   their own (`chooseObject`, `revealObjects`); the game's own and the
+   parts it needs are not offered. A segment's decision counts them as
+   exceptions ("decided, with 2 exceptions").
+10. **A report of what was decided**, at the end of the review and on the
+    patch page, pair by pair of mods: what of each mod is hidden, place by
+    place with the objects' names; what was kept and with how many
+    exceptions; what is still open; what stays because the game needs it.
+    Objects hidden on their own are named and placed from what the window
+    remembers of the objects it showed (in its storage per game; without
+    it they are counted). The report is written as a text file into Mod
+    Mallet's own folder next to the patch whenever the patch is created,
+    and on request (`save_patch_report`); nothing goes into the game's or
+    a mod's folders.
+11. **"You might not need it any more."** Where the suggestions about whole
+    mods (ADR 0043) know how many objects a mod places and that it has no
+    rooms of its own, the report names a mod of which, after the
+    decisions, no more than 15 % and no more than 30 objects are left. It
+    says so gently and leaves uninstalling to the user. This is counted in
+    the window from the patch's choices; findings stay what the scan read.
 
 ## Consequences
 

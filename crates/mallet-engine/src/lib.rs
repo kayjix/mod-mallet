@@ -44,7 +44,7 @@ use mallet_store::{Store, StoreError};
 
 pub use actions::{
     CreatedPatch, ManagerLink, ManagerOptions, create_patch, install_manager_link, manager_link,
-    patch_file, run_action,
+    patch_file, run_action, save_patch_report,
 };
 pub use anchors::object_anchors;
 pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects, world_land};

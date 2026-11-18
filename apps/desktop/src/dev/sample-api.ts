@@ -278,6 +278,26 @@ const samples: Sample[] = [
     ),
     args: { mod: "Old Town", count: 151, total: 170 },
   },
+  {
+    kind: "mods.collides-widely",
+    severity: "info",
+    confidence: "likely",
+    key: "Water Mod",
+    mod: "Water Mod",
+    title: two(
+      "A mod collides with many places of other mods",
+      "Eine Mod kollidiert an vielen Stellen mit anderen",
+    ),
+    headline: two(
+      "Suggestion: Water Mod collides with other mods in 2 places",
+      "Vorschlag: Water Mod kollidiert an 2 Stellen mit anderen Mods",
+    ),
+    summary: two(
+      "14 of the 17 objects Water Mod puts into the world stand in or against objects of Old Town.",
+      "14 der 17 Objekte, die Water Mod in die Welt stellt, stehen in oder an Objekten von Old Town.",
+    ),
+    args: { mod: "Water Mod", count: 2, objects: 14, total: 17, interiors: 0, modCount: 1 },
+  },
 ];
 
 function render(sample: Sample, lang: Lang): RenderedFinding {
@@ -1114,6 +1134,8 @@ export const sampleApi: Api = {
   openPage: async () => {},
   createPatch: () =>
     later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch.zip"),
+  savePatchReport: () =>
+    later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch - report.txt"),
   openFolder: async () => {},
   toolbox: (lang) => later(toolbox(lang)),
   restartManager: () => later(undefined),

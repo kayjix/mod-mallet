@@ -237,6 +237,20 @@ fn open_page(url: String) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+/// Writes the report of what the patch hides next to it, in Mod Mallet's
+/// own folder, and returns where it is. Only ever called because the user
+/// created the patch or pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn save_patch_report(text: String) -> Result<String, String> {
+    mallet_engine::save_patch_report(&text, &manager_options())
+        .map(|path| path.display().to_string())
+        .map_err(|error| {
+            tracing::warn!(%error, "patch report not written");
+            error.to_string()
+        })
+}
+
 /// Writes the patch that hides `objects` and returns where it is. Nothing
 /// is installed. Only ever called because the user pressed a button.
 #[tauri::command(async)]
@@ -585,6 +599,7 @@ pub fn run() -> tauri::Result<()> {
             setup_fingerprint,
             open_page,
             create_patch,
+            save_patch_report,
             open_folder,
             log_file,
             toolbox,

@@ -39,6 +39,8 @@ export interface CompareStage3DProps {
   onStructures?: (structures: [AreaObject[], AreaObject[]]) => void;
   /** Told about the segments whenever they are known better. */
   onSegments?: (segments: StageSegment[]) => void;
+  /** Told about the object clicked in any of the three views. */
+  onPick?: (object: AreaObject) => void;
   /** The height of the stage, in pixels. */
   height?: number;
 }
@@ -117,6 +119,7 @@ export function CompareStage3D({
   hidden,
   onStructures,
   onSegments,
+  onPick,
   height = 420,
 }: CompareStage3DProps) {
   const seeds: [ObjectRef[], ObjectRef[]] = [
@@ -307,19 +310,9 @@ export function CompareStage3D({
       element.width = wanted[0] ?? element.width;
       element.height = wanted[1] ?? element.height;
     }
-    const view = camera.current;
-    const level = Math.cos(view.pitch) * view.distance;
-    const eye: Vec3 = [
-      view.target[0] - Math.sin(view.yaw) * level,
-      view.target[1] - Math.cos(view.yaw) * level,
-      view.target[2] + Math.sin(view.pitch) * view.distance,
-    ];
     const third = gl.drawingBufferWidth / 3;
     aspectNow.current = width / 3 / tall;
-    const matrix: Mat4 = multiply(
-      perspective(FIELD_OF_VIEW, width / 3 / tall, view.distance * 0.02, view.distance * 8 + 2),
-      lookAt(eye, view.target, [0, 0, 1]),
-    );
+    const matrix = matrixOf(camera.current, width / 3 / tall);
     const style = getComputedStyle(element);
     const ghost = colour(style.getPropertyValue("--spot-ghost"));
     gl.enable(gl.SCISSOR_TEST);
@@ -458,13 +451,47 @@ export function CompareStage3D({
     return () => observer.disconnect();
   }, []);
 
-  const drag = useRef<{ x: number; y: number; move: boolean; camera: Camera } | null>(null);
+  const drag = useRef<{
+    x: number;
+    y: number;
+    move: boolean;
+    /** Whether the pointer stayed put: a click, not a drag. */
+    still: boolean;
+    camera: Camera;
+  } | null>(null);
+  /** The object drawn at a point of the screen, in whichever of the three views. */
+  const objectAt = (clientX: number, clientY: number): AreaObject | null => {
+    const element = canvas.current;
+    const current = layer.current;
+    if (element === null || current === null) {
+      return null;
+    }
+    const rect = element.getBoundingClientRect();
+    const x = (clientX - rect.left) * (element.width / Math.max(1, rect.width));
+    const y =
+      element.height - (clientY - rect.top) * (element.height / Math.max(1, rect.height)) - 1;
+    const third = element.width / 3;
+    const index = Math.min(2, Math.max(0, Math.floor(x / third)));
+    const left = Math.round(third * index);
+    const span = Math.round(third * (index + 1)) - left;
+    const found = current.pick(
+      matrixOf(camera.current, span / Math.max(1, element.height)),
+      1,
+      Math.floor(x - left),
+      Math.floor(y),
+      span,
+      element.height,
+    );
+    redraw();
+    return found;
+  };
   const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = {
       x: event.clientX,
       y: event.clientY,
       move: event.button === 2 || event.shiftKey,
+      still: true,
       camera: { ...camera.current, target: [...camera.current.target] as Vec3 },
     };
   };
@@ -475,6 +502,10 @@ export function CompareStage3D({
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
+    if (Math.abs(dx) + Math.abs(dy) <= 3) {
+      return;
+    }
+    start.still = false;
     moved.current = true;
     moving.current = true;
     const from = start.camera;
@@ -500,7 +531,14 @@ export function CompareStage3D({
     redraw();
   };
   const onPointerUp = () => {
+    const start = drag.current;
     drag.current = null;
+    if (start?.still === true && !start.move && onPick !== undefined) {
+      const found = objectAt(start.x, start.y);
+      if (found !== null) {
+        onPick(found);
+      }
+    }
     rest();
   };
   /** Back to the full resolution a moment after the camera stops. */
@@ -697,6 +735,20 @@ function segmentsOf(
     joined.set(at, segment);
   });
   return [...joined.values()];
+}
+
+/** The camera's matrix (cells, heights as drawn) for a view `aspect` wide per unit high. */
+function matrixOf(view: Camera, aspect: number): Mat4 {
+  const level = Math.cos(view.pitch) * view.distance;
+  const eye: Vec3 = [
+    view.target[0] - Math.sin(view.yaw) * level,
+    view.target[1] - Math.cos(view.yaw) * level,
+    view.target[2] + Math.sin(view.pitch) * view.distance,
+  ];
+  return multiply(
+    perspective(FIELD_OF_VIEW, aspect, view.distance * 0.02, view.distance * 8 + 2),
+    lookAt(eye, view.target, [0, 0, 1]),
+  );
 }
 
 /** A plugin's name without its extension. */
