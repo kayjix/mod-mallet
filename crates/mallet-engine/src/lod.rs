@@ -25,7 +25,7 @@ const TEXTURE_SIDES: (u32, u32) = (16, 2048);
 static LIBRARIES: Mutex<Vec<(String, Arc<LodLibrary>)>> = Mutex::new(Vec::new());
 
 /// The level-of-detail files of `world` in the setup `options` describe.
-fn library(options: &ScanOptions, world: &str) -> Option<Arc<LodLibrary>> {
+pub(crate) fn library(options: &ScanOptions, world: &str) -> Option<Arc<LodLibrary>> {
     let game = options.game().ok()?;
     let (game_dir, _) = options.located_game_dir()?;
     let key = format!(

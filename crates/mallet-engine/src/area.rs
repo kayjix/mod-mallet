@@ -226,8 +226,48 @@ pub fn area_land(
     centre: [f32; 2],
     radius: f32,
 ) -> Option<AreaLand> {
+    land_within(options, world, centre, radius.clamp(256.0, MAX_RADIUS))
+}
+
+/// The most cells of a worldspace whose whole land is read at once.
+const MAX_WORLD_CELLS: i64 = 1024;
+
+/// The ground of every outside cell within `bounds` (west, south, east,
+/// north) of the worldspace `world`, for drawing a world that has no level
+/// of detail from its land. `None` if the setup cannot be read
+/// or the bounds hold more than 1024 cells.
+pub fn world_land(options: &ScanOptions, world: &str, bounds: [i32; 4]) -> Option<AreaLand> {
+    let [west, south, east, north] = bounds;
+    let columns = i64::from(east) - i64::from(west) + 1;
+    let rows = i64::from(north) - i64::from(south) + 1;
+    if columns <= 0 || rows <= 0 || columns.max(rows).pow(2) > MAX_WORLD_CELLS {
+        return None;
+    }
+    // A square of cells around the middle that ends just inside the
+    // bounds' edges.
+    let side = cells_to_units(columns.max(rows));
+    let centre = [
+        cells_to_units(i64::from(west)) + side / 2.0,
+        cells_to_units(i64::from(south)) + side / 2.0,
+    ];
+    land_within(options, world, centre, side / 2.0 - 1.0)
+}
+
+/// Game units across `cells` cells.
+#[allow(clippy::cast_precision_loss)]
+fn cells_to_units(cells: i64) -> f32 {
+    // Worldspaces span at most a few hundred cells: exact in a float.
+    (cells * 4096) as f32
+}
+
+/// The ground of the cells within `radius` game units of `centre`.
+fn land_within(
+    options: &ScanOptions,
+    world: &str,
+    centre: [f32; 2],
+    radius: f32,
+) -> Option<AreaLand> {
     let started = std::time::Instant::now();
-    let radius = radius.clamp(256.0, MAX_RADIUS);
     let reader = reader(options)?;
     let mut reader = reader.lock().ok()?;
     let textures = land_textures(options);

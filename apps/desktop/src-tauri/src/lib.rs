@@ -322,6 +322,24 @@ fn interior_objects(cell: String) -> Result<Option<mallet_core::mesh::AreaObject
     ))
 }
 
+/// The game's ground of every cell of a small worldspace, for a world that
+/// has no level of detail.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn world_land(
+    world: String,
+    west: i32,
+    south: i32,
+    east: i32,
+    north: i32,
+) -> Result<Option<mallet_core::mesh::AreaLand>, String> {
+    Ok(mallet_engine::world_land(
+        &settings()?.scan_options(),
+        &world,
+        [west, south, east, north],
+    ))
+}
+
 /// The game's ground of the cells around a point of a worldspace (ADR 0041).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -582,6 +600,7 @@ pub fn run() -> tauri::Result<()> {
             lod_texture,
             area_objects,
             area_land,
+            world_land,
             interior_objects,
             object_anchors,
             area_mesh,

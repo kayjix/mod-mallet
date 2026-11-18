@@ -2,14 +2,17 @@
 //! game and its mods ship (`textures/terrain/<world>/<world>.32.<x>.<y>.dds`).
 //!
 //! Each such tile covers 32 × 32 cells; its name gives the cell at its
-//! south-west corner. Only loose files are read: that is where mods that
-//! generate LOD put them. Nothing is written.
+//! south-west corner. They are read as the game finds them, from its
+//! archives and loose files ([`world_image_in`]), or from loose files alone
+//! ([`world_image`]). Nothing is written.
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use mallet_formats_bethesda::dds;
+
+use crate::lod_library::LodLibrary;
 
 /// How many cells one tile covers in each direction.
 const TILE_CELLS: i32 = 32;
@@ -97,6 +100,37 @@ fn read_tile(path: &Path, pixels_per_cell: u32) -> Option<dds::Rgb> {
 /// if the worldspace has no tiles there.
 pub fn world_image(data_dir: &Path, world: &str, pixels_per_cell: u32) -> Option<WorldImage> {
     let found = tiles(data_dir, world);
+    assemble(&found, pixels_per_cell, |path| {
+        read_tile(path, pixels_per_cell)
+    })
+}
+
+/// The picture of the worldspace of `library` from its LOD tiles, in the
+/// versions the game uses: from the archives as well as loose files. As
+/// [`world_image`] otherwise.
+pub fn world_image_in(library: &LodLibrary, pixels_per_cell: u32) -> Option<WorldImage> {
+    let found = library.land_pictures();
+    assemble(&found, pixels_per_cell, |path| {
+        let bytes = library.read(path)?;
+        tile_from_bytes(&bytes, pixels_per_cell)
+    })
+}
+
+/// One level of a tile held in memory, `pixels_per_cell` to a cell.
+fn tile_from_bytes(bytes: &[u8], pixels_per_cell: u32) -> Option<dds::Rgb> {
+    let size = dds::size(bytes).ok()?;
+    let wanted = u32::try_from(TILE_CELLS).ok()? * pixels_per_cell;
+    let level = (size.width / wanted.max(1)).max(1).ilog2();
+    let image = dds::decode_level(bytes, level).ok()?;
+    (image.width == wanted && image.height == wanted).then_some(image)
+}
+
+/// The picture put together from the tiles `found`, each read by `read`.
+fn assemble<T>(
+    found: &[(i32, i32, T)],
+    pixels_per_cell: u32,
+    read: impl Fn(&T) -> Option<dds::Rgb>,
+) -> Option<WorldImage> {
     let west = found.iter().map(|(x, _, _)| *x).min()?;
     let south = found.iter().map(|(_, y, _)| *y).min()?;
     let east = found.iter().map(|(x, _, _)| *x).max()? + TILE_CELLS;
@@ -109,8 +143,8 @@ pub fn world_image(data_dir: &Path, world: &str, pixels_per_cell: u32) -> Option
     let tile_pixels = (TILE_CELLS as usize) * pixels_per_cell as usize;
 
     let mut any = false;
-    for (x, y, path) in &found {
-        let Some(tile) = read_tile(path, pixels_per_cell) else {
+    for (x, y, path) in found {
+        let Some(tile) = read(path) else {
             continue;
         };
         any = true;
@@ -188,5 +222,24 @@ mod tests {
     fn a_world_without_tiles_has_no_image() {
         let data = tempfile::tempdir().unwrap();
         assert_eq!(world_image(data.path(), "Tamriel", 4), None);
+    }
+
+    #[test]
+    fn a_tile_in_memory_gives_the_level_of_the_wanted_size() {
+        let image = tile_from_bytes(&tile(0xf800), 1).unwrap();
+        assert_eq!((image.width, image.height), (32, 32));
+        assert_eq!(&image.pixels[..3], &[255, 0, 0]);
+        // Larger than the tile itself: none.
+        assert_eq!(tile_from_bytes(&tile(0xf800), 4), None);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn a_tile_in_memory_never_panics(
+            bytes in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..400),
+            pixels_per_cell in 0u32..8,
+        ) {
+            let _ = tile_from_bytes(&bytes, pixels_per_cell);
+        }
     }
 }

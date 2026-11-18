@@ -93,6 +93,10 @@ const HIT = 11;
 const NEAR = 8;
 /** How far around the point the objects are read, in cells: at least, and at most. */
 const AREA = [1.5, 3] as const;
+/** A world without level of detail is drawn from its whole land up to this many cells. */
+const WHOLE_LAND_CELLS = 1024;
+/** The height, in game units, the colours of the land span at least, so that a flat cave floor is not coloured like mountains. */
+const MIN_COLOUR_SPAN = 8192;
 /** How close the camera may come, in cells: a few metres. */
 const MIN_DISTANCE = 0.04;
 
@@ -466,6 +470,9 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
+  // The world as last drawn, for the effects that only run when it changes.
+  const worldNow = useRef(world);
+  worldNow.current = world;
   // The game's own ground under them (ADR 0041).
   const land = useRef<LandLayer | null>(null);
   const areaAt = useRef<[number, number, number] | null>(null);
@@ -668,7 +675,10 @@ export function MapView3D({
     const shownArea = near && view.distance <= NEAR * 1.5 ? (area.current?.area ?? null) : null;
     // The level of detail stays: towns such as Whiterun are only there.
     const realObjects = null;
-    const fineLand = shownArea !== null ? (land.current?.covers ?? null) : null;
+    // The whole land of a world without level of detail is drawn from any
+    // distance; the land around the camera only up close.
+    const fineLand =
+      land.current?.whole === true || shownArea !== null ? (land.current?.covers ?? null) : null;
     if (area.current !== null) {
       const progress = area.current.progress;
       const key = `${progress.done}/${progress.total}`;
@@ -677,7 +687,7 @@ export function MapView3D({
         setAreaProgress(progress.total === 0 ? null : progress);
       }
     }
-    const span = Math.max(1, terrain.highest - terrain.lowest);
+    const span = Math.max(MIN_COLOUR_SPAN, terrain.highest - terrain.lowest);
 
     gl.enable(gl.DEPTH_TEST);
     const style = getComputedStyle(target);
@@ -1048,7 +1058,18 @@ export function MapView3D({
     api
       .lodTiles(world.name)
       .then((found) => {
-        if (gone || found.tiles.length === 0) {
+        if (gone) {
+          return;
+        }
+        // Without level of detail, a small world is drawn from its land.
+        const shown = worldNow.current;
+        const fromLand = () => {
+          if (shown.bounds && (shown.landCells ?? 0) <= WHOLE_LAND_CELLS) {
+            land.current?.loadWorld(shown.bounds, () => redraw());
+          }
+        };
+        if (found.tiles.length === 0) {
+          fromLand();
           return;
         }
         try {
@@ -1059,9 +1080,11 @@ export function MapView3D({
             redraw();
           } else {
             layer.dispose();
+            fromLand();
           }
         } catch {
           // The relief of the height samples stays.
+          fromLand();
         }
       })
       .catch(() => {});

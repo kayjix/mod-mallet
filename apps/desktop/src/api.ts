@@ -69,6 +69,11 @@ export interface Api {
   areaObjects(world: string, x: number, y: number, radius: number): Promise<AreaObjects | null>;
   /** The game's ground of the cells within `radius` game units of a point. */
   areaLand(world: string, x: number, y: number, radius: number): Promise<AreaLand | null>;
+  /** The game's ground of every cell of a small world within its bounds, for a world without level of detail. */
+  worldLand(
+    world: string,
+    bounds: { west: number; south: number; east: number; north: number },
+  ): Promise<AreaLand | null>;
   /** Everything placed in an interior cell, by its editor ID. */
   interiorObjects(cell: string): Promise<AreaObjects | null>;
   /** A mesh of the setup in its own units, textures named by path. */
@@ -141,6 +146,8 @@ const tauriApi: Api = {
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
   interiorObjects: (cell) => invoke<AreaObjects | null>("interior_objects", { cell }),
+  worldLand: (world, { west, south, east, north }) =>
+    invoke<AreaLand | null>("world_land", { world, west, south, east, north }),
   areaLand: (world, x, y, radius) => invoke<AreaLand | null>("area_land", { world, x, y, radius }),
   areaMesh: (path) => invoke<LodMesh | null>("area_mesh", { path }),
   areaTexture: (path, maxSide) => invoke<string | null>("area_texture", { path, maxSide }),

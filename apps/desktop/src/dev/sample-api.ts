@@ -1121,6 +1121,7 @@ export const sampleApi: Api = {
   // The sample has no objects up close and no level of detail.
   areaObjects: () => later(null),
   areaLand: () => later(null),
+  worldLand: () => later(null),
   interiorObjects: () => later(null),
   areaMesh: () => later(null),
   areaTexture: () => later(null),

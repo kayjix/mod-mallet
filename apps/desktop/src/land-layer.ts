@@ -298,6 +298,7 @@ export class LandLayer {
   /** Where each ground texture is: its slot, or being fetched, or not to be had. */
   private readonly slots = new Map<string, number | "loading" | "missing">();
   private asked = 0;
+  private wholeWorld = false;
   private disposed = false;
 
   constructor(
@@ -330,8 +331,46 @@ export class LandLayer {
     return this.rect;
   }
 
+  /**
+   * Whether the layer holds the whole land of its world, for a world that
+   * has no level of detail: it is then drawn from any distance and not
+   * replaced by the land around the camera.
+   */
+  get whole(): boolean {
+    return this.wholeWorld;
+  }
+
+  /**
+   * Fetches the whole land within `bounds` (in cells, edges included), for
+   * a small world without level of detail. Tells `done` whether there was
+   * any.
+   */
+  loadWorld(
+    bounds: { west: number; south: number; east: number; north: number },
+    done: (found: boolean) => void,
+  ) {
+    const asked = ++this.asked;
+    this.api
+      .worldLand(this.world, bounds)
+      .then((land) => {
+        if (asked !== this.asked || this.disposed) {
+          return;
+        }
+        const found = land !== null && land.cells.length > 0;
+        if (found) {
+          this.wholeWorld = true;
+          this.show(land);
+        }
+        done(found);
+      })
+      .catch(() => done(false));
+  }
+
   /** Fetches the ground within `radius` game units of `x`, `y`. */
   load(x: number, y: number, radius: number) {
+    if (this.wholeWorld) {
+      return;
+    }
     const asked = ++this.asked;
     this.api
       .areaLand(this.world, x, y, radius)

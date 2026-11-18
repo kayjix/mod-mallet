@@ -47,7 +47,7 @@ pub use actions::{
     patch_file, run_action,
 };
 pub use anchors::object_anchors;
-pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects};
+pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects, world_land};
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
@@ -321,17 +321,16 @@ fn installed_patch(game_dir: &Path, mods: &dyn ModSource) -> Option<InstalledPat
 /// Pixels per cell of the map's picture.
 const MAP_PIXELS_PER_CELL: u32 = 8;
 
-/// A picture of `world` from above, from the terrain LOD textures in the
-/// game's data directory, or `None` if the worldspace has none there.
+/// A picture of `world` from above, from the terrain LOD textures the game
+/// uses, in its archives or loose, or `None` if the worldspace has none.
 /// Only reads.
 pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapImage> {
     if !options.game().ok()?.has_terrain_lod_pictures() {
         return None;
     }
-    let (game_dir, _) = options.located_game_dir()?;
     let started = Instant::now();
-    let image =
-        mallet_game_bethesda::lod::world_image(&game_dir.join("Data"), world, MAP_PIXELS_PER_CELL)?;
+    let library = lod::library(options, world)?;
+    let image = mallet_game_bethesda::lod::world_image_in(&library, MAP_PIXELS_PER_CELL)?;
     let png = png::encode_rgb(image.width(), image.height(), &image.rgb)
         .map_err(|error| tracing::warn!(%error, "map picture not encoded"))
         .ok()?;

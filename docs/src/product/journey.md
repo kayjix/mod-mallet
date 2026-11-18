@@ -472,6 +472,17 @@ what makes the floor visible. The first step of this work is a screenshot of
 Blackreach and Falskaar on the reference setup, to check each point above
 against what is actually wrong there.
 
+**Found on the reference setup** (checked by reading the files, not by
+screenshot). Blackreach has level of detail of its own (85 blocks of
+land, in the game's archives) and a picture of its land in the archives;
+what was wrong was the land cut to the few cells where mods place things
+and the flat picture read only from loose files, which only Tamriel had.
+Falskaar, Solstheim, Sovngarde and the other DLC worlds have level of
+detail too. Some worlds have none at all: Blackbone Isle (Creation Club),
+and mods' worlds such as Arnimatown and Sancre Tor. MNAM, the world map's
+cells, is much smaller than the land for Tamriel (-30 to 40 against -57
+to 61), so the bounds come from NAM0/NAM9 first.
+
 ### The toolbox
 
 **LOOT.** Today LOOT counts as present when `%LOCALAPPDATA%\LOOT` or

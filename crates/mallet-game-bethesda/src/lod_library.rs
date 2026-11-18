@@ -120,6 +120,25 @@ impl LodLibrary {
         library
     }
 
+    /// The colour textures of the land of the coarsest blocks
+    /// (`textures/terrain/<world>/<world>.32.<x>.<y>.dds`), by the cell at
+    /// their south-west corner, with their paths.
+    pub fn land_pictures(&self) -> Vec<(i32, i32, String)> {
+        let prefix = format!("textures/terrain/{0}/{0}.32.", self.world);
+        let mut found: Vec<(i32, i32, String)> = self
+            .files
+            .keys()
+            .filter_map(|path| {
+                // Normal maps (`_n.dds`) do not parse as a cell.
+                let rest = path.strip_prefix(&prefix)?.strip_suffix(".dds")?;
+                let (x, y) = rest.split_once('.')?;
+                Some((x.parse().ok()?, y.parse().ok()?, path.clone()))
+            })
+            .collect();
+        found.sort_unstable();
+        found
+    }
+
     /// The blocks that have land, and those that have objects.
     pub fn blocks(&self) -> (Vec<Block>, Vec<Block>) {
         let terrain = format!("meshes/terrain/{0}/{0}.", self.world);
