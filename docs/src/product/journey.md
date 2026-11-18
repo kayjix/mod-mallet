@@ -7,7 +7,9 @@ appeared on three, the scan button and the game picker twice. This page
 takes stock and sets the structure the app grows into: one job per page,
 at most two ways to do something on it, and links instead of copies.
 The decisions are recorded in
-[ADR 0048](../adr/0048-one-job-per-page.md).
+[ADR 0048](../adr/0048-one-job-per-page.md). On the same day the user
+added a page for the comparison of files, *Assets*; this page describes
+the plan with it.
 
 The page describes the window as it stands on `main` at `fa8c395` plus the
 work merged with it on the same day: the health score, the task page by
@@ -93,7 +95,8 @@ All games ──▶ Overview of a game ──▶ Tasks
                       │             ├─▶ Collisions  (Spots | Mod against mod)
                       │             ├─▶ Patch
                       │             ├─▶ Map
-                      │             └─▶ Mods        (List | Ranking)
+                      │             ├─▶ Assets      (Duels | Ranking)
+                      │             └─▶ Mods
                       └─ the sidebar reaches every page directly
 Toolbox, Settings: beside the game's pages, always reachable
 ```
@@ -113,6 +116,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 │ ⧉ Collisions         37  │  ← open spots
 │ ✎ Patch               ●  │  ← dot: decided but not in the patch
 │ ⌖ Map                    │
+│ ▨ Assets              4  │  ← duels about files without a side picked
 │ ≡ Mods                   │
 │ ──────────────────────── │
 │ ⚒ Toolbox             2  │  ← tools needing attention
@@ -127,8 +131,8 @@ Toolbox, Settings: beside the game's pages, always reachable
   move to the overview.
 - Badges count what the page itself lists first, so the numbers agree:
   Tasks the open tasks, Collisions the open spots, Patch a dot when
-  choices are not yet in the installed patch, Toolbox the tools needing
-  attention. The toolbox pill goes; the manager line stays.
+  choices are not yet in the installed patch, Assets the duels about files
+  with no side picked, Toolbox the tools needing attention. The toolbox pill goes; the manager line stays.
 - Before a scan, every game page shows the same empty state with the scan
   button; before the places are confirmed, only Settings and the first-run
   page are open (as today).
@@ -139,11 +143,12 @@ Toolbox, Settings: beside the game's pages, always reachable
 |---|---|---|---|
 | **All games** | Pick the game to work on | a card per game; a game not installed says so | show a game's findings |
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
-| **Tasks** | Work through what is to do, except collisions | by step; a duel opens its comparison | list collisions (one line leads to them) |
+| **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
 | **Collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
 | **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
 | **Map** | Look at the places of any worldspace | flat or relief | decide; a spot links to the worklist |
-| **Mods** | Know the mods, one at a time | *List* (and a mod's details); *Ranking* | decide collisions or duels in place |
+| **Assets** | Decide whose textures, meshes and faces the game shows where two mods bring their own | *Duels*: two mods side by side on the comparison stage; *Ranking*: which mods to prefer, which suggests every duel's side | decide placed objects (Collisions does) |
+| **Mods** | Know the mods, one at a time | the list; a mod's details | decide collisions or duels in place |
 | **Toolbox** | Have the tools the setup needs | the list; the one button a tool offers | – |
 | **Settings** | Where Mod Mallet reads, language, theme | tabs | – |
 
@@ -163,9 +168,9 @@ them.
 | Collision spot | Collisions · Spots | counts (sidebar, overview, Tasks' collisions line, a mod's details); a pin on the map with *open in the worklist* |
 | Pair of mods whose objects collide | Collisions · Mod against mod | a line in each mod's details with *open the pair* |
 | Duel about placed objects | merged into its pair on *Mod against mod* | – |
-| Duel about anything else | Tasks, step *choose* | a line in each mod's details with *compare* |
-| The comparison of a duel | a layer over the page it was opened from | – |
-| Ranking of mods | Mods · Ranking | the reason given under a duel's decision |
+| Duel about files (textures, meshes, faces) | Assets · Duels | a count on the overview and in Tasks' *choose* step, a line in each mod's details, each with *compare*, which opens Assets at the duel |
+| The comparison stage | Assets · Duels | – |
+| Ranking of mods | Assets · Ranking | the reason given under a duel's decision |
 | Patch choices | made in Collisions; listed in Patch | the dot on Patch; *waiting* spots in the worklist |
 | Places and worldspaces | Map | the place named on a spot |
 | Tools | Toolbox | the manager line; a finding's *needs tool* link |
@@ -222,13 +227,14 @@ the first run and *‹ All games* lead here.
 │                              │ [crash]  door cut off          −8  │
 │                              │ (each line: [ Go ] to its page)    │
 ├──────────────┬───────────────┼──────────────┬─────────────────────┤
-│ Tasks     12 │ Collisions 37 │ Patch        │ Mods      168/172   │
-│ 1 can crash  │ 8 decided,    │ 214 objects  │ 9 with problems     │
-│              │ not in patch  │ ● not current│                     │
-├──────────────┴───────────────┼──────────────┴─────────────────────┤
-│ Map: Skyrim, Solstheim,      │ Toolbox: 2 need attention          │
-│ Falskaar, Blackbone Isle     │ Vortex · link ready                │
-├──────────────────────────────┴────────────────────────────────────┤
+│ Tasks     12 │ Collisions 37 │ Assets     4 │ Patch           214 │
+│ 1 can crash  │ 8 decided,    │ pairs to     │ objects hidden      │
+│              │ not in patch  │ compare      │ ● not current       │
+├──────────────┼───────────────┼──────────────┼─────────────────────┤
+│ Mods 168/172 │ Map         4 │ Toolbox    2 │                     │
+│ 3 newer      │ Skyrim, Sol-  │ need         │                     │
+│ versions     │ stheim, …     │ attention    │                     │
+├──────────────┴───────────────┴──────────────┴─────────────────────┤
 │ ▸ 412 plugins, 960 archives, 170 installers, 28 812 meshes read   │
 │ ▸ What was read                                                   │
 └───────────────────────────────────────────────────────────────────┘
@@ -242,8 +248,9 @@ the overview is decided.
 
 As ADR 0045 sets it out, with three changes: the scan statistics and
 *what was read* move to the overview; a collision finding never appears
-here (it already does not); the duel cards keep *pick a side* and
-*compare*, and the comparison opens as a layer.
+here (it already does not); the step *choose* no longer holds the duel
+cards but one line, like the collisions' line: how many duels about files
+are still open, and the way to Assets.
 
 #### Collisions
 
@@ -266,8 +273,9 @@ here (it already does not); the duel cards keep *pick a side* and
 │ [take every suggestion]                              sort: open ▾ │
 │ JK's Riverwood ⟷ Riverwood Trader   12 spots  5 open  2 dup 3 ovl │
 │    suggested: hide Trader's (smaller, later)                      │
-│    [Hide JK's] [Hide Trader's] [Keep both] [Compare] [Spots ▸]    │
+│    [Hide JK's] [Hide Trader's] [Keep both]            [Spots ▸]   │
 │    also: 1 object of the game moved by both (finding, no spot)    │
+│    their textures differ too: 1 duel                   [Assets ▸] │
 │ Cutting Room Floor ⟷ Lanterns of Skyrim   …                       │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -276,8 +284,9 @@ here (it already does not); the duel cards keep *pick a side* and
 *Spots ▸* opens *Spots* grouped by mods at that pair; *this pair: 12 ▸* on
 the stage opens the pair on *Mod against mod*. *Show on map* opens the map
 at the spot. The duels about placed objects are folded into their pair
-(*Compare* opens their comparison), and the collision findings without a
-spot are listed under their pair as *also*.
+(the spots show them in 3D), and the collision findings without a spot are
+listed under their pair as *also*. Where the same two mods also have a duel
+about files, the pair says so and leads to Assets.
 
 #### Patch
 
@@ -316,24 +325,53 @@ a cell. A spot on the map opens the worklist at it; the map decides
 nothing. The worldspaces are named and grouped as set out in
 [Worldspaces](#worldspaces).
 
+#### Assets
+
+```text
+┌─ Assets ──────────────────────────────────────────────────────────┐
+│ [ Duels 6 | Ranking ]                                             │
+├──────────────────┬─────────────────────────────┬──────────────────┤
+│ search · open ▾  │  Cut Content ⟷ Face Overhaul│ What they share  │
+│ ▾ Faces (2)      │  ┌──────────┐ ┌──────────┐  │  Lydia  face     │
+│   ● Lydia ×34    │  │ 3D left  │ │ 3D right │  │  Uthgerd face    │
+│ ▾ Textures (3)   │  └──────────┘ └──────────┘  │  …               │
+│   ○ Old Town     │  light · turn · reset       │                  │
+│ ▸ Meshes (1)     │  [Cut Content wins] [Face Overhaul wins]       │
+│                  │  ranking suggests: Face Overhaul               │
+└──────────────────┴─────────────────────────────┴──────────────────┘
+```
+
+Assets is today's comparison view made a page of its own: the duels about
+files in the list on the left, the two mods' files side by side on the
+stage, the decision under it, and *Ranking* as the second tab. The
+duel list is grouped by what the mods compete for (faces, textures,
+meshes). A duel opened from elsewhere (Tasks, a mod's details) opens here,
+at that duel; the page has no *back* button, since the sidebar is the way
+back.
+
+The ranking lives here and not under Mods because it has one use: it
+suggests the side of every duel about files, and it is edited where those
+duels are decided, so that a change shows at once in the suggestions next
+to it. Under Mods it would be a second job on a page whose job is knowing
+the mods.
+
 #### Mods
 
 ```text
 ┌─ Mods ────────────────────────────────────────────────────────────┐
-│ [ List | Ranking ]   search…   [all|problems|off]   sort ▾        │
+│ search…   [all|problems|off]   sort ▾                             │
 │ ▾ JK's Riverwood   2.1  on   1 problem · 5 open spots   [page]    │
 │     Problems: (the same rows as on Tasks)                         │
 │     Collides with: Riverwood Trader 5 open  [open the pair]       │
-│     Duels: Ethereal Elven Overhaul        [compare]               │
+│     Its files against: Ethereal Elven Overhaul   [compare ▸]      │
 │     Covered by others: 12 files                                   │
 │     Places it adds or changes          [show on map]              │
 │ ▸ Riverwood Trader  …                                             │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-*Ranking* is Compare's former ranking tab: the order in which the user
-prefers mods, used to suggest a duel's side. *Show on map* opens the map
-filtered to the mod.
+*Compare ▸* opens Assets at the duel; *open the pair* opens the pair on
+*Mod against mod*; *show on map* opens the map filtered to the mod.
 
 #### Toolbox
 
@@ -475,11 +513,12 @@ by rule:
 
 | # | Package | Files | Size | After |
 |---|---|---|---|---|
-| A | **Frame and overview.** Two levels; sidebar without the game select, with the game card, badges that match their pages, Toolbox and Settings at the bottom, toolbox pill gone; *All games* page (Home's game grid, with a score per game where a scan is kept); *Overview* page (Home's health and tiles plus a tile per page, scan statistics and *what was read*); Compare as a layer; new session links (`openPair`, `showModOnMap`); the old report's code and styles removed. | `App.tsx`, `App.css`, `Actions.tsx`, `Home.tsx` → `AllGames.tsx`, new `Overview.tsx`, new `journey-texts.ts`; in `Tasks.tsx` only the removal of the statistics | L | the overview pages merged (ADR 0045) |
-| B | **Collisions.** *Mod against mod* with the duels about placed objects folded into their pair, the findings without a spot as *also*, *take every suggestion*; group heads no longer decide; on the stage *this pair* and *show on map*. | `Collisions.tsx`, new `collisions-texts.ts` | M | A |
+| A | **Frame and overview.** Two levels; sidebar without the game select, with the game card, badges that match their pages, Toolbox and Settings at the bottom, toolbox pill gone; *All games* page (Home's game grid, with a score per game where a scan is kept); *Overview* page (Home's health and tiles plus a tile per page, scan statistics and *what was read*); *Assets* in the sidebar and as a tile, its route showing today's comparison view; new session links (`openPair`, `showModOnMap`; `openCompare` now opens Assets); the old report's code and styles removed. | `App.tsx`, `App.css`, `Actions.tsx`, `Home.tsx` → `AllGames.tsx`, new `Overview.tsx`, new `journey-texts.ts`, new `journey.css`; in `Tasks.tsx` only the removal of the statistics | L | the overview pages merged (ADR 0045) |
+| B | **Collisions.** *Mod against mod* with the duels about placed objects folded into their pair, the findings without a spot as *also*, a pair's duel about files as a link to Assets, *take every suggestion*, open at `pairAt`; group heads no longer decide; on the stage *this pair* and *show on map*; `App.tsx` stops passing `Duels` and `TaskList` as children. | `Collisions.tsx`, new `collisions-texts.ts`, the collisions route in `App.tsx` | M | A |
 | C | **Patch.** Decisions listed by pair with *change* and *undo*; *suggest all* and the per-pair buttons gone; *waiting* line. | `PatchView.tsx`, `patch.ts` | S | A |
-| D | **Mods and ranking.** *List* and *Ranking* (from Compare); a mod's links: *open the pair*, *compare*, *show on map*; Compare without tabs. | `ModsView.tsx`, `Compare.tsx`, `Duels.tsx` | M | A |
-| E | **Task rows.** A collision finding offers *open in the worklist* instead of *hide*; *show on map* only for findings that are not collisions. | `Tasks.tsx` (`FindingRow`, `Choices`, `Spots`) | S | A |
+| D | **Assets.** The comparison view as a page: no *back* button, the duel list grouped by faces, textures and meshes, only duels about files (those about placed objects belong to Collisions), *Duels* and *Ranking* as its two tabs; a compact duel line for other pages to link with. | `Compare.tsx`, `Duels.tsx`, new `assets-texts.ts` | M | A |
+| D2 | **Mods.** A mod's links: *open the pair*, *compare ▸* (Assets at the duel), *show on map*; no duel cards of its own. | `ModsView.tsx` | S | A (uses D's duel line if merged, else a plain link) |
+| E | **Task rows.** A collision finding offers *open in the worklist* instead of *hide*; *show on map* only for findings that are not collisions; the step *choose* shows one line to Assets instead of the duel cards. | `Tasks.tsx` (`FindingRow`, `Choices`, `Spots`, `TasksPage`) | S | A |
 | F | **Worldspaces.** WRLD read on every scan (EDID, FULL, WNAM, flags, MNAM, NAM0/NAM9), worlds listed by land or places, `title`, `origin`, `parent`, `bounds`, `small`; terrain over the bounds; picker grouped; density colouring of cells removed; sample worlds (a DLC world, a mod world, a small one, a child). | `crates/mallet-game-bethesda` (`objects.rs`, `ingest.rs`, `terrain.rs`), `crates/mallet-core/src/report.rs`, `crates/mallet-analysis/src/map.rs`, generated, `MapView.tsx`, the world part of `dev/sample-api.ts` | L | – |
 | G | **Relief for every world.** LOD textures from archives for the flat picture and the relief's colours, water by flags, height by range, relief from the land where there is no LOD, child worlds; Blackreach checked on the reference setup first. | `MapView3D.tsx`, `lod-layer.ts`, `land-layer.ts`, `crates/mallet-game-bethesda/src/lod.rs`, `lod_library.rs` | L | F, and the area terrain session's work on `MapView3D.tsx` merged |
 | H | **Toolbox.** LOOT inside Vortex; the Creation Kit's purpose; optional tools folded; tools in the sample. | `crates/mallet-game-bethesda/src/tools.rs`, `crates/mallet-engine/src/toolbox.rs`, `crates/mallet-core/src/toolbox.rs` (a *provided by* field), `crates/mallet-messages/locales/*/ui.ftl`, `Toolbox.tsx`, the tools part of `dev/sample-api.ts` | S | – |
@@ -489,7 +528,7 @@ Order:
 ```text
 now:            A ─────────┐        F ──────────▶ G (after area terrain)
                            │        H
-after A:        B   C   D   E   (all four at once)
+after A:        B   C   D   D2   E   (all five at once)
 ```
 
 A, F and H can start at once: A is the window's frame, F and H are engine

@@ -40,8 +40,19 @@ export interface Session {
   ranking: string[];
   /** Keeps a new order of preference. */
   setRanking: (ranking: string[]) => void;
-  /** Opens the comparison of two mods, at one duel if given. */
+  /** Switches to the assets page, the comparison of two mods' files, at one duel if given. */
   openCompare: (duel: string | null) => void;
+  /**
+   * Switches to the collisions' pairs of mods and opens the pair of two
+   * mods there, by the names the mod manager shows for them (ADR 0048).
+   */
+  openPair: (first: string, second: string) => void;
+  /** The pair the collisions are to open with, until the user goes elsewhere. */
+  pairAt: [string, string] | null;
+  /** Switches to the map, filtered to what one mod places, by its name. */
+  showModOnMap: (mod: string) => void;
+  /** The mod the map is to be filtered to, until the user goes elsewhere. */
+  mapMod: string | null;
 }
 
 export const SessionContext = createContext<Session | null>(null);

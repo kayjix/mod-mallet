@@ -31,10 +31,6 @@ export interface OverviewTexts {
   adviceNotCounted: (count: number) => string;
   howCounted: string;
   howCountedText: string;
-  noScanYet: string;
-  statTasks: string;
-  statSpots: string;
-  statMods: string;
 
   tasksHeadline: (count: number) => string;
   tasksHeadlineNone: string;
@@ -131,10 +127,6 @@ const en: OverviewTexts = {
   howCounted: "How the score is counted",
   howCountedText:
     "It starts at 100. Each open finding takes points off by what it does to the game: whatever can crash it the most, then what looks or behaves wrong, then what only costs quality. Findings Mod Mallet is less sure about count less, and many of one sort count less than one each. Collision spots that are not decided take off up to 30 points; a decided spot no longer counts once the patch is built. Findings you set aside and recommendations do not count.",
-  noScanYet: "Scan once, and this shows how your setup is doing.",
-  statTasks: "Things to do",
-  statSpots: "Collision spots to decide",
-  statMods: "Mods enabled",
 
   tasksHeadline: (count) => (count === 1 ? "1 thing to do" : `${count} things to do`),
   tasksHeadlineNone: "Nothing to do apart from the collisions",
@@ -281,10 +273,6 @@ const de: OverviewTexts = {
   howCounted: "Wie der Wert entsteht",
   howCountedText:
     "Er beginnt bei 100. Jeder offene Befund zieht Punkte ab, je nachdem, was er im Spiel anrichtet: am meisten, was es abstürzen lässt, dann, was falsch aussieht oder sich falsch verhält, dann, was nur Qualität kostet. Befunde, bei denen sich Mod Mallet weniger sicher ist, zählen weniger, und viele einer Sorte zählen weniger als je einer. Nicht entschiedene Kollisionsstellen ziehen bis zu 30 Punkte ab; eine entschiedene Stelle zählt nicht mehr, sobald der Patch gebaut ist. Beiseitegelegte Befunde und Empfehlungen zählen nicht.",
-  noScanYet: "Einmal prüfen, dann steht hier, wie es um dein Setup steht.",
-  statTasks: "Aufgaben",
-  statSpots: "Kollisionsstellen offen",
-  statMods: "Mods aktiv",
 
   tasksHeadline: (count) => (count === 1 ? "1 Sache zu tun" : `${count} Sachen zu tun`),
   tasksHeadlineNone: "Außer den Kollisionen nichts zu tun",

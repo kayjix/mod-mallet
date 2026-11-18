@@ -1,21 +1,25 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { type Session, SessionContext } from "./Actions";
+import "./journey.css";
+import { type Session, SessionContext, useSession } from "./Actions";
+import { AllGames, useGameArt } from "./AllGames";
 import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, modsByName } from "./arrange";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { Duels } from "./Duels";
-import { type Games, isPlayable, useGames } from "./games";
+import { type Games, useGames } from "./games";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
-import { Home } from "./Home";
+import { type Health, healthOf } from "./health";
 import { initialLive, type Lang, rememberLang, rememberLive, type Texts, texts } from "./i18n";
+import { type JourneyTexts, journeyTexts } from "./journey-texts";
 import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
+import { Overview, openFileDuels } from "./Overview";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
 import { choicesOf, installedKeys, type PatchChoices, pairsOf } from "./patch";
@@ -28,17 +32,22 @@ interface AppProps {
   startLang: Lang;
 }
 
-/** The views of the sidebar. */
+/**
+ * The pages of the window (ADR 0048): all games, and the pages of the game
+ * in use, starting with its overview. Assets is the home of the duels
+ * about files, with the comparison stage and the ranking.
+ */
 type ViewName =
-  | "home"
+  | "games"
+  | "overview"
   | "tasks"
   | "collisions"
   | "patch"
   | "map"
+  | "assets"
   | "mods"
   | "toolbox"
   | "settings"
-  | "compare"
   | "places";
 
 /** How often the window looks whether the setup changed, in milliseconds. */
@@ -52,7 +61,7 @@ const SAVE_CHOICES_AFTER = 400;
 
 export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
-  const [view, setView] = useState<ViewName>("home");
+  const [view, setView] = useState<ViewName>("overview");
   const [places, setPlaces] = useState<RenderedPlaces | null>(null);
   const [report, setReport] = useState<RenderedReport | null>(null);
   const [link, setLink] = useState<RenderedLink | null>(null);
@@ -141,9 +150,15 @@ export default function App({ api, startLang }: AppProps) {
     },
     [api],
   );
-  // The comparison opens over the view it was opened from and goes back to it.
+  // The duel the assets page is to open at, and the page that led there,
+  // for its way back.
   const [compareAt, setCompareAt] = useState<string | null>(null);
-  const [compareFrom, setCompareFrom] = useState<ViewName>("tasks");
+  const viewNow = useRef<ViewName>(view);
+  viewNow.current = view;
+  const assetsFrom = useRef<ViewName>("overview");
+  // Where the collisions and the map are to open, when another page led there.
+  const [pairAt, setPairAt] = useState<[string, string] | null>(null);
+  const [mapMod, setMapMod] = useState<string | null>(null);
   useEffect(() => {
     if (patchChoices !== null || storedChoices === undefined || report === null) {
       return;
@@ -158,6 +173,7 @@ export default function App({ api, startLang }: AppProps) {
     setPatchChoicesNow({ ...installed, ...(storedChoices ?? {}) });
   }, [patchChoices, storedChoices, report, ignored]);
   const t = texts[lang];
+  const j = journeyTexts[lang];
 
   const refreshToolbox = useCallback(() => {
     api
@@ -280,7 +296,7 @@ export default function App({ api, startLang }: AppProps) {
   const confirmPlaces = async (named: NamedPlaces) => {
     try {
       setPlaces(await api.confirmPlaces(named, lang));
-      setView("tasks");
+      setView("overview");
       await scan();
     } catch (error: unknown) {
       setFailure(String(error));
@@ -297,31 +313,61 @@ export default function App({ api, startLang }: AppProps) {
     [api],
   );
 
-  const showPatch = useCallback(() => {
+  // Going to a page: whatever another page asked it to open with is
+  // forgotten.
+  const go = useCallback((next: ViewName) => {
+    if (next === "assets" && viewNow.current !== "assets") {
+      assetsFrom.current = viewNow.current;
+    }
     setFocus(null);
-    setView("patch");
+    setWorkSpot(null);
+    setPairAt(null);
+    setMapMod(null);
+    setCompareAt(null);
+    setView(next);
   }, []);
+
+  const showPatch = useCallback(() => go("patch"), [go]);
 
   const openCompare = useCallback(
     (duel: string | null) => {
+      go("assets");
       setCompareAt(duel);
-      if (view !== "compare") {
-        setCompareFrom(view);
-      }
-      setView("compare");
     },
-    [view],
+    [go],
   );
 
-  const showOnMap = useCallback((spot: MapSpot) => {
-    setFocus(spot);
-    setView("map");
-  }, []);
+  const showOnMap = useCallback(
+    (spot: MapSpot) => {
+      go("map");
+      setFocus(spot);
+    },
+    [go],
+  );
 
-  const decideSpot = useCallback((spot: MapSpot) => {
-    setWorkSpot(spot);
-    setView("collisions");
-  }, []);
+  const showModOnMap = useCallback(
+    (mod: string) => {
+      go("map");
+      setMapMod(mod);
+    },
+    [go],
+  );
+
+  const decideSpot = useCallback(
+    (spot: MapSpot) => {
+      go("collisions");
+      setWorkSpot(spot);
+    },
+    [go],
+  );
+
+  const openPair = useCallback(
+    (first: string, second: string) => {
+      go("collisions");
+      setPairAt([first, second]);
+    },
+    [go],
+  );
 
   const session = useMemo<Session>(
     () => ({
@@ -344,6 +390,10 @@ export default function App({ api, startLang }: AppProps) {
       ranking,
       setRanking,
       openCompare,
+      openPair,
+      pairAt,
+      showModOnMap,
+      mapMod,
     }),
     [
       api,
@@ -364,64 +414,66 @@ export default function App({ api, startLang }: AppProps) {
       ranking,
       setRanking,
       openCompare,
+      openPair,
+      pairAt,
+      showModOnMap,
+      mapMod,
     ],
   );
   const counts = useMemo(
     () => (report === null ? null : countFindings(report.findings, ignored)),
     [report, ignored],
   );
+  const health = useMemo(
+    () => (report === null ? null : healthOf(report, ignored, patchChoices ?? {})),
+    [report, ignored, patchChoices],
+  );
 
   // Nothing is read before the user has seen where Mod Mallet looks.
   const askFirst = places !== null && !places.confirmed;
   const current: ViewName = askFirst ? "places" : view;
-  const titles: Record<ViewName, string> = {
-    home: t.viewHome,
-    tasks: t.viewTasks,
-    collisions: t.viewCollisions,
-    patch: t.viewPatch,
-    map: t.viewMap,
-    mods: t.viewMods,
-    toolbox: t.viewToolbox,
-    settings: t.viewSettings,
-    compare: t.viewCompare,
-    places: askFirst ? t.placesTitleFirst : t.placesTitle,
-  };
 
   return (
     <SessionContext value={session}>
       <div className="shell">
         <Sidebar
           view={current}
-          onView={(next) => {
-            setFocus(null);
-            setWorkSpot(null);
-            setView(next);
-          }}
+          onView={go}
           disabled={askFirst}
           counts={counts}
+          health={health}
           report={report}
           link={link}
           toolbox={toolbox}
-          games={games}
           t={t}
-          scanBox={
-            askFirst ? null : (
-              <ScanBox
-                scannedAt={report?.scannedAt ?? null}
-                live={live}
-                scanning={scanning}
-                onScan={scan}
-                lang={lang}
-                t={t}
-              />
-            )
+          j={j}
+          gameCard={
+            <GameCard
+              games={games}
+              current={current === "overview"}
+              disabled={askFirst}
+              onOpen={() => go("overview")}
+              t={t}
+              j={j}
+            >
+              {!askFirst && (
+                <ScanBox
+                  scannedAt={report?.scannedAt ?? null}
+                  live={live}
+                  scanning={scanning}
+                  onScan={scan}
+                  lang={lang}
+                  t={t}
+                />
+              )}
+            </GameCard>
           }
         />
         <main className="content" data-view={current}>
           {/* The sidebar says where the user is; only the first run needs a title. */}
           {current === "places" && (
             <header className="pagehead">
-              <h1>{titles[current]}</h1>
+              <h1>{askFirst ? t.placesTitleFirst : t.placesTitle}</h1>
             </header>
           )}
 
@@ -443,19 +495,19 @@ export default function App({ api, startLang }: AppProps) {
               t={t}
               busy={scanning}
               onConfirm={confirmPlaces}
-              onCancel={askFirst ? undefined : () => setView("tasks")}
+              onCancel={askFirst ? undefined : () => go("overview")}
             />
-          ) : current === "home" ? (
-            <Home
+          ) : current === "games" ? (
+            <AllGames games={games} report={report} health={health} onOpen={() => go("overview")} />
+          ) : current === "overview" ? (
+            <Overview
               games={games}
               report={report}
-              counts={counts}
+              health={health}
+              toolbox={toolbox}
               scanning={scanning}
               onScan={scan}
-              onOpen={(next) => {
-                setFocus(null);
-                setView(next);
-              }}
+              onOpen={go}
             />
           ) : current === "toolbox" ? (
             <ToolboxView toolbox={toolbox} refresh={refreshToolbox} />
@@ -478,8 +530,6 @@ export default function App({ api, startLang }: AppProps) {
                 </button>
               </section>
             )
-          ) : current === "compare" ? (
-            <CompareView report={report} start={compareAt} onBack={() => setView(compareFrom)} />
           ) : current === "collisions" ? (
             <Collisions report={report} start={workSpot}>
               <Duels
@@ -489,6 +539,8 @@ export default function App({ api, startLang }: AppProps) {
               />
               <TaskList findings={report.findings} filter="collisions" exclude={inDuels(report)} />
             </Collisions>
+          ) : current === "assets" ? (
+            <CompareView report={report} start={compareAt} onBack={() => go(assetsFrom.current)} />
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (
@@ -521,54 +573,76 @@ function headlinesOf(report: RenderedReport): Map<string, string> {
   return new Map(report.findings.map((rendered) => [rendered.finding.id, rendered.headline]));
 }
 
+interface NavEntry {
+  name: ViewName;
+  label: string;
+  icon: ReactNode;
+  /** A number, or a dot for something waiting without a count. */
+  badge?: number | "dot" | null;
+  /** What the badge means, for a dot. */
+  badgeLabel?: string;
+}
+
 interface SidebarProps {
   view: ViewName;
   onView: (view: ViewName) => void;
   disabled: boolean;
   counts: Counts | null;
+  health: Health | null;
   report: RenderedReport | null;
   link: RenderedLink | null;
   toolbox: RenderedToolbox | null;
-  games: Games;
   t: Texts;
-  /** Scanning, with when it last happened; none before the places are confirmed. */
-  scanBox: ReactNode;
+  j: JourneyTexts;
+  /** The game in use, with scanning. */
+  gameCard: ReactNode;
 }
 
+/**
+ * The way to every page (ADR 0048): back to all games, the game in use,
+ * its pages, and the toolbox and settings beside them. Each badge counts
+ * what its page lists first, so that the numbers agree.
+ */
 function Sidebar({
   view,
   onView,
   disabled,
   counts,
+  health,
   report,
   link,
   toolbox,
-  games,
   t,
-  scanBox,
+  j,
+  gameCard,
 }: SidebarProps) {
-  const open = counts === null ? null : counts.errors + counts.warnings;
-  const collisions = counts === null ? null : counts.collisions;
-  const items: { name: ViewName; label: string; icon: ReactNode; badge?: number | null }[] = [
-    { name: "home", label: t.viewHome, icon: <IconHome /> },
-    { name: "tasks", label: t.viewTasks, icon: <IconTasks />, badge: open },
+  const { decisions } = useSession();
+  const assets = report === null ? null : openFileDuels(report, decisions);
+  const game: NavEntry[] = [
+    { name: "overview", label: j.navOverview, icon: <IconOverview /> },
+    { name: "tasks", label: t.viewTasks, icon: <IconTasks />, badge: counts?.tasks },
     {
       name: "collisions",
       label: t.viewCollisions,
       icon: <IconCollisions />,
-      badge: collisions,
+      badge: health?.spots.open,
     },
-    { name: "patch", label: t.viewPatch, icon: <IconPatch /> },
+    {
+      name: "patch",
+      label: t.viewPatch,
+      icon: <IconPatch />,
+      badge: (health?.spots.waiting ?? 0) > 0 ? "dot" : null,
+      badgeLabel: health === null ? undefined : j.spotsWaiting(health.spots.waiting),
+    },
     { name: "map", label: t.viewMap, icon: <IconMap /> },
+    { name: "assets", label: j.navAssets, icon: <IconAssets />, badge: assets },
     { name: "mods", label: t.viewMods, icon: <IconMods /> },
-    { name: "toolbox", label: t.viewToolbox, icon: <IconToolbox /> },
   ];
-  const navButton = (item: {
-    name: ViewName;
-    label: string;
-    icon: ReactNode;
-    badge?: number | null;
-  }) => (
+  const beside: NavEntry[] = [
+    { name: "toolbox", label: t.viewToolbox, icon: <IconToolbox />, badge: toolbox?.attention },
+    { name: "settings", label: t.viewSettings, icon: <IconSettings /> },
+  ];
+  const navButton = (item: NavEntry) => (
     <button
       type="button"
       key={item.name}
@@ -579,13 +653,18 @@ function Sidebar({
     >
       {item.icon}
       <span className="nav-label">{item.label}</span>
-      {item.badge != null && item.badge > 0 && <span className="badge">{item.badge}</span>}
+      {item.badge === "dot" ? (
+        <span
+          className="badge-dot"
+          role="img"
+          aria-label={item.badgeLabel}
+          title={item.badgeLabel}
+        />
+      ) : (
+        item.badge != null && item.badge > 0 && <span className="badge">{item.badge}</span>
+      )}
     </button>
   );
-  const game = report?.game;
-  const attention = toolbox?.attention ?? 0;
-  const status =
-    toolbox === null ? null : attention > 0 ? t.toolboxAttention(attention) : t.toolboxReady;
 
   return (
     <aside className="sidebar">
@@ -593,12 +672,18 @@ function Sidebar({
         <Mallet />
         <span className="brand-name">Mod Mallet</span>
       </div>
-      <GamePicker games={games} t={t} />
-      {scanBox}
-      <nav>{items.map(navButton)}</nav>
-      <nav className="nav-bottom">
-        {navButton({ name: "settings", label: t.viewSettings, icon: <IconSettings /> })}
-      </nav>
+      <button
+        type="button"
+        className="nav-back"
+        aria-current={view === "games" ? "page" : undefined}
+        disabled={disabled}
+        onClick={() => onView("games")}
+      >
+        ‹ {j.navAllGames}
+      </button>
+      {gameCard}
+      <nav>{game.map(navButton)}</nav>
+      <nav className="nav-bottom">{beside.map(navButton)}</nav>
       <div className="sidebar-foot">
         <ManagerStatus
           toolbox={toolbox}
@@ -607,27 +692,50 @@ function Sidebar({
           onOpen={() => onView("toolbox")}
           t={t}
         />
-        {game != null && (
-          <p className="game-version">
-            {game.version ?? t.versionUnknown}
-            {game.extenderVersion != null &&
-              ` · ${games.active?.scriptExtender ?? t.scriptExtender} ${game.extenderVersion}`}
-          </p>
-        )}
-        {status !== null && (
-          <button
-            type="button"
-            className="pill status-pill"
-            data-state={attention > 0 ? "restart" : "ready"}
-            title={link?.message}
-            disabled={disabled}
-            onClick={() => onView("toolbox")}
-          >
-            {status}
-          </button>
-        )}
       </div>
     </aside>
+  );
+}
+
+interface GameCardProps {
+  games: Games;
+  /** Whether the overview is the page shown. */
+  current: boolean;
+  disabled: boolean;
+  onOpen: () => void;
+  t: Texts;
+  j: JourneyTexts;
+  /** Scanning, below the game's name. */
+  children: ReactNode;
+}
+
+/** The game in use: its picture and name, which lead to its overview, and scanning. */
+function GameCard({ games, current, disabled, onOpen, t, j, children }: GameCardProps) {
+  const activeId = games.choice?.active;
+  const art = useGameArt(activeId === undefined ? [] : [activeId]);
+  const picture = activeId === undefined ? undefined : art[activeId];
+  const name = t.games.find((game) => game.id === activeId)?.name ?? "";
+  return (
+    <div className="side-game">
+      <button
+        type="button"
+        className="side-game-head"
+        aria-current={current ? "page" : undefined}
+        title={j.gameCardHint}
+        disabled={disabled || activeId === undefined}
+        onClick={onOpen}
+      >
+        <span
+          className="side-game-art"
+          style={picture === undefined ? undefined : { backgroundImage: `url(${picture})` }}
+          aria-hidden="true"
+        >
+          {picture === undefined && name.slice(0, 1)}
+        </span>
+        <span className="side-game-name">{name}</span>
+      </button>
+      {children}
+    </div>
   );
 }
 
@@ -730,41 +838,6 @@ function ManagerStatus({ toolbox, link, disabled, onOpen, t }: ManagerStatusProp
   );
 }
 
-/**
- * The game Mod Mallet looks at. Games it reads and that are on this machine
- * can be chosen; the others are on the list so that it is clear where this
- * is going. Choosing a game starts the window over for it.
- */
-function GamePicker({ games, t }: { games: Games; t: Texts }) {
-  const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
-  const label = (entry: Texts["games"][number]) => {
-    const game = known.get(entry.id);
-    if (game !== undefined) {
-      return isPlayable(game) ? entry.name : `${entry.name} – ${t.gameNotInstalled}`;
-    }
-    return entry.quip === undefined ? entry.name : `${entry.name} – ${entry.quip}`;
-  };
-  return (
-    <label className="game-picker">
-      <span className="brand-tagline">{t.tagline}</span>
-      <select
-        value={games.choice?.active ?? ""}
-        disabled={games.choice === null}
-        onChange={(event) => {
-          games.select(event.target.value).catch(() => {});
-        }}
-        aria-label={t.gameLabel}
-      >
-        {t.games.map((entry) => (
-          <option key={entry.id} value={entry.id} disabled={!isPlayable(known.get(entry.id))}>
-            {label(entry)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 // Icons of the sidebar: simple strokes in the text colour.
 
 function Icon({ children }: { children: ReactNode }) {
@@ -820,6 +893,16 @@ function IconMap() {
   );
 }
 
+function IconAssets() {
+  return (
+    <Icon>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="M21 16l-5-5-9 9" />
+    </Icon>
+  );
+}
+
 function IconMods() {
   return (
     <Icon>
@@ -829,10 +912,13 @@ function IconMods() {
   );
 }
 
-function IconHome() {
+function IconOverview() {
   return (
     <Icon>
-      <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="13" y="3" width="8" height="5" rx="1.5" />
+      <rect x="13" y="10" width="8" height="11" rx="1.5" />
+      <rect x="3" y="13" width="8" height="8" rx="1.5" />
     </Icon>
   );
 }

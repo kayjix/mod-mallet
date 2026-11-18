@@ -1,0 +1,192 @@
+/* The window's frame (ADR 0048): the way back to all games, the game in
+   use in the sidebar, and the overview of a game. */
+
+/* ---- the sidebar ---------------------------------------------------------- */
+
+.nav-back {
+  justify-self: start;
+  margin: 18px 4px 6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--side-muted);
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.nav-back:hover:not(:disabled),
+.nav-back[aria-current="page"] {
+  background: rgb(255 255 255 / 6%);
+  color: var(--side-text);
+}
+
+.side-game {
+  display: grid;
+  gap: 8px;
+  margin: 0 4px 14px;
+  padding: 8px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.side-game-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--side-text);
+  font-weight: 600;
+  text-align: left;
+}
+
+.side-game-head:hover:not(:disabled),
+.side-game-head[aria-current="page"] {
+  background: var(--side-active);
+}
+
+.side-game-art {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--side-bg), var(--brand)) center / cover;
+  color: rgb(255 255 255 / 70%);
+  font-size: 0.9rem;
+}
+
+.side-game-name {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.side-game .scan-box {
+  margin: 0;
+}
+
+.badge-dot {
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---- all games ------------------------------------------------------------- */
+
+.game-in-use {
+  justify-self: start;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.game-open {
+  justify-self: start;
+  margin-top: var(--space-1);
+}
+
+.games-later {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ---- the overview of a game ------------------------------------------------ */
+
+.overview-banner {
+  display: flex;
+  align-items: flex-end;
+  min-height: 150px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--side-bg), var(--brand)) center / cover;
+}
+
+.overview-banner-text {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  background: linear-gradient(to top, rgb(7 19 23 / 92%), rgb(7 19 23 / 0%));
+  color: #f8f9fa;
+}
+
+.overview-banner-text h2 {
+  font-size: 1.6rem;
+}
+
+.overview-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 1100px) {
+  .overview-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .overview-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.overview-tile {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-top: 4px solid var(--border);
+  text-align: left;
+}
+
+.overview-tile:hover {
+  border-color: var(--brand);
+}
+
+.overview-tile[data-tone="ok"] {
+  border-top-color: var(--ok);
+}
+
+.overview-tile[data-tone="warning"] {
+  border-top-color: var(--warning);
+}
+
+.overview-tile[data-tone="error"] {
+  border-top-color: var(--error);
+}
+
+.overview-tile-title {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.overview-tile-value {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-tile-line {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.overview-sources {
+  padding: var(--space-3) var(--space-4);
+}
+
+.overview-sources .meta {
+  margin: 0 0 var(--space-2);
+}

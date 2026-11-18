@@ -400,7 +400,7 @@ const FOLDED: Step[] = ["notes", "ignored"];
  * recommendations and notes come after everything that is required.
  */
 export function TasksPage({ report }: { report: RenderedReport }) {
-  const { t, ignored } = useSession();
+  const { ignored } = useSession();
   const o = useOverviewTexts();
   // Duels about the same thing in two mods are decided as a whole; their
   // findings are shown in the duel, not again on their own. Duels about
@@ -458,29 +458,6 @@ export function TasksPage({ report }: { report: RenderedReport }) {
           <p className="aside step-empty">{o.adviceEmpty}</p>
         </StepSection>
       )}
-
-      <p className="meta tasks-stats">
-        {t.scanStats({
-          plugins: report.pluginsChecked,
-          archives: report.archivesChecked,
-          installers: report.installersChecked,
-          meshes: report.meshesChecked,
-        })}
-      </p>
-      <details className="sources">
-        <summary className="more">{t.whatWasRead}</summary>
-        <dl>
-          {report.locations.map(({ location, roleLabel, originLabel }) => (
-            <div key={location.role}>
-              <dt>{roleLabel}</dt>
-              <dd>
-                <code>{location.path}</code>
-                <span className="origin">{location.found ? originLabel : t.notFound}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </details>
     </section>
   );
 }

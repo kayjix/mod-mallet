@@ -40,11 +40,13 @@ pages; this record states the rules.
    page, the scan statistics and what was read. The window opens on the
    overview of the game in use.
 2. **One job per page, at most two ways.** Tasks: what is to do except
-   collisions, by step. Collisions: decide every spot, by *Spots* (one at
+   collisions and duels, by step. Collisions: decide every spot, by *Spots* (one at
    a time, in 3D) or by *Mod against mod* (a pair as a whole). Patch: build
    and install what was decided. Map: look at the places of any
-   worldspace, flat or as a relief. Mods: the mods, as a list or as the
-   ranking. Toolbox: the tools the setup needs. Settings: where Mod Mallet
+   worldspace, flat or as a relief. Assets: decide whose textures, meshes
+   and faces the game shows where two mods bring their own, by *Duels* (the
+   two side by side on the comparison stage) or by *Ranking* (which mods to
+   prefer). Mods: the mods, as a list with each mod's details. Toolbox: the tools the setup needs. Settings: where Mod Mallet
    reads, language, theme.
 3. **Every thing has one home.** It is shown in full and decided only
    there; elsewhere it appears as a count or a link to its home. The one
@@ -57,11 +59,17 @@ pages; this record states the rules.
    leads back to Collisions) and makes none of its own. A collision
    finding offers *open in the worklist*, not *hide*. The map decides
    nothing.
-5. **The comparison of a duel is a layer** over the page it was opened
-   from. The ranking of mods moves to the mods page.
+5. **Assets is the home of the duels about files** (textures, meshes,
+   faces): the comparison stage of ADR 0029 and 0033 becomes a page of its
+   own, next to the map, with the ranking as its second tab. Duels about
+   placed objects stay with their pair in Collisions. Tasks, the overview
+   and a mod's details show the duels about files only as a count or a
+   line with *compare*, which opens Assets at the duel. The ranking lives
+   here because its one use is to suggest the side of these duels, and it
+   is edited where they are decided.
 6. **Badges count what their page lists first**: open tasks, open spots, a
-   dot for choices not yet in the installed patch, tools needing
-   attention. The sidebar keeps the mod manager's line and loses the
+   dot for choices not yet in the installed patch, duels about files with
+   no side picked, tools needing attention. The sidebar keeps the mod manager's line and loses the
    toolbox pill and the game select.
 7. **Worldspaces are listed by what they are**, not by whether mods touch
    them: every worldspace with land or places, read on every scan, named
@@ -87,8 +95,8 @@ pages; this record states the rules.
 - The overview and *All games* are two pages where Home was one. A score
   per game on *All games* needs the last scan of each game to be kept;
   until it is, only the game in use shows one.
-- The comparison of a duel loses its own place in the navigation; it was
-  never in it.
+- The comparison, once reached only through a duel's button, has a place
+  in the navigation, and the ranking with it.
 - Reading every WRLD on every scan costs little (a few hundred records)
   but changes the cache of the game's plugins.
 - The CSS map palette stays for worlds without LOD textures; worlds with
@@ -103,6 +111,11 @@ pages; this record states the rules.
   convenient where it stood. Together they made it unclear what a button
   does and whether two places agree; links reach the same place with one
   click more.
+- **The comparison as a layer over the page it was opened from, and the
+  ranking under Mods.** This record's first version said so. The user
+  asked for a clear place for the comparison of files, as the map has one;
+  a layer has no place to return to, and the ranking under Mods would be a
+  second job on a page meant for knowing the mods.
 - **Dropping *Mod against mod*.** The worklist can group by mods. But a
   pair as a whole, with its counts and its suggestion, is how someone who
   knows the mods thinks; the user asked for it as the technical view next

@@ -78,7 +78,6 @@ export interface Texts {
   managerLinkRestart: string;
   managerLinkOutdated: string;
   managerLinkMissing: string;
-  gameLabel: string;
   /**
    * The games of the game menu. Those Mod Mallet reads have no quip; which
    * of them are installed comes from the Rust side. The others are a promise.
@@ -88,18 +87,10 @@ export interface Texts {
   gameNotInstalled: string;
   /** A game Mod Mallet reads, but not yet with every check. */
   gameBasic: string;
-  /** The button that makes a game the one to look at. */
-  gameSwitch: string;
-  viewHome: string;
-  homeGames: string;
-  homeActive: string;
   homeNoArt: string;
   homeOpenTasks: string;
   homeCollisions: string;
   homeMods: string;
-  homePatch: string;
-  homePatchNone: string;
-  homeToTasks: string;
   settingsTabGeneral: string;
   settingsTabPlaces: string;
   settingsTabAbout: string;
@@ -110,11 +101,8 @@ export interface Texts {
   themeLight: string;
   themeDark: string;
   aboutText: string;
-  soon: string;
   viewToolbox: string;
   viewSettings: string;
-  toolboxReady: string;
-  toolboxAttention: (count: number) => string;
   restartVortex: string;
   startVortex: string;
   restartingVortex: string;
@@ -501,7 +489,6 @@ export const texts: Record<Lang, Texts> = {
     managerLinkRestart: "Restart needed for the new link",
     managerLinkOutdated: "Link update available",
     managerLinkMissing: "Link not installed",
-    gameLabel: "Game",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
       { id: "skyrimvr", name: "Skyrim VR" },
@@ -517,20 +504,12 @@ export const texts: Record<Lang, Texts> = {
       { id: "baldursgate3", name: "Baldur's Gate 3", quip: "rolling for initiative" },
       { id: "cyberpunk2077", name: "Cyberpunk 2077", quip: "waiting for a patch (yes, we know)" },
     ],
-    soon: "soon",
     gameNotInstalled: "not found on this computer",
     gameBasic: "the basics: load order, files, archives, map, toolbox",
-    gameSwitch: "Switch to this game",
-    viewHome: "Home",
-    homeGames: "Games",
-    homeActive: "Active",
     homeNoArt: "Vortex brings a picture of this game along; it is not installed here.",
     homeOpenTasks: "open tasks",
     homeCollisions: "collisions",
     homeMods: "mods",
-    homePatch: "objects hidden by the patch",
-    homePatchNone: "no patch installed",
-    homeToTasks: "To the tasks",
     settingsTabGeneral: "General",
     settingsTabPlaces: "Places",
     settingsTabAbout: "About",
@@ -544,8 +523,6 @@ export const texts: Record<Lang, Texts> = {
       "Mod Mallet looks at a modded game, explains what is wrong in plain words and lets the mod manager carry out the fixes. It changes nothing by itself.",
     viewToolbox: "Toolbox",
     viewSettings: "Settings",
-    toolboxReady: "All set",
-    toolboxAttention: (count) => (count === 1 ? "1 thing needs you" : `${count} things need you`),
     restartVortex: "Restart Vortex",
     startVortex: "Start Vortex",
     restartingVortex: "Closing Vortex and starting it again…",
@@ -1057,7 +1034,6 @@ export const texts: Record<Lang, Texts> = {
     managerLinkRestart: "Neustart nötig für die neue Verbindung",
     managerLinkOutdated: "Update der Verbindung verfügbar",
     managerLinkMissing: "Verbindung nicht installiert",
-    gameLabel: "Spiel",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
       { id: "skyrimvr", name: "Skyrim VR" },
@@ -1077,20 +1053,12 @@ export const texts: Record<Lang, Texts> = {
         quip: "wartet auf einen Patch (ja, wissen wir)",
       },
     ],
-    soon: "bald",
     gameNotInstalled: "auf diesem Computer nicht gefunden",
     gameBasic: "das Grundlegende: Ladereihenfolge, Dateien, Archive, Karte, Werkzeuge",
-    gameSwitch: "Zu diesem Spiel wechseln",
-    viewHome: "Start",
-    homeGames: "Spiele",
-    homeActive: "Aktiv",
     homeNoArt: "Vortex bringt ein Bild dieses Spiels mit; hier ist es nicht installiert.",
     homeOpenTasks: "offene Aufgaben",
     homeCollisions: "Kollisionen",
     homeMods: "Mods",
-    homePatch: "Objekte vom Patch ausgeblendet",
-    homePatchNone: "kein Patch installiert",
-    homeToTasks: "Zu den Aufgaben",
     settingsTabGeneral: "Allgemein",
     settingsTabPlaces: "Orte",
     settingsTabAbout: "Über",
@@ -1104,9 +1072,6 @@ export const texts: Record<Lang, Texts> = {
       "Mod Mallet schaut sich ein gemoddetes Spiel an, erklärt verständlich, was nicht stimmt, und lässt den Mod-Manager die Korrekturen ausführen. Selbst ändert es nichts.",
     viewToolbox: "Werkzeugkasten",
     viewSettings: "Einstellungen",
-    toolboxReady: "Alles bereit",
-    toolboxAttention: (count) =>
-      count === 1 ? "1 Punkt braucht dich" : `${count} Punkte brauchen dich`,
     restartVortex: "Vortex neu starten",
     startVortex: "Vortex starten",
     restartingVortex: "Vortex wird geschlossen und wieder gestartet …",
