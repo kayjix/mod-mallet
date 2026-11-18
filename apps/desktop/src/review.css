@@ -221,3 +221,72 @@
 .overview-banner-actions {
   margin-top: var(--space-2);
 }
+
+/* Moving through the structures: a bar of its own, apart from the steps. */
+.review-structures {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--sunken);
+}
+
+.review-structures-where {
+  display: grid;
+  flex: 1;
+  justify-items: center;
+  gap: 2px;
+}
+
+.review-state {
+  color: var(--warning);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.review-state[data-decided="true"] {
+  color: var(--ok);
+}
+
+.review-choices button[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.stage3-eye[aria-pressed="false"] {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.stage3-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.stage3-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.stage3-key[data-key="hidden"] {
+  background: var(--spot-ghost);
+  opacity: 0.7;
+}
+
+.stage3-others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.stage3-other[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

@@ -17,6 +17,7 @@ import { isGameObject } from "./object-actions";
 import {
   chooseObject,
   chooseSpot,
+  decisionAt,
   hiddenKeysOf,
   type PatchChoices,
   revealObjects,
@@ -125,6 +126,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
   );
   useEffect(() => remember(game, stored), [game, stored]);
   const index = REVIEW_STEPS.indexOf(stored.step);
+  const previous = REVIEW_STEPS[index - 1];
+  const following = REVIEW_STEPS[index + 1];
 
   const install = useMemo(() => findingsOf(report, ignored, "install"), [report, ignored]);
   const order = useMemo(() => findingsOf(report, ignored, "order"), [report, ignored]);
@@ -203,25 +206,19 @@ export function Review({ report, game, onOpen }: ReviewProps) {
         )}
         {stored.step === "map" && <MapStep report={report} onOpen={onOpen} />}
         {stored.step === "collisions" && <CollisionsStep report={report} />}
+        {/* Between the steps; moving within a step is the step's own. */}
         <footer className="review-foot">
-          <button
-            type="button"
-            className="quiet"
-            disabled={index === 0}
-            onClick={() => go(REVIEW_STEPS[index - 1] ?? stored.step)}
-          >
-            ← {r.back}
-          </button>
+          {previous !== undefined && (
+            <button type="button" className="quiet" onClick={() => go(previous)}>
+              {r.stepBack(r.step[previous].title)}
+            </button>
+          )}
           <span className="spacer" />
           {finished && stored.step === "collisions" ? (
             <p className="aside">{r.finished}</p>
           ) : (
             <button type="button" className="primary" onClick={next}>
-              {index === REVIEW_STEPS.length - 1
-                ? r.finish
-                : open[stored.step] === 0 || open[stored.step] === null
-                  ? `${r.markSeen} →`
-                  : `${r.next} →`}
+              {following === undefined ? r.finish : r.stepNext(r.step[following].title)}
             </button>
           )}
         </footer>
@@ -359,27 +356,45 @@ function placeOf(
 }
 
 /**
- * The collisions, one structure at a time: the spot still open that is
- * worst, its two mods' structures side by side, and the three choices.
+ * The collisions, one structure at a time: its two mods' structures side
+ * by side, the three choices, and the way to the structure before and
+ * after, decided ones included, to see or change what was decided there.
  * Deciding hides a whole structure, which decides every spot it is part
- * of; the next open spot is the next structure.
+ * of, and moves on to the next spot still open.
  */
 function CollisionsStep({ report }: { report: RenderedReport }) {
   const { ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [cursor, setCursor] = useState<string | null>(null);
   const [history, setHistory] = useState<PatchChoices[]>([]);
   const [structures, setStructures] = useState<[AreaObject[], AreaObject[]]>([[], []]);
   const all = useMemo(
     () => reportSpots(report, ignored, patchChoices),
     [report, ignored, patchChoices],
   );
-  const open = all
-    .filter((item) => item.state === "open" && (item.spot.parts ?? []).length > 0)
-    .filter((item) => !skipped.has(spotKey(item.spot) ?? item.finding))
-    .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
-  const current = open[0];
-  const currentKey = current === undefined ? null : (spotKey(current.spot) ?? current.finding);
+  // Every spot that names its objects, the worst first; the order does not
+  // change as spots are decided, so that moving back finds them again.
+  const ordered = useMemo(
+    () =>
+      all
+        .filter((item) => (item.spot.parts ?? []).length > 0)
+        .map((item) => ({ item, key: spotKey(item.spot) ?? item.finding }))
+        .sort(
+          (a, b) =>
+            KIND_ORDER.indexOf(a.item.kind) - KIND_ORDER.indexOf(b.item.kind) ||
+            a.key.localeCompare(b.key),
+        ),
+    [all],
+  );
+  const openCount = ordered.filter(({ item }) => item.state === "open").length;
+  const at = Math.max(
+    0,
+    ordered.findIndex(({ key }) => key === cursor) >= 0
+      ? ordered.findIndex(({ key }) => key === cursor)
+      : ordered.findIndex(({ item }) => item.state === "open"),
+  );
+  const entry = ordered[at];
+  const currentKey = entry?.key ?? null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the structures belong to the spot.
   useEffect(() => setStructures([[], []]), [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
@@ -401,15 +416,15 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
     </button>
   );
 
-  if (current === undefined) {
+  if (entry === undefined) {
     return (
       <div className="review-rows">
         <p>{r.allDecided}</p>
-        <p className="aside">{r.decidedCount(decided, all.length)}</p>
         {history.length > 0 && <div className="review-choices">{undo}</div>}
       </div>
     );
   }
+  const current = entry.item;
   const parts = current.spot.parts ?? [];
   const plugins = [...new Set(parts.map((part) => part.object.plugin))];
   const sides: [string, string] = [plugins[0] ?? "", plugins[1] ?? plugins[0] ?? ""];
@@ -419,15 +434,43 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
     parts.filter((part) => part.object.plugin === sides[1]),
   ];
   const { place, centre } = placeOf(current.spot, report.map.worlds);
+  const decision = decisionAt(patchChoices, current.finding, spotKey(current.spot), parts);
+  const state =
+    decision === undefined
+      ? r.stateOpen
+      : decision === null
+        ? r.stateKept
+        : r.stateHidden(short(decision));
 
+  const go = (index: number) => {
+    const target = ordered[(index + ordered.length) % ordered.length];
+    if (target !== undefined) {
+      setCursor(target.key);
+    }
+  };
   /** A side's structure, or the spot's own parts of it until the structure is known. */
   const structureOf = (side: 0 | 1) =>
     structures[side].length > 0
       ? structures[side].map((object) => ({ id: object.id, game: isGameObject(object) }))
       : seeds[side].map((part) => ({ id: part.object, game: !part.hideable }));
+  /** Keeps the choices, and moves on to the next spot still open after this one. */
   const apply = (next: PatchChoices) => {
     setHistory([...history, patchChoices]);
     setPatchChoices(next);
+    const after = reportSpots(report, ignored, next);
+    const open = new Set(
+      after
+        .filter((item) => item.state === "open")
+        .map((item) => spotKey(item.spot) ?? item.finding),
+    );
+    for (let step = 1; step <= ordered.length; step++) {
+      const candidate = ordered[(at + step) % ordered.length];
+      if (candidate !== undefined && open.has(candidate.key)) {
+        setCursor(candidate.key);
+        return;
+      }
+    }
+    setCursor(entry.key);
   };
   const keep = (side: 0 | 1) => {
     const kept = structureOf(side).map((part) => part.id);
@@ -460,9 +503,28 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
     apply(own === null ? next : chooseSpot(next, own, null));
   };
   const gameParts = [...structureOf(0), ...structureOf(1)].filter((part) => part.game).length;
+  const keptSide =
+    decision === undefined || decision === null
+      ? null
+      : decision.toLowerCase() === sides[1].toLowerCase()
+        ? 0
+        : 1;
 
   return (
     <div className="review-collision">
+      <nav className="review-structures" aria-label={r.spotOf(at + 1, ordered.length)}>
+        <button type="button" className="small" onClick={() => go(at - 1)}>
+          {r.previousStructure}
+        </button>
+        <span className="review-structures-where">
+          <strong>{r.spotOf(at + 1, ordered.length)}</strong>
+          <span className="aside">{r.decidedCount(decided, all.length)}</span>
+        </span>
+        <button type="button" className="small" onClick={() => go(at + 1)}>
+          {r.nextStructure}
+        </button>
+      </nav>
+      {openCount === 0 && <p className="aside">{r.allDecided}</p>}
       <div className="review-collision-head">
         <strong>
           {names[0]} ⟷ {names[1]}
@@ -471,7 +533,9 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
           {current.spot.objects} · <code>{current.spot.console}</code>
         </span>
         <span className="spacer" />
-        <span className="aside">{r.decidedCount(decided, all.length)}</span>
+        <span className="review-state" data-decided={decision !== undefined}>
+          {state}
+        </span>
       </div>
       <CompareStage3D
         place={place}
@@ -483,23 +547,29 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
       />
       {gameParts > 0 && <p className="aside">{r.gameParts(gameParts)}</p>}
       <div className="review-choices">
-        <button type="button" className="primary" onClick={() => keep(0)}>
+        <button
+          type="button"
+          className="primary"
+          aria-pressed={keptSide === 0}
+          onClick={() => keep(0)}
+        >
+          {keptSide === 0 ? "✓ " : ""}
           {r.keep(names[0])}
         </button>
-        <button type="button" className="primary" onClick={() => keep(1)}>
+        <button
+          type="button"
+          className="primary"
+          aria-pressed={keptSide === 1}
+          onClick={() => keep(1)}
+        >
+          {keptSide === 1 ? "✓ " : ""}
           {r.keep(names[1])}
         </button>
-        <button type="button" onClick={keepBoth}>
+        <button type="button" aria-pressed={decision === null} onClick={keepBoth}>
+          {decision === null ? "✓ " : ""}
           {r.keepBoth}
         </button>
         <span className="spacer" />
-        <button
-          type="button"
-          className="quiet"
-          onClick={() => currentKey !== null && setSkipped(new Set(skipped).add(currentKey))}
-        >
-          {r.skip}
-        </button>
         {undo}
       </div>
     </div>

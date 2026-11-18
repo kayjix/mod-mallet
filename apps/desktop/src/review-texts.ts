@@ -14,11 +14,6 @@ export interface ReviewTexts {
   step: Record<ReviewStep, { title: string; hint: string }>;
   stepOf: (index: number, total: number) => string;
   open: (count: number) => string;
-  seen: string;
-  done: string;
-  back: string;
-  next: string;
-  markSeen: string;
   finish: string;
   finished: string;
   continueAt: (step: string) => string;
@@ -31,11 +26,8 @@ export interface ReviewTexts {
   nothing: string;
   modsLine: (enabled: number, total: number, newer: number) => string;
   worldLine: (cells: number, places: number) => string;
-  /** The collisions step. */
-  structureOf: (index: number, total: number) => string;
   keep: (name: string) => string;
   keepBoth: string;
-  skip: string;
   undo: string;
   decidedCount: (decided: number, total: number) => string;
   allDecided: string;
@@ -45,6 +37,21 @@ export interface ReviewTexts {
   viewNow: string;
   viewOnly: (name: string) => string;
   markings: string;
+  showTrees: string;
+  markingsHint: string;
+  legendHidden: string;
+  othersHere: (count: number) => string;
+  othersShow: (name: string) => string;
+  othersCount: (name: string, count: number) => string;
+  /** Moving through the structures, and through the steps. */
+  previousStructure: string;
+  nextStructure: string;
+  spotOf: (index: number, total: number) => string;
+  stateOpen: string;
+  stateKept: string;
+  stateHidden: (name: string) => string;
+  stepBack: (step: string) => string;
+  stepNext: (step: string) => string;
   fit: string;
   topView: string;
   loading: string;
@@ -81,11 +88,6 @@ const en: ReviewTexts = {
   },
   stepOf: (index, total) => `Step ${index} of ${total}`,
   open: (count) => `${count} open`,
-  seen: "looked at",
-  done: "done",
-  back: "Back",
-  next: "Next step",
-  markSeen: "Looks right, next step",
   finish: "Finish",
   finished: "You have been through everything. New scans may bring new things; come back here.",
   continueAt: (step) => `Continue: ${step}`,
@@ -99,10 +101,8 @@ const en: ReviewTexts = {
   modsLine: (enabled, total, newer) =>
     `${enabled} of ${total} mods switched on${newer > 0 ? `, ${newer} with a newer version` : ""}.`,
   worldLine: (cells, places) => `mods place objects in ${cells} cells · ${places} places`,
-  structureOf: (index, total) => `Structure ${index} of ${total}`,
   keep: (name) => `Keep ${name}'s`,
   keepBoth: "Keep both",
-  skip: "Skip",
   undo: "Undo",
   decidedCount: (decided, total) => `${decided} of ${total} spots decided`,
   allDecided: "Every collision is decided.",
@@ -114,6 +114,22 @@ const en: ReviewTexts = {
   viewNow: "Now",
   viewOnly: (name) => `Only ${name}`,
   markings: "Markings",
+  showTrees: "Show trees",
+  markingsHint:
+    "With the eye closed, the place looks as the game would show it: nothing tinted, and what is hidden left out.",
+  legendHidden: "red: already hidden, by this or your other decisions",
+  othersHere: (count) =>
+    count === 1 ? "One more mod built here:" : `${count} more mods built here:`,
+  othersShow: (name) => `Pick out what ${name} places here`,
+  othersCount: (name, count) => `${name} (${count})`,
+  previousStructure: "‹ Previous structure",
+  nextStructure: "Next structure ›",
+  spotOf: (index, total) => `Spot ${index} of ${total}`,
+  stateOpen: "not decided yet",
+  stateKept: "decided: both stay",
+  stateHidden: (name) => `decided: ${name}'s is hidden`,
+  stepBack: (step) => `‹ Step back: ${step}`,
+  stepNext: (step) => `Next step: ${step} ›`,
   fit: "Fit",
   topView: "From above",
   loading: "Reading what stands here…",
@@ -150,11 +166,6 @@ const de: ReviewTexts = {
   },
   stepOf: (index, total) => `Schritt ${index} von ${total}`,
   open: (count) => `${count} offen`,
-  seen: "angesehen",
-  done: "erledigt",
-  back: "Zurück",
-  next: "Nächster Schritt",
-  markSeen: "Passt so, weiter",
   finish: "Fertig",
   finished:
     "Du bist alles durchgegangen. Neue Scans können Neues bringen; dann geht es hier weiter.",
@@ -169,10 +180,8 @@ const de: ReviewTexts = {
   modsLine: (enabled, total, newer) =>
     `${enabled} von ${total} Mods eingeschaltet${newer > 0 ? `, ${newer} mit neuerer Version` : ""}.`,
   worldLine: (cells, places) => `Mods stellen Objekte in ${cells} Zellen · ${places} Orte`,
-  structureOf: (index, total) => `Bauwerk ${index} von ${total}`,
   keep: (name) => `${name} behalten`,
   keepBoth: "Beide behalten",
-  skip: "Überspringen",
   undo: "Rückgängig",
   decidedCount: (decided, total) => `${decided} von ${total} Stellen entschieden`,
   allDecided: "Jede Kollision ist entschieden.",
@@ -184,6 +193,22 @@ const de: ReviewTexts = {
   viewNow: "Jetzt",
   viewOnly: (name) => `Nur ${name}`,
   markings: "Markierungen",
+  showTrees: "Bäume zeigen",
+  markingsHint:
+    "Mit geschlossenem Auge sieht die Stelle aus, wie das Spiel sie zeigt: nichts eingefärbt, Ausgeblendetes weggelassen.",
+  legendHidden: "rot: schon ausgeblendet, durch diese oder deine anderen Entscheidungen",
+  othersHere: (count) =>
+    count === 1 ? "Ein weiterer Mod baut hier:" : `${count} weitere Mods bauen hier:`,
+  othersShow: (name) => `Hervorheben, was ${name} hier platziert`,
+  othersCount: (name, count) => `${name} (${count})`,
+  previousStructure: "‹ Vorheriges Bauwerk",
+  nextStructure: "Nächstes Bauwerk ›",
+  spotOf: (index, total) => `Stelle ${index} von ${total}`,
+  stateOpen: "noch nicht entschieden",
+  stateKept: "entschieden: beide bleiben",
+  stateHidden: (name) => `entschieden: ${name} wird ausgeblendet`,
+  stepBack: (step) => `‹ Schritt zurück: ${step}`,
+  stepNext: (step) => `Nächster Schritt: ${step} ›`,
   fit: "Einpassen",
   topView: "Von oben",
   loading: "Lese, was hier steht …",

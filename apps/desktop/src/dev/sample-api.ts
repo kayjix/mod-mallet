@@ -1260,6 +1260,31 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
   );
   if (docks) {
     bridge("Water Mod.esp", 0xa11, 0x6000, 0.08, 1, 0xa21);
+    // A third mod built on the docks too: two crates and a pillar of Patch Hub.
+    place(
+      "Patch Hub.esp",
+      0x8001,
+      "sample\\barrel.nif",
+      [cx + 40, cy + 60, ground + 86],
+      0,
+      "Crate",
+    );
+    place(
+      "Patch Hub.esp",
+      0x8002,
+      "sample\\barrel.nif",
+      [cx - 90, cy + 70, ground + 86],
+      0,
+      "Crate",
+    );
+    place(
+      "Patch Hub.esp",
+      0x8003,
+      "sample\\pillar.nif",
+      [cx + 152, cy - 40, ground + 26],
+      0,
+      "Post",
+    );
     // A long pier of Water Mod that touches its dock and runs on far beyond
     // the spot, as a town's walls run on from its gate.
     for (let index = 1; index <= 40; index++) {

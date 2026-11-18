@@ -263,20 +263,42 @@ export function placement(object: AreaObject): Float32Array {
 export const TOUCHING = 14;
 
 /**
- * Folders of models that are not built: trees, plants, grass, rocks and the
- * rest of the landscape, clutter lying about, effects and lights. Their
- * parts stand next to a building and touch it, but do not belong to it.
+ * Folders of models of nature and the like: trees, plants, grass, rocks and
+ * the rest of the landscape, effects and lights. They stand next to what is
+ * built and touch it, but never belong to it.
  */
-const NOT_BUILT =
-  /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|clutter|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
+const NATURE =
+  /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
 
-/** Whether a model is something built: architecture rather than nature or clutter. */
-export function isBuilt(model: string): boolean {
-  return !NOT_BUILT.test(model);
+/** The folder of clutter: crates, barrels, sacks and whatever else lies about. */
+const CLUTTER = /(^|[\\/])clutter[\\/]/i;
+
+/** Folders of trees, plants and grass. */
+const FLORA = /(^|[\\/])(trees|plants|flora|grass)[\\/]/i;
+
+/** Whether a model is a tree, a plant or grass. */
+export function isFlora(model: string): boolean {
+  return FLORA.test(model);
+}
+
+/** Whether a model is nature rather than something placed by hand: trees, rocks, landscape. */
+export function isNature(model: string): boolean {
+  return NATURE.test(model);
 }
 
 /** Below this longest side, in game units (about 35 cm), a part is clutter, not building. */
 const SMALL = 24;
+
+/**
+ * What a part is, for growing a structure: nature, clutter lying about
+ * (by its folder or its size), or something built.
+ */
+function kindOf(model: string, size: number): "nature" | "clutter" | "built" {
+  if (NATURE.test(model)) {
+    return "nature";
+  }
+  return CLUTTER.test(model) || size < SMALL ? "clutter" : "built";
+}
 
 /** The longest side of a model's box at `scale`, in game units. */
 function sizeOf(box: [[number, number, number], [number, number, number]], scale: number): number {
@@ -384,6 +406,8 @@ interface Model {
   box: [[number, number, number], [number, number, number]];
   /** Its objects: one matrix and one look each, in one buffer. */
   instances: WebGLBuffer | null;
+  /** What its buffer holds, to change the looks in place. */
+  data: Float32Array | null;
   count: number;
   /** Its objects, in the order of the buffer. */
   own: Instance[];
@@ -443,17 +467,35 @@ export class AreaLayer {
       instance.look = look(objectKey(instance.object.id.plugin, instance.object.id.localId));
       instance.marked = instance.look !== LOOK.plain;
     }
-    for (const model of this.models.keys()) {
-      this.place(model);
+    this.relookAll();
+  }
+
+  /**
+   * Writes the looks anew into every model's buffer, in place where the
+   * model holds the same objects as when it was placed (a view drawn
+   * several times with other looks, many times a second).
+   */
+  private relookAll() {
+    const { gl } = this;
+    for (const [name, model] of this.models) {
+      const { data, instances } = model;
+      if (data === null || instances === null || data.length !== model.own.length * 17) {
+        this.place(name);
+        continue;
+      }
+      model.own.forEach((instance, index) => {
+        const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
+        data[index * 17 + 16] = this.selected.has(key) ? LOOK.selected : instance.look;
+      });
+      gl.bindBuffer(gl.ARRAY_BUFFER, instances);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     }
   }
 
   /** Picks the objects with `keys` (see {@link objectKey}), or none. */
   select(keys: string[]) {
     this.selected = new Set(keys);
-    for (const model of this.models.keys()) {
-      this.place(model);
-    }
+    this.relookAll();
   }
 
   /**
@@ -475,6 +517,17 @@ export class AreaLayer {
       near === undefined ||
       isStart(other) ||
       Math.hypot(other.position[0] - near.x, other.position[1] - near.y) <= near.radius;
+    // What a structure grows through depends on what it starts from: from
+    // something built, through what is built (a gate and its walls, not the
+    // crates in front of it); from clutter, through clutter (a pile of
+    // crates). Never through trees, rocks or the landscape. The part
+    // started from always belongs to it.
+    const startModel = this.models.get(object.model);
+    const startKind =
+      startModel === undefined || !Array.isArray(startModel.surfaces)
+        ? "built"
+        : kindOf(object.model, sizeOf(startModel.box, object.scale));
+    const grows = startKind === "clutter" ? "clutter" : "built";
     const candidates = this.instances
       .filter(
         (instance) => instance.object.id.plugin.toLowerCase() === plugin && isNear(instance.object),
@@ -484,11 +537,9 @@ export class AreaLayer {
         if (model === undefined || !Array.isArray(model.surfaces)) {
           return [];
         }
-        // Trees, plants, rocks and small clutter stand next to a building
-        // and touch it, but are no part of it; the part picked always is.
         if (
           !isStart(instance.object) &&
-          (!isBuilt(instance.object.model) || sizeOf(model.box, instance.object.scale) < SMALL)
+          kindOf(instance.object.model, sizeOf(model.box, instance.object.scale)) !== grows
         ) {
           return [];
         }
@@ -569,6 +620,7 @@ export class AreaLayer {
           [0, 0, 0],
         ],
         instances: null,
+        data: null,
         count: 0,
         own: [],
       };
@@ -615,6 +667,7 @@ export class AreaLayer {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, model.instances);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    model.data = data;
     model.count = own.length;
     model.own = own;
     const matrixAt = gl.getAttribLocation(this.program, "a_model");

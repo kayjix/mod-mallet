@@ -5,11 +5,12 @@
 
 import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
-import { AreaLayer, LOOK, type Look, objectKey } from "./area-layer";
+import { AreaLayer, isFlora, LOOK, type Look, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
 import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
+import { isGameObject } from "./object-actions";
 import { useReviewTexts } from "./review-texts";
 
 /** Where the structures stand: in a worldspace, or in an interior cell. */
@@ -92,9 +93,18 @@ export function CompareStage3D({
   const pending = useRef<number | null>(null);
   const [state, setState] = useState<"loading" | "missing" | "shown">("loading");
   const [markings, setMarkings] = useState(true);
+  // Trees around a building hide it; they are left out unless wanted.
+  const [trees, setTrees] = useState(false);
   const [failed, setFailed] = useState(false);
   const structures = useRef<[Set<string>, Set<string>]>([new Set(), new Set()]);
   const [counts, setCounts] = useState<[number, number]>([0, 0]);
+  /** The other mods with objects among the structures, with their objects' keys. */
+  const [others, setOthers] = useState<{ plugin: string; keys: string[] }[]>([]);
+  /** The other mod whose objects are picked out, if any. */
+  const [shown, setShown] = useState<string | null>(null);
+  /** Whether the camera is being moved: drawn at a lower resolution meanwhile. */
+  const moving = useRef(false);
+  const settle = useRef<number | undefined>(undefined);
   // What is known of the structures, and whether the camera framed them
   // yet: roughly while models are still read, or for good.
   const known = useRef<{ signature: string; framed: "no" | "rough" | "done"; done: number }>({
@@ -118,6 +128,10 @@ export function CompareStage3D({
   told.current = onStructures;
   const markingsNow = useRef(markings);
   markingsNow.current = markings;
+  const treesNow = useRef(trees);
+  treesNow.current = trees;
+  /** The trees, plants and grass of the place, by key. */
+  const flora = useRef<Set<string>>(new Set());
   const hiddenNow = useRef(hidden);
   hiddenNow.current = hidden;
   const seedsNow = useRef(seeds);
@@ -125,7 +139,13 @@ export function CompareStage3D({
 
   /** How an object looks in view `index`: now, only the first, only the second. */
   const lookIn = (index: 0 | 1 | 2) =>
-    lookFor(index, structures.current, markingsNow.current, hiddenNow.current);
+    lookFor(
+      index,
+      structures.current,
+      markingsNow.current,
+      hiddenNow.current,
+      treesNow.current ? null : flora.current,
+    );
   const lookNow = useRef(lookIn);
   lookNow.current = lookIn;
 
@@ -164,6 +184,7 @@ export function CompareStage3D({
       ];
       setCounts([first.length, second.length]);
       told.current?.([first, second]);
+      setOthers(othersAmong(area, structures.current, seedsNow.current));
     }
     // The camera frames both structures roughly as soon as they are known,
     // and once more when every model is read, unless the user moved it.
@@ -186,7 +207,7 @@ export function CompareStage3D({
       return;
     }
     findStructures();
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = Math.min(1.5, window.devicePixelRatio || 1) * (moving.current ? 0.5 : 1);
     const width = Math.max(3, element.clientWidth);
     const tall = Math.max(1, element.clientHeight);
     const wanted = [Math.round(width * ratio), Math.round(tall * ratio)];
@@ -309,6 +330,11 @@ export function CompareStage3D({
           setState("missing");
           return;
         }
+        flora.current = new Set(
+          found.objects
+            .filter((object) => isFlora(object.model))
+            .map((object) => objectKey(object.id.plugin, object.id.localId)),
+        );
         current.show(found, lookNow.current(0));
         findNow.current();
         setState("shown");
@@ -327,7 +353,7 @@ export function CompareStage3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.
   useEffect(() => {
     redraw();
-  }, [markings, hidden, height, redraw]);
+  }, [markings, trees, hidden, height, redraw]);
 
   // The canvas follows the width of its frame.
   useEffect(() => {
@@ -358,6 +384,7 @@ export function CompareStage3D({
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     moved.current = true;
+    moving.current = true;
     const from = start.camera;
     if (!start.move) {
       camera.current = {
@@ -382,7 +409,18 @@ export function CompareStage3D({
   };
   const onPointerUp = () => {
     drag.current = null;
+    rest();
   };
+  /** Back to the full resolution a moment after the camera stops. */
+  const rest = () => {
+    window.clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => {
+      moving.current = false;
+      redrawNow.current();
+    }, 180);
+  };
+  const restNow = useRef(rest);
+  restNow.current = rest;
 
   // The wheel zooms; attached directly so that the page does not scroll.
   useEffect(() => {
@@ -393,6 +431,8 @@ export function CompareStage3D({
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       moved.current = true;
+      moving.current = true;
+      restNow.current();
       camera.current = {
         ...camera.current,
         distance: Math.min(
@@ -405,6 +445,12 @@ export function CompareStage3D({
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
   }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the keys belong to the mod shown.
+  useEffect(() => {
+    layer.current?.select(others.find((other) => other.plugin === shown)?.keys ?? []);
+    redraw();
+  }, [shown, redraw]);
 
   const fit = () => {
     const current = layer.current;
@@ -440,13 +486,22 @@ export function CompareStage3D({
         )}
       </div>
       <div className="stage3-controls">
+        <button
+          type="button"
+          className="small stage3-eye"
+          aria-pressed={markings}
+          title={r.markingsHint}
+          onClick={() => setMarkings(!markings)}
+        >
+          <Eye open={markings} /> {r.markings}
+        </button>
         <label className="control-check">
           <input
             type="checkbox"
-            checked={markings}
-            onChange={(event) => setMarkings(event.target.checked)}
+            checked={trees}
+            onChange={(event) => setTrees(event.target.checked)}
           />
-          {r.markings}
+          {r.showTrees}
         </label>
         <span className="stage3-swatch" data-side="0">
           {r.parts(names[0], counts[0])}
@@ -470,24 +525,108 @@ export function CompareStage3D({
         </button>
         <span className="aside stage3-hint">{r.stageHint}</span>
       </div>
+      {markings && (
+        <p className="stage3-legend aside">
+          <span className="stage3-key" data-key="hidden" /> {r.legendHidden}
+        </p>
+      )}
+      {others.length > 0 && (
+        <div className="stage3-others">
+          <span className="aside">{r.othersHere(others.length)}</span>
+          {others.map((other) => (
+            <button
+              type="button"
+              key={other.plugin}
+              className="small stage3-other"
+              aria-pressed={shown === other.plugin}
+              title={r.othersShow(shortName(other.plugin))}
+              onClick={() => setShown(shown === other.plugin ? null : other.plugin)}
+            >
+              {r.othersCount(shortName(other.plugin), other.keys.length)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** A plugin's name without its extension. */
+const shortName = (plugin: string) => plugin.replace(/\.(esp|esm|esl)$/i, "");
+
+/** How far around the structures other mods' objects count as being there, in game units (4 m). */
+const AROUND = 280;
+
+/**
+ * The mods besides the two whose objects stand among the structures (in
+ * the box around them, a little wider), the most first: at a town's gate
+ * a third and fourth mod may have built there too. The game's own objects
+ * and trees do not count.
+ */
+function othersAmong(
+  area: AreaObjects,
+  [first, second]: [Set<string>, Set<string>],
+  seeds: [ObjectRef[], ObjectRef[]],
+): { plugin: string; keys: string[] }[] {
+  const inside = area.objects.filter((object) =>
+    [first, second].some((set) => set.has(objectKey(object.id.plugin, object.id.localId))),
+  );
+  if (inside.length === 0) {
+    return [];
+  }
+  const low = [0, 1, 2].map((axis) => Math.min(...inside.map((o) => o.position[axis] ?? 0)));
+  const high = [0, 1, 2].map((axis) => Math.max(...inside.map((o) => o.position[axis] ?? 0)));
+  const sides = new Set(seeds.flat().map((seed) => seed.plugin.toLowerCase()));
+  const found = new Map<string, string[]>();
+  for (const object of area.objects) {
+    const plugin = object.id.plugin;
+    if (sides.has(plugin.toLowerCase()) || isGameObject(object) || isFlora(object.model)) {
+      continue;
+    }
+    const within = [0, 1, 2].every(
+      (axis) =>
+        (object.position[axis] ?? 0) >= (low[axis] ?? 0) - AROUND &&
+        (object.position[axis] ?? 0) <= (high[axis] ?? 0) + AROUND,
+    );
+    if (within) {
+      found.set(plugin, [...(found.get(plugin) ?? []), objectKey(plugin, object.id.localId)]);
+    }
+  }
+  return [...found.entries()]
+    .map(([plugin, keys]) => ({ plugin, keys }))
+    .sort((a, b) => b.keys.length - a.keys.length || a.plugin.localeCompare(b.plugin));
+}
+
+/** An eye, open or struck through, as on the collisions page. */
+function Eye({ open }: { open: boolean }) {
+  return (
+    <svg className="eye" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {!open && <path d="M4 4l16 16" />}
+    </svg>
   );
 }
 
 /**
  * How an object looks in view `index` (now, only the first structure,
  * only the second): the other structure left out, what the patch hides as
- * a ghost or left out, the two structures in their colours.
+ * a ghost or left out, the two structures in their colours, and the trees
+ * in `flora` left out (unless they are part of a structure).
  */
 function lookFor(
   index: 0 | 1 | 2,
   [first, second]: [Set<string>, Set<string>],
   marks: boolean,
   hidden: Set<string>,
+  flora: Set<string> | null,
 ): (key: string) => Look {
   return (key) => {
     const inFirst = first.has(key);
     const inSecond = second.has(key) && !inFirst;
+    if (flora?.has(key) && !inFirst && !inSecond) {
+      return LOOK.gone;
+    }
     if ((index === 1 && inSecond) || (index === 2 && inFirst)) {
       return LOOK.gone;
     }
@@ -506,8 +645,14 @@ function lookFor(
 type Box = [Vec3, Vec3];
 
 /**
+ * How much room the camera leaves around the structures, in game units
+ * (about 12 m): enough to see where they stand, not only themselves.
+ */
+const ROOM = 850;
+
+/**
  * The box around both structures' parts, from where their models' middles
- * stand, widened a little for the models' size; none before they are known.
+ * stand, widened by some room around them; none before they are known.
  */
 function boxOf(layer: AreaLayer, [first, second]: [Set<string>, Set<string>]): Box | null {
   const low: Vec3 = [Infinity, Infinity, Infinity];
@@ -525,10 +670,9 @@ function boxOf(layer: AreaLayer, [first, second]: [Set<string>, Set<string>]): B
   if (!Number.isFinite(low[0])) {
     return null;
   }
-  const pad = 120;
   return [
-    [low[0] - pad, low[1] - pad, low[2] - pad],
-    [high[0] + pad, high[1] + pad, high[2] + pad],
+    [low[0] - ROOM, low[1] - ROOM, low[2] - 120],
+    [high[0] + ROOM, high[1] + ROOM, high[2] + 120],
   ];
 }
 
