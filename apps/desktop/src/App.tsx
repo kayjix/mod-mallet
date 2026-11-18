@@ -7,7 +7,6 @@ import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, modsByName } from "./arrange";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
-import { Duels } from "./Duels";
 import { type Games, useGames } from "./games";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
@@ -24,7 +23,7 @@ import { PatchView } from "./PatchView";
 import { Places } from "./Places";
 import { choicesOf, installedKeys, type PatchChoices, pairsOf } from "./patch";
 import { SettingsView } from "./Settings";
-import { TaskList, TasksPage } from "./Tasks";
+import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 
 interface AppProps {
@@ -531,14 +530,7 @@ export default function App({ api, startLang }: AppProps) {
               </section>
             )
           ) : current === "collisions" ? (
-            <Collisions report={report} start={workSpot}>
-              <Duels
-                duels={report.duels}
-                findings={report.findings}
-                topics={["objects", "contained"]}
-              />
-              <TaskList findings={report.findings} filter="collisions" exclude={inDuels(report)} />
-            </Collisions>
+            <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
             <CompareView report={report} start={compareAt} onBack={() => go(assetsFrom.current)} />
           ) : current === "patch" ? (
@@ -554,11 +546,6 @@ export default function App({ api, startLang }: AppProps) {
       </div>
     </SessionContext>
   );
-}
-
-/** The findings that a duel between two mods takes care of. */
-function inDuels(report: RenderedReport): Set<string> {
-  return new Set(report.duels.flatMap((rendered) => rendered.duel.findings));
 }
 
 function spotsByFinding(report: RenderedReport | null): Map<string, MapSpot[]> {

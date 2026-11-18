@@ -5,10 +5,11 @@
 // out, decides which of them the patch hides (spot by spot, for a passage
 // of spots close together, or for a pair of mods at once) and goes on.
 
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CopyButton, useSession } from "./Actions";
 import { objectKey } from "./area-layer";
 import { isCollision } from "./arrange";
+import { collisionsTexts } from "./collisions-texts";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type {
   MapSpot,
@@ -35,6 +36,7 @@ import {
   spotKey,
   undecideSpot,
 } from "./patch";
+import { TaskList } from "./Tasks";
 
 /** One plugin's objects at a spot. */
 interface Side {
@@ -333,22 +335,49 @@ function grouped(
 export function Collisions({
   report,
   start,
-  children,
 }: {
   report: RenderedReport;
   /** The spot to open with, if any. */
   start: MapSpot | null;
-  /** The duels and the remaining findings, on the tab of the pairs of mods. */
-  children?: ReactNode;
 }) {
-  const { t, ignored, patchChoices: choices, setPatchChoices, showPatch } = useSession();
+  const {
+    t,
+    lang,
+    ignored,
+    patchChoices: choices,
+    setPatchChoices,
+    showPatch,
+    pairAt,
+    decide: decideDuel,
+  } = useSession();
+  const own = collisionsTexts[lang];
   const items = useItems(report);
+  // The pair to open with, from the names of its two mods (ADR 0048).
+  const focusPair = useMemo(() => {
+    if (pairAt === null) {
+      return null;
+    }
+    const wanted = pairAt
+      .map((name) => name.toLowerCase())
+      .sort()
+      .join("|");
+    const named = new Map(
+      report.findings.map((rendered) => {
+        const args = rendered.finding.args as Record<string, unknown>;
+        const names = [args.first, args.second].map((name) => String(name ?? "").toLowerCase());
+        return [rendered.finding.id, names.sort().join("|")];
+      }),
+    );
+    return items.find((item) => named.get(item.spot.finding) === wanted)?.mods.key ?? null;
+  }, [pairAt, report, items]);
   const [tab, setTab] = useState<"spots" | "mods">(() =>
     start !== null
       ? "spots"
-      : remembered<"spots" | "mods">("mallet.workTab", "spots", (value) =>
-          value === "mods" || value === "spots" ? value : null,
-        ),
+      : pairAt !== null
+        ? "mods"
+        : remembered<"spots" | "mods">("mallet.workTab", "spots", (value) =>
+            value === "mods" || value === "spots" ? value : null,
+          ),
   );
   const changeTab = (next: "spots" | "mods") => {
     setTab(next);
@@ -440,6 +469,14 @@ export function Collisions({
       setTab("spots");
     }
   }, [startKey]);
+  // So is a pair handed over later.
+  useEffect(() => {
+    if (focusPair !== null) {
+      setTab("mods");
+    }
+  }, [focusPair]);
+  // The pair opened from a spot, on the tab of the pairs.
+  const [openedPair, setOpenedPair] = useState<string | null>(null);
   const current =
     (currentKey === null ? undefined : byKey.get(currentKey)) ??
     ordered.find((item) => decision(item) === undefined) ??
@@ -502,6 +539,19 @@ export function Collisions({
   };
   const undecide = (item: Item) => setPatchChoices(undecideSpot(choices, item.key));
   const decideMods = (pairs: Pair[], plugin: string | null) => {
+    // The duel of the two mods, if one gathers these findings: the pair's
+    // verdict is its verdict (ADR 0048).
+    const duel = report.duels.find((rendered) =>
+      pairs.some((pair) => rendered.duel.findings.includes(pair.id)),
+    );
+    if (duel !== undefined && plugin !== null) {
+      const loser = duel.duel.sides.findIndex((side) =>
+        (side.plugins ?? []).some((name) => name.toLowerCase() === plugin.toLowerCase()),
+      );
+      if (loser === 0 || loser === 1) {
+        decideDuel(duel.duel.id, loser === 0 ? 1 : 0);
+      }
+    }
     let next = choices;
     for (const pair of pairs) {
       const side =
@@ -587,11 +637,27 @@ export function Collisions({
   );
 
   if (tab === "mods" || items.length === 0) {
+    const suggested = pairs.filter((pair) => pair.suggested !== null);
+    const withSpots = new Set(items.map((item) => item.spot.finding));
     return (
       <section className="work work-pairs-view">
         <div className="work-bar">
           {tabs}
           <span className="spacer" />
+          {suggested.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                let next = choices;
+                for (const pair of suggested) {
+                  next = chooseFinding(next, pair, pair.suggested);
+                }
+                setPatchChoices(next);
+              }}
+            >
+              {own.takeSuggestions(suggested.length)}
+            </button>
+          )}
           {toPatch}
         </div>
         {items.length === 0 && <p className="empty">{t.workEmpty}</p>}
@@ -600,6 +666,7 @@ export function Collisions({
           decision={decision}
           sort={sort}
           duels={report.duels}
+          focus={openedPair ?? focusPair}
           onDecideMods={decideMods}
           onShow={(item) => {
             changeBy("mods");
@@ -607,7 +674,15 @@ export function Collisions({
             changeTab("spots");
           }}
         />
-        {children}
+        {report.findings.some(
+          (rendered) => isCollision(rendered) && !withSpots.has(rendered.finding.id),
+        ) && (
+          <section className="work-also">
+            <h3>{own.also}</h3>
+            <p className="aside">{own.alsoNote}</p>
+            <TaskList findings={report.findings} filter="collisions" exclude={withSpots} />
+          </section>
+        )}
       </section>
     );
   }
@@ -706,7 +781,6 @@ export function Collisions({
             searching={needle !== ""}
             decision={decision}
             onPick={go}
-            onDecideMods={decideMods}
           />
         </div>
         <div className="work-stage">
@@ -736,6 +810,10 @@ export function Collisions({
               onDecide={(plugin) => decide(current, plugin)}
               onUndecide={() => undecide(current)}
               onDecideMods={decideMods}
+              onOpenPair={() => {
+                setOpenedPair(current.mods.key);
+                changeTab("mods");
+              }}
               onDecidePassage={decidePassage}
               onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
               onPick={(spot) => {
@@ -764,21 +842,10 @@ interface WorkListProps {
   searching: boolean;
   decision: (item: Item) => string | null | undefined;
   onPick: (item: Item) => void;
-  onDecideMods: (pairs: Pair[], plugin: string | null) => void;
 }
 
 /** The spots by group; the group of the current spot is open, others open on a click. */
-function WorkList({
-  groups,
-  by,
-  current,
-  shown,
-  searching,
-  decision,
-  onPick,
-  onDecideMods,
-}: WorkListProps) {
-  const { t } = useSession();
+function WorkList({ groups, by, current, shown, searching, decision, onPick }: WorkListProps) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const currentGroup = current === null ? null : current[by === "region" ? "region" : "mods"].key;
   const list = useRef<HTMLDivElement>(null);
@@ -805,7 +872,6 @@ function WorkList({
           kind,
           count: items.filter((item) => item.kind === kind).length,
         })).filter((entry) => entry.count > 0);
-        const pairs = by === "mods" ? (items[0]?.pairs ?? []) : [];
         return (
           <section
             className="work-group"
@@ -841,24 +907,6 @@ function WorkList({
                 </span>
               </span>
             </button>
-            {isOpen && pairs.length > 0 && (
-              <div className="work-group-actions">
-                {sidesOfMods(pairs).map((side) => (
-                  <button
-                    type="button"
-                    className="small"
-                    key={side.plugin}
-                    disabled={side.objects === 0}
-                    onClick={() => onDecideMods(pairs, side.plugin)}
-                  >
-                    {t.workEverywhere(side.plugin)}
-                  </button>
-                ))}
-                <button type="button" className="small" onClick={() => onDecideMods(pairs, null)}>
-                  {t.workKeepEverywhere}
-                </button>
-              </div>
-            )}
             {isOpen && (
               <ul className="work-items">
                 {visible.map((item, index) => (
@@ -945,6 +993,8 @@ interface SpotProps {
   onDecide: (plugin: string | null) => void;
   onUndecide: () => void;
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
+  /** Opens the pair of this spot's two mods on the tab of the pairs. */
+  onOpenPair: () => void;
   onDecidePassage: (passage: Item[], plugin: string, extra: ObjectRef[]) => void;
   onObject: (object: ObjectRef, hide: boolean) => void;
   onPick: (spot: MapSpot) => void;
@@ -955,7 +1005,8 @@ interface SpotProps {
 
 /** The spot looked at: what it is, what to do about it, and the place in 3D. */
 function Spot(props: SpotProps) {
-  const { t } = useSession();
+  const { t, lang, showOnMap } = useSession();
+  const own = collisionsTexts[lang];
   const { item, passage, preview, decided, marks } = props;
   const { spot, pairs } = item;
   const depth = spot.depth ?? null;
@@ -1117,18 +1168,17 @@ function Spot(props: SpotProps) {
                   {t.workPairMany(first.plugin, second.plugin, pairSpots)}
                 </span>
               )}
-              {modSides.map((side) => (
-                <button
-                  type="button"
-                  className="small"
-                  key={side.plugin}
-                  disabled={side.objects === 0}
-                  onClick={() => props.onDecideMods(pairs, side.plugin)}
-                >
-                  {t.workEverywhere(side.plugin)}
-                </button>
-              ))}
+              <button type="button" className="small" onClick={props.onOpenPair}>
+                {own.openThePair}
+              </button>
             </div>
+          </div>
+        )}
+        {spot.location.type === "exterior" && (
+          <div className="work-line">
+            <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
+              {own.showOnMap}
+            </button>
           </div>
         )}
         <div className="work-decision-foot">
@@ -1347,6 +1397,8 @@ interface ModPairsProps {
   sort: Sorting;
   /** The duels of the report, to tell where one was decided. */
   duels: RenderedDuel[];
+  /** The pair to show first, by its key, if any. */
+  focus: string | null;
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
   onShow: (item: Item) => void;
 }
@@ -1391,8 +1443,19 @@ function PairVerdict({
 }
 
 /** The pairs of mods whose objects collide, the most first, to decide as a whole. */
-function ModPairs({ items, decision, sort, duels, onDecideMods, onShow }: ModPairsProps) {
-  const { t } = useSession();
+function ModPairs({ items, decision, sort, duels, focus, onDecideMods, onShow }: ModPairsProps) {
+  const { t, lang, openCompare } = useSession();
+  const own = collisionsTexts[lang];
+  const list = useRef<HTMLUListElement>(null);
+  // The pair opened with comes into sight.
+  useEffect(() => {
+    if (focus === null) {
+      return;
+    }
+    list.current
+      ?.querySelector<HTMLElement>(`[data-key="${CSS.escape(focus)}"]`)
+      ?.scrollIntoView({ block: "center" });
+  }, [focus]);
   const pairs = useMemo(() => {
     const found = new Map<string, { key: string; pairs: Pair[]; items: Item[] }>();
     for (const item of items) {
@@ -1425,7 +1488,7 @@ function ModPairs({ items, decision, sort, duels, onDecideMods, onShow }: ModPai
   return (
     <section className="work-pairs">
       <p className="aside">{t.workPairsIntro}</p>
-      <ul className="work-pair-list">
+      <ul className="work-pair-list" ref={list}>
         {pairs.map(({ key, pairs: findings, items: spots }) => {
           const sides = sidesOfMods(findings);
           const decided = spots.filter((item) => decision(item) !== undefined).length;
@@ -1438,6 +1501,8 @@ function ModPairs({ items, decision, sort, duels, onDecideMods, onShow }: ModPai
             <li
               className="work-pair-row"
               key={key}
+              data-key={key}
+              data-focus={key === focus || undefined}
               data-done={decided === spots.length || undefined}
             >
               <div className="work-pair-head">
@@ -1483,6 +1548,24 @@ function ModPairs({ items, decision, sort, duels, onDecideMods, onShow }: ModPai
                     {t.workShowSpots}
                   </button>
                 )}
+                {(() => {
+                  // The duel of the two about files is decided among the assets.
+                  const duel = duels.find((rendered) =>
+                    findings.some((pair) => rendered.duel.findings.includes(pair.id)),
+                  );
+                  const files = duel?.duel.topics.some(
+                    (topic) => topic.topic !== "objects" && topic.topic !== "contained",
+                  );
+                  return duel !== undefined && files ? (
+                    <button
+                      type="button"
+                      className="small quiet"
+                      onClick={() => openCompare(duel.duel.id)}
+                    >
+                      {own.compareFiles}
+                    </button>
+                  ) : null;
+                })()}
               </div>
             </li>
           );

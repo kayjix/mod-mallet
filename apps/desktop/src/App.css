@@ -3314,3 +3314,14 @@ button.quiet {
   gap: 2px;
   font-size: 0.85rem;
 }
+
+.work-pair-row[data-focus] {
+  border-color: var(--spot-focus);
+  box-shadow: inset 0 0 0 1px var(--spot-focus);
+}
+
+.work-also {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
