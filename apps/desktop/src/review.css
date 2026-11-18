@@ -1,0 +1,223 @@
+/* The guided review (ADR 0050) and its three-way stage. */
+
+.review {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.review-head h2 {
+  font-size: 1.3rem;
+}
+
+.review-head p {
+  margin: 4px 0 0;
+}
+
+.review-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+}
+
+.review-step[aria-current="step"] {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+.review-step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sunken);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.review-step[data-done="true"] .review-step-number {
+  background: var(--ok);
+  color: var(--surface);
+}
+
+.review-step-title {
+  font-weight: 600;
+}
+
+.review-step-count {
+  color: var(--warning);
+  font-size: 0.8rem;
+}
+
+.review-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.review-body-head h3 {
+  font-size: 1.15rem;
+}
+
+.review-body-head p {
+  margin: 2px 0 0;
+}
+
+.review-rows,
+.review-findings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.review-line {
+  margin: 0;
+}
+
+.review-world {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.review-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.review-collision {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.review-collision-head,
+.review-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+
+/* ---- the three-way stage ---------------------------------------------------- */
+
+.stage3 {
+  display: grid;
+  gap: 6px;
+}
+
+.stage3-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0d0f12;
+}
+
+.stage3-canvas {
+  display: block;
+  width: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.stage3-canvas:active {
+  cursor: grabbing;
+}
+
+.stage3-labels {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  pointer-events: none;
+}
+
+.stage3-label {
+  justify-self: start;
+  margin: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 55%);
+  color: #f1f3f5;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* A thin line between the three views. */
+.stage3-label[data-view="1"],
+.stage3-label[data-view="2"] {
+  box-shadow: -9px 0 0 -8px rgb(255 255 255 / 25%);
+}
+
+.stage3-state {
+  position: absolute;
+  inset: 0;
+  height: fit-content;
+  margin: auto;
+  color: #c9d1d9;
+  text-align: center;
+}
+
+.stage3-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 0.85rem;
+}
+
+.stage3-swatch::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.stage3-swatch[data-side="0"]::before {
+  background: #0072b2;
+}
+
+.stage3-swatch[data-side="1"]::before {
+  background: #e69f00;
+}
+
+.stage3-hint {
+  font-size: 0.8rem;
+}
+
+.overview-banner-actions {
+  margin-top: var(--space-2);
+}

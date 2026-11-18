@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "./journey.css";
+import "./review.css";
 import { type Session, SessionContext, useSession } from "./Actions";
 import { AllGames, useGameArt } from "./AllGames";
 import type { Api, NamedPlaces } from "./api";
@@ -22,6 +23,8 @@ import { Overview, openFileDuels } from "./Overview";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
 import { choicesOf, installedKeys, type PatchChoices, pairsOf, withoutMisspelt } from "./patch";
+import { Review } from "./Review";
+import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
@@ -39,6 +42,7 @@ interface AppProps {
 type ViewName =
   | "games"
   | "overview"
+  | "review"
   | "tasks"
   | "collisions"
   | "patch"
@@ -536,6 +540,8 @@ export default function App({ api, startLang }: AppProps) {
                 </button>
               </section>
             )
+          ) : current === "review" ? (
+            <Review report={report} game={games.choice?.active ?? ""} onOpen={go} />
           ) : current === "collisions" ? (
             <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
@@ -610,10 +616,12 @@ function Sidebar({
   j,
   gameCard,
 }: SidebarProps) {
+  const reviewTexts = useReviewTexts();
   const { decisions } = useSession();
   const assets = report === null ? null : openFileDuels(report, decisions);
   const game: NavEntry[] = [
     { name: "overview", label: j.navOverview, icon: <IconOverview /> },
+    { name: "review", label: reviewTexts.nav, icon: <IconReview /> },
     { name: "tasks", label: t.viewTasks, icon: <IconTasks />, badge: counts?.tasks },
     {
       name: "collisions",
@@ -903,6 +911,15 @@ function IconMods() {
     <Icon>
       <path d="M12 3l8 4-8 4-8-4z" />
       <path d="M4 12l8 4 8-4M4 17l8 4 8-4" />
+    </Icon>
+  );
+}
+
+function IconReview() {
+  return (
+    <Icon>
+      <path d="M4 6h9M4 12h7M4 18h9" />
+      <path d="M16 9l4 3-4 3" />
     </Icon>
   );
 }

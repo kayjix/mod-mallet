@@ -5,7 +5,9 @@
 // development and is not part of a release build.
 
 import type { Api } from "../api";
+import type { AreaObject, AreaObjects } from "../generated/area-objects";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
+import type { LodMesh } from "../generated/lod-mesh";
 import type { MeshView } from "../generated/mesh-view";
 import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
 import type { RenderedPlaces } from "../generated/rendered-places";
@@ -1118,12 +1120,12 @@ export const sampleApi: Api = {
   // The sample has no pictures; the page shows its placeholder.
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
-  // The sample has no objects up close and no level of detail.
-  areaObjects: () => later(null),
+  // Up close, made-up bridges at every collision spot; no level of detail.
+  areaObjects: (world, x, y, radius) => later(sampleArea(world, x, y, radius)),
   areaLand: () => later(null),
   worldLand: () => later(null),
   interiorObjects: () => later(null),
-  areaMesh: () => later(null),
+  areaMesh: (name) => later(sampleBox(name)),
   areaTexture: () => later(null),
   objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
   lodTiles: (world) => later({ world, tiles: [] }),
@@ -1176,3 +1178,171 @@ export const sampleApi: Api = {
     }),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
 };
+
+// ---- objects up close ------------------------------------------------------------
+
+/** The half sizes of the made-up models up close, in game units. */
+const SAMPLE_MODELS: Record<string, [number, number, number]> = {
+  "sample\\plank.nif": [40, 14, 4],
+  "sample\\pillar.nif": [6, 6, 30],
+  "sample\\barrel.nif": [16, 16, 22],
+  "sample\\rock.nif": [45, 35, 25],
+};
+
+/**
+ * What stands around a point up close: at every collision spot of the
+ * sample, two bridges of planks on pillars, one of Old Town and one of
+ * Texture Pack, built into each other; a barrel of Old Town a little
+ * away that belongs to neither bridge; and rocks of the game.
+ */
+function sampleArea(world: string, cx: number, cy: number, radius: number): AreaObjects {
+  const cellX = Math.floor(cx / 4096);
+  const cellY = Math.floor(cy / 4096);
+  const ground = sampleHeight(sampleTerrain(), cx / 4096, cy / 4096);
+  const objects: AreaObject[] = [];
+  const place = (
+    plugin: string,
+    localId: number,
+    model: string,
+    position: [number, number, number],
+    turn: number,
+    name: string,
+  ) =>
+    objects.push({
+      id: { plugin, localId },
+      plugin,
+      model,
+      name,
+      position,
+      rotation: [0, 0, turn],
+      scale: 1,
+    });
+  const bridge = (
+    plugin: string,
+    seed: number,
+    first: number,
+    turn: number,
+    lift: number,
+    also: number | null = null,
+  ) => {
+    const along: [number, number] = [Math.cos(turn), -Math.sin(turn)];
+    for (let index = -4; index <= 4; index++) {
+      const at: [number, number, number] = [
+        cx + along[0] * index * 76,
+        cy + along[1] * index * 76,
+        ground + 60 + lift,
+      ];
+      const id = index === 0 ? seed : index === 2 && also !== null ? also : first + index + 4;
+      place(plugin, id, "sample\\plank.nif", at, turn, "Plank");
+      if (index % 2 === 0) {
+        place(
+          plugin,
+          first + 20 + index + 4,
+          "sample\\pillar.nif",
+          [at[0], at[1], ground + 26 + lift],
+          0,
+          "Pillar",
+        );
+      }
+    }
+  };
+  // The docks of the sample's duplicates: Old Town and Water Mod place the same.
+  const docks = cellX === 6 && cellY === 1;
+  bridge(
+    "Old Town.esp",
+    docks ? 0xa10 : 0x800 + cellX * 16 + cellY,
+    0x5000,
+    0,
+    0,
+    docks ? 0xa20 : null,
+  );
+  if (docks) {
+    bridge("Water Mod.esp", 0xa11, 0x6000, 0.08, 1, 0xa21);
+  } else {
+    bridge("Texture Pack.esp", 0x900 + cellX * 16 + cellY, 0x6000, 0.55, 3);
+  }
+  place(
+    "Old Town.esp",
+    0x5100,
+    "sample\\barrel.nif",
+    [cx - 260, cy + 240, ground + 22],
+    0,
+    "Barrel",
+  );
+  for (let index = 0; index < 6; index++) {
+    const angle = (index / 6) * Math.PI * 2;
+    place(
+      "Skyrim.esm",
+      0x7000 + index,
+      "sample\\rock.nif",
+      [cx + Math.cos(angle) * 520, cy + Math.sin(angle) * 520, ground + 20],
+      angle,
+      "Rock",
+    );
+  }
+  return { world, centre: [cx, cy], radius, objects };
+}
+
+/** A box of the made-up models, as the backend sends a model up close. */
+function sampleBox(name: string): LodMesh | null {
+  const half = SAMPLE_MODELS[name];
+  if (half === undefined) {
+    return null;
+  }
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const corners = (face: number[][]) => {
+    const start = positions.length / 3;
+    for (const corner of face) {
+      positions.push(...corner.map((value, axis) => value * (half[axis] ?? 1)));
+    }
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  };
+  corners([
+    [-1, -1, -1],
+    [-1, 1, -1],
+    [1, 1, -1],
+    [1, -1, -1],
+  ]);
+  corners([
+    [-1, -1, 1],
+    [1, -1, 1],
+    [1, 1, 1],
+    [-1, 1, 1],
+  ]);
+  corners([
+    [-1, -1, -1],
+    [1, -1, -1],
+    [1, -1, 1],
+    [-1, -1, 1],
+  ]);
+  corners([
+    [1, -1, -1],
+    [1, 1, -1],
+    [1, 1, 1],
+    [1, -1, 1],
+  ]);
+  corners([
+    [1, 1, -1],
+    [-1, 1, -1],
+    [-1, 1, 1],
+    [1, 1, 1],
+  ]);
+  corners([
+    [-1, 1, -1],
+    [-1, -1, -1],
+    [-1, -1, 1],
+    [-1, 1, 1],
+  ]);
+  return {
+    shapes: [
+      {
+        positions: base64Of(new Float32Array(positions)),
+        indices: base64Of(new Uint32Array(indices)),
+        uvs: "",
+        texture: null,
+        alphaTest: false,
+      },
+    ],
+  };
+}

@@ -7,6 +7,8 @@ import type { Health } from "./health";
 import { useJourneyTexts } from "./journey-texts";
 import { openFileDuels, ScoreRing } from "./Overview";
 import { useOverviewTexts } from "./overview-texts";
+import { storedReview } from "./Review";
+import { useReviewTexts } from "./review-texts";
 import "./journey.css";
 import "./overview.css";
 
@@ -38,7 +40,7 @@ export function useGameArt(ids: string[]): Record<string, string> {
 }
 
 /** Where the start page leads. */
-export type StartTarget = "overview" | "tasks" | "collisions" | "assets" | "patch";
+export type StartTarget = "overview" | "review" | "tasks" | "collisions" | "assets" | "patch";
 
 interface AllGamesProps {
   games: Games;
@@ -68,6 +70,8 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
   const hero = activeId === undefined ? undefined : art[activeId];
   const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
   const installed = report?.installedPatch?.objects.length;
+  const r = useReviewTexts();
+  const review = activeId === undefined ? null : storedReview(activeId);
 
   const tiles: { target: StartTarget; value: string; label: string }[] =
     report === null || health === null
@@ -126,9 +130,14 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
                 {scanning ? t.scanning : t.scan}
               </button>
             ) : (
-              <button type="button" className="primary" onClick={() => onOpen("overview")}>
-                {j.toOverview}
-              </button>
+              <>
+                <button type="button" className="primary" onClick={() => onOpen("review")}>
+                  {review === null ? r.start : r.continueAt(r.step[review.step].title)}
+                </button>
+                <button type="button" onClick={() => onOpen("overview")}>
+                  {j.toOverview}
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -111,6 +111,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 │ │ [ Scan ]  14:02 ·live│ │
 │ └──────────────────────┘ │
 │ ▣ Overview               │
+│ ➜ Go through it   3/5    │  ← the guided review (ADR 0050)
 │ ☑ Tasks              12  │  ← open tasks (ADR 0045 counts.tasks)
 │ ⧉ Collisions         37  │  ← open spots
 │ ✎ Patch               ●  │  ← dot: decided but not in the patch
@@ -144,6 +145,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 |---|---|---|---|
 | **Start** (all games) | Choose what to do and which game | the game in use with its state and the way to what is open; a card per game to switch | list findings, decide anything |
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
+| **Go through it** | Lead through the setup step by step, and remember how far | the steps in order; a step's own items, shown by the homes' own rows | own any item: it is a path through the homes (ADR 0050) |
 | **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
 | **Collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
 | **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
@@ -225,6 +227,33 @@ to switch to another. The start page is that page, reached by the name
 *Mod Mallet* at the top of the sidebar. The game's overview stays the
 place for the reasons behind the score. The window opens on the overview
 of the game in use; the start page is one click away.
+
+#### Go through it
+
+```text
+┌─ Go through it ───────────────────────────────────────────────────┐
+│ ① Installation ✓  ② Load order ✓  ③ Assets 2  ④ Map  ⑤ Collisions │
+├───────────────────────────────────────────────────────────────────┤
+│ Collisions · structure 4 of 31        Lux Via ⟷ JK's Outskirts    │
+│ ┌─────────────────┬─────────────────┬─────────────────┐           │
+│ │ now             │ only Lux Via    │ only JK's       │           │
+│ │  blue + orange  │  blue           │  orange         │           │
+│ └─────────────────┴─────────────────┴─────────────────┘           │
+│ ☑ markings    Lux Via: 41 parts · JK's: 38 parts                  │
+│ [Keep Lux Via's] [Keep JK's] [Keep both]  [skip]  [undo]          │
+│ [◂ back]                                          [next step ▸]   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+The guided review walks through five steps: the installation, the load
+order, the assets, the world map and the collisions. The first four show
+the homes' own rows (the task page's finding rows, the assets page's duel
+lines) and lead to the home where more is needed; the collisions are
+decided in the review itself, one structure at a time. A structure is
+the parts of one mod that hang together; the stage shows the place as it
+is now, with only the one structure and with only the other, through one
+camera. Deciding writes the same patch choices the collisions page
+writes. ADR 0050 records the rules.
 
 #### Overview of a game
 

@@ -64,6 +64,7 @@
   - [0047 The ground painted as the game paints it](adr/0047-the-ground-painted-as-the-game-paints-it.md)
   - [0048 One job per page, and a home for each thing](adr/0048-one-job-per-page.md)
   - [0049 The files every mod brings](adr/0049-the-files-every-mod-brings.md)
+  - [0050 A guided review through the homes](adr/0050-a-guided-review-through-the-homes.md)
   - [Template](adr/template.md)
 
 # Reference

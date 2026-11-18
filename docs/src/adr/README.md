@@ -76,3 +76,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0047](0047-the-ground-painted-as-the-game-paints-it.md) | The ground painted as the game paints it | accepted |
 | [0048](0048-one-job-per-page.md) | One job per page, and a home for each thing | accepted |
 | [0049](0049-the-files-every-mod-brings.md) | The files every mod brings, from the mod manager's staging folder | accepted |
+| [0050](0050-a-guided-review-through-the-homes.md) | A guided review through the homes, collisions structure by structure | accepted |

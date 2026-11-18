@@ -8,11 +8,13 @@ import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import { type Health, type Target, weightOf } from "./health";
 import { useJourneyTexts } from "./journey-texts";
 import { useOverviewTexts } from "./overview-texts";
+import { storedReview } from "./Review";
+import { useReviewTexts } from "./review-texts";
 import "./journey.css";
 import "./overview.css";
 
 /** The pages the overview leads to. */
-export type OverviewTarget = Target | "map" | "assets" | "toolbox";
+export type OverviewTarget = Target | "map" | "assets" | "toolbox" | "review";
 
 /** The duels about files (textures, meshes, faces), whose home is the assets page. */
 export function fileDuels(report: RenderedReport): RenderedReport["duels"] {
@@ -54,7 +56,9 @@ export function Overview({
 }: OverviewProps) {
   const { t, ignored, decisions, ranking } = useSession();
   const j = useJourneyTexts();
+  const r = useReviewTexts();
   const activeId = games.choice?.active;
+  const review = activeId === undefined ? null : storedReview(activeId);
   const art = useGameArt(activeId === undefined ? [] : [activeId]);
   const name = t.games.find((game) => game.id === activeId)?.name ?? games.active?.id ?? "";
   const picture = activeId === undefined ? undefined : art[activeId];
@@ -72,6 +76,13 @@ export function Overview({
             {report.game.extenderVersion != null &&
               ` · ${games.active?.scriptExtender ?? t.scriptExtender} ${report.game.extenderVersion}`}
           </span>
+        )}
+        {report !== null && (
+          <div className="overview-banner-actions">
+            <button type="button" className="primary" onClick={() => onOpen("review")}>
+              {review === null ? r.start : r.continueAt(r.step[review.step].title)}
+            </button>
+          </div>
         )}
       </div>
     </section>
