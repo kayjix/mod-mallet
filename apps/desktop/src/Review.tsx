@@ -4,7 +4,7 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
-import { AreaLayer, LOOK, objectKey } from "./area-layer";
+import { AreaLayer, isGamePlugin, LOOK, objectKey } from "./area-layer";
 import { isCollision, stepOf } from "./arrange";
 import {
   CompareStage3D,
@@ -21,7 +21,7 @@ import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
-import { rememberObjects } from "./pair-report";
+import { counted, rememberObjects } from "./pair-report";
 import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
@@ -512,7 +512,12 @@ function CollisionsStep({
   const shownSegments: StageSegment[] =
     segments.length > 0
       ? segments
-      : cluster.spots.map(({ key }) => ({ groups: [key], parts: [[], []], volumes: [0, 0] }));
+      : cluster.spots.map(({ key }) => ({
+          groups: [key],
+          parts: [[], []],
+          volumes: [0, 0],
+          decor: [],
+        }));
   const spotsOf = (segment: StageSegment) =>
     segment.groups.flatMap((key) => {
       const spot = bySpot.get(key);
@@ -540,7 +545,7 @@ function CollisionsStep({
     if (known.length > 0) {
       return known.map((object) => ({
         id: object.id,
-        game: isGameObject(object),
+        game: isGameObject(object) && isGamePlugin(object.plugin),
         name: object.name ?? object.model.split(/[\\/]/).pop() ?? object.model,
       }));
     }
@@ -745,7 +750,7 @@ function CollisionsStep({
       const loser = candidate.plugins[losingSide];
       const losing = found
         .flatMap((segment) => segment.parts[losingSide])
-        .filter((object) => !isGameObject(object));
+        .filter((object) => !isGameObject(object) || !isGamePlugin(object.plugin));
       const keeping = found.flatMap((segment) => segment.parts[suggestion.side]);
       const notHideable = new Set(
         candidate.spots.flatMap(({ item }) =>
@@ -1051,6 +1056,7 @@ function CollisionsStep({
               loser={names[side === 0 ? 1 : 0]}
               effect={effects[side]}
               anchors={anchors.byPart}
+              decor={new Set(shownSegments.flatMap((segment) => segment.decor))}
               onAnyway={() => keep(side, shownSegments, true, true)}
             />
           ))}
@@ -1207,7 +1213,13 @@ function partsToAsk(
   };
   for (const segment of segments) {
     for (const part of [...segment.parts[0], ...segment.parts[1]]) {
-      add(part.id);
+      // Objects of the game a mod moved are asked about too (ADR 0032).
+      if (!isGameObject(part) || !isGamePlugin(part.plugin)) {
+        found.set(objectKey(part.id.plugin, part.id.localId), {
+          plugin: part.id.plugin,
+          localId: part.id.localId,
+        });
+      }
     }
   }
   for (const { item } of cluster.spots) {
@@ -1261,14 +1273,20 @@ function KeepEffect({
   loser,
   effect,
   anchors,
+  decor,
   onAnyway,
 }: {
   winner: string;
   loser: string;
   effect: { parts: Part[]; go: Part[]; careful: Part[]; locked: Part[]; game: Part[] };
   anchors: Map<string, ObjectAnchors>;
+  /** The parts that are decor resting on others, by key. */
+  decor: Set<string>;
   onAnyway: () => void;
 }) {
+  const isDecor = (part: Part) => decor.has(objectKey(part.id.plugin, part.id.localId));
+  const resting = effect.go.filter(isDecor);
+  const restingStays = [...effect.careful, ...effect.locked, ...effect.game].filter(isDecor);
   const r = useReviewTexts();
   const staying = [...effect.careful, ...effect.locked];
   if (effect.parts.length === 0) {
@@ -1282,6 +1300,9 @@ function KeepEffect({
         {nothing
           ? r.nothingCanGo(loser)
           : r.keepEffect(loser, effect.go.length, effect.parts.length)}
+        {resting.length > 0 && ` ${r.restingGoes(counted(resting.map((part) => part.name)))}`}
+        {restingStays.length > 0 &&
+          ` ${r.restingStays(counted(restingStays.map((part) => part.name)))}`}
         {effect.careful.length > 0 && ` ${r.carefulNote(effect.careful.length)}`}
         {effect.locked.length > 0 && ` ${r.lockedNote(effect.locked.length)}`}
         {effect.game.length > 0 && ` ${r.gameParts(effect.game.length)}`}

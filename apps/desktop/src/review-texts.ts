@@ -87,6 +87,8 @@ export interface ReviewTexts {
   keepEffect: (loser: string, go: number, total: number) => string;
   nothingCanGo: (loser: string) => string;
   carefulNote: (count: number) => string;
+  restingGoes: (names: string) => string;
+  restingStays: (names: string) => string;
   lockedNote: (count: number) => string;
   whyTheyStay: (count: number) => string;
   neededByGame: string;
@@ -235,6 +237,8 @@ const en: ReviewTexts = {
       : `${go} of ${total} parts of ${loser} can go.`,
   nothingCanGo: (loser) =>
     `nothing of ${loser} can go here: the game needs these parts. "Keep both here" settles the place without hiding anything.`,
+  restingGoes: (names) => `What stands on it goes with it: ${names}.`,
+  restingStays: (names) => `Standing on it, but staying (then in the air): ${names}.`,
   carefulNote: (count) =>
     count === 1
       ? "1 part is tied into the game: hiding it is possible, but may break something."
@@ -393,6 +397,8 @@ const de: ReviewTexts = {
       : `${go} von ${total} Teilen von ${loser} können weg.`,
   nothingCanGo: (loser) =>
     `von ${loser} kann hier nichts weg: das Spiel braucht diese Teile. „Hier beide behalten“ entscheidet die Stelle, ohne etwas auszublenden.`,
+  restingGoes: (names) => `Was darauf steht, geht mit: ${names}.`,
+  restingStays: (names) => `Steht darauf, bleibt aber (dann in der Luft): ${names}.`,
   carefulNote: (count) =>
     count === 1
       ? "1 Teil ist ins Spiel eingebunden: ausblenden geht, kann aber etwas stören."

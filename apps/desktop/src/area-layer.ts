@@ -270,6 +270,24 @@ export const TOUCHING = 14;
 const NATURE =
   /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
 
+/** The plugins of the games themselves. */
+const GAME_PLUGIN =
+  /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
+
+/** Whether a plugin is one of the game's own. */
+export function isGamePlugin(plugin: string): boolean {
+  return GAME_PLUGIN.test(plugin);
+}
+
+/**
+ * The mod an object belongs to, by plugin: the one that placed it, or,
+ * for an object of the game, the one whose version of it wins (a mod that
+ * moves a vanilla book onto its shelf makes the book its own, ADR 0032).
+ */
+export function ownerOf(object: AreaObject): string {
+  return (isGamePlugin(object.id.plugin) ? object.plugin : object.id.plugin).toLowerCase();
+}
+
 /** Folders of trees, which stay out of structures even as leaves. */
 const TREES = /(^|[\\/])trees[\\/]/i;
 
@@ -527,7 +545,7 @@ export class AreaLayer {
     /** Only parts placed within `radius` game units of `x`, `y`, if given. */
     near?: { x: number; y: number; radius: number },
   ): AreaObject[] {
-    const plugin = object.id.plugin.toLowerCase();
+    const owner = ownerOf(object);
     const isStart = (other: AreaObject) =>
       other.id.plugin === object.id.plugin && other.id.localId === object.id.localId;
     const isNear = (other: AreaObject) =>
@@ -548,11 +566,14 @@ export class AreaLayer {
     // Decor of the same mod on what it builds (plants in a planter, a
     // banner, a basket) is taken along as leaves: it belongs to the
     // structure it touches, but the structure does not grow on from it.
+    // Decor counts also where the mod's version of another mod's object
+    // wins (a book it moved onto its shelf); what it grows through is its own.
     const leaves: { object: AreaObject; box: PlacedBox }[] = [];
     const candidates = this.instances
-      .filter(
-        (instance) => instance.object.id.plugin.toLowerCase() === plugin && isNear(instance.object),
-      )
+      .filter((instance) => {
+        const other = instance.object;
+        return isNear(other) && (ownerOf(other) === owner || other.plugin.toLowerCase() === owner);
+      })
       .flatMap((instance) => {
         const model = this.models.get(instance.object.model);
         if (model === undefined || !Array.isArray(model.surfaces)) {
@@ -560,7 +581,8 @@ export class AreaLayer {
         }
         const kind = kindOf(instance.object.model, sizeOf(model.box, instance.object.scale));
         const box = placedBox(model.box, instance.matrix);
-        if (!isStart(instance.object) && kind !== grows) {
+        const own = ownerOf(instance.object) === owner;
+        if (!isStart(instance.object) && (kind !== grows || !own)) {
           if (grows === "built" && isDecor(instance.object.model, kind)) {
             leaves.push({ object: instance.object, box });
           }
@@ -609,6 +631,18 @@ export class AreaLayer {
     const [low, high] = model.box;
     const side = (axis: 0 | 1 | 2) => Math.max(1, (high[axis] - low[axis]) * object.scale);
     return side(0) * side(1) * side(2);
+  }
+
+  /**
+   * Whether an object is decor (clutter, small plants) that rests on what
+   * it touches; null until its model is read.
+   */
+  isDecorPart(object: AreaObject): boolean | null {
+    const model = this.models.get(object.model);
+    if (model === undefined || !Array.isArray(model.surfaces)) {
+      return null;
+    }
+    return isDecor(object.model, kindOf(object.model, sizeOf(model.box, object.scale)));
   }
 
   /** How many of the area's models are there, of how many. */

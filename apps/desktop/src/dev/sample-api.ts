@@ -647,6 +647,7 @@ function sampleMap(): RenderedReport["map"] {
       placed([6, 1, 0.4, 0.4], duplicate(6, 1, "Dock / Dock", 0xa10)),
       placed([6, 1, 0.6, 0.7], duplicate(6, 1, "Boat / Boat", 0xa20)),
       placed([7, 2, 0.5, 0.5], duplicate(7, 2, "Bridge / Lantern post", 0xb12)),
+      placed([8, 2, 0.5, 0.5], duplicate(8, 2, "UpperShelf02 / Divider", 0xb20)),
     ],
   };
 }
@@ -1212,6 +1213,8 @@ const SAMPLE_MODELS: Record<string, [number, number, number]> = {
   "sample\\rock.nif": [45, 35, 25],
   "landscape\\trees\\sampletree.nif": [20, 20, 120],
   "sample\\cup.nif": [5, 5, 6],
+  "sample\\shelf.nif": [40, 12, 30],
+  "sample\\book.nif": [4, 6, 8],
 };
 
 /**
@@ -1271,6 +1274,26 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
       }
     }
   };
+  // A shelf of Old Town against a divider of Water Mod, with three books on
+  // the shelf's top: one Old Town placed, one of the game that Old Town
+  // moved there (its version wins), and one of Patch Hub. Hiding the shelf
+  // takes the first two along; the third is another mod's.
+  if (cellX === 8 && cellY === 2) {
+    place("Old Town.esp", 0xb20, "sample\\shelf.nif", [cx, cy, ground + 30], 0, "UpperShelf02");
+    place("Water Mod.esp", 0xb21, "sample\\pillar.nif", [cx + 46, cy, ground + 30], 0, "Divider");
+    place("Old Town.esp", 0xb22, "sample\\book.nif", [cx - 20, cy, ground + 68], 0, "Book");
+    objects.push({
+      id: { plugin: "Skyrim.esm", localId: 0xb23 },
+      plugin: "Old Town.esp",
+      model: "sample\\book.nif",
+      name: "Iron",
+      position: [cx, cy, ground + 68],
+      rotation: [0, 0, 0],
+      scale: 1,
+    });
+    place("Patch Hub.esp", 0xb24, "sample\\book.nif", [cx + 20, cy, ground + 68], 0, "Book");
+    return { world, centre: [cx, cy], radius, objects };
+  }
   // The docks of the sample's duplicates: Old Town and Water Mod place the same.
   const docks = cellX === 6 && cellY === 1;
   const lantern = cellX === 7 && cellY === 2;

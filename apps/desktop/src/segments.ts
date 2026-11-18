@@ -22,6 +22,8 @@ export interface StageSegment {
   parts: [AreaObject[], AreaObject[]];
   /** How much room each side's parts take: their model boxes as placed, in cubic game units. */
   volumes: [number, number];
+  /** The parts that are decor resting on others (clutter, small plants), by key. */
+  decor: string[];
 }
 
 /** How close two parts must come to count as one structure, in game units (about 6 cm). */
@@ -89,6 +91,9 @@ export function findSegments(
   return segmentsOf(perGroup).map((segment) => ({
     ...segment,
     volumes: [volume(layer, segment.parts[0]), volume(layer, segment.parts[1])],
+    decor: [...segment.parts[0], ...segment.parts[1]]
+      .filter((part) => layer.isDecorPart(part) === true)
+      .map((part) => objectKey(part.id.plugin, part.id.localId)),
   }));
 }
 
@@ -103,7 +108,7 @@ function volume(layer: AreaLayer, parts: AreaObject[]): number {
  */
 function segmentsOf(
   perGroup: { key: string; parts: [AreaObject[], AreaObject[]] }[],
-): Omit<StageSegment, "volumes">[] {
+): Omit<StageSegment, "volumes" | "decor">[] {
   const owner = new Map<string, number>();
   const root = perGroup.map((_, index) => index);
   const find = (index: number): number => {
@@ -124,7 +129,7 @@ function segmentsOf(
       }
     }
   });
-  const joined = new Map<number, Omit<StageSegment, "volumes">>();
+  const joined = new Map<number, Omit<StageSegment, "volumes" | "decor">>();
   perGroup.forEach((group, index) => {
     const at = find(index);
     const segment = joined.get(at) ?? { groups: [], parts: [[], []] };

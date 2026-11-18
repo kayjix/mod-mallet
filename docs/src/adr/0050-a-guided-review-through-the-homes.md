@@ -67,6 +67,14 @@ a colour of its own.
      plants, not trees) is taken along as a leaf, so that hiding a
      building takes its planters and banners with it; it does not grow on
      from there.
+   *The same mod* is the mod that placed a part, or, for an object of the
+   game, the mod whose version of it wins (ADR 0032): at Candlehearth Hall
+   the books on JK's shelf were objects of the game that JK moved there,
+   and hiding the shelf left them in the air. Decor counts also where the
+   mod's version of another mod's object wins. Such moved objects of the
+   game are not *the game's own* for the keep buttons: their ties decide,
+   as for the mod's own parts. The keep effect names what rests on a part
+   and goes with it, and what rests on it but stays ("then in the air").
    The part started from always belongs to the structure. The object
    card's *parts that hang together* follows the same rules.
 5. **A structure is shown three times, through one camera**: the place as
