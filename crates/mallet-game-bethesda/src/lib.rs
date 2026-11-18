@@ -50,6 +50,7 @@ pub mod skse_log;
 pub mod swap;
 pub mod terrain;
 pub mod tools;
+pub mod walkways;
 
 pub use game::Game;
 

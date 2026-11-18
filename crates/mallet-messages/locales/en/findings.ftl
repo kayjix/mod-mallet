@@ -423,3 +423,26 @@ mods-duplicates-another = Suggestion: a mod places largely the same objects as a
         }
     .explanation = This is only a suggestion; nothing is broken. Collections ("all in one") often contain mods that are also offered on their own, and two mods can rebuild the same place in the same way. With both installed, the same buildings stand twice in the same spot and their surfaces flicker. A plugin made for one of the two, such as a compatibility patch, only works with that one, which is a good reason to keep it.
     .remedy = Keep the one you prefer and switch the other off in your mod manager; prefer the one the patches you use are made for. Before you switch one off, check whether it brings something the other lacks, such as an interior: then keep both, and in the list of collisions let one of them lose in every place at once.
+
+patch-hides-walkway = Mod Mallet's patch hides something characters walk on
+    .headline =
+        The patch hides { $count ->
+            [one] an object
+           *[other] { $count } objects
+        } of { $plugin } that characters walk on
+    .summary =
+        The paths the game's characters follow run over { $count ->
+            [one] an object
+           *[other] { $count } objects
+        } of { $plugin } that Mod Mallet's patch hides: { $objects }. { $triangles ->
+            [one] One piece of path lies
+           *[other] { $triangles } pieces of path lie
+        } on { $count ->
+            [one] it
+           *[other] them
+        }, in { $placeCount ->
+            [one] one place
+           *[other] { $placeCount } places
+        }: { $places }. These paths come from { $navmeshes }. An interior is given by its internal name, outside by worldspace and cell.
+    .explanation = Characters in the game find their way on an invisible net laid over everything they can walk on: the ground, but also bridges, piers, decks and stairs. Mod Mallet's patch hides an object by making it invisible and letting everyone pass through it, but the net stays as it was made. Where the net runs over a hidden deck, pier or bridge, townspeople, guards, followers and animals walk on thin air or get stuck at its edge, and a quest that sends someone across can stop. You yourself fall through where the object was.
+    .remedy = Decide what matters more to you here. Keep the object: on the collisions page, let the other mod's object give way instead, or keep both. Or accept it knowingly if nobody needs to walk there, such as on a ship that nobody boards. Mod Mallet cannot yet repair the paths so that they fit without the object.

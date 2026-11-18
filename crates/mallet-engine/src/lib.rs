@@ -28,6 +28,7 @@ mod preview;
 mod settings;
 mod staging;
 mod toolbox;
+mod walkways;
 
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -57,6 +58,7 @@ pub use settings::{
     select_game, setup_fingerprint, update_settings,
 };
 pub use toolbox::{game_art, restart_manager, toolbox};
+pub use walkways::hidden_walkways;
 
 /// Where to look. Every field that is `None` is detected automatically.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -241,10 +243,27 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         "read the setup"
     );
 
+    // The objects Mod Mallet's patch hides, and the paths over them
+    // (ADR 0051).
+    let installed_patch = game
+        .has_object_swapper()
+        .then(|| installed_patch(&game_dir, mods.as_ref()))
+        .flatten();
+    facts.hidden_objects = walkways::hidden_by(installed_patch.as_ref());
+
     // Where objects of two mods meet by their boxes, their models decide
-    // (ADR 0039). Only those models are read.
+    // (ADR 0039). Only those models are read, and those of the hidden
+    // objects.
     let started = Instant::now();
-    let wanted = mallet_analysis::objects::models_to_check(&Context::new(&facts, mods.as_ref()));
+    let mut wanted =
+        mallet_analysis::objects::models_to_check(&Context::new(&facts, mods.as_ref()));
+    facts.navmeshes.near_hidden = walkways::near_hidden(
+        game,
+        &game_dir,
+        options.local_dir.as_deref(),
+        &facts,
+        &mut wanted,
+    );
     facts.models = mallet_game_bethesda::models::read_models(
         game,
         &game_dir,
@@ -269,10 +288,6 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         "analysed the setup"
     );
 
-    let installed_patch = game
-        .has_object_swapper()
-        .then(|| installed_patch(&game_dir, mods.as_ref()))
-        .flatten();
     let extender = facts.extender.as_ref();
     Ok(ScanReport {
         schema_version: report::SCHEMA_VERSION,

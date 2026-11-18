@@ -64,6 +64,9 @@ pub struct Facts {
     pub markers: MarkerFacts,
     /// The navigation meshes of other plugins that mods change.
     pub navmeshes: NavmeshFacts,
+    /// The placed objects that Mod Mallet's patch in the game hides, by
+    /// the plugin that placed them (ADR 0025).
+    pub hidden_objects: Vec<RecordId>,
     /// The recent crashes, as the crash loggers reported them.
     pub crashes: CrashFacts,
     /// The shapes of the models of objects that may collide.

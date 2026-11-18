@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HiddenWalkways",
+  "description": "The paths characters walk on that run over objects about to be hidden\n(ADR 0051): hiding an object through Base Object Swapper takes away\nwhat characters stand on, but not the paths they follow over it.",
+  "type": "object",
+  "properties": {
+    "found": {
+      "description": "The objects asked about that were found there.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ObjectRef"
+      }
+    },
+    "place": {
+      "description": "The worldspace or interior cell asked about, as in\n[`AreaObjects::world`].",
+      "type": "string"
+    },
+    "walkways": {
+      "description": "Each version of a navigation mesh that runs over one of them.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Walkway"
+      }
+    }
+  },
+  "required": [
+    "place",
+    "found",
+    "walkways"
+  ],
+  "$defs": {
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "Walkway": {
+      "description": "One plugin's version of a navigation mesh that runs over a hidden\nobject.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "Where the navigation mesh lies, for people: an interior cell's\ninternal name, or the worldspace and the cell's grid position.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "navmesh": {
+          "description": "The navigation mesh, by the plugin that first defined it and its\nnumber there, such as `skyrim.esm:102F4F`.",
+          "type": "string"
+        },
+        "object": {
+          "description": "The object it runs over.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "plugin": {
+          "description": "The plugin of this version, as the load order spells it.",
+          "type": "string"
+        },
+        "triangles": {
+          "description": "How many of its triangles lie on the object.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "used": {
+          "description": "Whether the game uses this version. A version another plugin\nreplaces does no harm.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "object",
+        "navmesh",
+        "plugin",
+        "used",
+        "triangles"
+      ]
+    }
+  }
+}

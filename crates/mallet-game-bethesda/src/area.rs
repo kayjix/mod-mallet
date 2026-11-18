@@ -63,6 +63,9 @@ pub struct AreaObject {
     /// Whether the game relies on it being there: it is persistent (other
     /// things refer to it) or part of the distant view.
     pub anchored: bool,
+    /// The worldspace it stands in, which may be a city on the land of
+    /// the one asked for; `None` inside.
+    pub world: Option<RecordId>,
 }
 
 /// The ground of one outside cell near the point, in the version the game
@@ -154,6 +157,15 @@ impl AreaReader {
         let mut objects: Vec<AreaObject> = found.into_values().flatten().filter(within).collect();
         objects.sort_by(|a, b| a.id.cmp(&b.id));
         objects
+    }
+
+    /// The navigation meshes and the ground of the cells `around`, every
+    /// plugin's version (ADR 0051).
+    pub fn navmeshes(
+        &self,
+        around: &crate::walkways::Around,
+    ) -> mallet_core::facts::navmeshes::NearHidden {
+        crate::walkways::read_plugins(&self.plugins, around)
     }
 
     /// The ground of the outside cells of the worldspace named `world`
@@ -256,7 +268,12 @@ impl AreaReader {
                             continue;
                         }
                         let id = record_id(record.form_id, masters, name);
-                        let object = area_object(record, masters, name, id.clone());
+                        let object = area_object(record, masters, name, id.clone()).map(|object| {
+                            AreaObject {
+                                world: Some(in_world),
+                                ..object
+                            }
+                        });
                         found.insert(id, object);
                     }
                     b"CELL" => {
@@ -413,6 +430,7 @@ fn area_object(
         rotation: [*rx, *ry, *rz],
         scale,
         anchored: record.flags & (FLAG_PERSISTENT | FLAG_VISIBLE_WHEN_DISTANT) != 0,
+        world: None,
     })
 }
 

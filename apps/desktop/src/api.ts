@@ -9,6 +9,7 @@ import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
+import type { HiddenWalkways } from "./generated/hidden-walkways";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { LodTiles } from "./generated/lod-tiles";
 import type { MapImage } from "./generated/map-image";
@@ -90,6 +91,19 @@ export interface Api {
    * the setup cannot be read.
    */
   objectAnchors(worldOrCell: string, objects: ObjectRef[]): Promise<ObjectAnchors[] | null>;
+  /**
+   * The paths characters walk on that run over `objects`, which are about to
+   * be hidden: in the worldspace `worldOrCell` near the point `x`, `y`, or,
+   * with `x` and `y` null, in that interior cell. Every plugin's version of
+   * each path is given, with whether the game uses it. Null if the setup
+   * cannot be read.
+   */
+  hiddenWalkways(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    objects: ObjectRef[],
+  ): Promise<HiddenWalkways | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -156,6 +170,8 @@ const tauriApi: Api = {
   areaTexture: (path, maxSide) => invoke<string | null>("area_texture", { path, maxSide }),
   objectAnchors: (worldOrCell, objects) =>
     invoke<ObjectAnchors[] | null>("object_anchors", { worldOrCell, objects }),
+  hiddenWalkways: (worldOrCell, x, y, objects) =>
+    invoke<HiddenWalkways | null>("hidden_walkways", { worldOrCell, x, y, objects }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

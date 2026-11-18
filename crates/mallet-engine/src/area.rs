@@ -39,7 +39,7 @@ fn setup_key(options: &ScanOptions) -> Option<String> {
     Some(format!("{}|{}", game.id(), game_dir.display()))
 }
 
-fn reader(options: &ScanOptions) -> Option<Arc<Mutex<AreaReader>>> {
+pub(crate) fn reader(options: &ScanOptions) -> Option<Arc<Mutex<AreaReader>>> {
     let key = setup_key(options)?;
     let mut kept = READER.lock().ok()?;
     if let Some((known, reader)) = kept.as_ref()
@@ -58,7 +58,7 @@ fn reader(options: &ScanOptions) -> Option<Arc<Mutex<AreaReader>>> {
     Some(reader)
 }
 
-fn library(options: &ScanOptions) -> Option<Arc<LodLibrary>> {
+pub(crate) fn library(options: &ScanOptions) -> Option<Arc<LodLibrary>> {
     let key = setup_key(options)?;
     let mut kept = FILES.lock().ok()?;
     if let Some((known, library)) = kept.as_ref()

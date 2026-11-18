@@ -875,6 +875,31 @@ impl<'a> Solid<'a> {
     }
 }
 
+/// The points of a model or a box, in its own space, placed in the world
+/// as `object` places it: scaled, turned and moved. `None` for an object
+/// without size.
+pub(crate) fn placed_points(
+    object: &PlacedObject,
+    points: &[[i32; 3]],
+) -> Option<Vec<contact::Point>> {
+    let scale = f64::from(object.scale) / 1000.0;
+    if scale <= 0.0 {
+        return None;
+    }
+    let [rx, ry, rz] = object.rotation.map(|value| f64::from(value) / 1000.0);
+    let rotation = Matrix::placed(rx, ry, rz);
+    let position = Vector::from(object.position);
+    Some(
+        points
+            .iter()
+            .map(|&point| {
+                let world = position.plus(rotation.apply(Vector::from(point).scaled(scale)));
+                [world.x, world.y, world.z]
+            })
+            .collect(),
+    )
+}
+
 /// The square a coordinate lies in.
 #[allow(clippy::cast_possible_truncation)]
 fn square(coordinate: f64) -> i64 {

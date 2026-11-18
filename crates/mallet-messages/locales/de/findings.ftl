@@ -417,3 +417,26 @@ mods-duplicates-another = Vorschlag: Eine Mod stellt größtenteils dieselben Ob
         }
     .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Sammlungen („all in one“) enthalten oft Mods, die es auch einzeln gibt, und zwei Mods können denselben Ort auf dieselbe Weise umbauen. Sind beide installiert, stehen dieselben Gebäude doppelt am selben Ort, und ihre Oberflächen flackern. Ein Plugin, das für eine der beiden gemacht ist, etwa ein Kompatibilitäts-Patch, funktioniert nur mit dieser, und das ist ein guter Grund, sie zu behalten.
     .remedy = Behalte die, die dir lieber ist, und schalte die andere in deinem Mod-Manager aus; nimm lieber die, für die die Patches gemacht sind, die du benutzt. Bevor du eine ausschaltest, sieh nach, ob sie etwas mitbringt, das der anderen fehlt, etwa einen Innenraum: Dann behalte beide und lass in der Liste der Kollisionen eine von ihnen an allen Orten auf einmal verlieren.
+
+patch-hides-walkway = Der Patch von Mod Mallet versteckt etwas, worauf Figuren laufen
+    .headline =
+        Der Patch versteckt { $count ->
+            [one] ein Objekt
+           *[other] { $count } Objekte
+        } von { $plugin }, auf { $count ->
+            [one] dem
+           *[other] denen
+        } Figuren laufen
+    .summary =
+        Die Wege, denen die Figuren im Spiel folgen, führen über { $count ->
+            [one] ein Objekt
+           *[other] { $count } Objekte
+        } von { $plugin }, die der Patch von Mod Mallet versteckt: { $objects }. { $triangles ->
+            [one] Ein Wegstück liegt
+           *[other] { $triangles } Wegstücke liegen
+        } darauf, an { $placeCount ->
+            [one] einem Ort
+           *[other] { $placeCount } Orten
+        }: { $places }. Diese Wege stammen aus { $navmeshes }. Angegeben ist ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+    .explanation = Figuren im Spiel finden ihren Weg über ein unsichtbares Netz, das über allem liegt, worauf sie laufen können: über dem Boden, aber auch über Brücken, Stegen, Schiffsdecks und Treppen. Der Patch von Mod Mallet versteckt ein Objekt, indem er es unsichtbar macht und alle hindurchlässt, doch das Netz bleibt, wie es gemacht wurde. Wo es über ein verstecktes Deck, einen Steg oder eine Brücke führt, laufen Bewohner, Wachen, Begleiter und Tiere durch die Luft oder bleiben an der Kante hängen, und eine Quest, die jemanden hinüberschickt, kann stehen bleiben. Du selbst fällst dort hindurch, wo das Objekt war.
+    .remedy = Entscheide, was dir hier wichtiger ist. Behalte das Objekt: Lass auf der Seite der Kollisionen stattdessen das Objekt der anderen Mod weichen, oder behalte beide. Oder nimm es bewusst in Kauf, wenn dort niemand laufen muss, etwa auf einem Schiff, das niemand betritt. Die Wege so zu reparieren, dass sie ohne das Objekt passen, kann Mod Mallet noch nicht.

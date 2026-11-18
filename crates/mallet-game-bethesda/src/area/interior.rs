@@ -37,6 +37,18 @@ const CHILDREN: [u32; 3] = [
 ];
 
 impl AreaReader {
+    /// The interior cell whose editor ID is `cell` (case does not matter),
+    /// by the plugin that made it; `None` if no plugin has such a cell.
+    pub fn interior_cell(&mut self, cell: &str) -> Option<RecordId> {
+        if self.interiors.is_none() {
+            self.interiors = Some(self.list_interiors());
+        }
+        self.interiors
+            .as_ref()?
+            .get(&cell.to_ascii_lowercase())
+            .map(|interior| interior.cell.clone())
+    }
+
     /// The objects placed in the interior cell whose editor ID is `cell`
     /// (case does not matter), each in the version the game uses: the
     /// cell's persistent and temporary children. Empty if no plugin has

@@ -263,7 +263,10 @@ mod tests {
     fn facts(plugins: Vec<PluginFacts>, changes: Vec<NavmeshChanges>) -> Facts {
         Facts {
             plugins,
-            navmeshes: NavmeshFacts { changes },
+            navmeshes: NavmeshFacts {
+                changes,
+                ..NavmeshFacts::default()
+            },
             ..Facts::default()
         }
     }

@@ -65,6 +65,7 @@
   - [0048 One job per page, and a home for each thing](adr/0048-one-job-per-page.md)
   - [0049 The files every mod brings](adr/0049-the-files-every-mod-brings.md)
   - [0050 A guided review through the homes](adr/0050-a-guided-review-through-the-homes.md)
+  - [0051 Paths over hidden objects](adr/0051-paths-over-hidden-objects.md)
   - [Template](adr/template.md)
 
 # Reference

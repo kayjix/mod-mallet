@@ -386,6 +386,26 @@ fn object_anchors(
     ))
 }
 
+/// The paths characters walk on that run over objects about to be hidden
+/// (ADR 0051): in a worldspace near the point `x`, `y`, or, without a
+/// point, in an interior cell by its editor ID.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn hidden_walkways(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    objects: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::mesh::HiddenWalkways>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::hidden_walkways(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &objects,
+    ))
+}
+
 /// A mesh of the setup in its own units, with its textures named by path.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -618,6 +638,7 @@ pub fn run() -> tauri::Result<()> {
             world_land,
             interior_objects,
             object_anchors,
+            hidden_walkways,
             area_mesh,
             area_texture,
             ranking,

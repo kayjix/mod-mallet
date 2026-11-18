@@ -1152,6 +1152,20 @@ export const sampleApi: Api = {
   areaMesh: (name) => later(sampleBox(name)),
   areaTexture: () => later(null),
   objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
+  // In the sample, a path of the game runs over the first object to hide.
+  hiddenWalkways: (worldOrCell, _x, _y, objects) =>
+    later({
+      place: worldOrCell,
+      found: objects,
+      walkways: objects.slice(0, 1).map((object) => ({
+        object,
+        navmesh: "skyrim.esm:00A1B2",
+        plugin: "Skyrim.esm",
+        used: true,
+        cell: `${worldOrCell} 3,-2`,
+        triangles: 12,
+      })),
+    }),
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),

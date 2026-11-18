@@ -193,3 +193,40 @@ pub struct LandTextureLayer {
     /// corner to its middle.
     pub opacity: String,
 }
+
+/// The paths characters walk on that run over objects about to be hidden
+/// (ADR 0051): hiding an object through Base Object Swapper takes away
+/// what characters stand on, but not the paths they follow over it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HiddenWalkways {
+    /// The worldspace or interior cell asked about, as in
+    /// [`AreaObjects::world`].
+    pub place: String,
+    /// The objects asked about that were found there.
+    pub found: Vec<crate::ObjectRef>,
+    /// Each version of a navigation mesh that runs over one of them.
+    pub walkways: Vec<Walkway>,
+}
+
+/// One plugin's version of a navigation mesh that runs over a hidden
+/// object.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Walkway {
+    /// The object it runs over.
+    pub object: crate::ObjectRef,
+    /// The navigation mesh, by the plugin that first defined it and its
+    /// number there, such as `skyrim.esm:102F4F`.
+    pub navmesh: String,
+    /// The plugin of this version, as the load order spells it.
+    pub plugin: String,
+    /// Whether the game uses this version. A version another plugin
+    /// replaces does no harm.
+    pub used: bool,
+    /// Where the navigation mesh lies, for people: an interior cell's
+    /// internal name, or the worldspace and the cell's grid position.
+    pub cell: Option<String>,
+    /// How many of its triangles lie on the object.
+    pub triangles: u32,
+}

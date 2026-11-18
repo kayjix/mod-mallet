@@ -1,4 +1,4 @@
-//! Reads which doors a navigation mesh connects to.
+//! Reads which doors a navigation mesh connects to, and its triangles.
 //!
 //! A navigation mesh (`NAVM`) keeps its geometry in one field, `NVNM`. In
 //! Skyrim (format version 12) it is laid out as follows, all numbers little
@@ -9,7 +9,8 @@
 //! u32 checksum, u32 worldspace     where the mesh lies
 //! 4 bytes                          grid position or cell
 //! u32 n, n × 12 bytes              vertices: three floats each
-//! u32 n, n × 16 bytes              triangles
+//! u32 n, n × 16 bytes              triangles: three u16 vertices,
+//!                                  three u16 neighbours, two u16 flags
 //! u32 n, n × 10 bytes              links to neighbouring meshes
 //! u32 n, n × 10 bytes              door triangles: u16 triangle,
 //!                                  u32 checksum, u32 door reference
@@ -61,6 +62,56 @@ pub fn doors(nvnm: &[u8]) -> Option<Vec<u32>> {
         doors.push(door);
     }
     Some(doors)
+}
+
+/// The surface of a navigation mesh: where characters can walk.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Geometry {
+    /// The vertices, in game units, in the coordinates of the worldspace
+    /// or the interior cell.
+    pub vertices: Vec<[f32; 3]>,
+    /// The triangles, three vertex numbers each.
+    pub triangles: Vec<[u16; 3]>,
+}
+
+/// The vertices and triangles of a navigation mesh. `None` if the field
+/// is not in Skyrim's format or does not hold together, as when a triangle
+/// names a vertex the mesh does not have.
+pub fn geometry(nvnm: &[u8]) -> Option<Geometry> {
+    let mut bytes = Bytes::new(nvnm);
+    if bytes.u32()? != SKYRIM_VERSION {
+        return None;
+    }
+    bytes.skip(12)?;
+    let count = usize::try_from(bytes.u32()?).ok()?;
+    if count > bytes.remaining() / VERTEX_LEN {
+        return None;
+    }
+    let mut vertices = Vec::with_capacity(count);
+    for _ in 0..count {
+        vertices.push([bytes.f32()?, bytes.f32()?, bytes.f32()?]);
+    }
+    let count = usize::try_from(bytes.u32()?).ok()?;
+    if count > bytes.remaining() / TRIANGLE_LEN {
+        return None;
+    }
+    let mut triangles = Vec::with_capacity(count);
+    for _ in 0..count {
+        let triangle = [bytes.u16()?, bytes.u16()?, bytes.u16()?];
+        // Neighbours and flags.
+        bytes.skip(10)?;
+        if triangle
+            .iter()
+            .any(|&vertex| usize::from(vertex) >= vertices.len())
+        {
+            return None;
+        }
+        triangles.push(triangle);
+    }
+    Some(Geometry {
+        vertices,
+        triangles,
+    })
 }
 
 /// Skips an array that starts with its length as `u32`, and returns the
@@ -121,10 +172,54 @@ mod tests {
         assert_eq!(doors(&[]), None);
     }
 
+    /// A field with the given vertices and triangles, and nothing after.
+    fn surface(vertices: &[[f32; 3]], triangles: &[[u16; 3]]) -> Vec<u8> {
+        let mut data = 12u32.to_le_bytes().to_vec();
+        data.extend([0; 12]);
+        data.extend(u32::try_from(vertices.len()).unwrap().to_le_bytes());
+        for vertex in vertices {
+            for value in vertex {
+                data.extend(value.to_le_bytes());
+            }
+        }
+        data.extend(u32::try_from(triangles.len()).unwrap().to_le_bytes());
+        for triangle in triangles {
+            for vertex in triangle {
+                data.extend(vertex.to_le_bytes());
+            }
+            data.extend([0xFF; 6]);
+            data.extend([0; 4]);
+        }
+        data.extend(0u32.to_le_bytes());
+        data.extend(0u32.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn the_triangles_of_a_skyrim_navmesh_are_read() {
+        let vertices = [[0.0, 0.0, 10.0], [100.0, 0.0, 10.0], [0.0, 100.0, 12.5]];
+        let data = surface(&vertices, &[[0, 1, 2]]);
+        assert_eq!(
+            geometry(&data),
+            Some(Geometry {
+                vertices: vertices.to_vec(),
+                triangles: vec![[0, 1, 2]],
+            })
+        );
+    }
+
+    #[test]
+    fn a_triangle_with_a_missing_vertex_breaks_the_surface() {
+        let vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        assert_eq!(geometry(&surface(&vertices, &[[0, 1, 3]])), None);
+        assert_eq!(geometry(&field(15, 1, &[])), None);
+    }
+
     proptest! {
         #[test]
         fn never_panics(data in prop::collection::vec(any::<u8>(), 0..256)) {
             let _ = doors(&data);
+            let _ = geometry(&data);
         }
 
         #[test]
@@ -132,6 +227,7 @@ mod tests {
             let mut data = SKYRIM_VERSION.to_le_bytes().to_vec();
             data.extend(rest);
             let _ = doors(&data);
+            let _ = geometry(&data);
         }
     }
 }

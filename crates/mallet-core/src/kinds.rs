@@ -339,6 +339,7 @@ pub const ALL: &[KindInfo] = &[
     MODS_COLLIDES_WIDELY,
     MODS_MOSTLY_OVERRIDDEN,
     MODS_DUPLICATES_ANOTHER,
+    PATCH_HIDES_WALKWAY,
 ];
 
 /// A mod whose placed objects collide with many spots of other mods: a
@@ -388,6 +389,23 @@ pub const MODS_DUPLICATES_ANOTHER: KindInfo = KindInfo {
         "otherPatches",
         "lootCount",
         "loot",
+    ],
+};
+
+/// Mod Mallet's patch hides objects that the paths characters walk on run
+/// over (ADR 0051).
+pub const PATCH_HIDES_WALKWAY: KindInfo = KindInfo {
+    id: "patch.hides-walkway",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &[
+        "plugin",
+        "count",
+        "objects",
+        "places",
+        "placeCount",
+        "triangles",
+        "navmeshes",
     ],
 };
 
