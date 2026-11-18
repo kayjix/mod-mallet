@@ -10,17 +10,24 @@ import { CopyButton, useSession } from "./Actions";
 import { objectKey } from "./area-layer";
 import { isCollision } from "./arrange";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
-import type { MapSpot, ObjectRef, RenderedReport, SpotPart } from "./generated/rendered-report";
+import type {
+  MapSpot,
+  ObjectRef,
+  RenderedDuel,
+  RenderedReport,
+  SpotPart,
+} from "./generated/rendered-report";
+import { InteriorView } from "./InteriorView";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
+import { FreeObjectActions, NeededPart } from "./object-actions";
 import {
   chooseFinding,
   chooseObject,
   chooseSpot,
   decisionAt,
   keyOf,
-  objectChoiceKey,
   objectsOf,
   type Pair,
   type PatchChoices,
@@ -51,6 +58,8 @@ interface Item {
   mods: Group;
   /** The passage it belongs to: its spots of the same two mods close by. */
   passage: string;
+  /** What a search finds it by, in lower case. */
+  text: string;
 }
 
 interface Group {
@@ -60,6 +69,9 @@ interface Group {
 }
 
 type Grouping = "region" | "mods";
+
+/** How the groups are ordered: by their spots, or by those still open. */
+type Sorting = "open" | "spots";
 
 /** The two mods of some findings, with what each could hide in all of them together. */
 function sidesOfMods(pairs: Pair[]): { plugin: string; objects: number }[] {
@@ -98,10 +110,6 @@ const CLOSE = 0.9;
 
 /** From this many spots on, a pair of mods is better decided as a whole. */
 const MANY = 20;
-
-/** The plugins of the games themselves, whose objects quests may need. */
-const GAME_PLUGIN =
-  /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
 
 /** Reads a remembered setting; only a convenience. */
 function remembered<T>(name: string, fallback: T, read: (value: string) => T | null): T {
@@ -262,13 +270,26 @@ function useItems(report: RenderedReport): Item[] {
           aside: null,
         },
         passage: passages.get(key) ?? key,
+        text: [
+          region.label,
+          region.aside ?? "",
+          spot.location.type === "interior" ? spot.location.cell : spot.location.world,
+          ...(spot.parts ?? []).flatMap((part) => [part.name, part.object.plugin]),
+        ]
+          .join(" ")
+          .toLowerCase(),
       };
     });
   }, [report, ignored, t]);
 }
 
 /** Groups of items, the groups with the most serious spots first, each worst first. */
-function grouped(items: Item[], by: Grouping): { group: Group; items: Item[] }[] {
+function grouped(
+  items: Item[],
+  by: Grouping,
+  sort: Sorting,
+  open: (item: Item) => boolean,
+): { group: Group; items: Item[] }[] {
   const groups = new Map<string, { group: Group; items: Item[] }>();
   for (const item of items) {
     const group = item[by === "region" ? "region" : "mods"];
@@ -280,6 +301,9 @@ function grouped(items: Item[], by: Grouping): { group: Group; items: Item[] }[]
     entry.items.filter((item) => item.kind !== "touch").length;
   const worst = (entry: { items: Item[] }) =>
     Math.min(...entry.items.map((item) => RANK[item.kind]));
+  const left = (entry: { items: Item[] }) => entry.items.filter(open).length;
+  // Groups with nothing left to decide go last, either way.
+  const done = (entry: { items: Item[] }) => (left(entry) === 0 ? 1 : 0);
   return [...groups.values()]
     .map((entry) => ({
       ...entry,
@@ -293,6 +317,8 @@ function grouped(items: Item[], by: Grouping): { group: Group; items: Item[] }[]
     }))
     .sort(
       (a, b) =>
+        done(a) - done(b) ||
+        (sort === "open" ? left(b) - left(a) : 0) ||
         worst(a) - worst(b) ||
         serious(b) - serious(a) ||
         b.items.length - a.items.length ||
@@ -345,6 +371,15 @@ export function Collisions({
       value === "mods" || value === "region" ? value : null,
     ),
   );
+  const [sort, setSort] = useState<Sorting>(() =>
+    remembered<Sorting>("mallet.workSort", "open", (value) =>
+      value === "open" || value === "spots" ? value : null,
+    ),
+  );
+  const changeSort = (next: Sorting) => {
+    setSort(next);
+    remember("mallet.workSort", next);
+  };
   const changeBy = (next: Grouping) => {
     setBy(next);
     remember("mallet.workGroup", next);
@@ -374,13 +409,19 @@ export function Collisions({
       grouped(
         items.filter((item) => kinds.has(item.kind)),
         by,
+        sort,
+        (item) => decision(item) === undefined,
       ),
-    [items, kinds, by],
+    [items, kinds, by, sort, decision],
   );
   /** Every spot of the chosen kinds, in the order of the list. */
   const ordered = useMemo(() => groups.flatMap((entry) => entry.items), [groups]);
   const decidedCount = ordered.filter((item) => decision(item) !== undefined).length;
-  const shown = (item: Item) => !hideDecided || decision(item) === undefined;
+  // What the search looks for: places, mods, objects.
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const shown = (item: Item) =>
+    (!hideDecided || decision(item) === undefined) && (needle === "" || item.text.includes(needle));
 
   const byKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
   const passages = useMemo(() => {
@@ -557,6 +598,8 @@ export function Collisions({
         <ModPairs
           items={items}
           decision={decision}
+          sort={sort}
+          duels={report.duels}
           onDecideMods={decideMods}
           onShow={(item) => {
             changeBy("mods");
@@ -583,64 +626,89 @@ export function Collisions({
             />
           </span>
         </div>
-        <fieldset className="work-kinds" aria-label={t.mapCollisions}>
-          {WORK_KINDS.map((kind) => (
-            <label key={kind} className="control-check" title={t.spotKindHints[kind]}>
-              <input
-                type="checkbox"
-                checked={kinds.has(kind)}
-                onChange={(event) => {
-                  const next = new Set(kinds);
-                  if (event.target.checked) {
-                    next.add(kind);
-                  } else {
-                    next.delete(kind);
-                  }
-                  setKinds(next);
-                  remember("mallet.workKinds2", [...next].join(","));
-                }}
-              />
-              <PlaceIcon shape="circle" origin="spot" kind={kind} />
-              {t.spotKinds[kind]} <span className="aside">{counts[kind]}</span>
-            </label>
-          ))}
-        </fieldset>
-        <fieldset className="segmented" aria-label={t.workGroupBy}>
-          {(["region", "mods"] as const).map((grouping) => (
-            <button
-              type="button"
-              key={grouping}
-              aria-pressed={by === grouping}
-              onClick={() => changeBy(grouping)}
-            >
-              {grouping === "region" ? t.workByRegion : t.workByMods}
-            </button>
-          ))}
-        </fieldset>
-        <label className="control-check">
-          <input
-            type="checkbox"
-            checked={hideDecided}
-            onChange={(event) => {
-              setHideDecided(event.target.checked);
-              remember("mallet.workHideDecided", event.target.checked ? "on" : "off");
-            }}
-          />
-          {t.workHideDecided}
-        </label>
         <span className="spacer" />
         {toPatch}
       </div>
       <div className="work-bench">
-        <WorkList
-          groups={groups}
-          by={by}
-          current={current}
-          shown={shown}
-          decision={decision}
-          onPick={go}
-          onDecideMods={decideMods}
-        />
+        <div className="work-left">
+          <div className="work-filters">
+            <input
+              type="search"
+              className="work-search"
+              placeholder={t.workSearch}
+              aria-label={t.workSearch}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <fieldset className="work-kinds" aria-label={t.mapCollisions}>
+              {WORK_KINDS.map((kind) => (
+                <label key={kind} className="control-check" title={t.spotKindHints[kind]}>
+                  <input
+                    type="checkbox"
+                    checked={kinds.has(kind)}
+                    onChange={(event) => {
+                      const next = new Set(kinds);
+                      if (event.target.checked) {
+                        next.add(kind);
+                      } else {
+                        next.delete(kind);
+                      }
+                      setKinds(next);
+                      remember("mallet.workKinds2", [...next].join(","));
+                    }}
+                  />
+                  <PlaceIcon shape="circle" origin="spot" kind={kind} />
+                  {t.spotKinds[kind]} <span className="aside">{counts[kind]}</span>
+                </label>
+              ))}
+            </fieldset>
+            <fieldset className="segmented" aria-label={t.workGroupBy}>
+              {(["region", "mods"] as const).map((grouping) => (
+                <button
+                  type="button"
+                  key={grouping}
+                  aria-pressed={by === grouping}
+                  onClick={() => changeBy(grouping)}
+                >
+                  {grouping === "region" ? t.workByRegion : t.workByMods}
+                </button>
+              ))}
+            </fieldset>
+            <fieldset className="segmented" aria-label={t.workSortBy}>
+              {(["open", "spots"] as const).map((sorting) => (
+                <button
+                  type="button"
+                  key={sorting}
+                  aria-pressed={sort === sorting}
+                  onClick={() => changeSort(sorting)}
+                >
+                  {sorting === "open" ? t.workSortOpen : t.workSortSpots}
+                </button>
+              ))}
+            </fieldset>
+            <label className="control-check">
+              <input
+                type="checkbox"
+                checked={hideDecided}
+                onChange={(event) => {
+                  setHideDecided(event.target.checked);
+                  remember("mallet.workHideDecided", event.target.checked ? "on" : "off");
+                }}
+              />
+              {t.workHideDecided}
+            </label>
+          </div>
+          <WorkList
+            groups={groups}
+            by={by}
+            current={current}
+            shown={shown}
+            searching={needle !== ""}
+            decision={decision}
+            onPick={go}
+            onDecideMods={decideMods}
+          />
+        </div>
         <div className="work-stage">
           {current === null ? (
             <p className="empty">{t.workPickSpot}</p>
@@ -692,13 +760,24 @@ interface WorkListProps {
   by: Grouping;
   current: Item | null;
   shown: (item: Item) => boolean;
+  /** Whether a search is on: every group with a find is open. */
+  searching: boolean;
   decision: (item: Item) => string | null | undefined;
   onPick: (item: Item) => void;
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
 }
 
 /** The spots by group; the group of the current spot is open, others open on a click. */
-function WorkList({ groups, by, current, shown, decision, onPick, onDecideMods }: WorkListProps) {
+function WorkList({
+  groups,
+  by,
+  current,
+  shown,
+  searching,
+  decision,
+  onPick,
+  onDecideMods,
+}: WorkListProps) {
   const { t } = useSession();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const currentGroup = current === null ? null : current[by === "region" ? "region" : "mods"].key;
@@ -720,7 +799,7 @@ function WorkList({ groups, by, current, shown, decision, onPick, onDecideMods }
         if (visible.length === 0) {
           return null;
         }
-        const isOpen = open.has(group.key) || group.key === currentGroup;
+        const isOpen = searching || open.has(group.key) || group.key === currentGroup;
         const decided = items.filter((item) => decision(item) !== undefined).length;
         const kinds = WORK_KINDS.map((kind) => ({
           kind,
@@ -728,7 +807,11 @@ function WorkList({ groups, by, current, shown, decision, onPick, onDecideMods }
         })).filter((entry) => entry.count > 0);
         const pairs = by === "mods" ? (items[0]?.pairs ?? []) : [];
         return (
-          <section className="work-group" key={group.key}>
+          <section
+            className="work-group"
+            key={group.key}
+            data-done={decided === items.length || undefined}
+          >
             <button
               type="button"
               className="work-group-head"
@@ -909,106 +992,143 @@ function Spot(props: SpotProps) {
             {t.workNextOpen} »
           </button>
         </div>
-        <div className="work-choices">
-          {item.sides.map((side, at) => {
-            const name = side.parts.map((part) => part.name).join(", ");
-            const left = preview.has(side.plugin) || decided === side.plugin;
-            return (
-              <div className="work-side" key={side.plugin} data-left={left || undefined}>
-                <button
-                  type="button"
-                  className="work-eye"
-                  aria-pressed={preview.has(side.plugin)}
-                  title={t.workPreviewWithout(name)}
-                  aria-label={t.workPreviewWithout(name)}
-                  onClick={() => props.onPreview(side.plugin)}
-                >
-                  <Eye open={!left} />
-                </button>
-                <button
-                  type="button"
-                  className="work-choice"
-                  aria-pressed={decided === side.plugin}
-                  disabled={!side.hideable}
-                  title={side.hideable ? undefined : t.workCannotHide}
-                  onClick={() => props.onDecide(side.plugin)}
-                >
-                  <kbd>{at + 1}</kbd>
-                  <span className="work-choice-text">
-                    <strong className="work-choice-title">{t.workHide(name)}</strong>
-                    <span className="aside">
-                      {side.plugin}
-                      {side.suggested && <span className="suggested-mark">{t.patchSuggested}</span>}
-                    </span>
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-          <button
-            type="button"
-            className="work-choice"
-            aria-pressed={decided === null}
-            onClick={() => props.onDecide(null)}
-          >
-            <kbd>0</kbd>
-            <span className="work-choice-text">
-              <strong className="work-choice-title">{t.patchKeepBoth}</strong>
-            </span>
-          </button>
-          {props.ownChoice && (
-            <button type="button" className="small quiet" onClick={props.onUndecide}>
-              {t.workReset}
-            </button>
-          )}
-        </div>
-        {passage.length > 1 && (
-          <div className="work-line">
-            <span className="aside">{t.workPassage(passage.length)}</span>
-            {item.sides.map((side) => {
-              const extra = around.get(side.plugin.toLowerCase()) ?? [];
+        <div className="work-section">
+          <span className="work-section-label">{t.workScopeSpot}</span>
+          <div className="work-choices">
+            {item.sides.map((side, at) => {
+              const name = side.parts.map((part) => part.name).join(", ");
+              const left = preview.has(side.plugin) || decided === side.plugin;
               return (
-                <span key={side.plugin} className="work-line-group">
+                <div className="work-side" key={side.plugin} data-left={left || undefined}>
                   <button
                     type="button"
-                    className="small"
-                    disabled={!side.hideable}
-                    onClick={() => props.onDecidePassage(passage, side.plugin, [])}
+                    className="work-eye"
+                    aria-pressed={preview.has(side.plugin)}
+                    title={t.workPreviewWithout(name)}
+                    aria-label={t.workPreviewWithout(name)}
+                    onClick={() => props.onPreview(side.plugin)}
                   >
-                    {t.workPassageHide(side.plugin)}
+                    <Eye open={!left} />
                   </button>
-                  {extra.length > 0 && (
+                  <button
+                    type="button"
+                    className="work-choice"
+                    aria-pressed={decided === side.plugin}
+                    disabled={!side.hideable}
+                    title={side.hideable ? undefined : t.workCannotHide}
+                    onClick={() => props.onDecide(side.plugin)}
+                  >
+                    <kbd>{at + 1}</kbd>
+                    <span className="work-choice-text">
+                      <span className="work-choice-verb">
+                        {side.hideable ? t.workHideVerb : t.workNeeded}
+                      </span>
+                      <strong className="work-choice-title">{name}</strong>
+                      <span className="aside">
+                        {side.plugin}
+                        {side.suggested && (
+                          <span className="suggested-mark">{t.patchSuggested}</span>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              className="work-choice"
+              aria-pressed={decided === null}
+              onClick={() => props.onDecide(null)}
+            >
+              <kbd>0</kbd>
+              <span className="work-choice-text">
+                <span className="work-choice-verb">{t.workKeepVerb}</span>
+                <strong className="work-choice-title">{t.patchKeepBoth}</strong>
+              </span>
+            </button>
+            {props.ownChoice && (
+              <button type="button" className="small quiet" onClick={props.onUndecide}>
+                {t.workReset}
+              </button>
+            )}
+          </div>
+        </div>
+        {item.sides.some((side) => !side.hideable) && (
+          <div className="work-section">
+            <span className="work-section-label">{t.anchorWhy}</span>
+            <div className="needed-parts">
+              {item.sides
+                .filter((side) => !side.hideable)
+                .flatMap((side) => side.parts)
+                .map((part) => (
+                  <NeededPart
+                    key={`${part.object.plugin}:${part.object.localId}`}
+                    place={
+                      spot.location.type === "interior" ? spot.location.cell : spot.location.world
+                    }
+                    object={part.object}
+                    name={`${part.name} · ${part.object.plugin}`}
+                  />
+                ))}
+            </div>
+          </div>
+        )}
+        {item.sides.every((side) => !side.hideable) && (
+          <p className="work-note">{t.workBothNeeded}</p>
+        )}
+        {passage.length > 1 && (
+          <div className="work-section">
+            <span className="work-section-label">{t.workScopePassage(passage.length)}</span>
+            <div className="work-line">
+              {item.sides.map((side) => {
+                const extra = around.get(side.plugin.toLowerCase()) ?? [];
+                return (
+                  <span key={side.plugin} className="work-line-group">
                     <button
                       type="button"
                       className="small"
-                      onClick={() => props.onDecidePassage(passage, side.plugin, extra)}
+                      disabled={!side.hideable}
+                      onClick={() => props.onDecidePassage(passage, side.plugin, [])}
                     >
-                      {t.workPassageAll(side.plugin, extra.length)}
+                      {t.workPassageHide(side.plugin)}
                     </button>
-                  )}
-                </span>
-              );
-            })}
+                    {extra.length > 0 && (
+                      <button
+                        type="button"
+                        className="small"
+                        onClick={() => props.onDecidePassage(passage, side.plugin, extra)}
+                      >
+                        {t.workPassageAll(side.plugin, extra.length)}
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
         {first !== undefined && second !== undefined && pairSpots > 1 && (
-          <div className="work-line" data-many={pairSpots >= MANY || undefined}>
-            <span className="aside">
-              {pairSpots >= MANY
-                ? t.workPairMany(first.plugin, second.plugin, pairSpots)
-                : t.workPair(first.plugin, second.plugin, pairSpots)}
-            </span>
-            {modSides.map((side) => (
-              <button
-                type="button"
-                className="small"
-                key={side.plugin}
-                disabled={side.objects === 0}
-                onClick={() => props.onDecideMods(pairs, side.plugin)}
-              >
-                {t.workEverywhere(side.plugin)}
-              </button>
-            ))}
+          <div className="work-section" data-many={pairSpots >= MANY || undefined}>
+            <span className="work-section-label">{t.workScopePair(pairSpots)}</span>
+            <div className="work-line">
+              {pairSpots >= MANY && (
+                <span className="work-many">
+                  {t.workPairMany(first.plugin, second.plugin, pairSpots)}
+                </span>
+              )}
+              {modSides.map((side) => (
+                <button
+                  type="button"
+                  className="small"
+                  key={side.plugin}
+                  disabled={side.objects === 0}
+                  onClick={() => props.onDecideMods(pairs, side.plugin)}
+                >
+                  {t.workEverywhere(side.plugin)}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <div className="work-decision-foot">
@@ -1085,10 +1205,8 @@ function Stage({
   hiddenObjects,
   preview,
   marks,
-  choices,
   onPick,
   onDecide,
-  onObject,
   onArea,
 }: SpotProps & { onArea: (area: AreaObjects | null) => void }) {
   const { t } = useSession();
@@ -1126,7 +1244,7 @@ function Stage({
   const hiddenKeys = useMemo(() => new Set(hiddenObjects.map(keyOf)), [hiddenObjects]);
 
   // What can be done with an object picked in the view.
-  const extra = (object: AreaObject) => {
+  const extra = (object: AreaObject, group: AreaObject[]) => {
     const key = objectKey(object.id.plugin, object.id.localId);
     const part = parts.find(
       (candidate) => objectKey(candidate.object.plugin, candidate.object.localId) === key,
@@ -1144,30 +1262,37 @@ function Stage({
         <p className="aside relief-object-action">{t.workCannotHide}</p>
       );
     }
-    if (object.anchored) {
-      return <p className="aside relief-object-action">{t.workObjectLocked}</p>;
-    }
-    const own = objectChoiceKey(object.id) in choices;
-    const hidden = hiddenKeys.has(keyOf(object.id));
-    if (hidden && !own) {
-      return null;
-    }
     return (
-      <div className="relief-object-action">
-        {GAME_PLUGIN.test(object.id.plugin) && !own && (
-          <p className="aside relief-object-warning">{t.workObjectGame}</p>
-        )}
-        <button
-          type="button"
-          className={own ? "small" : "small primary"}
-          onClick={() => onObject(object.id, !own)}
-        >
-          {own ? t.workObjectShow : t.workObjectHide}
-        </button>
-      </div>
+      <FreeObjectActions
+        object={object}
+        group={group}
+        place={location.type === "interior" ? location.cell : location.world}
+        hiddenOtherwise={hiddenKeys.has(keyOf(object.id))}
+      />
     );
   };
 
+  if (location.type === "interior") {
+    return (
+      <InteriorView
+        key={location.cell}
+        cell={location.cell}
+        centre={item.spot.position ?? null}
+        focus={focus}
+        hidden={ghosts}
+        plain={!marks}
+        objectExtra={extra}
+        onArea={onArea}
+      >
+        {marks && (
+          <p className="work-legend">
+            <span className="work-legend-focus" /> {t.workThisSpot}
+            <span className="work-legend-ghost" /> {t.workGhost}
+          </p>
+        )}
+      </InteriorView>
+    );
+  }
   if (world === undefined || !world.terrain) {
     return (
       <div className="map-frame map-missing work-inside">
@@ -1219,12 +1344,54 @@ function Stage({
 interface ModPairsProps {
   items: Item[];
   decision: (item: Item) => string | null | undefined;
+  sort: Sorting;
+  /** The duels of the report, to tell where one was decided. */
+  duels: RenderedDuel[];
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
   onShow: (item: Item) => void;
 }
 
+/**
+ * What is decided for a pair of mods: on every spot the same mod hidden,
+ * and whether the duel of the two (ADR 0029) says the same.
+ */
+function PairVerdict({
+  findings,
+  spots,
+  decision,
+  duels,
+}: {
+  findings: Pair[];
+  spots: Item[];
+  decision: (item: Item) => string | null | undefined;
+  duels: RenderedDuel[];
+}) {
+  const { t, decisions } = useSession();
+  const losers = new Set(spots.map((item) => decision(item)));
+  const duel = duels.find((rendered) =>
+    findings.some((pair) => rendered.duel.findings.includes(pair.id)),
+  );
+  const duelWinner = duel === undefined ? undefined : decisions[duel.duel.id];
+  const [loser] = [...losers];
+  if (losers.size !== 1 || loser === undefined || loser === null) {
+    return duel !== undefined && duelWinner !== undefined ? (
+      <span className="work-verdict">
+        {t.workDuelWinner(duel.duel.sides[duelWinner === 0 ? 0 : 1].name)}
+      </span>
+    ) : null;
+  }
+  const winner = sidesOfMods(findings).find(
+    (side) => side.plugin.toLowerCase() !== loser.toLowerCase(),
+  );
+  return (
+    <span className="work-verdict" data-done="true">
+      {t.workWinsEverywhere(winner?.plugin ?? "")}
+    </span>
+  );
+}
+
 /** The pairs of mods whose objects collide, the most first, to decide as a whole. */
-function ModPairs({ items, decision, onDecideMods, onShow }: ModPairsProps) {
+function ModPairs({ items, decision, sort, duels, onDecideMods, onShow }: ModPairsProps) {
   const { t } = useSession();
   const pairs = useMemo(() => {
     const found = new Map<string, { key: string; pairs: Pair[]; items: Item[] }>();
@@ -1240,12 +1407,18 @@ function ModPairs({ items, decision, onDecideMods, onShow }: ModPairsProps) {
       entry.items.push(item);
       found.set(item.mods.key, entry);
     }
+    const left = (entry: { items: Item[] }) =>
+      entry.items.filter((item) => decision(item) === undefined).length;
+    const serious = (entry: { items: Item[] }) =>
+      entry.items.filter((item) => item.kind !== "touch").length;
     return [...found.values()].sort(
       (a, b) =>
-        b.items.filter((item) => item.kind !== "touch").length -
-          a.items.filter((item) => item.kind !== "touch").length || b.items.length - a.items.length,
+        (left(a) === 0 ? 1 : 0) - (left(b) === 0 ? 1 : 0) ||
+        (sort === "open" ? left(b) - left(a) : 0) ||
+        serious(b) - serious(a) ||
+        b.items.length - a.items.length,
     );
-  }, [items]);
+  }, [items, sort, decision]);
   if (pairs.length === 0) {
     return null;
   }
@@ -1262,9 +1435,14 @@ function ModPairs({ items, decision, onDecideMods, onShow }: ModPairsProps) {
           })).filter((entry) => entry.count > 0);
           const first = [...spots].sort((a, b) => RANK[a.kind] - RANK[b.kind])[0];
           return (
-            <li className="work-pair-row" key={key}>
+            <li
+              className="work-pair-row"
+              key={key}
+              data-done={decided === spots.length || undefined}
+            >
               <div className="work-pair-head">
                 <strong>{sides.map((side) => side.plugin).join(" × ")}</strong>
+                <PairVerdict findings={findings} spots={spots} decision={decision} duels={duels} />
                 <span className="work-group-counts">
                   {kinds.map(({ kind, count }) => (
                     <span

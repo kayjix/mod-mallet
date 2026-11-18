@@ -15,7 +15,7 @@
 //! again only when it changed.
 
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use mallet_core::facts::{ForeignMesh, MeshTextures};
@@ -88,26 +88,14 @@ pub fn read(game: Game, loose: &[(GamePath, PathBuf)], cache: &dyn TextCache) ->
             }
             entry
         };
-        if let (Some(native), Some(variant)) = (native, entry.variant)
-            && variant.bethesda_version != native
-        {
-            meshes.foreign.push(ForeignMesh {
-                path: path.clone(),
-                bethesda_version: variant.bethesda_version,
-                skinned: variant.skinned,
-            });
-        }
-        meshes.textures.push(MeshTextures {
-            path: path.clone(),
-            textures: entry.textures,
-        });
+        entry.add_to(&mut meshes, native, path, None);
     }
     meshes
 }
 
 /// What one mesh says about itself.
 #[derive(Debug, PartialEq, Eq)]
-struct Entry {
+pub(crate) struct Entry {
     /// Its variant, if its header could be read.
     variant: Option<nif::Variant>,
     /// Its surface textures.
@@ -120,13 +108,17 @@ impl Entry {
         let mut reader = BufReader::new(File::open(file).ok()?);
         let variant = read_variant(&mut reader);
         reader.seek(SeekFrom::Start(0)).ok()?;
-        let textures = nif::read_surface_textures(&mut reader).ok().map(|raw| {
-            // A slot that names a folder and only blanks names nothing.
-            game_paths(&raw)
-                .into_iter()
-                .filter(|path| !path.file_name().trim().is_empty())
-                .collect()
-        });
+        Self::new(variant, surface_textures(&mut reader))
+    }
+
+    /// The mesh whose whole file is `data`, as packed in an archive;
+    /// `None` if nothing in it can be read.
+    pub(crate) fn from_bytes(data: &[u8]) -> Option<Self> {
+        let variant = nif::variant(data).ok();
+        Self::new(variant, surface_textures(&mut Cursor::new(data)))
+    }
+
+    fn new(variant: Option<nif::Variant>, textures: Option<Vec<GamePath>>) -> Option<Self> {
         if variant.is_none() && textures.is_none() {
             return None;
         }
@@ -136,9 +128,36 @@ impl Entry {
         })
     }
 
+    /// Adds what this entry says about the mesh at `path`, packed in
+    /// `archive` if not loose, to `meshes`, for a game that reads the
+    /// variant `native`.
+    pub(crate) fn add_to(
+        self,
+        meshes: &mut LooseMeshes,
+        native: Option<u32>,
+        path: &GamePath,
+        archive: Option<&GamePath>,
+    ) {
+        if let (Some(native), Some(variant)) = (native, self.variant)
+            && variant.bethesda_version != native
+        {
+            meshes.foreign.push(ForeignMesh {
+                path: path.clone(),
+                archive: archive.cloned(),
+                bethesda_version: variant.bethesda_version,
+                skinned: variant.skinned,
+            });
+        }
+        meshes.textures.push(MeshTextures {
+            path: path.clone(),
+            archive: archive.cloned(),
+            textures: self.textures,
+        });
+    }
+
     /// The entry as kept in the cache: the variant on the first line
     /// (`-` if unknown), then one texture per line.
-    fn to_text(&self) -> String {
+    pub(crate) fn to_text(&self) -> String {
         let variant = self.variant.map_or_else(
             || "-".to_owned(),
             |variant| format!("{} {}", variant.bethesda_version, u8::from(variant.skinned)),
@@ -150,7 +169,7 @@ impl Entry {
     }
 
     /// The entry from the cache; `None` if the text is not one.
-    fn from_text(text: &str) -> Option<Self> {
+    pub(crate) fn from_text(text: &str) -> Option<Self> {
         let mut lines = text.lines();
         let first = lines.next()?;
         let variant = if first == "-" {
@@ -167,6 +186,18 @@ impl Entry {
             textures: lines.map(GamePath::new).collect(),
         })
     }
+}
+
+/// The colour and normal maps of the mesh `reader` is at the start of, by
+/// game path. A slot that names a folder and only blanks names nothing.
+fn surface_textures<R: Read + Seek>(reader: &mut R) -> Option<Vec<GamePath>> {
+    let raw = nif::read_surface_textures(reader).ok()?;
+    Some(
+        game_paths(&raw)
+            .into_iter()
+            .filter(|path| !path.file_name().trim().is_empty())
+            .collect(),
+    )
 }
 
 /// The variant of the mesh `reader` is at the start of, reading no more of
@@ -248,6 +279,7 @@ mod tests {
             meshes.foreign,
             vec![ForeignMesh {
                 path: GamePath::new("data/meshes/old.nif"),
+                archive: None,
                 bethesda_version: 83,
                 skinned: false,
             }]
@@ -261,10 +293,12 @@ mod tests {
             vec![
                 MeshTextures {
                     path: GamePath::new("data/meshes/old.nif"),
+                    archive: None,
                     textures: wall.clone(),
                 },
                 MeshTextures {
                     path: GamePath::new("data/meshes/new.nif"),
+                    archive: None,
                     textures: wall,
                 },
             ]

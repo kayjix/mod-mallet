@@ -15,6 +15,7 @@
 //! [`run_action`], and only when the user asks for them.
 
 mod actions;
+mod anchors;
 mod area;
 mod installers;
 mod knowledge;
@@ -36,7 +37,7 @@ use mallet_core::{
     Facts, GameInfo, GamePath, InstalledPatch, LocationOrigin, LocationRole, ModInfo, ModSource,
     NoCache, NoModSource, ScanLocation, ScanReport, TextCache, report,
 };
-use mallet_game_bethesda::{Game, ingest, locate, skse_log};
+use mallet_game_bethesda::{Game, crash_logs, ingest, locate, skse_log};
 use mallet_source_vortex::{VortexDeployment, VortexError};
 use mallet_store::{Store, StoreError};
 
@@ -44,7 +45,8 @@ pub use actions::{
     CreatedPatch, ManagerLink, ManagerOptions, create_patch, install_manager_link, manager_link,
     patch_file, run_action,
 };
-pub use area::{area_land, area_mesh, area_objects, area_texture};
+pub use anchors::object_anchors;
+pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects};
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
@@ -436,6 +438,11 @@ fn gather_facts(
             locate::extender_log(game, Some(game_dir)).map(|path| (path, LocationOrigin::Standard))
         }
     };
+    // Crash loggers write next to the script extender's log.
+    let extender_dir = log_path
+        .as_ref()
+        .and_then(|(path, _)| path.parent())
+        .map(Path::to_path_buf);
     let extender = match log_path {
         Some((path, origin)) => {
             let text = read_if_exists(&path)?;
@@ -455,6 +462,7 @@ fn gather_facts(
 
     let mut facts = Facts {
         extender,
+        crashes: read_crash_logs(extender_dir.as_deref(), game_dir, locations),
         ..Facts::default()
     };
     // Without a load order there is nothing to say about plugins and
@@ -578,6 +586,32 @@ fn without_removed_plugins(mut report: ExtenderReport, game_dir: &Path) -> Exten
         present
     });
     report
+}
+
+/// Reads the recent reports of the crash loggers, which write next to the
+/// script extender's log in `extender_dir` and below `game_dir`, and notes
+/// each of their folders that exists among the places looked at.
+fn read_crash_logs(
+    extender_dir: Option<&Path>,
+    game_dir: &Path,
+    locations: &mut Vec<ScanLocation>,
+) -> mallet_core::facts::CrashFacts {
+    let folders = crash_logs::folders(extender_dir, game_dir);
+    for (folder, _) in folders.iter().filter(|(folder, _)| folder.is_dir()) {
+        locations.push(ScanLocation {
+            role: LocationRole::CrashLogs,
+            path: folder.display().to_string(),
+            origin: LocationOrigin::Standard,
+            found: true,
+        });
+    }
+    let crashes = crash_logs::read(&folders, std::time::SystemTime::now());
+    tracing::info!(
+        reports = crashes.logs.len(),
+        days = crashes.window_days,
+        "read crash reports"
+    );
+    crashes
 }
 
 fn read_if_exists(path: &Path) -> Result<Option<String>, EngineError> {

@@ -3,21 +3,38 @@
 // docks, floors and paths stand on the land the game has rather than on
 // the coarse level of detail.
 //
-// The ground is coloured with the land texture of the game's level of
-// detail; where a block has none, with the land's own vertex colours.
+// The ground is painted as the game paints it (ADR 0047): each quarter of
+// a cell has a base texture and layers over it, each showing as much as
+// its opacity at the quarter's 17 × 17 points says, all of it tinted by
+// the land's vertex colours. The textures are kept in one texture array;
+// the opacities of a quarter in two small textures of four layers each.
+// Until a quarter's base texture is there, it is coloured with the land
+// texture of the game's level of detail, or else with the vertex colours.
 
 import type { Api } from "./api";
-import type { AreaLand, LandCell } from "./generated/area-land";
+import type { AreaLand, LandCell, LandQuarter } from "./generated/area-land";
 import type { LodMesh } from "./generated/lod-mesh";
 import { type Mat4, program } from "./gl";
 import { CELL } from "./map-places";
 
 /** Points per side of a cell's grid. */
 const GRID = 33;
+/** Points per side of a quarter of a cell. */
+const QUARTER = 17;
 /** Game units between two points of the grid. */
 const STEP = CELL / (GRID - 1);
-/** The largest side of a block's land texture. */
+/** The largest side of a block's land texture of the level of detail. */
 const TEXTURE_SIDE = 1024;
+/** The side of every ground texture in the array. */
+const GROUND_SIDE = 512;
+/** How many ground textures the array holds. */
+const GROUND_SLOTS = 32;
+/** The most layers drawn over the base of one quarter. */
+const MAX_LAYERS = 8;
+/** How often a ground texture repeats along the side of a cell. */
+const TILES_PER_CELL = 6;
+/** Indices of the triangles of one quarter. */
+const QUARTER_INDICES = (QUARTER - 1) * (QUARTER - 1) * 6;
 
 const VERTEX = `#version 300 es
 in vec3 a_position;
@@ -28,11 +45,13 @@ uniform float u_exaggeration;
 uniform vec3 u_uvU;
 uniform vec3 u_uvV;
 out vec2 v_uv;
+out vec2 v_cells;
 out vec3 v_normal;
 out vec3 v_colour;
 void main() {
   vec3 at = vec3(a_position.xy / ${CELL}.0, 1.0);
   v_uv = vec2(dot(u_uvU, at), dot(u_uvV, at));
+  v_cells = at.xy;
   v_normal = a_normal;
   v_colour = a_colour;
   gl_Position = u_matrix * vec4(at.xy, a_position.z / ${CELL}.0 * u_exaggeration, 1.0);
@@ -40,15 +59,47 @@ void main() {
 
 const FRAGMENT = `#version 300 es
 precision highp float;
+precision highp sampler2DArray;
 in vec2 v_uv;
+in vec2 v_cells;
 in vec3 v_normal;
 in vec3 v_colour;
 uniform sampler2D u_texture;
 uniform bool u_hasTexture;
+uniform sampler2DArray u_ground;
+uniform sampler2D u_opacityA;
+uniform sampler2D u_opacityB;
+uniform int u_base;
+uniform int u_layers[${MAX_LAYERS}];
+uniform int u_count;
+uniform vec2 u_corner;
 out vec4 colour;
 void main() {
-  // Without a texture: a plain earth, tinted as the land's own colours say.
-  vec3 base = u_hasTexture ? texture(u_texture, v_uv).rgb : vec3(0.42, 0.4, 0.33) * v_colour;
+  vec3 base;
+  if (u_base >= 0) {
+    // As the game paints it: the base, each layer over it as far as its
+    // opacity at the nearest points says, tinted by the vertex colours.
+    vec2 uv = v_cells * ${TILES_PER_CELL}.0;
+    vec2 at = ((v_cells - u_corner) * ${GRID - 1}.0 + 0.5) / ${QUARTER}.0;
+    vec4 a = texture(u_opacityA, at);
+    vec4 b = texture(u_opacityB, at);
+    float opacity[8] = float[8](a.r, a.g, a.b, a.a, b.r, b.g, b.b, b.a);
+    vec3 painted = texture(u_ground, vec3(uv, float(u_base))).rgb;
+    for (int i = 0; i < ${MAX_LAYERS}; i++) {
+      if (i >= u_count) {
+        break;
+      }
+      if (u_layers[i] >= 0) {
+        painted = mix(painted, texture(u_ground, vec3(uv, float(u_layers[i]))).rgb, opacity[i]);
+      }
+    }
+    base = painted * v_colour;
+  } else if (u_hasTexture) {
+    base = texture(u_texture, v_uv).rgb;
+  } else {
+    // A plain earth, tinted as the land's own colours say.
+    base = vec3(0.42, 0.4, 0.33) * v_colour;
+  }
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float facing = max(dot(normalize(v_normal), light), 0.0);
   // Lit as the level of detail's land is, so that the two meet unseen.
@@ -66,12 +117,21 @@ interface Mapping {
   v: [number, number, number];
 }
 
+/** One quarter of a cell's ground: its textures and their opacities. */
+interface DrawnQuarter {
+  base: string | null;
+  layers: string[];
+  opacityA: WebGLTexture;
+  opacityB: WebGLTexture;
+}
+
 /** One cell's ground in graphics memory. */
 interface Drawn {
   x: number;
   y: number;
   vao: WebGLVertexArrayObject;
   buffers: WebGLBuffer[];
+  quarters: DrawnQuarter[];
 }
 
 /** A block of the level of detail by its finest level and corner. */
@@ -167,33 +227,76 @@ export function mappingOf(mesh: LodMesh): Mapping | null {
   return null;
 }
 
-/** The two triangles of every square of a cell's grid. */
+/** Where the quarters of a cell start, in points: south-west, south-east, north-west, north-east. */
+const QUARTER_CORNERS: [number, number][] = [
+  [0, 0],
+  [QUARTER - 1, 0],
+  [0, QUARTER - 1],
+  [QUARTER - 1, QUARTER - 1],
+];
+
+/** The two triangles of every square of a cell's grid, quarter by quarter. */
 function gridIndices(): Uint16Array {
-  const indices = new Uint16Array((GRID - 1) * (GRID - 1) * 6);
+  const indices = new Uint16Array(QUARTER_INDICES * QUARTER_CORNERS.length);
   let at = 0;
-  for (let row = 0; row + 1 < GRID; row++) {
-    for (let column = 0; column + 1 < GRID; column++) {
-      const a = row * GRID + column;
-      const b = a + 1;
-      const c = a + GRID;
-      const d = c + 1;
-      indices.set([a, b, d, a, d, c], at);
-      at += 6;
+  for (const [left, bottom] of QUARTER_CORNERS) {
+    for (let row = bottom; row < bottom + QUARTER - 1; row++) {
+      for (let column = left; column < left + QUARTER - 1; column++) {
+        const a = row * GRID + column;
+        const b = a + 1;
+        const c = a + GRID;
+        const d = c + 1;
+        indices.set([a, b, d, a, d, c], at);
+        at += 6;
+      }
     }
   }
   return indices;
 }
 
+/**
+ * The opacities of up to four layers of a quarter as one texture of
+ * 17 × 17 points, a layer in each channel.
+ */
+function opacityTexture(
+  gl: WebGL2RenderingContext,
+  quarter: LandQuarter | undefined,
+  first: number,
+): WebGLTexture {
+  const pixels = new Uint8Array(QUARTER * QUARTER * 4);
+  for (let channel = 0; channel < 4; channel++) {
+    const layer = quarter?.layers[first + channel];
+    if (layer === undefined) {
+      continue;
+    }
+    const opacity = new Uint8Array(bytesOf(layer.opacity));
+    for (let point = 0; point < QUARTER * QUARTER; point++) {
+      pixels[point * 4 + channel] = opacity[point] ?? 0;
+    }
+  }
+  const made = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, made);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, QUARTER, QUARTER, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return made;
+}
+
 export class LandLayer {
   private readonly program: WebGLProgram;
   private readonly indices: WebGLBuffer;
-  private readonly count = (GRID - 1) * (GRID - 1) * 6;
   private drawn: Drawn[] = [];
   /** The cells (west, south, east, north edges) the ground covers. */
   private rect: [number, number, number, number] | null = null;
   private blocks: Promise<Block[]> | null = null;
   private readonly mappings = new Map<string, Mapping | "loading" | "missing">();
   private readonly textures = new Map<string, WebGLTexture | "loading" | "missing">();
+  /** The ground textures, one per slot of the array. */
+  private readonly ground: WebGLTexture;
+  /** Where each ground texture is: its slot, or being fetched, or not to be had. */
+  private readonly slots = new Map<string, number | "loading" | "missing">();
   private asked = 0;
   private disposed = false;
 
@@ -208,6 +311,15 @@ export class LandLayer {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gridIndices(), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    this.ground = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.ground);
+    const levels = Math.floor(Math.log2(GROUND_SIDE)) + 1;
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, levels, gl.RGBA8, GROUND_SIDE, GROUND_SIDE, GROUND_SLOTS);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
   }
 
   /**
@@ -259,8 +371,23 @@ export class LandLayer {
       this.drawn.length === 0
         ? null
         : [Math.min(...xs), Math.min(...ys), Math.max(...xs) + 1, Math.max(...ys) + 1];
+    // The ground textures, the most used first, so that the array holds
+    // those that matter most.
+    const uses = new Map<string, number>();
     for (const cell of this.drawn) {
       void this.mapping(cell.x, cell.y);
+      for (const quarter of cell.quarters) {
+        for (const path of [quarter.base, ...quarter.layers]) {
+          if (path !== null) {
+            uses.set(path, (uses.get(path) ?? 0) + 1);
+          }
+        }
+      }
+    }
+    const wanted = [...uses.entries()].sort((a, b) => b[1] - a[1]).map(([path]) => path);
+    this.release(new Set(wanted));
+    for (const path of wanted) {
+      this.slot(path);
     }
     this.changed();
   }
@@ -315,7 +442,94 @@ export class LandLayer {
     }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indices);
     gl.bindVertexArray(null);
-    return { x: cell.x, y: cell.y, vao, buffers };
+    const quarters = QUARTER_CORNERS.map((_, index) => {
+      const quarter = cell.quarters?.[index];
+      return {
+        base: quarter?.base ?? null,
+        layers: (quarter?.layers ?? []).slice(0, MAX_LAYERS).map((layer) => layer.texture),
+        opacityA: opacityTexture(gl, quarter, 0),
+        opacityB: opacityTexture(gl, quarter, 4),
+      };
+    });
+    return { x: cell.x, y: cell.y, vao, buffers, quarters };
+  }
+
+  /** Frees the slots of ground textures that are not `wanted`. */
+  private release(wanted: Set<string>) {
+    for (const [path, slot] of [...this.slots]) {
+      if (!wanted.has(path) && slot !== "loading") {
+        this.slots.delete(path);
+      }
+    }
+  }
+
+  /** The slot of a ground texture, fetched the first time it is asked for. */
+  private slot(path: string): number | null {
+    const known = this.slots.get(path);
+    if (typeof known === "number") {
+      return known;
+    }
+    if (known !== undefined) {
+      return null;
+    }
+    const taken = new Set([...this.slots.values()].filter((slot) => typeof slot === "number"));
+    const loading = [...this.slots.values()].filter((slot) => slot === "loading").length;
+    if (taken.size + loading >= GROUND_SLOTS) {
+      // The array is full: drawn with its quarter's base or without.
+      return null;
+    }
+    this.slots.set(path, "loading");
+    this.api
+      .areaTexture(path, GROUND_SIDE)
+      .then((url) => {
+        if (url === null || this.disposed) {
+          this.slots.set(path, "missing");
+          return;
+        }
+        const image = new Image();
+        image.onload = () => {
+          if (this.disposed) {
+            return;
+          }
+          const used = new Set([...this.slots.values()].filter((slot) => typeof slot === "number"));
+          let free = 0;
+          while (used.has(free)) {
+            free += 1;
+          }
+          if (free >= GROUND_SLOTS) {
+            this.slots.delete(path);
+            return;
+          }
+          // Every texture of the array has the same size.
+          const square = document.createElement("canvas");
+          square.width = GROUND_SIDE;
+          square.height = GROUND_SIDE;
+          square.getContext("2d")?.drawImage(image, 0, 0, GROUND_SIDE, GROUND_SIDE);
+          const { gl } = this;
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.ground);
+          gl.texSubImage3D(
+            gl.TEXTURE_2D_ARRAY,
+            0,
+            0,
+            0,
+            free,
+            GROUND_SIDE,
+            GROUND_SIDE,
+            1,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            square,
+          );
+          gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+          this.slots.set(path, free);
+          this.changed();
+        };
+        image.onerror = () => this.slots.set(path, "missing");
+        image.src = url;
+      })
+      .catch(() => this.slots.set(path, "missing"));
+    return null;
   }
 
   /** The finest block of level of detail with land around each cell. */
@@ -425,23 +639,51 @@ export class LandLayer {
     gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
     gl.uniform1f(at("u_exaggeration"), exaggeration);
     gl.uniform1i(at("u_texture"), 0);
+    gl.uniform1i(at("u_ground"), 1);
+    gl.uniform1i(at("u_opacityA"), 2);
+    gl.uniform1i(at("u_opacityB"), 3);
     // Without colours of its own, the land is untinted.
     const colour = gl.getAttribLocation(this.program, "a_colour");
     if (colour >= 0) {
       gl.vertexAttrib3f(colour, 1, 1, 1);
     }
-    gl.activeTexture(gl.TEXTURE0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.ground);
+    const layers = at("u_layers");
+    const slotOf = (path: string | null) => (path === null ? -1 : (this.slot(path) ?? -1));
     for (const cell of this.drawn) {
       const mapping = this.knownMapping(cell.x, cell.y);
       const texture = mapping === null ? null : this.texture(mapping.texture);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(at("u_hasTexture"), texture === null ? 0 : 1);
       gl.uniform3fv(at("u_uvU"), mapping?.u ?? [0, 0, 0]);
       gl.uniform3fv(at("u_uvV"), mapping?.v ?? [0, 0, 0]);
       gl.bindVertexArray(cell.vao);
-      gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
+      cell.quarters.forEach((quarter, index) => {
+        const [left, bottom] = QUARTER_CORNERS[index] ?? [0, 0];
+        const slots = new Int32Array(MAX_LAYERS).fill(-1);
+        quarter.layers.forEach((path, layer) => {
+          slots[layer] = slotOf(path);
+        });
+        gl.uniform1i(at("u_base"), slotOf(quarter.base));
+        gl.uniform1iv(layers, slots);
+        gl.uniform1i(at("u_count"), quarter.layers.length);
+        gl.uniform2f(at("u_corner"), cell.x + left / (GRID - 1), cell.y + bottom / (GRID - 1));
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, quarter.opacityA);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, quarter.opacityB);
+        gl.drawElements(
+          gl.TRIANGLES,
+          QUARTER_INDICES,
+          gl.UNSIGNED_SHORT,
+          index * QUARTER_INDICES * 2,
+        );
+      });
     }
     gl.bindVertexArray(null);
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   private free() {
@@ -450,6 +692,10 @@ export class LandLayer {
       gl.deleteVertexArray(cell.vao);
       for (const buffer of cell.buffers) {
         gl.deleteBuffer(buffer);
+      }
+      for (const quarter of cell.quarters) {
+        gl.deleteTexture(quarter.opacityA);
+        gl.deleteTexture(quarter.opacityB);
       }
     }
     this.drawn = [];
@@ -467,6 +713,8 @@ export class LandLayer {
       }
     }
     this.textures.clear();
+    this.slots.clear();
+    gl.deleteTexture(this.ground);
     gl.deleteBuffer(this.indices);
     gl.deleteProgram(this.program);
   }

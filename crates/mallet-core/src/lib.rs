@@ -16,6 +16,7 @@
 //! without touching the analyses.
 
 pub mod action;
+pub mod anchors;
 pub mod cache;
 pub mod duel;
 pub mod encoding;

@@ -271,6 +271,8 @@ interface Model {
   surfaces: Surface[] | "loading" | "missing";
   /** The middle of its points, in its own units, to pick it by. */
   centre: [number, number, number];
+  /** Half the diagonal of the box around its points, in its own units. */
+  radius: number;
   /** Its objects: one matrix and one look each, in one buffer. */
   instances: WebGLBuffer | null;
   count: number;
@@ -287,7 +289,7 @@ export class AreaLayer {
   private running = 0;
   private disposed = false;
   private instances: Instance[] = [];
-  private selected: string | null = null;
+  private selected = new Set<string>();
   /** The objects shown, as last set. */
   area: AreaObjects | null = null;
 
@@ -337,12 +339,63 @@ export class AreaLayer {
     }
   }
 
-  /** Picks the object with `key` (see {@link objectKey}), or none. */
-  select(key: string | null) {
-    this.selected = key;
+  /** Picks the objects with `keys` (see {@link objectKey}), or none. */
+  select(keys: string[]) {
+    this.selected = new Set(keys);
     for (const model of this.models.keys()) {
       this.place(model);
     }
+  }
+
+  /**
+   * The objects placed by the same plugin as `object` that hang together
+   * with it: each touches another of them (their models' spheres meet), as
+   * far as the area shows them. A bridge or a scaffold built of parts.
+   */
+  connected(object: AreaObject): AreaObject[] {
+    const plugin = object.id.plugin.toLowerCase();
+    const candidates = this.instances
+      .filter((instance) => instance.object.id.plugin.toLowerCase() === plugin)
+      .map((instance) => {
+        const model = this.models.get(instance.object.model);
+        const [x, y, z] = model?.centre ?? [0, 0, 0];
+        const m = instance.matrix;
+        const at = (row: number) =>
+          (m[row] ?? 0) * x + (m[4 + row] ?? 0) * y + (m[8 + row] ?? 0) * z + (m[12 + row] ?? 0);
+        return {
+          object: instance.object,
+          centre: [at(0), at(1), at(2)],
+          radius: (model?.radius ?? 0) * instance.object.scale,
+        };
+      });
+    const start = candidates.find(
+      (candidate) =>
+        candidate.object.id.plugin === object.id.plugin &&
+        candidate.object.id.localId === object.id.localId,
+    );
+    if (start === undefined) {
+      return [object];
+    }
+    const found = [start];
+    const left = new Set(candidates.filter((candidate) => candidate !== start));
+    for (let index = 0; index < found.length; index += 1) {
+      const from = found[index];
+      if (from === undefined) {
+        break;
+      }
+      for (const other of [...left]) {
+        const distance = Math.hypot(
+          (from.centre[0] ?? 0) - (other.centre[0] ?? 0),
+          (from.centre[1] ?? 0) - (other.centre[1] ?? 0),
+          (from.centre[2] ?? 0) - (other.centre[2] ?? 0),
+        );
+        if (distance <= (from.radius + other.radius) * 0.8) {
+          found.push(other);
+          left.delete(other);
+        }
+      }
+    }
+    return found.map((candidate) => candidate.object);
   }
 
   /** How many of the area's models are there, of how many. */
@@ -389,6 +442,7 @@ export class AreaLayer {
       const model: Model = {
         surfaces: "loading",
         centre: [0, 0, 0],
+        radius: 0,
         instances: null,
         count: 0,
         own: [],
@@ -429,7 +483,7 @@ export class AreaLayer {
     own.forEach((instance, index) => {
       data.set(instance.matrix, index * 17);
       const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-      data[index * 17 + 16] = key === this.selected ? LOOK.selected : instance.look;
+      data[index * 17 + 16] = this.selected.has(key) ? LOOK.selected : instance.look;
     });
     if (model.instances === null) {
       model.instances = gl.createBuffer();
@@ -462,6 +516,8 @@ export class AreaLayer {
     const { gl } = this;
     let sum = [0, 0, 0];
     let points = 0;
+    const low = [Infinity, Infinity, Infinity];
+    const high = [-Infinity, -Infinity, -Infinity];
     model.surfaces = mesh.shapes.flatMap((shape) => {
       const positions = new Float32Array(bytesOf(shape.positions));
       const indices = new Uint32Array(bytesOf(shape.indices));
@@ -475,6 +531,11 @@ export class AreaLayer {
           (sum[2] ?? 0) + (positions[index + 2] ?? 0),
         ];
         points += 1;
+        for (let axis = 0; axis < 3; axis += 1) {
+          const value = positions[index + axis] ?? 0;
+          low[axis] = Math.min(low[axis] ?? 0, value);
+          high[axis] = Math.max(high[axis] ?? 0, value);
+        }
       }
       const uvs =
         shape.uvs === ""
@@ -514,6 +575,12 @@ export class AreaLayer {
     });
     if (points > 0) {
       model.centre = [(sum[0] ?? 0) / points, (sum[1] ?? 0) / points, (sum[2] ?? 0) / points];
+      model.radius =
+        Math.hypot(
+          (high[0] ?? 0) - (low[0] ?? 0),
+          (high[1] ?? 0) - (low[1] ?? 0),
+          (high[2] ?? 0) - (low[2] ?? 0),
+        ) / 2;
     }
   }
 

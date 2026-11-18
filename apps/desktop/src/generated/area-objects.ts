@@ -2,11 +2,13 @@
 
 /**
  * Everything placed around a point of a worldspace, as the game shows
- * it, for looking at the place closely (ADR 0038).
+ * it, for looking at the place closely (ADR 0038); or everything placed
+ * in one interior cell (ADR 0042).
  */
 export interface AreaObjects {
   /**
-   * The point, in game units.
+   * The point, in game units; for an interior cell, the middle of what
+   * is placed in it.
    *
    * @minItems 2
    * @maxItems 2
@@ -21,7 +23,8 @@ export interface AreaObjects {
    */
   radius: number;
   /**
-   * The worldspace, by its internal name.
+   * The worldspace, by its internal name; for an interior cell, the
+   * cell's editor ID.
    */
   world: string;
 }

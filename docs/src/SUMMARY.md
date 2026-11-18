@@ -6,6 +6,7 @@
 
 - [Vision and non-goals](product/vision.md)
 - [Roadmap](product/roadmap.md)
+- [The journey through the app](product/journey.md)
 - [Glossary](product/glossary.md)
 
 # Architecture
@@ -55,6 +56,13 @@
   - [0039 Collisions are checked with the models, and touches count](adr/0039-collisions-checked-with-the-models.md)
   - [0040 Collisions as a worklist, decided spot by spot](adr/0040-collisions-as-a-worklist.md)
   - [0041 The game's own ground up close](adr/0041-the-games-own-ground-up-close.md)
+  - [0042 Interiors in 3D](adr/0042-interiors-in-3d.md)
+  - [0043 Suggestions about whole mods](adr/0043-suggestions-about-whole-mods.md)
+  - [0044 Crash reports point at suspects, with honest confidence](adr/0044-crash-reports-point-at-suspects.md)
+  - [0045 A health score, and tasks by what to do](adr/0045-a-health-score-and-tasks-by-what-to-do.md)
+  - [0046 Why the game relies on an object, and when it may be hidden all the same](adr/0046-why-the-game-relies-on-an-object.md)
+  - [0047 The ground painted as the game paints it](adr/0047-the-ground-painted-as-the-game-paints-it.md)
+  - [0048 One job per page, and a home for each thing](adr/0048-one-job-per-page.md)
   - [Template](adr/template.md)
 
 # Reference

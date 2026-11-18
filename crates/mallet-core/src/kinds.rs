@@ -184,20 +184,24 @@ pub const OBJECTS_TOUCHING: KindInfo = KindInfo {
     args: &["first", "second", "count", "examples"],
 };
 
-/// Loose meshes of a mod are in the format of another game or of another
-/// edition of this one.
+/// Meshes of a mod are in the format of another game or of another edition
+/// of this one. A note and a hint: many such meshes work, and well-kept
+/// mods ship hundreds of them; they are a lead when something crashes or
+/// stays invisible.
 pub const MESHES_MADE_FOR_OTHER_GAME: KindInfo = KindInfo {
     id: "meshes.made-for-other-game",
-    severity: Severity::Warning,
-    confidence: Confidence::Likely,
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
     args: &["count", "skinned", "madeFor", "examples"],
 };
 
-/// Loose meshes of a mod name textures that nothing in the game provides.
+/// Meshes of a mod name textures that nothing in the game provides. A
+/// hint: a mesh that is shown looks wrong, but a mod may bring meshes the
+/// game never shows.
 pub const MESHES_TEXTURE_MISSING: KindInfo = KindInfo {
     id: "meshes.texture-missing",
     severity: Severity::Warning,
-    confidence: Confidence::Likely,
+    confidence: Confidence::Hint,
     args: &["meshes", "count", "examples"],
 };
 
@@ -276,6 +280,31 @@ pub const NAVMESHES_DOOR_CUT_OFF: KindInfo = KindInfo {
     args: &["winner", "loser", "count", "places"],
 };
 
+/// The recent crash reports, summed up.
+pub const CRASHES_RECENT: KindInfo = KindInfo {
+    id: "crashes.recent",
+    severity: Severity::Info,
+    confidence: Confidence::Certain,
+    args: &["count", "days", "last", "examples"],
+};
+
+/// Recent crashes happened inside a program file that a mod brings.
+pub const CRASHES_IN_DLL: KindInfo = KindInfo {
+    id: "crashes.in-dll",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["file", "count", "last"],
+};
+
+/// Crash reports name records, meshes or program files of a mod near the
+/// crash.
+pub const CRASHES_MOD_INVOLVED: KindInfo = KindInfo {
+    id: "crashes.mod-involved",
+    severity: Severity::Warning,
+    confidence: Confidence::Hint,
+    args: &["count", "last", "examples"],
+};
+
 /// Every kind, in the order the reference documentation lists them.
 pub const ALL: &[KindInfo] = &[
     EXTENDER_PLUGIN_INCOMPATIBLE,
@@ -303,8 +332,51 @@ pub const ALL: &[KindInfo] = &[
     ASSETS_LOOSE_OVER_ARCHIVE,
     ASSETS_ARCHIVE_OVER_ARCHIVE,
     SETUP_FILE_UNREADABLE,
+    CRASHES_IN_DLL,
+    CRASHES_MOD_INVOLVED,
+    CRASHES_RECENT,
     SETUP_LOAD_ORDER_UNKNOWN,
+    MODS_COLLIDES_WIDELY,
+    MODS_MOSTLY_OVERRIDDEN,
+    MODS_DUPLICATES_ANOTHER,
 ];
+
+/// A mod whose placed objects collide with many spots of other mods: a
+/// suggestion to remove it, or to let it lose against them everywhere
+/// (ADR 0043).
+pub const MODS_COLLIDES_WIDELY: KindInfo = KindInfo {
+    id: "mods.collides-widely",
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
+    args: &["mod", "count", "modCount", "others", "objects", "total"],
+};
+
+/// A mod most of whose content does not reach the game, because mods
+/// loaded later replace it: a suggestion to remove it (ADR 0043).
+pub const MODS_MOSTLY_OVERRIDDEN: KindInfo = KindInfo {
+    id: "mods.mostly-overridden",
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
+    args: &["mod", "total", "surviving", "percent", "overriders"],
+};
+
+/// A mod whose placed objects another mod places as well, largely at the
+/// same places: a suggestion to keep only one of the two (ADR 0043).
+pub const MODS_DUPLICATES_ANOTHER: KindInfo = KindInfo {
+    id: "mods.duplicates-another",
+    severity: Severity::Info,
+    confidence: Confidence::Hint,
+    args: &[
+        "mod",
+        "other",
+        "count",
+        "total",
+        "patchCount",
+        "patches",
+        "otherPatchCount",
+        "otherPatches",
+    ],
+};
 
 /// Looks a kind up by its identifier.
 pub fn find(id: &str) -> Option<&'static KindInfo> {

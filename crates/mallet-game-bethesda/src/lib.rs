@@ -21,15 +21,20 @@
 //! Parts that touch the system:
 //!
 //! * [`locate`] finds the games and their files on this machine.
+//! * [`anchors`] finds what ties placed objects to the game (ADR 0046).
 //! * [`ingest`] reads the load order, the data directory, the archives,
 //!   the plugins, and the meshes that exist both loose and in an archive.
 
+pub mod anchors;
 mod archive;
+mod archive_meshes;
 pub mod archives;
 pub mod area;
+pub mod crash_logs;
 pub mod files;
 pub mod game;
 pub mod ingest;
+pub mod land_textures;
 pub mod locate;
 pub mod lod;
 pub mod lod_library;

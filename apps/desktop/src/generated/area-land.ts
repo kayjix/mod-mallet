@@ -31,6 +31,11 @@ export interface LandCell {
    */
   heights: string;
   /**
+   * The textures of its four quarters, south-west, south-east,
+   * north-west, north-east (ADR 0047); empty where the land names none.
+   */
+  quarters?: LandQuarter[];
+  /**
    * The cell's column.
    */
   x: number;
@@ -38,4 +43,35 @@ export interface LandCell {
    * The cell's row.
    */
   y: number;
+}
+/**
+ * The textures of one quarter of a cell, as the game paints it: a base
+ * and layers over it, each showing as much as its opacity at each point
+ * says (ADR 0047).
+ */
+export interface LandQuarter {
+  /**
+   * The colour texture underneath, below the data directory, if any.
+   */
+  base?: string | null;
+  /**
+   * The layers over it, the lowest first.
+   */
+  layers: LandTextureLayer[];
+}
+/**
+ * One layer of texture on a quarter of a cell.
+ */
+export interface LandTextureLayer {
+  /**
+   * How much of it shows at each of the 17 × 17 points of the quarter,
+   * one byte each (0 to 255), the southern row first, each from west to
+   * east; Base64-encoded. The quarter's points are the cell's, from its
+   * corner to its middle.
+   */
+  opacity: string;
+  /**
+   * The colour texture, below the data directory.
+   */
+  texture: string;
 }

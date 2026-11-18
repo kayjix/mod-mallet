@@ -567,6 +567,7 @@ impl Messages {
             LocationRole::Unpacker => "location-unpacker",
             LocationRole::DeploymentManifest => "location-deployment-manifest",
             LocationRole::Masterlist => "location-masterlist",
+            LocationRole::CrashLogs => "location-crash-logs",
         };
         let origin = match location.origin {
             LocationOrigin::Given => "origin-given",

@@ -93,6 +93,11 @@
           "description": "The list of community-maintained rules about plugins, the LOOT\nmasterlist.",
           "type": "string",
           "const": "masterlist"
+        },
+        {
+          "description": "A folder crash loggers write their reports to.",
+          "type": "string",
+          "const": "crash-logs"
         }
       ]
     },

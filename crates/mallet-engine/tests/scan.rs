@@ -11,7 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use mallet_core::{ArgValue, Finding, ScanReport, Severity, kinds};
+use mallet_core::{ArgValue, Finding, LocationRole, ScanReport, Severity, kinds};
 use mallet_engine::{EngineError, ScanOptions, last_report, scan, scan_and_store};
 use mallet_formats_bethesda::fixture::{self, RecordSpec};
 
@@ -1004,5 +1004,28 @@ fn without_a_named_masterlist_a_scan_of_named_files_reads_none() {
             .locations
             .iter()
             .all(|location| location.role != mallet_core::LocationRole::Masterlist)
+    );
+}
+
+#[test]
+fn a_crash_report_next_to_the_extender_log_is_read() {
+    let setup = Setup::new();
+    let folder = setup.log_path().parent().unwrap().to_path_buf();
+    fs::write(
+        folder.join("crash-2026-01-02-03-04-05.log"),
+        "Unhandled exception \"EXCEPTION_ACCESS_VIOLATION\" at 0x7FFD00001234 Made Up.dll+0001234\n",
+    )
+    .unwrap();
+    let report = scan(&setup.options()).unwrap();
+
+    let summary = only(&report, "crashes.recent");
+    assert_eq!(summary.args["count"], ArgValue::Number(1));
+    let in_dll = only(&report, "crashes.in-dll");
+    assert_eq!(in_dll.args["file"], ArgValue::from("Made Up.dll"));
+    assert!(
+        report
+            .locations
+            .iter()
+            .any(|location| location.role == LocationRole::CrashLogs)
     );
 }

@@ -1,6 +1,6 @@
 # 0040 Collisions as a worklist, decided spot by spot
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects can be hidden on their own
 - Date: 2026-11-17
 - Changes: ADR 0025 (what the patch hides is chosen per collision finding),
   ADR 0023 and ADR 0038 (the order in which a placed object is turned)
@@ -65,6 +65,11 @@ and decided where it is. Trying that on a real setup showed more:
    itself are offered with a warning that a quest may need them. The
    installed patch is read back the same way: what no collision names was
    hidden on its own. The patch view lists such objects to show again.
+   A picked object also finds the parts of the same plugin that hang
+   together with it (their models' spheres meet, as far as the area
+   shows them, a bridge built of planks and posts); they can be marked
+   and hidden at once. The map's 3D view offers the same, and a part of a
+   collision opens on the collisions' page.
 7. **The order of turning**: a placed object is turned clockwise about
    the world's z, then y, then x. The 3D view and the comparison of
    models (ADR 0039) use the same order.
@@ -83,5 +88,5 @@ and decided where it is. Trying that on a real setup showed more:
   in the worklist; its finding stays on the second tab.
 - What counts as "around a passage" depends on the area read in 3D; the
   button appears once it is read.
-- The choices live in the window until the patch is installed; the
-  installed patch is read back.
+- The choices are kept per game; what the installed patch hides counts
+  as decided as well, and a choice kept since wins over it.

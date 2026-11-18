@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AreaObjects",
-  "description": "Everything placed around a point of a worldspace, as the game shows\nit, for looking at the place closely (ADR 0038).",
+  "description": "Everything placed around a point of a worldspace, as the game shows\nit, for looking at the place closely (ADR 0038); or everything placed\nin one interior cell (ADR 0042).",
   "type": "object",
   "properties": {
     "centre": {
-      "description": "The point, in game units.",
+      "description": "The point, in game units; for an interior cell, the middle of what\nis placed in it.",
       "type": "array",
       "items": {
         "type": "number",
@@ -27,7 +27,7 @@
       "format": "float"
     },
     "world": {
-      "description": "The worldspace, by its internal name.",
+      "description": "The worldspace, by its internal name; for an interior cell, the\ncell's editor ID.",
       "type": "string"
     }
   },

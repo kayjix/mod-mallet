@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use mallet_core::{Finding, GamePath, ModRef, Subject, kinds};
 
-use crate::{Analysis, Context, examples};
+use crate::{Analysis, Context, examples, is_used};
 
 /// How many textures a finding names.
 const EXAMPLE_LIMIT: usize = 5;
@@ -33,6 +33,10 @@ impl Analysis for MissingTextures {
     fn run(&self, context: &Context<'_>) -> Vec<Finding> {
         let mut by_mod: BTreeMap<Option<ModRef>, Missing<'_>> = BTreeMap::new();
         for mesh in &context.facts.mesh_textures {
+            let archive = mesh.archive.as_ref();
+            if !is_used(context, &mesh.path, archive) {
+                continue;
+            }
             let missing: Vec<&GamePath> = mesh
                 .textures
                 .iter()
@@ -42,7 +46,7 @@ impl Analysis for MissingTextures {
                 continue;
             }
             let entry = by_mod
-                .entry(context.mods.provider_of(&mesh.path))
+                .entry(context.mods.provider_of(archive.unwrap_or(&mesh.path)))
                 .or_default();
             entry.meshes.insert(&mesh.path);
             entry.textures.extend(missing);
@@ -91,6 +95,7 @@ mod tests {
     fn mesh(path: &str, textures: &[&str]) -> MeshTextures {
         MeshTextures {
             path: GamePath::new(path),
+            archive: None,
             textures: textures
                 .iter()
                 .map(|texture| GamePath::new(texture))
@@ -136,7 +141,7 @@ mod tests {
             panic!("expected one finding, got {found:?}");
         };
         assert_eq!(finding.severity, Severity::Warning);
-        assert_eq!(finding.confidence, Confidence::Likely);
+        assert_eq!(finding.confidence, Confidence::Hint);
         assert_eq!(finding.id.as_str(), "meshes.texture-missing:mod:test:Farm");
         assert_eq!(finding.args["meshes"], ArgValue::Number(2));
         assert_eq!(finding.args["count"], ArgValue::Number(1));

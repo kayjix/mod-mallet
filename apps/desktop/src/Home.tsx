@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
-import type { Counts } from "./arrange";
+import { type Counts, openTaskCount } from "./arrange";
 import { type Games, isPlayable } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
-
-type Target = "tasks" | "collisions" | "mods" | "patch";
+import { type Health, healthOf, type Target } from "./health";
+import { useOverviewTexts } from "./overview-texts";
+import "./overview.css";
 
 interface HomeProps {
   games: Games;
@@ -20,8 +21,9 @@ interface HomeProps {
  * the games Mod Mallet knows, with a button for each one that is installed. Pictures of the games come from the mod
  * manager's installation on this machine; Mod Mallet ships none.
  */
-export function Home({ games, report, counts, scanning, onScan, onOpen }: HomeProps) {
-  const { t, api } = useSession();
+export function Home({ games, report, scanning, onScan, onOpen }: HomeProps) {
+  const { t, api, ignored, patchChoices } = useSession();
+  const o = useOverviewTexts();
   const [art, setArt] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -46,17 +48,25 @@ export function Home({ games, report, counts, scanning, onScan, onOpen }: HomePr
   const hero = activeId === undefined ? undefined : art[activeId];
   const known = new Map((games.choice?.games ?? []).map((game) => [game.id, game]));
   const installed = report?.installedPatch?.objects.length;
+  const health = useMemo(
+    () => (report === null ? null : healthOf(report, ignored, patchChoices)),
+    [report, ignored, patchChoices],
+  );
   const stats: { target: Target; value: string; label: string }[] =
-    counts === null || report === null
+    report === null || health === null
       ? []
       : [
           {
             target: "tasks",
-            value: String(counts.errors + counts.warnings),
-            label: t.homeOpenTasks,
+            value: String(openTaskCount(report.findings, ignored)),
+            label: o.statTasks,
           },
-          { target: "collisions", value: String(counts.collisions), label: t.homeCollisions },
-          { target: "mods", value: String(report.mods.length), label: t.homeMods },
+          { target: "collisions", value: String(health.spots.open), label: o.statSpots },
+          {
+            target: "mods",
+            value: `${report.mods.filter((info) => info.enabled).length} / ${report.mods.length}`,
+            label: o.statMods,
+          },
           {
             target: "patch",
             value: installed === undefined ? "–" : String(installed),
@@ -92,6 +102,14 @@ export function Home({ games, report, counts, scanning, onScan, onOpen }: HomePr
           </div>
         </div>
       </section>
+
+      {health === null ? (
+        <section className="panel health-empty">
+          <p className="aside">{o.noScanYet}</p>
+        </section>
+      ) : (
+        <HealthPanel health={health} onOpen={onOpen} />
+      )}
 
       {stats.length > 0 && (
         <div className="home-stats">
@@ -162,6 +180,100 @@ export function Home({ games, report, counts, scanning, onScan, onOpen }: HomePr
           })}
         </ul>
       </section>
+    </div>
+  );
+}
+
+/** How many reasons the home page names. */
+const REASON_LIMIT = 4;
+
+/**
+ * The health of the setup: a verdict in words, a score, and the few
+ * reasons that lower it most, each with the way to where it is dealt with.
+ */
+function HealthPanel({ health, onOpen }: { health: Health; onOpen: (view: Target) => void }) {
+  const o = useOverviewTexts();
+  const reasons = health.reasons.slice(0, REASON_LIMIT);
+  const notes = [
+    health.incomplete ? o.incomplete : null,
+    health.setAside > 0 ? o.setAside(health.setAside) : null,
+    health.advice > 0 ? o.adviceNotCounted(health.advice) : null,
+  ].filter((note): note is string => note !== null);
+
+  return (
+    <section className="panel health" data-verdict={health.verdict}>
+      <div className="health-verdict">
+        <ScoreRing score={health.score} />
+        <div className="health-words">
+          <span className="aside">{o.healthTitle}</span>
+          <h2>{o.verdict[health.verdict]}</h2>
+          <p>{o.verdictNote[health.verdict]}</p>
+        </div>
+      </div>
+      <div className="health-reasons">
+        <h3>{o.reasonsTitle}</h3>
+        {reasons.length === 0 ? (
+          <p className="aside">{o.nothingLowers}</p>
+        ) : (
+          <ul>
+            {reasons.map((reason) => (
+              <li key={reason.key} className="health-reason" data-impact={reason.impact}>
+                <span className="impact-chip" data-impact={reason.impact}>
+                  {o.impact[reason.impact]}
+                </span>
+                <span className="health-reason-text">
+                  {reason.kind === "open-spots"
+                    ? o.reasonOpenSpots(reason.count)
+                    : reason.kind === "waiting-spots"
+                      ? o.reasonWaitingSpots(reason.count)
+                      : o.reasonFindings(reason.title, reason.count)}
+                </span>
+                <span className="health-points">{o.points(Math.round(reason.points))}</span>
+                <button type="button" className="small" onClick={() => onOpen(reason.target)}>
+                  {o.go[reason.target]}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {notes.length > 0 && (
+          <p className="aside health-notes">
+            {notes.map((note) => (
+              <span key={note}>{note}</span>
+            ))}
+          </p>
+        )}
+        <details className="health-how">
+          <summary className="more">{o.howCounted}</summary>
+          <p className="aside">{o.howCountedText}</p>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+/** The score as a ring that fills up to it. */
+function ScoreRing({ score }: { score: number }) {
+  const o = useOverviewTexts();
+  const radius = 42;
+  const length = 2 * Math.PI * radius;
+  return (
+    <div className="score-ring" role="img" aria-label={`${score} ${o.scoreOf}`}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle className="score-track" cx="50" cy="50" r={radius} />
+        <circle
+          className="score-fill"
+          cx="50"
+          cy="50"
+          r={radius}
+          strokeDasharray={`${(length * score) / 100} ${length}`}
+          transform="rotate(-90 50 50)"
+        />
+      </svg>
+      <span className="score-value">
+        <strong>{score}</strong>
+        <span>{o.scoreOf}</span>
+      </span>
     </div>
   );
 }

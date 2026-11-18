@@ -237,11 +237,11 @@ meshes-made-for-other-game = Meshes of a mod were made for another game
            *[other] { $count } meshes of this mod are
         } in the format of { $madeFor }, not of the game you play{ $skinned ->
             [0] .
-            [one] . One of them bends with a skeleton, like clothes or armour, which is the kind most likely to crash the game.
-           *[other] . { $skinned } of them bend with a skeleton, like clothes or armour, which is the kind most likely to crash the game.
+            [one] . One of them bends with a skeleton, like clothes or armour. If something crashes or stays invisible, look at that one first.
+           *[other] . { $skinned } of them bend with a skeleton, like clothes or armour. If something crashes or stays invisible, look at these first.
         } For example: { $examples }.
-    .explanation = A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
-    .remedy = Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
+    .explanation = A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were, and many well-kept mods still ship such meshes. Most of them work. Some do not: then the thing they belong to stays invisible, looks wrong, or the game closes when it appears, most often with clothes, armour and creatures, which bend with a skeleton. This note is a lead for when something like that happens, not a sign that it will.
+    .remedy = Nothing to do while the game runs well. If something of this mod crashes the game or stays invisible, look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
 
 meshes-texture-missing = Meshes of a mod use textures that are not in the game
     .headline =
@@ -337,3 +337,79 @@ setup-load-order-unknown = The load order could not be read
     .summary = Plugins and archives were not checked: { $reason }
     .explanation = Mod Mallet needs to know which plugins are active and in which order the game loads them. Without that it cannot tell which files and records win, so those checks did not run. The other checks are not affected.
     .remedy = Start the game or your mod manager once so that the list of plugins is written, then scan again. If the game is installed in an unusual place, tell Mod Mallet where it is.
+
+crashes-recent = The game crashed recently
+    .headline =
+        { $count ->
+            [one] 1 crash
+           *[other] { $count } crashes
+        } in the last { $days } days, last on { $last }
+    .summary =
+        A crash logger recorded { $count ->
+            [one] one crash
+           *[other] { $count } crashes
+        } of the game in the last { $days } days, the last on { $last }. Where the game failed: { $examples }.
+    .explanation = A crash logger is a small addition to the script extender that writes a report every time the game crashes. The report says in which program file the game failed and lists what was nearby: characters, objects, meshes and the mods they come from. Reading it is a matter of likelihood, not certainty. Mod Mallet looks at the reports of the last weeks and says which mods they point at; a crash inside the game itself with nothing of a mod nearby is counted but not blamed on anyone.
+    .remedy = Look at the other findings about crashes, if there are any. If the game crashes at one place again and again, note what you were doing; that helps whoever looks into it.
+
+crashes-in-dll = The game crashed inside a mod's program file
+    .headline =
+        { $file }: { $count ->
+            [one] 1 recent crash
+           *[other] { $count } recent crashes
+        } happened inside it
+    .summary =
+        { $count ->
+            [one] One recent crash, on { $last }, happened
+           *[other] { $count } recent crashes, the last on { $last }, happened
+        } inside { $file }, a program file that a mod adds to the script extender.
+    .explanation = Some mods bring a program file of their own, a DLL that the script extender loads into the game. When the game crashes while running that file's code, the file is the most likely cause: it may not fit the game's version, clash with another such file, or have a bug. It is not certain: the file may also have been handed broken data by something else.
+    .remedy = Look on the mod's page for an update and for known problems with your game version. If the crashes go on, disable the mod for a while and see whether they stop.
+
+crashes-mod-involved = Recent crash reports point at a mod
+    .headline =
+        { $count ->
+            [one] 1 crash report points
+           *[other] { $count } crash reports point
+        } at this mod
+    .summary =
+        { $count ->
+            [one] One recent crash report, from { $last }, names
+           *[other] { $count } recent crash reports, the last from { $last }, name
+        } things of this mod near the crash: { $examples }.
+    .explanation = Crash reports list what was in use when the game failed: characters, objects, meshes, and program files on the way to the crash. When things of one mod turn up there, the mod may be involved, for example through a broken mesh or a character with an odd setup. It may also just have been close by, especially when the crash happened in a busy place. The more reports point at the same mod, the more likely it is involved.
+    .remedy = If several reports point at this mod, look on its page for known crashes and patches. To be sure, disable it for a while, or avoid the place or thing named above, and see whether the crashes stop.
+mods-collides-widely = Suggestion: a mod collides with many places of other mods
+    .headline =
+        Suggestion: { $mod } collides with other mods in { $count ->
+            [one] 1 place
+           *[other] { $count } places
+        }
+    .summary =
+        { $objects } of the { $total } objects { $mod } puts into the world stand in or against objects of { $modCount ->
+            [one] another mod
+           *[other] { $modCount } other mods
+        }, in { $count } places: { $others }. The number after each mod is how many places it shares with { $mod }.
+    .explanation = This is only a suggestion; nothing is broken. Two mods that change the same part of the world without knowing of each other put their buildings, trees and fences where the other already has something. A few such places are normal and are listed one by one under collisions. When one mod collides this often, it and the other mods were probably not made to be used together.
+    .remedy = Decide which version of these places you prefer. If it is the other mods', you can switch the mod off in your mod manager, or keep it and, in the list of collisions, let it lose against the other mods in every place at once. If you like the mod, keep it, and look on its page for a patch that makes it work with the other mods.
+
+mods-mostly-overridden = Suggestion: hardly anything of a mod reaches the game
+    .headline = Suggestion: only { $percent } % of { $mod } reaches the game
+    .summary = Of the { $total } parts of { $mod } that Mod Mallet compared, only { $surviving } reach the game. Mods loaded later replace the rest: { $overriders }. The number after each is how many parts it replaces.
+    .explanation = This is only a suggestion; nothing is broken. When two mods change the same thing, the game uses the version of the mod it loads later. Mod Mallet compared the objects the mod places, the characters it changes, and the files in its archives. A mod can bring other things as well, such as quests, items or scripts, which are not counted here.
+    .remedy = If you do not miss anything from the mod in the game, you can switch it off in your mod manager; that makes the setup simpler and loads faster. Before you do, check its page: some mods are needed by others, and those would then stop working. If you prefer the version of the mod, place its plugin after the mods named above.
+
+mods-duplicates-another = Suggestion: a mod places largely the same objects as another
+    .headline = Suggestion: keep { $mod } or { $other }, not both
+    .summary =
+        { $count } of the { $total } objects { $mod } puts into the world are placed by { $other } as well, the same model at the same place. { $patchCount ->
+            [0] No other mod is made for { $mod } alone.
+            [one] One plugin is made for { $mod } alone: { $patches }.
+           *[other] { $patchCount } plugins are made for { $mod } alone: { $patches }.
+        } { $otherPatchCount ->
+            [0] No other mod is made for { $other } alone.
+            [one] One plugin is made for { $other } alone: { $otherPatches }.
+           *[other] { $otherPatchCount } plugins are made for { $other } alone: { $otherPatches }.
+        }
+    .explanation = This is only a suggestion; nothing is broken. Collections ("all in one") often contain mods that are also offered on their own, and two mods can rebuild the same place in the same way. With both installed, the same buildings stand twice in the same spot and their surfaces flicker. A plugin made for one of the two, such as a compatibility patch, only works with that one, which is a good reason to keep it.
+    .remedy = Keep the one you prefer and switch the other off in your mod manager; prefer the one the patches you use are made for. Before you switch one off, check whether it brings something the other lacks, such as an interior: then keep both, and in the list of collisions let one of them lose in every place at once.

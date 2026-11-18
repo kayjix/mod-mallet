@@ -94,13 +94,16 @@ pub struct LodShape {
 }
 
 /// Everything placed around a point of a worldspace, as the game shows
-/// it, for looking at the place closely (ADR 0038).
+/// it, for looking at the place closely (ADR 0038); or everything placed
+/// in one interior cell (ADR 0042).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AreaObjects {
-    /// The worldspace, by its internal name.
+    /// The worldspace, by its internal name; for an interior cell, the
+    /// cell's editor ID.
     pub world: String,
-    /// The point, in game units.
+    /// The point, in game units; for an interior cell, the middle of what
+    /// is placed in it.
     pub centre: [f32; 2],
     /// How far around the point, in game units, in each direction.
     pub radius: f32,
@@ -160,4 +163,33 @@ pub struct LandCell {
     /// The colours of the same points, three bytes (red, green, blue)
     /// each, or empty.
     pub colours: String,
+    /// The textures of its four quarters, south-west, south-east,
+    /// north-west, north-east (ADR 0047); empty where the land names none.
+    #[serde(default)]
+    pub quarters: Vec<LandQuarter>,
+}
+
+/// The textures of one quarter of a cell, as the game paints it: a base
+/// and layers over it, each showing as much as its opacity at each point
+/// says (ADR 0047).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LandQuarter {
+    /// The colour texture underneath, below the data directory, if any.
+    pub base: Option<String>,
+    /// The layers over it, the lowest first.
+    pub layers: Vec<LandTextureLayer>,
+}
+
+/// One layer of texture on a quarter of a cell.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LandTextureLayer {
+    /// The colour texture, below the data directory.
+    pub texture: String,
+    /// How much of it shows at each of the 17 × 17 points of the quarter,
+    /// one byte each (0 to 255), the southern row first, each from west to
+    /// east; Base64-encoded. The quarter's points are the cell's, from its
+    /// corner to its middle.
+    pub opacity: String,
 }

@@ -25,13 +25,19 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `objects.touching` | Note | hint | Objects of two mods cut into each other |
 | `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
-| `meshes.made-for-other-game` | Warning | likely | Meshes of a mod were made for another game |
-| `meshes.texture-missing` | Warning | likely | Meshes of a mod use textures that are not in the game |
+| `meshes.made-for-other-game` | Note | hint | Meshes of a mod were made for another game |
+| `meshes.texture-missing` | Warning | hint | Meshes of a mod use textures that are not in the game |
 | `meshes.retexture-bypassed` | Warning | likely | A texture mod does not reach replaced meshes |
 | `assets.loose-over-archive` | Note | certain | Loose files cover files in another mod's archive |
 | `assets.archive-over-archive` | Note | certain | An archive covers files in another mod's archive |
 | `setup.file-unreadable` | Warning | certain | A file of the setup could not be read |
+| `crashes.in-dll` | Warning | likely | The game crashed inside a mod's program file |
+| `crashes.mod-involved` | Warning | hint | Recent crash reports point at a mod |
+| `crashes.recent` | Note | certain | The game crashed recently |
 | `setup.load-order-unknown` | Warning | certain | The load order could not be read |
+| `mods.collides-widely` | Note | hint | Suggestion: a mod collides with many places of other mods |
+| `mods.mostly-overridden` | Note | hint | Suggestion: hardly anything of a mod reaches the game |
+| `mods.duplicates-another` | Note | hint | Suggestion: a mod places largely the same objects as another |
 
 ## extender.plugin-incompatible
 
@@ -265,20 +271,20 @@ The game keeps an invisible net on the ground of every place, which characters u
 
 **Meshes of a mod were made for another game**
 
-- Severity: Warning
-- Confidence: likely
+- Severity: Note
+- Confidence: hint
 - Message arguments: `count`, `skinned`, `madeFor`, `examples`
 
-A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were. Objects that stand still often still show, sometimes with wrong lighting or without collision. Clothes, armour, bodies and creatures, which bend with a skeleton, usually make the game crash as soon as they appear, or stay invisible.
+A mesh is the 3D shape of a thing in the game. Each game, and each edition of a game, reads meshes in its own variant of the format. Mods for the original Skyrim of 2011 often reached Skyrim Special Edition with some meshes left as they were, and many well-kept mods still ship such meshes. Most of them work. Some do not: then the thing they belong to stays invisible, looks wrong, or the game closes when it appears, most often with clothes, armour and creatures, which bend with a skeleton. This note is a lead for when something like that happens, not a sign that it will.
 
-**What to do:** Look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
+**What to do:** Nothing to do while the game runs well. If something of this mod crashes the game or stays invisible, look on the mod's page for a version made for your game and install that instead. If there is none, the meshes can be converted with Cathedral Assets Optimizer, a free tool made for exactly this; then install the converted files as a mod of their own that overwrites this one.
 
 ## meshes.texture-missing
 
 **Meshes of a mod use textures that are not in the game**
 
 - Severity: Warning
-- Confidence: likely
+- Confidence: hint
 - Message arguments: `meshes`, `count`, `examples`
 
 A mesh is the 3D shape of a thing; its colour and the fine detail of its surface come from textures, separate image files that the mesh names. If a named texture is not there, the game draws the surface in a glaring purple, or dark and flat where the surface detail is missing. This usually means that a part of the mod was not installed, for example its textures in a separate download, or that the mod was made to go with another mod you do not have. Meshes a mod installs for a mod you do not use are never shown, so their missing textures do no harm.
@@ -333,6 +339,42 @@ Mod Mallet skipped this file, so problems that involve it are not reported. If t
 
 **What to do:** Reinstall the mod the file belongs to. If the game works with the file and Mod Mallet does not, please report it.
 
+## crashes.in-dll
+
+**The game crashed inside a mod's program file**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `file`, `count`, `last`
+
+Some mods bring a program file of their own, a DLL that the script extender loads into the game. When the game crashes while running that file's code, the file is the most likely cause: it may not fit the game's version, clash with another such file, or have a bug. It is not certain: the file may also have been handed broken data by something else.
+
+**What to do:** Look on the mod's page for an update and for known problems with your game version. If the crashes go on, disable the mod for a while and see whether they stop.
+
+## crashes.mod-involved
+
+**Recent crash reports point at a mod**
+
+- Severity: Warning
+- Confidence: hint
+- Message arguments: `count`, `last`, `examples`
+
+Crash reports list what was in use when the game failed: characters, objects, meshes, and program files on the way to the crash. When things of one mod turn up there, the mod may be involved, for example through a broken mesh or a character with an odd setup. It may also just have been close by, especially when the crash happened in a busy place. The more reports point at the same mod, the more likely it is involved.
+
+**What to do:** If several reports point at this mod, look on its page for known crashes and patches. To be sure, disable it for a while, or avoid the place or thing named above, and see whether the crashes stop.
+
+## crashes.recent
+
+**The game crashed recently**
+
+- Severity: Note
+- Confidence: certain
+- Message arguments: `count`, `days`, `last`, `examples`
+
+A crash logger is a small addition to the script extender that writes a report every time the game crashes. The report says in which program file the game failed and lists what was nearby: characters, objects, meshes and the mods they come from. Reading it is a matter of likelihood, not certainty. Mod Mallet looks at the reports of the last weeks and says which mods they point at; a crash inside the game itself with nothing of a mod nearby is counted but not blamed on anyone.
+
+**What to do:** Look at the other findings about crashes, if there are any. If the game crashes at one place again and again, note what you were doing; that helps whoever looks into it.
+
 ## setup.load-order-unknown
 
 **The load order could not be read**
@@ -344,3 +386,39 @@ Mod Mallet skipped this file, so problems that involve it are not reported. If t
 Mod Mallet needs to know which plugins are active and in which order the game loads them. Without that it cannot tell which files and records win, so those checks did not run. The other checks are not affected.
 
 **What to do:** Start the game or your mod manager once so that the list of plugins is written, then scan again. If the game is installed in an unusual place, tell Mod Mallet where it is.
+
+## mods.collides-widely
+
+**Suggestion: a mod collides with many places of other mods**
+
+- Severity: Note
+- Confidence: hint
+- Message arguments: `mod`, `count`, `modCount`, `others`, `objects`, `total`
+
+This is only a suggestion; nothing is broken. Two mods that change the same part of the world without knowing of each other put their buildings, trees and fences where the other already has something. A few such places are normal and are listed one by one under collisions. When one mod collides this often, it and the other mods were probably not made to be used together.
+
+**What to do:** Decide which version of these places you prefer. If it is the other mods', you can switch the mod off in your mod manager, or keep it and, in the list of collisions, let it lose against the other mods in every place at once. If you like the mod, keep it, and look on its page for a patch that makes it work with the other mods.
+
+## mods.mostly-overridden
+
+**Suggestion: hardly anything of a mod reaches the game**
+
+- Severity: Note
+- Confidence: hint
+- Message arguments: `mod`, `total`, `surviving`, `percent`, `overriders`
+
+This is only a suggestion; nothing is broken. When two mods change the same thing, the game uses the version of the mod it loads later. Mod Mallet compared the objects the mod places, the characters it changes, and the files in its archives. A mod can bring other things as well, such as quests, items or scripts, which are not counted here.
+
+**What to do:** If you do not miss anything from the mod in the game, you can switch it off in your mod manager; that makes the setup simpler and loads faster. Before you do, check its page: some mods are needed by others, and those would then stop working. If you prefer the version of the mod, place its plugin after the mods named above.
+
+## mods.duplicates-another
+
+**Suggestion: a mod places largely the same objects as another**
+
+- Severity: Note
+- Confidence: hint
+- Message arguments: `mod`, `other`, `count`, `total`, `patchCount`, `patches`, `otherPatchCount`, `otherPatches`
+
+This is only a suggestion; nothing is broken. Collections ("all in one") often contain mods that are also offered on their own, and two mods can rebuild the same place in the same way. With both installed, the same buildings stand twice in the same spot and their surfaces flicker. A plugin made for one of the two, such as a compatibility patch, only works with that one, which is a good reason to keep it.
+
+**What to do:** Keep the one you prefer and switch the other off in your mod manager; prefer the one the patches you use are made for. Before you switch one off, check whether it brings something the other lacks, such as an interior: then keep both, and in the list of collisions let one of them lose in every place at once.

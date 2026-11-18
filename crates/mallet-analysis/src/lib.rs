@@ -21,6 +21,7 @@ pub(crate) fn offer_disabling(finding: mallet_core::Finding) -> mallet_core::Fin
 
 pub mod assets;
 mod contact;
+pub mod crashes;
 pub mod duels;
 pub mod extender;
 pub mod faces;
@@ -35,6 +36,7 @@ pub mod missing_textures;
 pub mod navmeshes;
 pub mod objects;
 mod places;
+pub mod recommendations;
 pub mod setup;
 
 use std::cell::OnceCell;
@@ -100,6 +102,10 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(objects::PlacedObjects),
         Box::new(navmeshes::NavmeshConflicts),
         Box::new(assets::ArchiveOverrides),
+        Box::new(crashes::RecentCrashes),
+        Box::new(recommendations::WideCollisions),
+        Box::new(recommendations::MostlyOverridden),
+        Box::new(recommendations::DuplicateMods),
     ]
 }
 
@@ -113,6 +119,27 @@ pub fn run_all(context: &Context<'_>) -> Vec<Finding> {
     findings
         .sort_by(|a, b| (a.severity, a.confidence, &a.id).cmp(&(b.severity, b.confidence, &b.id)));
     findings
+}
+
+/// Whether the game takes the file at `path` from where it was read: the
+/// loose file if `archive` is `None`, that archive otherwise. A file in an
+/// archive that a loose file or a later archive covers is never used.
+fn is_used(
+    context: &Context<'_>,
+    path: &mallet_core::GamePath,
+    archive: Option<&mallet_core::GamePath>,
+) -> bool {
+    let Some(archive) = archive else {
+        return true;
+    };
+    match context.assets.source(path) {
+        Some(AssetSource::Archive(index)) => context
+            .facts
+            .archives
+            .get(index)
+            .is_some_and(|used| used.path == *archive),
+        _ => false,
+    }
 }
 
 /// Up to `limit` items joined for display, in a stable order.

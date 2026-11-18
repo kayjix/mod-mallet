@@ -25,7 +25,10 @@ use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
-use crate::{DATA_DIR, archive, archives, loose_meshes, markers, navmeshes, npc, objects, terrain};
+use crate::{
+    DATA_DIR, archive, archive_meshes, archives, loose_meshes, markers, navmeshes, npc, objects,
+    terrain,
+};
 
 /// What was read from the installation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -114,7 +117,7 @@ pub fn read_setup(
         }
     }
     facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
-    add_loose_meshes(&mut facts, game, &loose, cache);
+    add_meshes(&mut facts, game, &loose, &loaded_archives, cache);
 
     let mut placed = objects::Collector::new(game);
     let mut land = terrain::Collector::default();
@@ -441,15 +444,18 @@ fn add_game_versions(
     }
 }
 
-/// Adds what the loose meshes say about themselves: which variant of the
-/// format they are in, and which textures they name.
-fn add_loose_meshes(
+/// Adds what the meshes of mods, loose and in `archives`, say about
+/// themselves: which variant of the format they are in, and which textures
+/// they name.
+fn add_meshes(
     facts: &mut SetupFacts,
     game: Game,
     loose: &[(GamePath, PathBuf)],
+    archives: &[LoadedArchive],
     cache: &dyn TextCache,
 ) {
-    let meshes = loose_meshes::read(game, loose, cache);
+    let mut meshes = loose_meshes::read(game, loose, cache);
+    archive_meshes::read(game, archives, cache, &mut meshes);
     facts.foreign_meshes = meshes.foreign;
     facts.mesh_textures = meshes.textures;
 }

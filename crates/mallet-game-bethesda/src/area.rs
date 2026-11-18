@@ -4,7 +4,9 @@
 //!
 //! Only the blocks of cells around the point are read from each plugin;
 //! the rest of the worldspace is skipped without being unpacked. The
-//! models of the base objects are read once and kept. Nothing is written.
+//! models of the base objects are read once and kept. The objects of an
+//! interior cell are read by [`AreaReader::interior`] (ADR 0042). Nothing
+//! is written.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -21,6 +23,8 @@ use crate::objects::{
     floats, model_path, record_id,
 };
 use crate::terrain;
+
+mod interior;
 
 /// Game units per cell side.
 const CELL: f32 = 4096.0;
@@ -76,6 +80,8 @@ pub struct CellLand {
     /// The colours of the same points, three bytes each, if the land has
     /// them.
     pub colours: Option<Vec<u8>>,
+    /// The textures of its four quarters, south-west first (ADR 0047).
+    pub quarters: Vec<crate::land_textures::Quarter>,
 }
 
 /// The cells (west, east, south, north) around a point.
@@ -101,6 +107,8 @@ pub struct AreaReader {
     models: Option<HashMap<RecordId, BaseModel>>,
     /// The part of the last pass not yet asked for.
     last: Option<Pass>,
+    /// The interior cells of every plugin by editor ID, once listed.
+    interiors: Option<HashMap<String, interior::Interior>>,
 }
 
 impl AreaReader {
@@ -120,6 +128,7 @@ impl AreaReader {
             plugins,
             models: None,
             last: None,
+            interiors: None,
         }
     }
 
@@ -265,7 +274,9 @@ impl AreaReader {
                             continue;
                         };
                         match cell_land(record, position) {
-                            Some(cell) => {
+                            Some(mut cell) => {
+                                cell.quarters =
+                                    crate::land_textures::quarters(record, masters, name);
                                 land.insert(position, cell);
                             }
                             None if record.flags & FLAG_DELETED != 0 => {
@@ -315,6 +326,7 @@ fn cell_land(record: &Record, (x, y): (i32, i32)) -> Option<CellLand> {
         y,
         heights,
         colours,
+        quarters: Vec::new(),
     })
 }
 

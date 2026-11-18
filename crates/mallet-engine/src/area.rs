@@ -7,9 +7,12 @@ use std::sync::{Arc, Mutex};
 
 use mallet_core::ObjectRef;
 use mallet_core::encoding::base64;
-use mallet_core::mesh::{AreaLand, AreaObject, AreaObjects, LandCell, LodMesh};
+use mallet_core::mesh::{
+    AreaLand, AreaObject, AreaObjects, LandCell, LandQuarter, LandTextureLayer, LodMesh,
+};
 use mallet_game_bethesda::area::AreaReader;
 use mallet_game_bethesda::files;
+use mallet_game_bethesda::land_textures::{LandTextures, Quarter};
 use mallet_game_bethesda::lod_library::LodLibrary;
 
 use crate::ScanOptions;
@@ -25,6 +28,9 @@ static READER: Mutex<Option<(String, Arc<Mutex<AreaReader>>)>> = Mutex::new(None
 
 /// Every mesh and texture of the setup last asked about.
 static FILES: Mutex<Option<(String, Arc<LodLibrary>)>> = Mutex::new(None);
+
+/// The landscape textures of the setup last asked about (ADR 0047).
+static LAND_TEXTURES: Mutex<Option<(String, Arc<LandTextures>)>> = Mutex::new(None);
 
 /// A key for the setup `options` describe.
 fn setup_key(options: &ScanOptions) -> Option<String> {
@@ -91,7 +97,80 @@ pub fn area_objects(
     let reader = reader(options)?;
     let mut reader = reader.lock().ok()?;
     let placed = reader.objects(world, centre, radius);
-    let objects: Vec<AreaObject> = placed
+    let objects = drawable(&mut reader, placed);
+    tracing::info!(
+        world,
+        objects = objects.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "read a place up close"
+    );
+    Some(AreaObjects {
+        world: world.to_owned(),
+        centre,
+        radius,
+        objects,
+    })
+}
+
+/// Everything with a model placed in the interior cell whose editor ID is
+/// `cell` (ADR 0042), in the shape of an area: `world` is the cell, and
+/// `centre` and `radius` frame what is placed in it. `None` if the setup
+/// cannot be read or has no such cell.
+pub fn interior_objects(options: &ScanOptions, cell: &str) -> Option<AreaObjects> {
+    let started = std::time::Instant::now();
+    let reader = reader(options)?;
+    let mut reader = reader.lock().ok()?;
+    let placed = reader.interior(cell);
+    if placed.is_empty() {
+        tracing::info!(cell, "interior cell not found or empty");
+        return None;
+    }
+    let objects = drawable(&mut reader, placed);
+    let (centre, radius) = frame(&objects);
+    tracing::info!(
+        cell,
+        objects = objects.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "read an interior cell"
+    );
+    Some(AreaObjects {
+        world: cell.to_owned(),
+        centre,
+        radius,
+        objects,
+    })
+}
+
+/// The middle of the objects, east and north, and how far they reach from
+/// it in either direction, in game units.
+fn frame(objects: &[AreaObject]) -> ([f32; 2], f32) {
+    let mut low = [f32::MAX; 2];
+    let mut high = [f32::MIN; 2];
+    for object in objects {
+        for (axis, value) in object.position.iter().take(2).enumerate() {
+            if let (Some(low), Some(high)) = (low.get_mut(axis), high.get_mut(axis)) {
+                *low = low.min(*value);
+                *high = high.max(*value);
+            }
+        }
+    }
+    if objects.is_empty() {
+        return ([0.0, 0.0], 0.0);
+    }
+    let [west, south] = low;
+    let [east, north] = high;
+    (
+        [f32::midpoint(west, east), f32::midpoint(south, north)],
+        ((east - west).max(north - south) / 2.0).max(256.0),
+    )
+}
+
+/// The placed objects that can be drawn, with their models.
+fn drawable(
+    reader: &mut mallet_game_bethesda::area::AreaReader,
+    placed: Vec<mallet_game_bethesda::area::AreaObject>,
+) -> Vec<AreaObject> {
+    placed
         .into_iter()
         .filter_map(|object| {
             let base = reader.base(&object.base)?;
@@ -109,19 +188,7 @@ pub fn area_objects(
                 anchored: object.anchored,
             })
         })
-        .collect();
-    tracing::info!(
-        world,
-        objects = objects.len(),
-        elapsed_ms = started.elapsed().as_millis(),
-        "read a place up close"
-    );
-    Some(AreaObjects {
-        world: world.to_owned(),
-        centre,
-        radius,
-        objects,
-    })
+        .collect()
 }
 
 /// The bytes of a file of the setup as the game uses it.
@@ -163,6 +230,7 @@ pub fn area_land(
     let radius = radius.clamp(256.0, MAX_RADIUS);
     let reader = reader(options)?;
     let mut reader = reader.lock().ok()?;
+    let textures = land_textures(options);
     let cells: Vec<LandCell> = reader
         .land(world, centre, radius)
         .into_iter()
@@ -171,6 +239,9 @@ pub fn area_land(
             y: cell.y,
             heights: base64(&floats(&cell.heights)),
             colours: cell.colours.as_deref().map_or_default(base64),
+            quarters: textures
+                .as_deref()
+                .map_or_else(Vec::new, |textures| painted(textures, &cell.quarters)),
         })
         .collect();
     tracing::info!(
@@ -183,4 +254,52 @@ pub fn area_land(
         world: world.to_owned(),
         cells,
     })
+}
+
+/// The quarters of a cell with their landscape textures named by the
+/// colour texture each uses (ADR 0047). Layers whose texture has no colour
+/// texture are left out.
+fn painted(textures: &LandTextures, quarters: &[Quarter]) -> Vec<LandQuarter> {
+    let path = |id| textures.colour(id).map(texture_path);
+    quarters
+        .iter()
+        .map(|quarter| LandQuarter {
+            base: quarter.base.as_ref().and_then(path),
+            layers: quarter
+                .layers
+                .iter()
+                .filter_map(|layer| {
+                    Some(LandTextureLayer {
+                        texture: path(&layer.texture)?,
+                        opacity: base64(&layer.opacity),
+                    })
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+/// The landscape textures of the setup `options` describe, read once.
+fn land_textures(options: &ScanOptions) -> Option<Arc<LandTextures>> {
+    let key = setup_key(options)?;
+    let mut kept = LAND_TEXTURES.lock().ok()?;
+    if let Some((known, textures)) = kept.as_ref()
+        && *known == key
+    {
+        return Some(Arc::clone(textures));
+    }
+    let game = options.game().ok()?;
+    let (game_dir, _) = options.located_game_dir()?;
+    let started = std::time::Instant::now();
+    let textures = Arc::new(LandTextures::open(
+        game,
+        &game_dir,
+        options.local_dir.as_deref(),
+    ));
+    tracing::info!(
+        elapsed_ms = started.elapsed().as_millis(),
+        "landscape textures read"
+    );
+    *kept = Some((key, Arc::clone(&textures)));
+    Some(textures)
 }

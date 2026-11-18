@@ -54,7 +54,7 @@ interface MapView3DProps {
   /** The objects the patch would hide, by {@link objectKey}: drawn as ghosts. */
   hidden?: Set<string>;
   /** More for the card of a picked object, such as what to do with it. */
-  objectExtra?: (object: AreaObject) => ReactNode;
+  objectExtra?: (object: AreaObject, group: AreaObject[]) => ReactNode;
   /** Shown over the relief. */
   children?: ReactNode;
   /** How far from a picked collision the camera comes, in cells. */
@@ -473,6 +473,8 @@ export function MapView3D({
   const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
   const progressKey = useRef("");
   const [pickedObject, setPickedObject] = useState<AreaObject | null>(null);
+  // The parts of the same plugin that hang together with the picked object.
+  const [group, setGroup] = useState<AreaObject[]>([]);
   const areaTimer = useRef<number | null>(null);
   const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
   const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
@@ -1426,8 +1428,9 @@ export function MapView3D({
       if (found === null && !start.turn) {
         const object = objectAt(event.clientX, event.clientY);
         setPickedObject(object);
+        setGroup(object === null ? [] : (area.current?.connected(object) ?? [object]));
         area.current?.select(
-          object === null ? null : objectKey(object.id.plugin, object.id.localId),
+          object === null ? [] : [objectKey(object.id.plugin, object.id.localId)],
         );
         redraw();
       }
@@ -1526,7 +1529,8 @@ export function MapView3D({
               aria-label={t.viewerClose}
               onClick={() => {
                 setPickedObject(null);
-                area.current?.select(null);
+                setGroup([]);
+                area.current?.select([]);
                 redraw();
               }}
             >
@@ -1551,7 +1555,21 @@ export function MapView3D({
               <code>{pickedObject.model}</code>
             </dd>
           </dl>
-          {objectExtra?.(pickedObject)}
+          {group.length > 1 && (
+            <button
+              type="button"
+              className="small relief-object-action"
+              onClick={() => {
+                area.current?.select(
+                  group.map((part) => objectKey(part.id.plugin, part.id.localId)),
+                );
+                redraw();
+              }}
+            >
+              {t.mapObjectGroup(group.length)}
+            </button>
+          )}
+          {objectExtra?.(pickedObject, group)}
         </div>
       )}
       {children}

@@ -1,7 +1,46 @@
 import { useMemo, useState } from "react";
 import { type Session, useSession } from "./Actions";
-import type { DuelSide, ModDuel, RenderedDuel, RenderedFinding } from "./generated/rendered-report";
-import { chooseFinding, type PatchChoices, pairFor } from "./patch";
+import type {
+  DuelSide,
+  MapSpot,
+  ModDuel,
+  RenderedDuel,
+  RenderedFinding,
+} from "./generated/rendered-report";
+import { chooseFinding, decisionAt, type PatchChoices, pairFor, spotKey } from "./patch";
+
+/**
+ * The side the collisions' worklist lets win at every spot of a duel (the
+ * other side's objects hidden everywhere), if it does (ADR 0040).
+ */
+function collisionWinner(
+  duel: ModDuel,
+  spots: Map<string, MapSpot[]>,
+  choices: PatchChoices,
+): 0 | 1 | null {
+  const losers = new Set<string>();
+  for (const id of duel.findings) {
+    for (const spot of spots.get(id) ?? []) {
+      const key = spotKey(spot);
+      if (key === null) {
+        continue;
+      }
+      const decided = decisionAt(choices, id, key);
+      if (decided === undefined || decided === null) {
+        return null;
+      }
+      losers.add(decided.toLowerCase());
+    }
+  }
+  const [loser] = [...losers];
+  if (losers.size !== 1 || loser === undefined) {
+    return null;
+  }
+  const index = duel.sides.findIndex((side) =>
+    (side.plugins ?? []).some((plugin) => plugin.toLowerCase() === loser),
+  );
+  return index === 0 ? 1 : index === 1 ? 0 : null;
+}
 
 /** How many open duels are shown at first; the largest come first. */
 const OPEN_LIMIT = 8;
@@ -236,8 +275,10 @@ function DuelCard({
   byId: Map<string, RenderedFinding>;
   onDecided: (id: string) => void;
 }) {
-  const { t, decisions, decide, showPatch, mods, ranking, openCompare } = useSession();
+  const { t, decisions, decide, showPatch, mods, ranking, openCompare, spots, patchChoices } =
+    useSession();
   const { duel } = rendered;
+  const fromCollisions = collisionWinner(duel, spots, patchChoices);
   const { busy, applied, pick } = usePick(duel, byId, () => onDecided(duel.id));
   const decided = decisions[duel.id];
   const names = duelNames(duel, mods);
@@ -272,6 +313,19 @@ function DuelCard({
           ))}
         </ul>
         {rendered.suggestion != null && <p className="duel-why">{rendered.suggestion}</p>}
+        {decided === undefined && fromCollisions !== null && (
+          <p className="duel-why duel-from-collisions">
+            {t.duelFromCollisions(names[fromCollisions])}{" "}
+            <button
+              type="button"
+              className="small primary"
+              disabled={busy}
+              onClick={() => pick(fromCollisions)}
+            >
+              {t.duelTakeOver}
+            </button>
+          </p>
+        )}
         <div className="duel-actions">
           {([0, 1] as const).map((index) => (
             <button

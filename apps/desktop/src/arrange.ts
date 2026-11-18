@@ -22,6 +22,8 @@ export interface Counts {
   ignored: number;
   /** Findings about objects of two mods in the same spot. */
   collisions: number;
+  /** What the task page lists as to do: neither collisions, notes nor recommendations. */
+  tasks: number;
 }
 
 /** The findings of one kind. */
@@ -59,6 +61,7 @@ export function countFindings(findings: RenderedFinding[], ignored: Set<string>)
     direct: active.filter(isDirect).length,
     ignored: findings.length - active.length,
     collisions: active.filter(isCollision).length,
+    tasks: openTaskCount(findings, ignored),
   };
 }
 
@@ -144,4 +147,123 @@ export function modsOf(rendered: RenderedFinding): string[] {
 /** The mods by their name, to look up what a finding names. */
 export function modsByName(mods: ModInfo[]): Map<string, ModInfo> {
   return new Map(mods.map((info) => [info.mod.name, info]));
+}
+
+/**
+ * What the user does about a finding, for the task page: the steps in the
+ * order the page shows them. Collisions are not among them; they have a
+ * page of their own.
+ */
+export type Step =
+  | "one-click"
+  | "install"
+  | "update"
+  | "choose"
+  | "scan"
+  | "check"
+  | "advice"
+  | "notes"
+  | "ignored";
+
+export const STEPS: Step[] = [
+  "one-click",
+  "install",
+  "update",
+  "choose",
+  "scan",
+  "check",
+  "advice",
+  "notes",
+  "ignored",
+];
+
+/** Kinds of mod-level recommendations (ADR 0043): optional, never required. */
+export const ADVICE_KINDS = new Set([
+  "mods.collides-widely",
+  "mods.mostly-overridden",
+  "mods.duplicates-another",
+]);
+
+/** The step of the kinds whose remedy is the same for every finding of them. */
+const STEP_OF_KIND: Record<string, Step> = {
+  "plugins.master-missing": "install",
+  "plugins.requirement-missing": "install",
+  "meshes.texture-missing": "install",
+  "extender.plugin-incompatible": "update",
+  "extender.plugin-not-loaded": "update",
+  "meshes.made-for-other-game": "update",
+  "plugins.generated-outdated": "update",
+  "plugins.needs-cleaning": "update",
+  "installer.options-now-recommended": "update",
+  "plugins.incompatible": "choose",
+  "npcs.face-mismatch": "choose",
+  "meshes.retexture-bypassed": "choose",
+  "navmeshes.door-cut-off": "choose",
+  "navmeshes.changes-undone": "choose",
+  "setup.file-unreadable": "scan",
+  "setup.load-order-unknown": "scan",
+};
+
+/**
+ * The step a finding belongs to; null for collisions. What Mod Mallet can
+ * hand to the mod manager comes first, recommendations and guesses are
+ * optional, notes are only to know.
+ */
+export function stepOf(rendered: RenderedFinding, ignored: Set<string>): Step | null {
+  const { id, kind, severity, confidence } = rendered.finding;
+  if (isCollision(rendered)) {
+    return null;
+  }
+  if (ignored.has(id)) {
+    return "ignored";
+  }
+  if (ADVICE_KINDS.has(kind)) {
+    return "advice";
+  }
+  if (severity === "info") {
+    return "notes";
+  }
+  if (confidence === "hint") {
+    return "advice";
+  }
+  if (isDirect(rendered)) {
+    return "one-click";
+  }
+  return STEP_OF_KIND[kind] ?? "check";
+}
+
+/** How many things there are to do outside the collisions: the steps before the optional ones. */
+export function openTaskCount(findings: RenderedFinding[], ignored: Set<string>): number {
+  return findings.filter((rendered) => {
+    const step = stepOf(rendered, ignored);
+    return step !== null && step !== "advice" && step !== "notes" && step !== "ignored";
+  }).length;
+}
+
+/** The findings of each step, grouped by kind, the errors first. */
+export function stepsFor(
+  findings: RenderedFinding[],
+  ignored: Set<string>,
+): { step: Step; groups: Group[]; count: number }[] {
+  const byStep = new Map<Step, RenderedFinding[]>();
+  for (const rendered of findings) {
+    const step = stepOf(rendered, ignored);
+    if (step !== null) {
+      byStep.set(step, [...(byStep.get(step) ?? []), rendered]);
+    }
+  }
+  const rank = (group: Group) =>
+    Math.min(
+      ...group.findings.map(({ finding }) =>
+        finding.severity === "error" ? 0 : finding.severity === "warning" ? 1 : 2,
+      ),
+    );
+  return STEPS.flatMap((step) => {
+    const members = byStep.get(step) ?? [];
+    if (members.length === 0) {
+      return [];
+    }
+    const groups = groupByKind(members).sort((a, b) => rank(a) - rank(b));
+    return [{ step, groups, count: members.length }];
+  });
 }

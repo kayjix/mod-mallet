@@ -1,6 +1,6 @@
 # 0025 Patches hide objects through Base Object Swapper
 
-- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): a spot can have a choice of its own
+- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): a spot can have a choice of its own; [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects the game relies on
 - Date: 2026-11-15
 
 ## Context

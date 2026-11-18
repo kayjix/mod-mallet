@@ -33,6 +33,14 @@
           "description": "The heights of 33 rows of 33 points, 128 game units apart, as\n32-bit floats in game units: the southern row first, each from west\nto east. Neighbouring cells share their edge.",
           "type": "string"
         },
+        "quarters": {
+          "description": "The textures of its four quarters, south-west, south-east,\nnorth-west, north-east (ADR 0047); empty where the land names none.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LandQuarter"
+          }
+        },
         "x": {
           "description": "The cell's column.",
           "type": "integer",
@@ -49,6 +57,47 @@
         "y",
         "heights",
         "colours"
+      ]
+    },
+    "LandQuarter": {
+      "description": "The textures of one quarter of a cell, as the game paints it: a base\nand layers over it, each showing as much as its opacity at each point\nsays (ADR 0047).",
+      "type": "object",
+      "properties": {
+        "base": {
+          "description": "The colour texture underneath, below the data directory, if any.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layers": {
+          "description": "The layers over it, the lowest first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LandTextureLayer"
+          }
+        }
+      },
+      "required": [
+        "layers"
+      ]
+    },
+    "LandTextureLayer": {
+      "description": "One layer of texture on a quarter of a cell.",
+      "type": "object",
+      "properties": {
+        "opacity": {
+          "description": "How much of it shows at each of the 17 × 17 points of the quarter,\none byte each (0 to 255), the southern row first, each from west to\neast; Base64-encoded. The quarter's points are the cell's, from its\ncorner to its middle.",
+          "type": "string"
+        },
+        "texture": {
+          "description": "The colour texture, below the data directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "texture",
+        "opacity"
       ]
     }
   }

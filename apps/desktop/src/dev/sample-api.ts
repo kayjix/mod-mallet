@@ -7,6 +7,7 @@
 import type { Api } from "../api";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { MeshView } from "../generated/mesh-view";
+import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
   Finding,
@@ -15,6 +16,7 @@ import type {
   MapSpot,
   MapTerrain,
   ModInfo,
+  ObjectRef,
   RenderedFinding,
   RenderedReport,
 } from "../generated/rendered-report";
@@ -136,6 +138,7 @@ const covers = (winner: string, loser: string, count: number): Sample => ({
     `Loose files of ${winner} replace ${count} files in the archive of ${loser}.`,
     `Lose Dateien von ${winner} ersetzen ${count} Dateien im Archiv von ${loser}.`,
   ),
+  args: { count, winnerMod: winner, archiveMod: loser },
 });
 
 const samples: Sample[] = [
@@ -199,6 +202,79 @@ const samples: Sample[] = [
   covers("Grass Mod", "Landscape Mod", 8),
   covers("Tree Mod", "Landscape Mod", 3),
   covers("Rock Mod", "Landscape Mod", 44),
+  {
+    kind: "objects.duplicated",
+    severity: "warning",
+    confidence: "likely",
+    key: "Old Town+Water Mod",
+    title: two(
+      "Two mods place the same object twice",
+      "Zwei Mods stellen dasselbe Objekt doppelt hin",
+    ),
+    headline: two(
+      "Old Town and Water Mod: 2 objects stand twice",
+      "Old Town und Water Mod: 2 Objekte stehen doppelt",
+    ),
+    summary: two(
+      "Old Town and Water Mod place the same objects at almost the same spot.",
+      "Old Town und Water Mod stellen dieselben Objekte fast an dieselbe Stelle.",
+    ),
+    args: { first: "Old Town", second: "Water Mod", count: 2 },
+  },
+  {
+    kind: "navmeshes.door-cut-off",
+    severity: "warning",
+    confidence: "likely",
+    key: "Old Town.esp/Patch Hub.esp",
+    mod: "Old Town",
+    title: two(
+      "Doors that mods add are cut off from the paths of characters",
+      "Türen, die Mods hinzufügen, sind von den Wegen der Figuren abgeschnitten",
+    ),
+    headline: two(
+      "Old Town.esp cuts off 2 doors of Patch Hub.esp",
+      "Old Town.esp schneidet 2 Türen von Patch Hub.esp ab",
+    ),
+    summary: two(
+      "Old Town.esp replaces the paths of characters in 2 places where Patch Hub.esp connects new doors.",
+      "Old Town.esp ersetzt die Wege der Figuren an 2 Stellen, an denen Patch Hub.esp neue Türen anbindet.",
+    ),
+    args: { winner: "Old Town", loser: "Patch Hub", count: 2, places: "Riverwood" },
+  },
+  {
+    kind: "plugins.loot-warning",
+    severity: "warning",
+    confidence: "hint",
+    key: "Water Mod.esp",
+    mod: "Water Mod",
+    title: two("LOOT warns about a plugin", "LOOT warnt vor einem Plugin"),
+    headline: two("LOOT: Water Mod.esp has 1 warning", "LOOT: Water Mod.esp hat 1 Warnung"),
+    summary: two(
+      "LOOT says: a newer version of this plugin is available.",
+      "LOOT sagt: Es gibt eine neuere Version dieses Plugins.",
+    ),
+    args: { plugin: "Water Mod", count: 1, messages: "" },
+  },
+  {
+    kind: "mods.mostly-overridden",
+    severity: "info",
+    confidence: "likely",
+    key: "Old Town",
+    mod: "Old Town",
+    title: two(
+      "A mod is mostly covered by others",
+      "Eine Mod wird größtenteils von anderen überdeckt",
+    ),
+    headline: two(
+      "Old Town: 151 of its 170 files are covered by other mods",
+      "Old Town: 151 ihrer 170 Dateien werden von anderen Mods überdeckt",
+    ),
+    summary: two(
+      "Most of what Old Town brings is replaced by Texture Pack and Mesh Improvements. Perhaps it is not needed any more.",
+      "Das meiste, was Old Town mitbringt, ersetzen Texture Pack und Mesh Improvements. Vielleicht braucht es sie nicht mehr.",
+    ),
+    args: { mod: "Old Town", count: 151, total: 170 },
+  },
 ];
 
 function render(sample: Sample, lang: Lang): RenderedFinding {
@@ -459,6 +535,27 @@ function sampleMap(): RenderedReport["map"] {
     [x, y, dx, dy]: [number, number, number?, number?],
     spotted: MapSpot,
   ): MapSpot => ({ ...spotted, position: at(x, y, dx, dy) });
+  const duplicate = (x: number, y: number, objects: string, id: number): MapSpot => ({
+    finding: "objects.duplicated:Old Town+Water Mod",
+    kind: "duplicate",
+    location: { type: "exterior", world: "Tamriel", x, y },
+    objects,
+    console: `cow Tamriel ${x} ${y}`,
+    parts: [
+      {
+        object: { plugin: "Old Town.esp", localId: id },
+        name: objects,
+        hideable: true,
+        suggested: true,
+      },
+      {
+        object: { plugin: "Water Mod.esp", localId: id + 1 },
+        name: objects,
+        hideable: true,
+        suggested: false,
+      },
+    ],
+  });
   return {
     owners: ["Old Town", "Texture Pack", "Water Mod"],
     worlds: [{ name: "Tamriel", cells, terrain, markers: sampleMarkers(at) }],
@@ -467,6 +564,8 @@ function sampleMap(): RenderedReport["map"] {
       placed([4, 2, 0.7, 0.4], spot(4, 2, "Well / Cart")),
       placed([5, 2, 0.2, 0.2], spot(5, 2, "Fence / Stall")),
       placed([3, 3, 0.8, 0.5], spot(3, 3, "Tree / Roof")),
+      placed([6, 1, 0.4, 0.4], duplicate(6, 1, "Dock / Dock", 0xa10)),
+      placed([6, 1, 0.6, 0.7], duplicate(6, 1, "Boat / Boat", 0xa20)),
     ],
   };
 }
@@ -772,6 +871,42 @@ function samplePicture(colour: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * Made-up ties for an object, by its number: nothing, a link from a gate
+ * that is gone, or a door to the other side.
+ */
+function sampleAnchors(object: ObjectRef): ObjectAnchors {
+  const other = (name: string, localId: number, state: AnchorOther["state"]): AnchorOther => ({
+    plugin: object.plugin,
+    localId,
+    recordType: "REFR",
+    name,
+    state,
+  });
+  switch (object.localId % 3) {
+    case 1:
+      return {
+        object,
+        verdict: "careful",
+        reasons: [
+          { kind: "linked-ref", other: other("WRGate01", 0x801, "gone"), keyword: null },
+          { kind: "persistent", other: null, keyword: null },
+        ],
+      };
+    case 2:
+      return {
+        object,
+        verdict: "locked",
+        reasons: [
+          { kind: "teleport-door", other: other("WRDoor01", 0x802, "present"), keyword: null },
+          { kind: "persistent", other: null, keyword: null },
+        ],
+      };
+    default:
+      return { object, verdict: "free", reasons: [] };
+  }
+}
+
 /** Results arrive a little later, as they do from the real backend. */
 function later<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), 400));
@@ -886,8 +1021,10 @@ export const sampleApi: Api = {
   // The sample has no objects up close and no level of detail.
   areaObjects: () => later(null),
   areaLand: () => later(null),
+  interiorObjects: () => later(null),
   areaMesh: () => later(null),
   areaTexture: () => later(null),
+  objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),

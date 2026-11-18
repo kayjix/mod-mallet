@@ -133,6 +133,7 @@ export interface Texts {
   // Watching the setup.
   live: string;
   liveNote: string;
+  liveShort: string;
   changedRescanning: string;
 
   // The overview at the top of the task list.
@@ -354,6 +355,45 @@ export interface Texts {
   workMore: string;
   workGhost: string;
   workThisSpot: string;
+  workSearch: string;
+  workScopeSpot: string;
+  workScopePassage: (count: number) => string;
+  workScopePair: (count: number) => string;
+  workHideVerb: string;
+  workKeepVerb: string;
+  workNeeded: string;
+  workBothNeeded: string;
+  anchorAsking: string;
+  anchorLocked: string;
+  anchorCareful: string;
+  anchorHideAnyway: string;
+  anchorWhy: string;
+  anchorGone: string;
+  anchorOff: string;
+  anchorKinds: Record<
+    | "teleport-door"
+    | "quest-alias"
+    | "large-reference"
+    | "activate-parent"
+    | "enable-parent"
+    | "linked-ref"
+    | "location-role"
+    | "package"
+    | "script"
+    | "visible-when-distant"
+    | "persistent",
+    (other: string, keyword: string | null) => string
+  >;
+  workSortBy: string;
+  workSortOpen: string;
+  workSortSpots: string;
+  workWinsEverywhere: (mod: string) => string;
+  workDuelWinner: (mod: string) => string;
+  duelFromCollisions: (mod: string) => string;
+  duelTakeOver: string;
+  workGroupHide: (count: number) => string;
+  workGroupShow: (count: number) => string;
+  mapObjectGroup: (count: number) => string;
   workHideObject: string;
   workDecideHere: string;
   workAfterDecide: string;
@@ -526,6 +566,7 @@ export const texts: Record<Lang, Texts> = {
     live: "Live",
     liveNote:
       "Mod Mallet scans again by itself when your setup changes, for example after Vortex deploys.",
+    liveShort: "Scans again by itself",
     changedRescanning: "Your setup changed. Scanning again…",
 
     allGood: "Everything is in order",
@@ -810,6 +851,49 @@ export const texts: Record<Lang, Texts> = {
     workMore: "Mod against mod",
     workGhost: "Red and see-through: what the patch would hide.",
     workThisSpot: "this spot",
+    workSearch: "Search places, mods, objects…",
+    workScopeSpot: "This spot",
+    workScopePassage: (count) => `This passage · ${count} spots`,
+    workScopePair: (count) => `The two mods · ${count} spots`,
+    workHideVerb: "Hide",
+    workKeepVerb: "Keep",
+    anchorAsking: "Looking at what ties it…",
+    anchorLocked: "The game cannot do without this object:",
+    anchorCareful: "The game may miss it. Hide it only if what follows does not matter to you:",
+    anchorHideAnyway: "Hide anyway",
+    anchorWhy: "Why it is needed",
+    anchorGone: "(that one is gone, so this does not count)",
+    anchorOff: "(that one is switched off)",
+    anchorKinds: {
+      "teleport-door": (other) => `A door with a way through${other ? ` to ${other}` : ""}`,
+      "quest-alias": (other) => `A quest needs it${other ? ` (${other})` : ""}`,
+      "large-reference": () => "Part of the world's distant view",
+      "activate-parent": (other) => `It sets off ${other || "other objects"}`,
+      "enable-parent": (other) =>
+        `It switches other objects on and off${other ? `, such as ${other}` : ""}; they stay as they are`,
+      "linked-ref": (other, keyword) =>
+        `${other || "Another object"} is linked to it${keyword ? ` (${keyword})` : ""}`,
+      "location-role": (other) => `It has a role in a location${other ? ` (${other})` : ""}`,
+      package: (other) => `A character's routine uses it${other ? ` (${other})` : ""}`,
+      script: (other) => `A script names it${other ? ` (${other})` : ""}`,
+      "visible-when-distant": () =>
+        "It is drawn from afar; the distant view keeps showing it until it is generated again",
+      persistent: () => "The game keeps it loaded; nothing was found that still uses it",
+    },
+    workSortBy: "Order",
+    workSortOpen: "Most open",
+    workSortSpots: "Most spots",
+    workWinsEverywhere: (mod) => `✓ ${mod} wins everywhere`,
+    workDuelWinner: (mod) => `Duel: ${mod} wins`,
+    duelFromCollisions: (mod) =>
+      `In the collisions you let ${mod} win at every spot. Take that over here, for its files too?`,
+    duelTakeOver: "Take it over",
+    workGroupHide: (count) => `Hide with the parts it hangs together with (${count})`,
+    workGroupShow: (count) => `Show the ${count} parts again`,
+    mapObjectGroup: (count) => `Mark the ${count} parts of the same mod that hang together`,
+    workNeeded: "Needed by the game",
+    workBothNeeded:
+      "The game needs both objects (for example doors with a loading screen, or things scripts refer to). Nothing here can be hidden safely; keeping both is usually right.",
     workHideObject: "Hide this object here",
     workDecideHere: "Decide in the worklist",
     workAfterDecide: "After deciding, go on to the next open spot",
@@ -1043,6 +1127,7 @@ export const texts: Record<Lang, Texts> = {
     live: "Live",
     liveNote:
       "Mod Mallet scannt von selbst erneut, wenn sich dein Setup ändert, zum Beispiel nachdem Vortex bereitgestellt hat.",
+    liveShort: "Scannt von selbst neu",
     changedRescanning: "Dein Setup hat sich geändert. Es wird neu gescannt…",
 
     allGood: "Alles in Ordnung",
@@ -1326,6 +1411,50 @@ export const texts: Record<Lang, Texts> = {
     workMore: "Mod gegen Mod",
     workGhost: "Rot und durchscheinend: was der Patch ausblenden würde.",
     workThisSpot: "diese Stelle",
+    workSearch: "Orte, Mods, Objekte suchen…",
+    workScopeSpot: "Diese Stelle",
+    workScopePassage: (count) => `Diese Passage · ${count} Stellen`,
+    workScopePair: (count) => `Die beiden Mods · ${count} Stellen`,
+    workHideVerb: "Ausblenden",
+    workKeepVerb: "Behalten",
+    anchorAsking: "Prüfe, woran es hängt…",
+    anchorLocked: "Ohne dieses Objekt geht es im Spiel nicht:",
+    anchorCareful:
+      "Das Spiel könnte es vermissen. Blende es nur aus, wenn dir das Folgende egal ist:",
+    anchorHideAnyway: "Trotzdem ausblenden",
+    anchorWhy: "Warum gebraucht",
+    anchorGone: "(das ist selbst weg, zählt also nicht)",
+    anchorOff: "(das ist ausgeschaltet)",
+    anchorKinds: {
+      "teleport-door": (other) => `Eine Tür mit Durchgang${other ? ` nach ${other}` : ""}`,
+      "quest-alias": (other) => `Eine Quest braucht es${other ? ` (${other})` : ""}`,
+      "large-reference": () => "Teil der Fernansicht der Welt",
+      "activate-parent": (other) => `Es löst ${other || "andere Objekte"} aus`,
+      "enable-parent": (other) =>
+        `Es schaltet andere Objekte ein und aus${other ? `, etwa ${other}` : ""}; die bleiben, wie sie sind`,
+      "linked-ref": (other, keyword) =>
+        `${other || "Ein anderes Objekt"} ist damit verknüpft${keyword ? ` (${keyword})` : ""}`,
+      "location-role": (other) => `Es hat eine Rolle an einem Ort${other ? ` (${other})` : ""}`,
+      package: (other) => `Ein Tagesablauf einer Figur nutzt es${other ? ` (${other})` : ""}`,
+      script: (other) => `Ein Skript nennt es${other ? ` (${other})` : ""}`,
+      "visible-when-distant": () =>
+        "Wird aus der Ferne gezeigt; die Fernansicht zeigt es weiter, bis sie neu erzeugt wird",
+      persistent: () => "Das Spiel hält es geladen; nichts gefunden, das es noch nutzt",
+    },
+    workSortBy: "Reihenfolge",
+    workSortOpen: "Meiste offene",
+    workSortSpots: "Meiste Stellen",
+    workWinsEverywhere: (mod) => `✓ ${mod} gewinnt überall`,
+    workDuelWinner: (mod) => `Duell: ${mod} gewinnt`,
+    duelFromCollisions: (mod) =>
+      `In den Kollisionen hast du ${mod} an jeder Stelle gewinnen lassen. Hier übernehmen, auch für die Dateien?`,
+    duelTakeOver: "Übernehmen",
+    workGroupHide: (count) => `Mit den zusammenhängenden Teilen ausblenden (${count})`,
+    workGroupShow: (count) => `Die ${count} Teile wieder zeigen`,
+    mapObjectGroup: (count) => `Die ${count} zusammenhängenden Teile dieser Mod markieren`,
+    workNeeded: "Vom Spiel gebraucht",
+    workBothNeeded:
+      "Das Spiel braucht beide Objekte (zum Beispiel Türen mit Ladebildschirm oder Dinge, auf die Skripte verweisen). Hier lässt sich nichts gefahrlos ausblenden; beide zu behalten ist meist richtig.",
     workHideObject: "Dieses Objekt hier ausblenden",
     workDecideHere: "In der Arbeitsliste entscheiden",
     workAfterDecide: "Nach dem Entscheiden zur nächsten offenen Stelle",

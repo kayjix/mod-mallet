@@ -46,6 +46,7 @@ import {
   type WorkKind,
   worstKind,
 } from "./map-places";
+import { MapObjectActions } from "./object-actions";
 
 interface MapViewProps {
   map: WorldMap;
@@ -218,6 +219,9 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             hover={hover}
             onPick={setPicked}
             onHover={setHover}
+            objectExtra={(object, group) => (
+              <MapObjectActions object={object} group={group} place={world.name} />
+            )}
           />
         ) : (
           <div className="map-frame map-missing">

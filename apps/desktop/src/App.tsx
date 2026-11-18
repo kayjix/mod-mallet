@@ -1,8 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { type Session, SessionContext, useSession } from "./Actions";
+import { type Session, SessionContext } from "./Actions";
 import type { Api, NamedPlaces } from "./api";
-import { type Counts, countFindings, type Filter, modsByName } from "./arrange";
+import { type Counts, countFindings, modsByName } from "./arrange";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { Duels } from "./Duels";
@@ -20,7 +20,7 @@ import { PatchView } from "./PatchView";
 import { Places } from "./Places";
 import { choicesOf, installedKeys, type PatchChoices, pairsOf } from "./patch";
 import { SettingsView } from "./Settings";
-import { TaskList } from "./Tasks";
+import { TaskList, TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 
 interface AppProps {
@@ -145,20 +145,17 @@ export default function App({ api, startLang }: AppProps) {
   const [compareAt, setCompareAt] = useState<string | null>(null);
   const [compareFrom, setCompareFrom] = useState<ViewName>("tasks");
   useEffect(() => {
-    if (patchChoices !== null || storedChoices === undefined) {
+    if (patchChoices !== null || storedChoices === undefined || report === null) {
       return;
     }
-    if (storedChoices !== null) {
-      setPatchChoicesNow(storedChoices);
-    } else if (report !== null) {
-      setPatchChoicesNow(
-        choicesOf(
-          pairsOf(report, ignored),
-          installedKeys(report),
-          report.installedPatch?.objects ?? [],
-        ),
-      );
-    }
+    // What the installed patch hides counts as decided; what the user chose
+    // since, and kept, wins over it.
+    const installed = choicesOf(
+      pairsOf(report, ignored),
+      installedKeys(report),
+      report.installedPatch?.objects ?? [],
+    );
+    setPatchChoicesNow({ ...installed, ...(storedChoices ?? {}) });
   }, [patchChoices, storedChoices, report, ignored]);
   const t = texts[lang];
 
@@ -407,27 +404,26 @@ export default function App({ api, startLang }: AppProps) {
           toolbox={toolbox}
           games={games}
           t={t}
+          scanBox={
+            askFirst ? null : (
+              <ScanBox
+                scannedAt={report?.scannedAt ?? null}
+                live={live}
+                scanning={scanning}
+                onScan={scan}
+                lang={lang}
+                t={t}
+              />
+            )
+          }
         />
         <main className="content" data-view={current}>
-          <header className="pagehead">
-            <h1>{titles[current]}</h1>
-            {report !== null && !askFirst && (
-              <span className="aside">
-                {t.lastScan}: {new Date(report.scannedAt * 1000).toLocaleString(lang)}
-              </span>
-            )}
-            {live && (
-              <span className="live-dot" title={t.liveNote}>
-                {t.live}
-              </span>
-            )}
-            <span className="spacer" />
-            {!askFirst && (
-              <button type="button" className="primary" onClick={scan} disabled={scanning}>
-                {scanning ? t.scanning : t.scan}
-              </button>
-            )}
-          </header>
+          {/* The sidebar says where the user is; only the first run needs a title. */}
+          {current === "places" && (
+            <header className="pagehead">
+              <h1>{titles[current]}</h1>
+            </header>
+          )}
 
           {scanning && (
             <p className="progress" role="status">
@@ -500,7 +496,7 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "mods" ? (
             <ModsView mods={report.mods} findings={report.findings} />
           ) : (
-            counts !== null && <Report report={report} counts={counts} lang={lang} t={t} />
+            <TasksPage report={report} />
           )}
         </main>
       </div>
@@ -535,6 +531,8 @@ interface SidebarProps {
   toolbox: RenderedToolbox | null;
   games: Games;
   t: Texts;
+  /** Scanning, with when it last happened; none before the places are confirmed. */
+  scanBox: ReactNode;
 }
 
 function Sidebar({
@@ -547,6 +545,7 @@ function Sidebar({
   toolbox,
   games,
   t,
+  scanBox,
 }: SidebarProps) {
   const open = counts === null ? null : counts.errors + counts.warnings;
   const collisions = counts === null ? null : counts.collisions;
@@ -595,6 +594,7 @@ function Sidebar({
         <span className="brand-name">Mod Mallet</span>
       </div>
       <GamePicker games={games} t={t} />
+      {scanBox}
       <nav>{items.map(navButton)}</nav>
       <nav className="nav-bottom">
         {navButton({ name: "settings", label: t.viewSettings, icon: <IconSettings /> })}
@@ -628,6 +628,40 @@ function Sidebar({
         )}
       </div>
     </aside>
+  );
+}
+
+interface ScanBoxProps {
+  scannedAt: number | null;
+  live: boolean;
+  scanning: boolean;
+  onScan: () => void;
+  lang: Lang;
+  t: Texts;
+}
+
+/** The scan button, when the last scan was, and whether Mod Mallet scans by itself. */
+function ScanBox({ scannedAt, live, scanning, onScan, lang, t }: ScanBoxProps) {
+  return (
+    <div className="scan-box">
+      <button type="button" className="primary scan-button" onClick={onScan} disabled={scanning}>
+        {scanning ? t.scanning : t.scan}
+      </button>
+      {scannedAt !== null && (
+        <span className="scan-when" title={new Date(scannedAt * 1000).toLocaleString(lang)}>
+          {t.lastScan}:{" "}
+          {new Date(scannedAt * 1000).toLocaleString(lang, {
+            dateStyle: "short",
+            timeStyle: "short",
+          })}
+        </span>
+      )}
+      {live && (
+        <span className="live-dot" title={t.liveNote}>
+          {t.liveShort}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -728,156 +762,6 @@ function GamePicker({ games, t }: { games: Games; t: Texts }) {
         ))}
       </select>
     </label>
-  );
-}
-
-interface ReportProps {
-  report: RenderedReport;
-  counts: Counts;
-  lang: Lang;
-  t: Texts;
-}
-
-function Report({ report, counts, lang, t }: ReportProps) {
-  const open = counts.errors + counts.warnings;
-  const [filter, setFilter] = useState<Filter>(open > 0 ? "open" : "info");
-  const { openCompare } = useSession();
-  const [arrange, setArrange] = useState<"category" | "pairs">(() => {
-    try {
-      return localStorage.getItem("mallet.arrange") === "pairs" ? "pairs" : "category";
-    } catch {
-      return "category";
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem("mallet.arrange", arrange);
-    } catch {
-      // Only a convenience.
-    }
-  }, [arrange]);
-
-  return (
-    <section aria-live="polite">
-      <Overview
-        report={report}
-        counts={counts}
-        filter={filter}
-        onFilter={setFilter}
-        lang={lang}
-        t={t}
-      />
-      <div className="arrange-bar">
-        <fieldset className="segmented" aria-label={t.arrangeLabel}>
-          <button
-            type="button"
-            aria-pressed={arrange === "category"}
-            onClick={() => setArrange("category")}
-          >
-            {t.arrangeCategory}
-          </button>
-          <button
-            type="button"
-            aria-pressed={arrange === "pairs"}
-            onClick={() => setArrange("pairs")}
-          >
-            {t.arrangePairs} <span className="count">{report.duels.length}</span>
-          </button>
-        </fieldset>
-        {report.duels.length > 0 && (
-          <button type="button" className="quiet" onClick={() => openCompare(null)}>
-            {t.compareOpen}
-          </button>
-        )}
-      </div>
-      {arrange === "pairs" ? (
-        <Duels duels={report.duels} findings={report.findings} />
-      ) : (
-        <>
-          {report.duels.length > 0 && (
-            <p className="arrange-note aside">{t.arrangeDuelsAside(report.duels.length)}</p>
-          )}
-          <TaskList findings={report.findings} filter={filter} exclude={inDuels(report)} />
-        </>
-      )}
-
-      <details className="sources">
-        <summary className="more">{t.whatWasRead}</summary>
-        <dl>
-          {report.locations.map(({ location, roleLabel, originLabel }) => (
-            <div key={location.role}>
-              <dt>{roleLabel}</dt>
-              <dd>
-                <code>{location.path}</code>
-                <span className="origin">{location.found ? originLabel : t.notFound}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </details>
-    </section>
-  );
-}
-
-interface OverviewProps {
-  report: RenderedReport;
-  counts: Counts;
-  filter: Filter;
-  onFilter: (filter: Filter) => void;
-  lang: Lang;
-  t: Texts;
-}
-
-/**
- * The state of the setup at a glance: one sentence, then how much there is
- * of each sort. The numbers are also the switches of the list below.
- */
-function Overview({ report, counts, filter, onFilter, t }: OverviewProps) {
-  const open = counts.errors + counts.warnings;
-  const state = counts.errors > 0 ? "error" : counts.warnings > 0 ? "warning" : "ok";
-  const tiles: { filter: Filter; label: string; count: number; tone: string }[] = [
-    { filter: "open", label: t.filterOpen, count: open, tone: "plain" },
-    { filter: "error", label: t.filterFix, count: counts.errors, tone: "error" },
-    { filter: "warning", label: t.filterCheck, count: counts.warnings, tone: "warning" },
-    { filter: "direct", label: t.filterDirect, count: counts.direct, tone: "direct" },
-    { filter: "info", label: t.filterNotes, count: counts.notes, tone: "info" },
-  ];
-  if (counts.ignored > 0) {
-    tiles.push({
-      filter: "ignored",
-      label: t.filterIgnored,
-      count: counts.ignored,
-      tone: "plain",
-    });
-  }
-
-  return (
-    <section className="overview" data-state={state}>
-      <h2>{open === 0 ? t.allGood : t.headline(counts.errors, counts.warnings)}</h2>
-      <div className="tiles">
-        {tiles.map((tile) => (
-          <button
-            type="button"
-            key={tile.filter}
-            className="tile"
-            data-tone={tile.tone}
-            aria-pressed={filter === tile.filter}
-            onClick={() => onFilter(tile.filter)}
-          >
-            <strong>{tile.count}</strong>
-            <span>{tile.label}</span>
-          </button>
-        ))}
-      </div>
-      <p className="meta">
-        {t.scanStats({
-          plugins: report.pluginsChecked,
-          archives: report.archivesChecked,
-          installers: report.installersChecked,
-          meshes: report.meshesChecked,
-        })}
-      </p>
-    </section>
   );
 }
 

@@ -869,7 +869,8 @@ export interface ScanLocation {
     | "downloads"
     | "unpacker"
     | "deployment-manifest"
-    | "masterlist";
+    | "masterlist"
+    | "crash-logs";
 }
 /**
  * Where mods place objects, and where they collide.

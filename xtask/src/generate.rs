@@ -18,7 +18,7 @@ use crate::tools;
 
 /// The contracts of the desktop app: for each, the schema and the file its
 /// TypeScript types are written to.
-const DESKTOP_CONTRACTS: [(&str, &str); 13] = [
+const DESKTOP_CONTRACTS: [(&str, &str); 14] = [
     (
         "schemas/rendered-report.schema.json",
         "apps/desktop/src/generated/rendered-report.ts",
@@ -70,6 +70,10 @@ const DESKTOP_CONTRACTS: [(&str, &str); 13] = [
     (
         "schemas/area-land.schema.json",
         "apps/desktop/src/generated/area-land.ts",
+    ),
+    (
+        "schemas/object-anchors.schema.json",
+        "apps/desktop/src/generated/object-anchors.ts",
     ),
 ];
 
@@ -137,6 +141,10 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         Generated {
             path: "schemas/area-land.schema.json",
             content: schema(&schemars::schema_for!(mallet_core::mesh::AreaLand))?,
+        },
+        Generated {
+            path: "schemas/object-anchors.schema.json",
+            content: schema(&schemars::schema_for!(mallet_core::anchors::ObjectAnchors))?,
         },
         Generated {
             path: "docs/src/reference/findings.md",

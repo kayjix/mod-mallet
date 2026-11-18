@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObjectAnchors",
+  "description": "Why the game relies on one placed object, and what that means for\nhiding it.",
+  "type": "object",
+  "properties": {
+    "object": {
+      "description": "The object asked about.",
+      "$ref": "#/$defs/ObjectRef"
+    },
+    "reasons": {
+      "description": "Everything found that ties it to the game, the most binding first.\nEmpty for an object nothing relies on.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Anchor"
+      }
+    },
+    "verdict": {
+      "description": "Whether it can be hidden.",
+      "$ref": "#/$defs/AnchorVerdict"
+    }
+  },
+  "required": [
+    "object",
+    "verdict",
+    "reasons"
+  ],
+  "$defs": {
+    "Anchor": {
+      "description": "One thing that ties an object to the game.",
+      "type": "object",
+      "properties": {
+        "keyword": {
+          "description": "The keyword of a linked reference, or the role the object has in a\nlocation, by internal name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "What kind of tie it is.",
+          "$ref": "#/$defs/AnchorKind"
+        },
+        "other": {
+          "description": "The other record involved, for ties to another one.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnchorOther"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AnchorKind": {
+      "description": "The kinds of ties, as seen from the object asked about.",
+      "oneOf": [
+        {
+          "description": "It is a door that leads somewhere: the other is the door on the\nother side.",
+          "type": "string",
+          "const": "teleport-door"
+        },
+        {
+          "description": "A quest names it as one of its parts (a forced alias).",
+          "type": "string",
+          "const": "quest-alias"
+        },
+        {
+          "description": "The worldspace counts it among its large objects, which are drawn\nfrom afar.",
+          "type": "string",
+          "const": "large-reference"
+        },
+        {
+          "description": "Using it activates the other.",
+          "type": "string",
+          "const": "activate-parent"
+        },
+        {
+          "description": "It switches the other on and off: the other is shown only while it\nis.",
+          "type": "string",
+          "const": "enable-parent"
+        },
+        {
+          "description": "The other links to it, for example as a place to walk to or a part\nthat belongs to it.",
+          "type": "string",
+          "const": "linked-ref"
+        },
+        {
+          "description": "It has a role in a location, such as a boss's chest, that quests\nlook for. The other is the location, if one lists it.",
+          "type": "string",
+          "const": "location-role"
+        },
+        {
+          "description": "A character's routine (an AI package) uses it.",
+          "type": "string",
+          "const": "package"
+        },
+        {
+          "description": "A script of the other refers to it.",
+          "type": "string",
+          "const": "script"
+        },
+        {
+          "description": "It is part of the distant view, which still shows it from afar.",
+          "type": "string",
+          "const": "visible-when-distant"
+        },
+        {
+          "description": "The game keeps it loaded at all times, which it does for objects\nsomething refers to.",
+          "type": "string",
+          "const": "persistent"
+        }
+      ]
+    },
+    "AnchorOther": {
+      "description": "The other record of a tie.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "Its number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "name": {
+          "description": "Its internal name, or for a placed object without one the name of\nwhat is placed.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plugin": {
+          "description": "The plugin that defined it first, by file name in lower case.",
+          "type": "string"
+        },
+        "recordType": {
+          "description": "The record's type, such as `REFR` for a placed object or `QUST`\nfor a quest.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Whether it is still in the game.",
+          "$ref": "#/$defs/OtherState"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId",
+        "recordType",
+        "state"
+      ]
+    },
+    "AnchorVerdict": {
+      "description": "Whether an object can be hidden.",
+      "oneOf": [
+        {
+          "description": "Nothing relies on it.",
+          "type": "string",
+          "const": "free"
+        },
+        {
+          "description": "It can be hidden, but something still uses it or it is seen from\nafar; the reasons say what.",
+          "type": "string",
+          "const": "careful"
+        },
+        {
+          "description": "Hiding it would break the game: a door with a way through, an\nobject a quest names, a large object of the distant view.",
+          "type": "string",
+          "const": "locked"
+        }
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "OtherState": {
+      "description": "Whether the other record of a tie is still in the game, in the version\nthe load order gives it.",
+      "oneOf": [
+        {
+          "description": "It is there.",
+          "type": "string",
+          "const": "present"
+        },
+        {
+          "description": "It is switched off when the game starts, and something may switch\nit on.",
+          "type": "string",
+          "const": "off"
+        },
+        {
+          "description": "It is deleted, or switched off for good: nothing can bring it back,\nso the tie no longer counts.",
+          "type": "string",
+          "const": "gone"
+        }
+      ]
+    }
+  }
+}

@@ -3,6 +3,7 @@
 //! Facts are plain data. Adapters produce them from files and logs; analyses
 //! read them and never touch the disk themselves (ADR 0004).
 
+pub mod crashes;
 pub mod installer;
 pub mod knowledge;
 pub mod markers;
@@ -13,6 +14,7 @@ pub mod terrain;
 
 use crate::GamePath;
 
+pub use crashes::CrashFacts;
 pub use installer::InstallerFacts;
 pub use knowledge::KnowledgeFacts;
 pub use markers::MarkerFacts;
@@ -46,10 +48,11 @@ pub struct Facts {
     pub installers: Vec<InstallerFacts>,
     /// Loose meshes that replace a mesh from an archive.
     pub mesh_overrides: Vec<MeshOverride>,
-    /// Loose meshes in the variant of the format of another game, or of
-    /// another edition of this one.
+    /// Meshes in the variant of the format of another game, or of another
+    /// edition of this one, loose or in the archives of mods.
     pub foreign_meshes: Vec<ForeignMesh>,
-    /// The textures every loose mesh names, where they could be read.
+    /// The surface textures every mesh names, loose or in the archives of
+    /// mods, where they could be read.
     pub mesh_textures: Vec<MeshTextures>,
     /// The objects mods placed in the world.
     pub objects: ObjectFacts,
@@ -61,24 +64,30 @@ pub struct Facts {
     pub markers: MarkerFacts,
     /// The navigation meshes of other plugins that mods change.
     pub navmeshes: NavmeshFacts,
+    /// The recent crashes, as the crash loggers reported them.
+    pub crashes: CrashFacts,
     /// The shapes of the models of objects that may collide.
     pub models: ModelFacts,
 }
 
-/// The textures a loose mesh names.
+/// The surface textures a mesh names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeshTextures {
     /// Where the mesh lies.
     pub path: GamePath,
+    /// The archive it is packed in, or `None` for a loose file.
+    pub archive: Option<GamePath>,
     /// The textures, by the path the game looks them up under.
     pub textures: Vec<GamePath>,
 }
 
-/// A loose mesh made for another game or another edition of the game.
+/// A mesh made for another game or another edition of the game.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForeignMesh {
     /// Where the mesh lies.
     pub path: GamePath,
+    /// The archive it is packed in, or `None` for a loose file.
+    pub archive: Option<GamePath>,
     /// The Bethesda version of its format, such as 83 for Skyrim (2011).
     pub bethesda_version: u32,
     /// Whether it bends with a skeleton, as bodies, clothes and armour do.

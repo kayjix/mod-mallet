@@ -13,6 +13,7 @@ import type { LodMesh } from "./generated/lod-mesh";
 import type { LodTiles } from "./generated/lod-tiles";
 import type { MapImage } from "./generated/map-image";
 import type { MeshView } from "./generated/mesh-view";
+import type { ObjectAnchors } from "./generated/object-anchors";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
@@ -68,10 +69,20 @@ export interface Api {
   areaObjects(world: string, x: number, y: number, radius: number): Promise<AreaObjects | null>;
   /** The game's ground of the cells within `radius` game units of a point. */
   areaLand(world: string, x: number, y: number, radius: number): Promise<AreaLand | null>;
+  /** Everything placed in an interior cell, by its editor ID. */
+  interiorObjects(cell: string): Promise<AreaObjects | null>;
   /** A mesh of the setup in its own units, textures named by path. */
   areaMesh(path: string): Promise<LodMesh | null>;
   /** A texture of the setup, no larger than `maxSide`. */
   areaTexture(path: string, maxSide: number): Promise<string | null>;
+  /**
+   * Why the game relies on each placed object, and whether it can be hidden
+   * (ADR 0046), in the same order. `worldOrCell` is the worldspace by internal
+   * name, or the interior cell. The first call for a setup reads every plugin
+   * and takes a few seconds; calling with no objects does only that. Null if
+   * the setup cannot be read.
+   */
+  objectAnchors(worldOrCell: string, objects: ObjectRef[]): Promise<ObjectAnchors[] | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -129,9 +140,12 @@ const tauriApi: Api = {
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
+  interiorObjects: (cell) => invoke<AreaObjects | null>("interior_objects", { cell }),
   areaLand: (world, x, y, radius) => invoke<AreaLand | null>("area_land", { world, x, y, radius }),
   areaMesh: (path) => invoke<LodMesh | null>("area_mesh", { path }),
   areaTexture: (path, maxSide) => invoke<string | null>("area_texture", { path, maxSide }),
+  objectAnchors: (worldOrCell, objects) =>
+    invoke<ObjectAnchors[] | null>("object_anchors", { worldOrCell, objects }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

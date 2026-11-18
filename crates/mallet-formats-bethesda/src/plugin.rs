@@ -236,11 +236,29 @@ pub fn read_request_where<R: Read + Seek>(
     request: &Request<'_>,
     descend: &dyn Fn(GroupLabel) -> bool,
 ) -> Result<Plugin, PluginError> {
-    let (header, header_len) = read_plugin_header(reader)?;
-    let mut plugin = Plugin {
+    let mut records = Vec::new();
+    let (header, damaged) = read_request_each(reader, request, descend, &mut |_, record| {
+        records.push(record);
+    })?;
+    Ok(Plugin {
         header,
-        ..Plugin::default()
-    };
+        records,
+        damaged,
+    })
+}
+
+/// Like [`read_request_where`], but hands each record to `visit`, with the
+/// plugin's header, as soon as it is read instead of keeping them all. For
+/// going through every placed object of large plugins. Returns the header
+/// and how many records or groups were skipped because they are damaged.
+pub fn read_request_each<R: Read + Seek>(
+    reader: &mut R,
+    request: &Request<'_>,
+    descend: &dyn Fn(GroupLabel) -> bool,
+    visit: &mut dyn FnMut(&PluginHeader, Record),
+) -> Result<(PluginHeader, u32), PluginError> {
+    let (header, header_len) = read_plugin_header(reader)?;
+    let mut damaged = 0;
 
     while let Some(group_header) = read_header(reader, header_len)? {
         let mut bytes = Bytes::new(&group_header);
@@ -256,7 +274,7 @@ pub fn read_request_where<R: Read + Seek>(
         let (true, Some(body_len)) = (&signature == GROUP, body_len) else {
             // Anything but a well-formed group at the top level means the
             // rest of the file cannot be trusted.
-            plugin.damaged += 1;
+            damaged += 1;
             break;
         };
 
@@ -266,7 +284,7 @@ pub fn read_request_where<R: Read + Seek>(
             let mut body = Vec::new();
             reader.by_ref().take(body_len).read_to_end(&mut body)?;
             if u64::try_from(body.len()).ok() != Some(body_len) {
-                plugin.damaged += 1;
+                damaged += 1;
             }
             let scope = if nested {
                 Scope::Nested {
@@ -278,20 +296,21 @@ pub fn read_request_where<R: Read + Seek>(
             };
             let reading = Reading {
                 header_len,
-                masters: plugin.header.masters.len(),
+                masters: header.masters.len(),
                 scope,
                 descend,
             };
-            read_group(&body, &reading, &mut Vec::new(), &mut plugin);
+            let mut sink = |record: Record| visit(&header, record);
+            read_group(&body, &reading, &mut Vec::new(), &mut sink, &mut damaged);
         } else {
             let Ok(offset) = i64::try_from(body_len) else {
-                plugin.damaged += 1;
+                damaged += 1;
                 break;
             };
             reader.seek(SeekFrom::Current(offset))?;
         }
     }
-    Ok(plugin)
+    Ok((header, damaged))
 }
 
 /// Turns a form ID from a plugin into the plugin that defines the record
@@ -395,13 +414,15 @@ struct Reading<'a> {
     descend: &'a dyn Fn(GroupLabel) -> bool,
 }
 
-/// Reads the records in the body of a group. `groups` are the nested
-/// groups the body lies in.
+/// Reads the records in the body of a group and hands each to `sink`.
+/// `groups` are the nested groups the body lies in; `damaged` counts what
+/// had to be skipped.
 fn read_group(
     body: &[u8],
     reading: &Reading<'_>,
     groups: &mut Vec<GroupLabel>,
-    plugin: &mut Plugin,
+    sink: &mut dyn FnMut(Record),
+    damaged: &mut u32,
 ) {
     let Reading {
         header_len,
@@ -414,7 +435,7 @@ fn read_group(
         let (Some(signature), Some(size), Some(third), Some(form_id)) =
             (bytes.signature(), bytes.u32(), bytes.u32(), bytes.u32())
         else {
-            plugin.damaged += 1;
+            *damaged += 1;
             return;
         };
         // The rest of the header: version control data.
@@ -430,7 +451,7 @@ fn read_group(
                     .skip(rest_of_header)
                     .and_then(|()| bytes.take(body_len))
             }) else {
-                plugin.damaged += 1;
+                *damaged += 1;
                 return;
             };
             let group = GroupLabel { group_type, label };
@@ -439,10 +460,10 @@ fn read_group(
             {
                 if groups.len() < MAX_GROUP_DEPTH {
                     groups.push(group);
-                    read_group(nested, reading, groups, plugin);
+                    read_group(nested, reading, groups, sink, damaged);
                     groups.pop();
                 } else {
-                    plugin.damaged += 1;
+                    *damaged += 1;
                 }
             }
             continue;
@@ -450,7 +471,7 @@ fn read_group(
 
         let flags = third;
         let Some(data) = bytes.skip(rest_of_header).and_then(|()| bytes.take(size)) else {
-            plugin.damaged += 1;
+            *damaged += 1;
             return;
         };
         if let Scope::Nested { records, overrides } = scope
@@ -465,14 +486,14 @@ fn read_group(
             decompress(data).map(|data| read_subrecords(&data))
         };
         match subrecords {
-            Some(subrecords) => plugin.records.push(Record {
+            Some(subrecords) => sink(Record {
                 signature,
                 form_id,
                 flags,
                 subrecords,
                 groups: groups.clone(),
             }),
-            None => plugin.damaged += 1,
+            None => *damaged += 1,
         }
     }
 }

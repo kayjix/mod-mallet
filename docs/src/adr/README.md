@@ -68,3 +68,10 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0039](0039-collisions-checked-with-the-models.md) | Collisions are checked with the models, and touches count | accepted |
 | [0040](0040-collisions-as-a-worklist.md) | Collisions as a worklist, decided spot by spot | accepted |
 | [0041](0041-the-games-own-ground-up-close.md) | The game's own ground up close | accepted |
+| [0042](0042-interiors-in-3d.md) | Interiors in 3D | accepted |
+| [0043](0043-suggestions-about-whole-mods.md) | Suggestions about whole mods | accepted |
+| [0044](0044-crash-reports-point-at-suspects.md) | Crash reports point at suspects, with honest confidence | accepted |
+| [0045](0045-a-health-score-and-tasks-by-what-to-do.md) | A health score, and tasks by what to do | accepted |
+| [0046](0046-why-the-game-relies-on-an-object.md) | Why the game relies on an object, and when it may be hidden all the same | accepted |
+| [0047](0047-the-ground-painted-as-the-game-paints-it.md) | The ground painted as the game paints it | accepted |
+| [0048](0048-one-job-per-page.md) | One job per page, and a home for each thing | accepted |

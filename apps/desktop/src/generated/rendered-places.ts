@@ -56,5 +56,6 @@ export interface ScanLocation {
     | "downloads"
     | "unpacker"
     | "deployment-manifest"
-    | "masterlist";
+    | "masterlist"
+    | "crash-logs";
 }

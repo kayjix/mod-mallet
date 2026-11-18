@@ -231,11 +231,11 @@ meshes-made-for-other-game = Modelle einer Mod wurden für ein anderes Spiel gem
            *[other] { $count } Modelle dieser Mod liegen
         } im Format von { $madeFor } vor, nicht in dem des Spiels, das du spielst{ $skinned ->
             [0] .
-            [one] . Eines davon bewegt sich mit einem Skelett, wie Kleidung oder Rüstung – solche bringen das Spiel am ehesten zum Absturz.
-           *[other] . { $skinned } davon bewegen sich mit einem Skelett, wie Kleidung oder Rüstung – solche bringen das Spiel am ehesten zum Absturz.
+            [one] . Eines davon bewegt sich mit einem Skelett, wie Kleidung oder Rüstung – stürzt etwas ab oder bleibt unsichtbar, sieh zuerst nach diesem.
+           *[other] . { $skinned } davon bewegen sich mit einem Skelett, wie Kleidung oder Rüstung – stürzt etwas ab oder bleibt unsichtbar, sieh zuerst nach diesen.
         } Zum Beispiel: { $examples }.
-    .explanation = Ein Modell ist die 3D-Form eines Dings im Spiel. Jedes Spiel und jede Ausgabe eines Spiels liest Modelle in einer eigenen Variante des Formats. Mods für das ursprüngliche Skyrim von 2011 sind oft mit einigen unveränderten Modellen in die Special Edition gekommen. Unbewegliche Objekte erscheinen meist trotzdem, manchmal mit falschem Licht oder ohne Kollision. Kleidung, Rüstungen, Körper und Kreaturen, die sich mit einem Skelett bewegen, bringen das Spiel meist zum Absturz, sobald sie erscheinen, oder bleiben unsichtbar.
-    .remedy = Sieh auf der Seite der Mod nach einer Fassung für dein Spiel und installiere stattdessen diese. Gibt es keine, lassen sich die Modelle mit Cathedral Assets Optimizer umwandeln, einem kostenlosen Werkzeug genau dafür. Installiere die umgewandelten Dateien dann als eigene Mod, die diese überschreibt.
+    .explanation = Ein Modell ist die 3D-Form eines Dings im Spiel. Jedes Spiel und jede Ausgabe eines Spiels liest Modelle in einer eigenen Variante des Formats. Mods für das ursprüngliche Skyrim von 2011 sind oft mit einigen unveränderten Modellen in die Special Edition gekommen, und auch viele gepflegte Mods bringen solche Modelle mit. Die meisten funktionieren. Manche nicht: Dann bleibt das Ding, zu dem sie gehören, unsichtbar, sieht falsch aus, oder das Spiel schließt sich, sobald es erscheint – am ehesten bei Kleidung, Rüstungen und Kreaturen, die sich mit einem Skelett bewegen. Dieser Hinweis ist eine Spur für den Fall, dass so etwas passiert, kein Zeichen, dass es passieren wird.
+    .remedy = Nichts zu tun, solange das Spiel gut läuft. Stürzt etwas dieser Mod das Spiel ab oder bleibt unsichtbar, sieh auf der Seite der Mod nach einer Fassung für dein Spiel und installiere stattdessen diese. Gibt es keine, lassen sich die Modelle mit Cathedral Assets Optimizer umwandeln, einem kostenlosen Werkzeug genau dafür. Installiere die umgewandelten Dateien dann als eigene Mod, die diese überschreibt.
 
 meshes-texture-missing = Modelle einer Mod verwenden Texturen, die im Spiel fehlen
     .headline =
@@ -331,3 +331,79 @@ setup-load-order-unknown = Die Ladereihenfolge konnte nicht gelesen werden
     .summary = Plugins und Archive wurden nicht geprüft: { $reason }
     .explanation = Mod Mallet muss wissen, welche Plugins aktiv sind und in welcher Reihenfolge das Spiel sie lädt. Ohne das lässt sich nicht sagen, welche Dateien und Einträge gewinnen, deshalb sind diese Prüfungen nicht gelaufen. Die übrigen Prüfungen sind davon nicht betroffen.
     .remedy = Starte das Spiel oder deinen Mod-Manager einmal, damit die Liste der Plugins geschrieben wird, und scanne dann erneut. Ist das Spiel an einem ungewöhnlichen Ort installiert, gib Mod Mallet den Ort an.
+
+crashes-recent = Das Spiel ist kürzlich abgestürzt
+    .headline =
+        { $count ->
+            [one] 1 Absturz
+           *[other] { $count } Abstürze
+        } in den letzten { $days } Tagen, zuletzt am { $last }
+    .summary =
+        Ein Crash-Logger hat { $count ->
+            [one] einen Absturz
+           *[other] { $count } Abstürze
+        } des Spiels in den letzten { $days } Tagen aufgezeichnet, zuletzt am { $last }. Wo das Spiel versagt hat: { $examples }.
+    .explanation = Ein Crash-Logger ist eine kleine Erweiterung des Script Extenders, die bei jedem Absturz einen Bericht schreibt. Der Bericht sagt, in welcher Programmdatei das Spiel versagt hat, und nennt, was in der Nähe war: Figuren, Objekte, Modelle und die Mods, aus denen sie stammen. Ihn zu lesen ist eine Frage der Wahrscheinlichkeit, nicht der Gewissheit. Mod Mallet sieht sich die Berichte der letzten Wochen an und sagt, auf welche Mods sie hindeuten; ein Absturz im Spiel selbst, bei dem nichts von einer Mod in der Nähe war, wird gezählt, aber niemandem angelastet.
+    .remedy = Sieh dir die übrigen Meldungen zu Abstürzen an, falls es welche gibt. Stürzt das Spiel immer wieder an derselben Stelle ab, merke dir, was du gerade getan hast; das hilft jedem, der der Sache nachgeht.
+
+crashes-in-dll = Das Spiel ist in einer Programmdatei einer Mod abgestürzt
+    .headline =
+        { $file }: { $count ->
+            [one] 1 Absturz
+           *[other] { $count } Abstürze
+        } darin in letzter Zeit
+    .summary =
+        { $count ->
+            [one] Ein Absturz in letzter Zeit, am { $last }, geschah
+           *[other] { $count } Abstürze in letzter Zeit, zuletzt am { $last }, geschahen
+        } in { $file }, einer Programmdatei, die eine Mod dem Script Extender hinzufügt.
+    .explanation = Manche Mods bringen eine eigene Programmdatei mit, eine DLL, die der Script Extender ins Spiel lädt. Stürzt das Spiel ab, während es den Code dieser Datei ausführt, ist sie die wahrscheinlichste Ursache: Sie passt vielleicht nicht zur Version des Spiels, verträgt sich nicht mit einer anderen solchen Datei oder hat einen Fehler. Sicher ist das nicht: Die Datei kann auch von etwas anderem kaputte Daten bekommen haben.
+    .remedy = Sieh auf der Seite der Mod nach einem Update und nach bekannten Problemen mit deiner Spielversion. Hören die Abstürze nicht auf, deaktiviere die Mod eine Weile und sieh, ob sie dann ausbleiben.
+
+crashes-mod-involved = Absturzberichte deuten auf eine Mod hin
+    .headline =
+        { $count ->
+            [one] 1 Absturzbericht deutet
+           *[other] { $count } Absturzberichte deuten
+        } auf diese Mod hin
+    .summary =
+        { $count ->
+            [one] Ein Absturzbericht aus letzter Zeit, vom { $last }, nennt
+           *[other] { $count } Absturzberichte aus letzter Zeit, zuletzt vom { $last }, nennen
+        } Dinge dieser Mod in der Nähe des Absturzes: { $examples }.
+    .explanation = Absturzberichte zählen auf, was gerade in Gebrauch war, als das Spiel versagt hat: Figuren, Objekte, Modelle und Programmdateien auf dem Weg zum Absturz. Tauchen dort Dinge einer Mod auf, kann die Mod beteiligt sein, etwa durch ein kaputtes Modell oder eine Figur mit ungewöhnlichem Aufbau. Sie kann auch nur zufällig in der Nähe gewesen sein, vor allem an belebten Orten. Je mehr Berichte auf dieselbe Mod deuten, desto wahrscheinlicher ist sie beteiligt.
+    .remedy = Deuten mehrere Berichte auf diese Mod, sieh auf ihrer Seite nach bekannten Abstürzen und Patches. Um sicherzugehen, deaktiviere sie eine Weile oder meide den oben genannten Ort oder Gegenstand und sieh, ob die Abstürze ausbleiben.
+mods-collides-widely = Vorschlag: Eine Mod kollidiert an vielen Orten mit anderen Mods
+    .headline =
+        Vorschlag: { $mod } kollidiert an { $count ->
+            [one] 1 Ort
+           *[other] { $count } Orten
+        } mit anderen Mods
+    .summary =
+        { $objects } der { $total } Objekte, die { $mod } in die Welt stellt, stehen in oder an Objekten { $modCount ->
+            [one] einer anderen Mod
+           *[other] von { $modCount } anderen Mods
+        }, an { $count } Orten: { $others }. Die Zahl hinter jeder Mod sagt, an wie vielen Orten sie mit { $mod } zusammenstößt.
+    .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Zwei Mods, die denselben Teil der Welt verändern, ohne voneinander zu wissen, stellen ihre Gebäude, Bäume und Zäune dorthin, wo die andere schon etwas hat. Ein paar solcher Orte sind normal und stehen einzeln unter den Kollisionen. Kollidiert eine Mod so oft, waren sie und die anderen Mods wahrscheinlich nicht dafür gemacht, zusammen benutzt zu werden.
+    .remedy = Entscheide, welche Fassung dieser Orte dir lieber ist. Ist es die der anderen Mods, kannst du die Mod in deinem Mod-Manager ausschalten, oder sie behalten und in der Liste der Kollisionen an allen Orten auf einmal gegen die anderen Mods verlieren lassen. Gefällt dir die Mod, behalte sie und suche auf ihrer Seite nach einem Patch, der sie mit den anderen Mods verträglich macht.
+
+mods-mostly-overridden = Vorschlag: Von einer Mod kommt kaum etwas im Spiel an
+    .headline = Vorschlag: Nur { $percent } % von { $mod } kommen im Spiel an
+    .summary = Von den { $total } Teilen von { $mod }, die Mod Mallet verglichen hat, kommen nur { $surviving } im Spiel an. Den Rest ersetzen Mods, die später geladen werden: { $overriders }. Die Zahl hinter jeder sagt, wie viele Teile sie ersetzt.
+    .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Ändern zwei Mods dasselbe, nimmt das Spiel die Fassung der Mod, die es später lädt. Mod Mallet hat die Objekte verglichen, die die Mod in die Welt stellt, die Figuren, die sie ändert, und die Dateien in ihren Archiven. Eine Mod kann noch mehr mitbringen, etwa Quests, Gegenstände oder Skripte; die sind hier nicht mitgezählt.
+    .remedy = Fehlt dir im Spiel nichts von dieser Mod, kannst du sie in deinem Mod-Manager ausschalten; das macht das Setup übersichtlicher und lädt schneller. Sieh vorher auf ihrer Seite nach: Manche Mods werden von anderen gebraucht, und die würden dann nicht mehr funktionieren. Ist dir ihre Fassung lieber, lade ihr Plugin nach den oben genannten Mods.
+
+mods-duplicates-another = Vorschlag: Eine Mod stellt größtenteils dieselben Objekte auf wie eine andere
+    .headline = Vorschlag: Behalte { $mod } oder { $other }, nicht beide
+    .summary =
+        { $count } der { $total } Objekte, die { $mod } in die Welt stellt, stellt auch { $other } auf, dasselbe Modell am selben Ort. { $patchCount ->
+            [0] Für { $mod } allein ist keine andere Mod gemacht.
+            [one] Für { $mod } allein ist ein Plugin gemacht: { $patches }.
+           *[other] Für { $mod } allein sind { $patchCount } Plugins gemacht: { $patches }.
+        } { $otherPatchCount ->
+            [0] Für { $other } allein ist keine andere Mod gemacht.
+            [one] Für { $other } allein ist ein Plugin gemacht: { $otherPatches }.
+           *[other] Für { $other } allein sind { $otherPatchCount } Plugins gemacht: { $otherPatches }.
+        }
+    .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Sammlungen („all in one“) enthalten oft Mods, die es auch einzeln gibt, und zwei Mods können denselben Ort auf dieselbe Weise umbauen. Sind beide installiert, stehen dieselben Gebäude doppelt am selben Ort, und ihre Oberflächen flackern. Ein Plugin, das für eine der beiden gemacht ist, etwa ein Kompatibilitäts-Patch, funktioniert nur mit dieser, und das ist ein guter Grund, sie zu behalten.
+    .remedy = Behalte die, die dir lieber ist, und schalte die andere in deinem Mod-Manager aus; nimm lieber die, für die die Patches gemacht sind, die du benutzt. Bevor du eine ausschaltest, sieh nach, ob sie etwas mitbringt, das der anderen fehlt, etwa einen Innenraum: Dann behalte beide und lass in der Liste der Kollisionen eine von ihnen an allen Orten auf einmal verlieren.

@@ -1,15 +1,16 @@
 //! Meshes made for another game, or for another edition of this one.
 //!
 //! The meshes of one mod usually come from the same place, so they are
-//! reported per mod and per game they were made for. Meshes that bend with
+//! reported per mod, naming every game they were made for. Meshes that
+//! bend with
 //! a skeleton are named first: they are the ones that make the game crash
 //! when someone puts them on.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mallet_core::{Finding, ModRef, Subject, kinds};
 
-use crate::{Analysis, Context};
+use crate::{Analysis, Context, is_used};
 
 /// How many meshes a finding names.
 const EXAMPLE_LIMIT: usize = 5;
@@ -34,22 +35,26 @@ impl Analysis for ForeignMeshes {
     }
 
     fn run(&self, context: &Context<'_>) -> Vec<Finding> {
-        // By the mod that brings them and the game they were made for. A
-        // `BTreeMap` keeps the order of the meshes stable.
-        let mut groups: BTreeMap<(Option<ModRef>, &str), Vec<_>> = BTreeMap::new();
+        // By the mod that brings them. A `BTreeMap` keeps the order of the
+        // meshes stable.
+        let mut groups: BTreeMap<Option<ModRef>, Vec<_>> = BTreeMap::new();
         for mesh in &context.facts.foreign_meshes {
-            let Some(game) = made_for(mesh.bethesda_version) else {
+            if made_for(mesh.bethesda_version).is_none() {
                 continue;
-            };
+            }
+            let archive = mesh.archive.as_ref();
+            if !is_used(context, &mesh.path, archive) {
+                continue;
+            }
             groups
-                .entry((context.mods.provider_of(&mesh.path), game))
+                .entry(context.mods.provider_of(archive.unwrap_or(&mesh.path)))
                 .or_default()
                 .push(mesh);
         }
 
         groups
             .into_iter()
-            .filter_map(|((provider, game), mut meshes)| {
+            .filter_map(|(provider, mut meshes)| {
                 meshes.sort_by_key(|mesh| (!mesh.skinned, mesh.path.clone()));
                 let first = meshes.first()?;
                 let subject = match &provider {
@@ -62,6 +67,10 @@ impl Analysis for ForeignMeshes {
                     },
                 };
                 let skinned = meshes.iter().filter(|mesh| mesh.skinned).count();
+                let games: BTreeSet<&str> = meshes
+                    .iter()
+                    .filter_map(|mesh| made_for(mesh.bethesda_version))
+                    .collect();
                 let examples: Vec<&str> = meshes
                     .iter()
                     .take(EXAMPLE_LIMIT)
@@ -71,7 +80,7 @@ impl Analysis for ForeignMeshes {
                     Finding::new(&kinds::MESHES_MADE_FOR_OTHER_GAME, subject)
                         .with_arg("count", i64::try_from(meshes.len()).unwrap_or(i64::MAX))
                         .with_arg("skinned", i64::try_from(skinned).unwrap_or(i64::MAX))
-                        .with_arg("madeFor", game)
+                        .with_arg("madeFor", games.into_iter().collect::<Vec<_>>().join(", "))
                         .with_arg("examples", examples.join(", "))
                         .with_provider(provider),
                 )
@@ -82,7 +91,7 @@ impl Analysis for ForeignMeshes {
 
 #[cfg(test)]
 mod tests {
-    use mallet_core::facts::ForeignMesh;
+    use mallet_core::facts::{ArchiveFacts, ForeignMesh};
     use mallet_core::{ArgValue, Confidence, Facts, GamePath, NoModSource, Severity};
 
     use super::*;
@@ -92,6 +101,7 @@ mod tests {
     fn mesh(path: &str, version: u32, skinned: bool) -> ForeignMesh {
         ForeignMesh {
             path: GamePath::new(path),
+            archive: None,
             bethesda_version: version,
             skinned,
         }
@@ -122,8 +132,8 @@ mod tests {
         let [finding] = found.as_slice() else {
             panic!("expected one finding, got {found:?}");
         };
-        assert_eq!(finding.severity, Severity::Warning);
-        assert_eq!(finding.confidence, Confidence::Likely);
+        assert_eq!(finding.severity, Severity::Info);
+        assert_eq!(finding.confidence, Confidence::Hint);
         assert_eq!(
             finding.id.as_str(),
             "meshes.made-for-other-game:mod:test:Masks"
@@ -134,6 +144,75 @@ mod tests {
         assert_eq!(
             finding.args["examples"],
             ArgValue::from("data/meshes/armor/mask.nif, data/meshes/clutter/barrel.nif")
+        );
+    }
+
+    #[test]
+    fn packed_meshes_count_where_the_game_takes_them_from_their_archive() {
+        let packed = |path: &str, archive: &str| ForeignMesh {
+            archive: Some(GamePath::new(archive)),
+            ..mesh(path, 83, false)
+        };
+        let facts = Facts {
+            // The loose barrel covers the packed one.
+            loose_files: vec![GamePath::new("data/meshes/barrel.nif")],
+            archives: vec![
+                ArchiveFacts {
+                    path: GamePath::new("data/old.bsa"),
+                    files: vec![
+                        GamePath::new("data/meshes/barrel.nif"),
+                        GamePath::new("data/meshes/crate.nif"),
+                    ],
+                },
+                ArchiveFacts {
+                    path: GamePath::new("data/new.bsa"),
+                    files: vec![GamePath::new("data/meshes/crate.nif")],
+                },
+            ],
+            foreign_meshes: vec![
+                packed("data/meshes/barrel.nif", "data/old.bsa"),
+                // The later archive's crate wins over this one.
+                packed("data/meshes/crate.nif", "data/old.bsa"),
+                packed("data/meshes/crate.nif", "data/new.bsa"),
+            ],
+            ..Facts::default()
+        };
+        let mods = Mods(vec![("data/new.bsa", "New Crates")]);
+        let found = findings(&facts, &mods);
+
+        let [finding] = found.as_slice() else {
+            panic!("expected one finding, got {found:?}");
+        };
+        assert_eq!(
+            finding.id.as_str(),
+            "meshes.made-for-other-game:mod:test:New Crates"
+        );
+        assert_eq!(
+            finding.args["examples"],
+            ArgValue::from("data/meshes/crate.nif")
+        );
+    }
+
+    #[test]
+    fn meshes_of_one_mod_for_two_games_are_one_finding() {
+        let facts = Facts {
+            foreign_meshes: vec![
+                mesh("data/meshes/a.nif", 83, false),
+                mesh("data/meshes/b.nif", 34, false),
+            ],
+            ..Facts::default()
+        };
+        let mods = Mods(vec![
+            ("data/meshes/a.nif", "Mixed"),
+            ("data/meshes/b.nif", "Mixed"),
+        ]);
+        let found = findings(&facts, &mods);
+        let [finding] = found.as_slice() else {
+            panic!("expected one finding, got {found:?}");
+        };
+        assert_eq!(
+            finding.args["madeFor"],
+            ArgValue::from("Fallout 3 / New Vegas, Skyrim (2011)")
         );
     }
 

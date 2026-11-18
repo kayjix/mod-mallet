@@ -24,6 +24,7 @@ location-manager-state = Vortex's saved state
 location-downloads = Vortex's downloaded mod archives
 location-unpacker = Program for looking into mod archives
 location-masterlist = LOOT's list of known plugin problems (masterlist)
+location-crash-logs = Folder of crash reports
 origin-given = named by you
 origin-registry = from the entry the game's launcher wrote into the Windows registry
 origin-standard = at its standard place

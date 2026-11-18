@@ -50,6 +50,8 @@ pub enum LocationRole {
     /// The list of community-maintained rules about plugins, the LOOT
     /// masterlist.
     Masterlist,
+    /// A folder crash loggers write their reports to.
+    CrashLogs,
 }
 
 /// How Mod Mallet came to look at a place.

@@ -312,6 +312,16 @@ fn area_objects(
     ))
 }
 
+/// Everything placed in an interior cell, by its editor ID (ADR 0042).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn interior_objects(cell: String) -> Result<Option<mallet_core::mesh::AreaObjects>, String> {
+    Ok(mallet_engine::interior_objects(
+        &settings()?.scan_options(),
+        &cell,
+    ))
+}
+
 /// The game's ground of the cells around a point of a worldspace (ADR 0041).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -326,6 +336,21 @@ fn area_land(
         &world,
         [x, y],
         radius,
+    ))
+}
+
+/// Why the game relies on each placed object, and whether it can be hidden
+/// (ADR 0046).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn object_anchors(
+    world_or_cell: String,
+    objects: Vec<ObjectRef>,
+) -> Result<Option<Vec<mallet_core::anchors::ObjectAnchors>>, String> {
+    Ok(mallet_engine::object_anchors(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        &objects,
     ))
 }
 
@@ -557,6 +582,8 @@ pub fn run() -> tauri::Result<()> {
             lod_texture,
             area_objects,
             area_land,
+            interior_objects,
+            object_anchors,
             area_mesh,
             area_texture,
             ranking,

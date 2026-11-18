@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import {
   ActionResult,
   type ActionState,
@@ -13,13 +13,25 @@ import {
   isCollision,
   isDirect,
   modsOf,
+  openTaskCount,
   type Section,
+  type Step,
   sectionsFor,
+  stepsFor,
 } from "./arrange";
-import type { MapSpot, RenderedAction, RenderedFinding } from "./generated/rendered-report";
+import { Duels } from "./Duels";
+import type {
+  MapSpot,
+  RenderedAction,
+  RenderedFinding,
+  RenderedReport,
+} from "./generated/rendered-report";
+import { reportSpots, type SpotState, weightOf } from "./health";
 import type { Texts } from "./i18n";
+import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
 import { chooseFinding, pairFor } from "./patch";
+import "./overview.css";
 
 /** A group with more findings than this starts folded. */
 const OPEN_GROUP_LIMIT = 4;
@@ -130,8 +142,15 @@ function GroupRow({ group }: { group: Group }) {
 }
 
 /** One finding: a line, and behind it what it means and what to do. */
-function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; nested?: boolean }) {
+export function FindingRow({
+  rendered,
+  nested = false,
+}: {
+  rendered: RenderedFinding;
+  nested?: boolean;
+}) {
   const { t, mods, spots } = useSession();
+  const o = useOverviewTexts();
   const [open, setOpen] = useState(false);
   const action = useAction();
   const bodyId = useId();
@@ -146,6 +165,7 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
   // The mod a finding is about, on its line, unless the line names it.
   const provider = finding.provider?.name;
   const showProvider = provider != null && !rendered.headline.includes(provider);
+  const crash = weightOf(rendered).impact === "crash";
 
   return (
     <li className="finding" data-severity={finding.severity}>
@@ -159,6 +179,11 @@ function FindingRow({ rendered, nested = false }: { rendered: RenderedFinding; n
         >
           <span className="chevron" aria-hidden="true" />
           <span className="line-title">{rendered.headline}</span>
+          {crash && (
+            <span className="impact-chip" data-impact="crash">
+              {o.crashTag}
+            </span>
+          )}
           {showProvider && <span className="line-mod">{provider}</span>}
         </button>
         {rendered.actions.map((available) => (
@@ -363,5 +388,226 @@ function Spots({ spots }: { spots: MapSpot[] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** The steps that are only to know or optional; their findings start folded. */
+const FOLDED: Step[] = ["notes", "ignored"];
+
+/**
+ * The task page: what there is to do, grouped by what the user does about
+ * it. The collisions have their own page and are summed up in one line;
+ * recommendations and notes come after everything that is required.
+ */
+export function TasksPage({ report }: { report: RenderedReport }) {
+  const { t, ignored } = useSession();
+  const o = useOverviewTexts();
+  // Duels about the same thing in two mods are decided as a whole; their
+  // findings are shown in the duel, not again on their own. Duels about
+  // placed objects belong to the collisions.
+  const duels = useMemo(
+    () =>
+      report.duels.filter((rendered) =>
+        rendered.duel.topics.some(({ topic }) => topic !== "objects" && topic !== "contained"),
+      ),
+    [report.duels],
+  );
+  const inDuels = useMemo(
+    () => new Set(report.duels.flatMap((rendered) => rendered.duel.findings)),
+    [report.duels],
+  );
+  const steps = useMemo(
+    () =>
+      stepsFor(
+        report.findings.filter(
+          (rendered) => ignored.has(rendered.finding.id) || !inDuels.has(rendered.finding.id),
+        ),
+        ignored,
+      ),
+    [report.findings, ignored, inDuels],
+  );
+  const open = openTaskCount(report.findings, ignored);
+  const hasAdvice = steps.some(({ step }) => step === "advice");
+  const hasChoose = steps.some(({ step }) => step === "choose");
+
+  return (
+    <section className="tasks-page" aria-live="polite">
+      <h2 className="tasks-headline">{open === 0 ? o.tasksHeadlineNone : o.tasksHeadline(open)}</h2>
+      <CollisionsCard report={report} />
+
+      {steps.map(({ step, groups, count }) => (
+        <StepSection
+          key={step}
+          step={step}
+          count={step === "choose" ? count + duels.length : count}
+          folded={FOLDED.includes(step)}
+        >
+          {step === "choose" && duels.length > 0 && (
+            <Duels duels={duels} findings={report.findings} />
+          )}
+          {groups.length > 0 && <GroupList groups={groups} />}
+        </StepSection>
+      ))}
+      {!hasChoose && duels.length > 0 && (
+        <StepSection step="choose" count={duels.length} folded={false}>
+          <Duels duels={duels} findings={report.findings} />
+        </StepSection>
+      )}
+      {!hasAdvice && (
+        <StepSection step="advice" count={0} folded={false}>
+          <p className="aside step-empty">{o.adviceEmpty}</p>
+        </StepSection>
+      )}
+
+      <p className="meta tasks-stats">
+        {t.scanStats({
+          plugins: report.pluginsChecked,
+          archives: report.archivesChecked,
+          installers: report.installersChecked,
+          meshes: report.meshesChecked,
+        })}
+      </p>
+      <details className="sources">
+        <summary className="more">{t.whatWasRead}</summary>
+        <dl>
+          {report.locations.map(({ location, roleLabel, originLabel }) => (
+            <div key={location.role}>
+              <dt>{roleLabel}</dt>
+              <dd>
+                <code>{location.path}</code>
+                <span className="origin">{location.found ? originLabel : t.notFound}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+    </section>
+  );
+}
+
+/** One step of the task page: what to do, why, and the findings it is about. */
+function StepSection({
+  step,
+  count,
+  folded,
+  children,
+}: {
+  step: Step;
+  count: number;
+  folded: boolean;
+  children: ReactNode;
+}) {
+  const o = useOverviewTexts();
+  const [open, setOpen] = useState(!folded);
+  const { title, hint } = o.step[step];
+  return (
+    <section className="tasks step" data-step={step}>
+      <header>
+        <h2>
+          {title} {count > 0 && <span className="count">{count}</span>}
+        </h2>
+        {step === "advice" && <span className="tag optional-tag">{o.optional}</span>}
+        <span className="tasks-hint">{hint}</span>
+        <span className="spacer" />
+        {folded && (
+          <button
+            type="button"
+            className="small quiet"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? "–" : o.showFolded(count)}
+          </button>
+        )}
+      </header>
+      {open && children}
+    </section>
+  );
+}
+
+/** The groups of a step, one line per finding or per kind. */
+function GroupList({ groups }: { groups: Group[] }) {
+  return (
+    <ul>
+      {groups.map((group) =>
+        group.findings.length === 1 ? (
+          group.findings.map((rendered) => (
+            <FindingRow key={rendered.finding.id} rendered={rendered} />
+          ))
+        ) : (
+          <GroupRow key={group.kind} group={group} />
+        ),
+      )}
+    </ul>
+  );
+}
+
+/**
+ * The collisions in one line: how many spots are left to decide, and the
+ * way to the worklist; and what is decided but not in the patch yet.
+ */
+function CollisionsCard({ report }: { report: RenderedReport }) {
+  const { ignored, patchChoices, decideSpot, showPatch } = useSession();
+  const o = useOverviewTexts();
+  const spots = useMemo(
+    () => reportSpots(report, ignored, patchChoices),
+    [report, ignored, patchChoices],
+  );
+  const states: Record<SpotState, number> = { open: 0, kept: 0, waiting: 0, patched: 0 };
+  for (const spot of spots) {
+    states[spot.state] += 1;
+  }
+  // Pairs of mods, whatever kind of collision they have.
+  const pairOf = useMemo(() => {
+    const found = new Map<string, string>();
+    for (const { finding } of report.findings) {
+      const names = [
+        finding.args.first,
+        finding.args.second,
+        finding.args.plugin,
+        finding.args.container,
+      ]
+        .filter((name) => typeof name === "string")
+        .map(String)
+        .sort();
+      found.set(finding.id, names.join("|"));
+    }
+    return found;
+  }, [report.findings]);
+  const pairs = new Set(
+    spots
+      .filter((spot) => spot.state === "open")
+      .map((spot) => pairOf.get(spot.finding) ?? spot.finding),
+  ).size;
+  const first = spots.find((spot) => spot.state === "open") ?? spots[0];
+
+  return (
+    <section className="panel collisions-card" data-open={states.open > 0}>
+      <div className="collisions-card-text">
+        <strong>{o.collisionsTitle}</strong>
+        <span>
+          {spots.length === 0
+            ? o.collisionsNone
+            : states.open === 0
+              ? o.collisionsAllDecided(spots.length)
+              : o.collisionsSummary(states.open, spots.length, pairs)}
+          {states.waiting > 0 && ` ${o.collisionsWaiting(states.waiting)}`}
+        </span>
+      </div>
+      {states.waiting > 0 && (
+        <button type="button" onClick={showPatch}>
+          {o.collisionsToPatch}
+        </button>
+      )}
+      {first !== undefined && (
+        <button
+          type="button"
+          className={states.open > 0 ? "primary" : undefined}
+          onClick={() => decideSpot(first.spot)}
+        >
+          {o.collisionsOpen}
+        </button>
+      )}
+    </section>
   );
 }
