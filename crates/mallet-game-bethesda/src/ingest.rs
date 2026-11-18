@@ -16,11 +16,12 @@ use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
 use loadorder::GameSettings;
+use mallet_core::facts::objects::PlaceName;
 use mallet_core::facts::{
     ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, MeshTextures, NavmeshFacts, ObjectFacts,
     PluginFacts, TerrainFacts, UnreadableFile,
 };
-use mallet_core::{GamePath, TextCache};
+use mallet_core::{GamePath, TextCache, WorldOrigin};
 use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
@@ -145,20 +146,10 @@ pub fn read_setup(
                 placed.add(&name, &plugin);
                 add_navmeshes(&mut facts.navmeshes, reading, &name, &plugin);
                 map_markers.add(&name, &file, official, &plugin);
-                if let Some(contribution) = cached_land {
-                    land.merge(contribution);
-                } else {
-                    let contribution = terrain::Contribution::of(&name, &plugin);
-                    if official && let Some(fingerprint) = fingerprint(&file) {
-                        cache.put(
-                            LAND_CACHE,
-                            &name.to_lowercase(),
-                            &fingerprint,
-                            &contribution.to_text(),
-                        );
-                    }
-                    land.merge(contribution);
-                }
+                land.merge(cached_land.unwrap_or_else(|| {
+                    let names = map_markers.names(&name, &plugin);
+                    read_land(&name, &file, official, &plugin, &names, cache)
+                }));
                 facts.plugins.push(PluginFacts {
                     npcs: if game.has_face_meshes() {
                         npc::npc_facts(game, &name, &plugin)
@@ -180,7 +171,9 @@ pub fn read_setup(
         &mut facts.unreadable,
     );
     facts.objects = placed.finish();
-    facts.terrain = land.finish();
+    let shipped = crate::locate::shipped_plugins(game, game_dir);
+    facts.terrain = land.finish(game, &|plugin| origin(game, &shipped, plugin));
+    name_worldspaces(&mut facts.objects, &facts.terrain);
     facts.markers = map_markers.finish();
 
     Ok(facts)
@@ -370,8 +363,66 @@ pub(crate) fn active_plugin_names(
 }
 
 /// The header and the character records of the plugin at `path`.
-/// Under which name the land of a plugin is kept in the cache.
-const LAND_CACHE: &str = "land";
+/// The land of the plugin `name` at `file`, read as `plugin`; `names` are
+/// its strings if it is localized. The land of the game's own plugins is
+/// kept in `cache`.
+fn read_land(
+    name: &str,
+    file: &Path,
+    official: bool,
+    plugin: &plugin::Plugin,
+    names: &HashMap<u32, String>,
+    cache: &dyn TextCache,
+) -> terrain::Contribution {
+    let contribution = terrain::Contribution::of(name, plugin, names);
+    if official && let Some(fingerprint) = fingerprint(file) {
+        cache.put(
+            LAND_CACHE,
+            &name.to_lowercase(),
+            &fingerprint,
+            &contribution.to_text(),
+        );
+    }
+    contribution
+}
+
+/// Whether `plugin` comes with `game`, with the Creation Club content the
+/// game lists as its own (`shipped`), or with a mod.
+fn origin(game: Game, shipped: &[String], plugin: &str) -> WorldOrigin {
+    if game.is_official(plugin) {
+        WorldOrigin::Game
+    } else if shipped
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(plugin))
+    {
+        WorldOrigin::CreationClub
+    } else {
+        WorldOrigin::Mod
+    }
+}
+
+/// Gives every worldspace its internal name among the names of places.
+/// The worldspaces of the game's own plugins are named there only where a
+/// mod changes their record; their land, kept in the cache, names them all.
+fn name_worldspaces(objects: &mut ObjectFacts, terrain: &TerrainFacts) {
+    for world in &terrain.worldspaces {
+        if let Some(editor_id) = &world.editor_id
+            && !objects.place_names.iter().any(|name| name.id == world.id)
+        {
+            objects.place_names.push(PlaceName {
+                id: world.id.clone(),
+                editor_id: editor_id.clone(),
+            });
+        }
+    }
+    objects.place_names.sort_by(|a, b| a.id.cmp(&b.id));
+}
+
+/// Under which name the land of a plugin is kept in the cache. Raised when
+/// what is kept changes: the second version keeps the worldspaces' own
+/// records too, which the game's plugins are otherwise not read for once
+/// their land is kept.
+const LAND_CACHE: &str = "land-2";
 
 /// How much of a plugin is read.
 #[derive(Clone, Copy, PartialEq, Eq)]

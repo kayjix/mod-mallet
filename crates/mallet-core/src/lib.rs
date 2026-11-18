@@ -38,8 +38,8 @@ pub use mods::{ModRef, ModSource, NoModSource};
 pub use path::GamePath;
 pub use report::{
     FilePreview, GameChoice, GameInfo, GameSupport, InstalledPatch, KnownGame, LocationOrigin,
-    LocationRole, MapCell, MapImage, MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo, PlaceKind,
-    PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotKind, SpotLocation, SpotPart,
-    WorldMap,
+    LocationRole, MapBounds, MapCell, MapImage, MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo,
+    PlaceKind, PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotKind, SpotLocation,
+    SpotPart, WorldMap, WorldOrigin,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};

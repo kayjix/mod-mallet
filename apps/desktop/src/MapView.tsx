@@ -47,6 +47,7 @@ import {
   worstKind,
 } from "./map-places";
 import { MapObjectActions } from "./object-actions";
+import { type WorldTexts, worldTexts } from "./world-texts";
 
 interface MapViewProps {
   map: WorldMap;
@@ -81,30 +82,22 @@ const cellOf = (coordinate: number) => Math.floor(coordinate / CELL);
  * collide. Drawn flat or as a relief in 3D.
  */
 export function MapView({ map, headlines, focus }: MapViewProps) {
-  const { t } = useSession();
+  const { t, lang } = useSession();
+  const own = worldTexts[lang];
   const focusWorld =
     focus?.location.type === "exterior"
-      ? map.worlds.findIndex((world) => world.name === (focus.location as { world: string }).world)
+      ? map.worlds.findIndex((world) =>
+          showsWorld(world, (focus.location as { world: string }).world),
+        )
       : -1;
+  // The world of the spot the map was opened for, else the game's main
+  // world, which comes first.
   const [worldIndex, setWorldIndex] = useState(Math.max(focusWorld, 0));
   const [owner, setOwner] = useState(-1);
   const [mode, setMode] = useState<"flat" | "relief">("flat");
-  // Whether the cells with objects of mods are tinted; remembered.
-  const [showCells, setShowCells] = useState(() => {
-    try {
-      return localStorage.getItem("mallet.mapCells") !== "off";
-    } catch {
-      return true;
-    }
-  });
-  const changeCells = (next: boolean) => {
-    setShowCells(next);
-    try {
-      localStorage.setItem("mallet.mapCells", next ? "on" : "off");
-    } catch {
-      // Only a convenience.
-    }
-  };
+  // The cells are a grid to pick from, not coloured by how much is in
+  // them; only the cells of a mod picked above are marked.
+  const showCells = owner >= 0;
   const world = map.worlds[worldIndex];
   const [filter, setFilter] = useState<PlaceFilter>(() => startingFilter(world));
   const [picked, setPicked] = useState<Picked | null>(
@@ -130,7 +123,10 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   const worldSpots = useMemo(
     () =>
       map.spots.filter(
-        (spot) => spot.location.type === "exterior" && spot.location.world === world?.name,
+        (spot) =>
+          spot.location.type === "exterior" &&
+          world !== undefined &&
+          showsWorld(world, spot.location.world),
       ),
     [map.spots, world],
   );
@@ -146,10 +142,14 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
         <label className="control">
           {t.mapWorld}
           <select value={worldIndex} onChange={(event) => chooseWorld(Number(event.target.value))}>
-            {map.worlds.map((candidate, index) => (
-              <option key={candidate.name} value={index}>
-                {candidate.name}
-              </option>
+            {worldGroups(map.worlds).map((group) => (
+              <optgroup key={group.key} label={own.group[group.key](group.worlds.length)}>
+                {group.worlds.map(({ world: candidate, index }) => (
+                  <option key={candidate.name} value={index}>
+                    {worldLabel(candidate, own)}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -172,15 +172,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             {t.mapRelief}
           </button>
         </fieldset>
-        <label className="control control-check">
-          <input
-            type="checkbox"
-            checked={showCells}
-            onChange={(event) => changeCells(event.target.checked)}
-          />
-          {t.mapModCells}
-        </label>
-        <Legend cells={showCells} />
+        <Legend />
       </div>
       <div className="map-body map-body-places">
         <PlacesPanel
@@ -243,18 +235,56 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   );
 }
 
-function Legend({ cells }: { cells: boolean }) {
+/** Whether the map of `world` shows `name`: the world itself or one drawn on it. */
+function showsWorld(world: MapWorld, name: string): boolean {
+  return world.name === name || (world.children ?? []).includes(name);
+}
+
+type WorldGroupKey = "game" | "creationClub" | "mods" | "small";
+
+/** The worlds in the picker's groups, in order, each with its place in the list. */
+function worldGroups(
+  worlds: MapWorld[],
+): { key: WorldGroupKey; worlds: { world: MapWorld; index: number }[] }[] {
+  const order: WorldGroupKey[] = ["game", "creationClub", "mods", "small"];
+  const keyOf = (world: MapWorld): WorldGroupKey =>
+    world.small
+      ? "small"
+      : world.origin === "creationClub"
+        ? "creationClub"
+        : world.origin === "mod"
+          ? "mods"
+          : "game";
+  return order
+    .map((key) => ({
+      key,
+      worlds: worlds
+        .map((world, index) => ({ world, index }))
+        .filter(({ world }) => keyOf(world) === key),
+    }))
+    .filter((group) => group.worlds.length > 0);
+}
+
+/** A world as the picker names it: what the game calls it, and its internal name. */
+function worldLabel(world: MapWorld, own: WorldTexts): string {
+  const title = world.title || world.name;
+  const internal =
+    title.replace(/\s/g, "").toLowerCase() === world.name.toLowerCase() ? null : world.name;
+  // The mod it comes with, unless the world bears the mod's name.
+  const origin = world.originName ?? null;
+  const mod =
+    world.origin !== "game" &&
+    origin !== null &&
+    origin.replace(/\.es[mpl]$/i, "").toLowerCase() !== title.toLowerCase()
+      ? own.from(origin)
+      : null;
+  return [title, internal, mod].filter((part) => part !== null).join(" · ");
+}
+
+function Legend() {
   const { t } = useSession();
   return (
     <div className="legend">
-      {cells && (
-        <>
-          <span className="swatch" data-level="1" /> {t.mapLegendOne}
-          <span className="swatch" data-level="2" /> {t.mapLegendTwo}
-          <span className="swatch" data-level="3" /> {t.mapLegendThree}
-          <span className="swatch" data-level="4" /> {t.mapLegendMany}
-        </>
-      )}
       {SPOT_KINDS.map((kind) => (
         <span key={kind} className="legend-item">
           <span className="swatch swatch-spot" data-kind={kind} /> {t.spotKinds[kind]}

@@ -417,7 +417,7 @@ cache must not drop them). Each gets:
 | `title` | FULL, through the game's string files in the user's language | what the picker and the page show |
 | `origin` | the plugin that defines the WRLD: the game and its DLC, Creation Club content, or a mod (named) | the picker's groups |
 | `parent` | WNAM, with the flags for using the parent's land and map | a child worldspace (Whiterun inside its walls) is shown on its parent's map, its spots and places drawn there |
-| `bounds` | MNAM's cell bounds, else NAM0/NAM9, else the cells with land | the whole land, not only where mods place things |
+| `bounds` | NAM0/NAM9's corners, else MNAM's cells (the part the world map shows, much smaller for Tamriel), else the cells with land | the whole land, not only where mods place things |
 | `cells` | count of cells with land | *small* worlds |
 | `lod` | whether `meshes/terrain/<name>/` exists, loose or in an archive | relief from LOD, or from the land itself |
 

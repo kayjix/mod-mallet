@@ -1,17 +1,22 @@
 //! Where mods place objects, cell by cell.
 //!
-//! The map shows each worldspace as a grid of cells, how many objects mods
-//! place in each and which mods they are, and the spots where objects of
-//! two mods collide. It is built from the same facts as the findings and
+//! The map shows each worldspace with land or places as a grid of cells
+//! over its land, which mods place objects in each cell, the places of the
+//! game's map and the spots where objects of two mods collide. A
+//! worldspace that uses its parent's land, such as a city inside its
+//! walls, is shown on its parent's map. It is built from the same facts as the findings and
 //! decides nothing.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use mallet_core::facts::RecordId;
 use mallet_core::facts::markers::MapMarkerFact;
-use mallet_core::facts::objects::Place;
-use mallet_core::facts::terrain::{SAMPLES_PER_CELL, TerrainWorld};
-use mallet_core::{MapCell, MapMarker, MapTerrain, MapWorld, WorldMap};
+use mallet_core::facts::objects::{Place, PlacedObject};
+use mallet_core::facts::terrain::{SAMPLES_PER_CELL, TerrainWorld, WorldspaceFacts};
+use mallet_core::{
+    MapBounds, MapCell, MapMarker, MapSpot, MapTerrain, MapWorld, SpotLocation, WorldMap,
+    WorldOrigin,
+};
 
 use crate::Context;
 use crate::objects::Owners;
@@ -21,36 +26,51 @@ use crate::places::{self, Origin};
 type CellCount<'a> = (u32, BTreeSet<&'a str>);
 
 /// The map of the setup in `context`.
-pub fn world_map(context: &Context<'_>) -> WorldMap {
-    let objects = &context.facts.objects;
+pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
+    let facts: &'a mallet_core::Facts = context.facts;
+    let objects = &facts.objects;
+    let terrain_facts = &facts.terrain;
     let names: HashMap<&RecordId, &str> = objects
         .place_names
         .iter()
         .map(|name| (&name.id, name.editor_id.as_str()))
+        .chain(
+            terrain_facts
+                .worldspaces
+                .iter()
+                .filter_map(|world| Some((&world.id, world.editor_id.as_deref()?))),
+        )
         .collect();
+    let name_of = |worldspace: &RecordId| {
+        names
+            .get(worldspace)
+            .map_or_else(|| worldspace.to_string(), |name| (*name).to_owned())
+    };
+    let records: HashMap<&'a RecordId, &'a WorldspaceFacts> = terrain_facts
+        .worldspaces
+        .iter()
+        .map(|world| (&world.id, world))
+        .collect();
+    let lands: HashMap<&RecordId, &TerrainWorld> = terrain_facts
+        .worlds
+        .iter()
+        .map(|land| (&land.worldspace, land))
+        .collect();
+    let host = |worldspace: &'a RecordId| -> &'a RecordId { host_of(worldspace, &records) };
 
-    // Per worldspace and cell: how many objects, and which plugins.
-    let mut worlds: BTreeMap<&RecordId, BTreeMap<(i32, i32), CellCount<'_>>> = BTreeMap::new();
-    for object in &objects.placed {
-        let Place::Exterior { worldspace } = &object.place else {
-            continue;
-        };
-        let [x, y, _] = object.position;
-        let cell = worlds
-            .entry(worldspace)
-            .or_default()
-            .entry((x.div_euclid(4096), y.div_euclid(4096)))
-            .or_default();
-        cell.0 = cell.0.saturating_add(1);
-        cell.1.insert(object.owner());
-    }
-
-    // A worldspace with places is on the map even if no mod places objects
-    // in it.
-    let places_by_world = places_by_world(&context.facts.markers.markers);
+    let mut worlds = count_cells(&objects.placed, &host);
+    // Every worldspace with land or places is on the map, whether or not
+    // mods place objects in it.
+    let places_by_world = places_by_world(&facts.markers.markers, &host);
     for worldspace in places_by_world.keys() {
         worlds.entry(worldspace).or_default();
     }
+    for land in &terrain_facts.worlds {
+        worlds.entry(host(&land.worldspace)).or_default();
+    }
+    let mut children = children_of(&terrain_facts.worldspaces, &host, &name_of);
+    let spots = &context.collisions().spots;
+    let spot_worlds = spot_worlds(spots);
 
     // Plugins of the same mod become one owner, and owners are listed by
     // name.
@@ -81,71 +101,279 @@ pub fn world_map(context: &Context<'_>) -> WorldMap {
             .unwrap_or_default()
     };
 
-    // The worldspace where most mods meet comes first, then the busiest,
-    // then the one with the most places.
-    let mut map_worlds: Vec<((usize, u64, usize), MapWorld)> = worlds
+    let mut map_worlds: Vec<MapWorld> = worlds
         .into_iter()
         .map(|(worldspace, cells)| {
-            let total: u64 = cells.values().map(|(count, _)| u64::from(*count)).sum();
-            let cells: Vec<MapCell> = cells
-                .into_iter()
-                .map(|((x, y), (objects, plugins))| {
-                    let mut owners: Vec<u32> = plugins.into_iter().map(owner).collect();
-                    owners.sort_unstable();
-                    owners.dedup();
-                    MapCell {
-                        x,
-                        y,
-                        objects,
-                        owners,
-                    }
-                })
-                .collect();
-            let name = names
-                .get(worldspace)
-                .map_or_else(|| worldspace.to_string(), |name| (*name).to_owned());
-            let shared = cells.iter().filter(|cell| cell.owners.len() > 1).count();
-            let markers = world_markers(&places_by_world, worldspace, &name, &owner);
-            let terrain = context
-                .facts
-                .terrain
-                .worlds
-                .iter()
-                .find(|land| &land.worldspace == worldspace)
-                .and_then(|land| terrain(land, around(&occupied(&cells, &markers))));
-            (
-                (shared, total, markers.len()),
-                MapWorld {
-                    name,
-                    cells,
-                    terrain,
-                    markers,
-                },
-            )
+            let name = name_of(worldspace);
+            let children = children.remove(worldspace).unwrap_or_default();
+            let has_spot = std::iter::once(&name)
+                .chain(&children)
+                .any(|world| spot_worlds.contains(world.as_str()));
+            let mut world = MapWorld {
+                cells: map_cells(cells, &owner),
+                markers: world_markers(&places_by_world, worldspace, &name_of, &owner),
+                children,
+                name,
+                ..MapWorld::default()
+            };
+            let record = records.get(worldspace).copied();
+            describe(&mut world, record, lands.get(worldspace).copied(), has_spot);
+            world.origin_name =
+                (world.origin != WorldOrigin::Game).then(|| owners.display(&worldspace.plugin));
+            world
         })
         .collect();
-    map_worlds.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+    order(&mut map_worlds);
 
     WorldMap {
         owners: names_of_owners,
-        worlds: map_worlds.into_iter().map(|(_, world)| world).collect(),
-        spots: context.collisions().spots.clone(),
+        worlds: map_worlds,
+        spots: spots.clone(),
     }
 }
 
-/// How many cells of land are shown around the cells where mods place
-/// objects.
-const MARGIN: i32 = 8;
+/// The cells of a world for the report, each with its owners' positions
+/// among the owners of the map.
+fn map_cells(
+    cells: BTreeMap<(i32, i32), CellCount<'_>>,
+    owner: &dyn Fn(&str) -> u32,
+) -> Vec<MapCell> {
+    cells
+        .into_iter()
+        .map(|((x, y), (objects, plugins))| {
+            let mut owners: Vec<u32> = plugins.into_iter().map(owner).collect();
+            owners.sort_unstable();
+            owners.dedup();
+            MapCell {
+                x,
+                y,
+                objects,
+                owners,
+            }
+        })
+        .collect()
+}
+
+/// Fills in what the world's own record and land say: its title, origin,
+/// bounds, land and whether it is small. `has_spot` keeps it from being
+/// folded away.
+fn describe(
+    world: &mut MapWorld,
+    record: Option<&WorldspaceFacts>,
+    land: Option<&TerrainWorld>,
+    has_spot: bool,
+) {
+    let land_cells = land.map_or(0, |land| land.cells.len());
+    let bounds = record
+        .and_then(|record| record.bounds)
+        .or_else(|| land.and_then(land_bounds));
+    let shown = spanning(bounds, &occupied(&world.cells, &world.markers));
+    world.terrain = land.and_then(|land| terrain(land, shown));
+    world.title = record
+        .and_then(|record| record.title.clone())
+        .unwrap_or_else(|| readable(&world.name));
+    world.origin = record.map_or(WorldOrigin::Mod, |record| record.origin);
+    world.bounds = bounds.map(|[west, south, east, north]| MapBounds {
+        west,
+        south,
+        east,
+        north,
+    });
+    world.land_cells = u32::try_from(land_cells).unwrap_or(u32::MAX);
+    world.small = (record.is_some_and(|record| record.small) || land_cells < SMALL) && !has_spot;
+}
+
+/// Per worldspace and cell: how many objects mods place, and which
+/// plugins. A worldspace drawn on another's map, as `host` says, is
+/// counted there.
+fn count_cells<'a>(
+    placed: &'a [PlacedObject],
+    host: &dyn Fn(&'a RecordId) -> &'a RecordId,
+) -> BTreeMap<&'a RecordId, BTreeMap<(i32, i32), CellCount<'a>>> {
+    let mut worlds: BTreeMap<&RecordId, BTreeMap<(i32, i32), CellCount<'_>>> = BTreeMap::new();
+    for object in placed {
+        let Place::Exterior { worldspace } = &object.place else {
+            continue;
+        };
+        let [x, y, _] = object.position;
+        let cell = worlds
+            .entry(host(worldspace))
+            .or_default()
+            .entry((x.div_euclid(4096), y.div_euclid(4096)))
+            .or_default();
+        cell.0 = cell.0.saturating_add(1);
+        cell.1.insert(object.owner());
+    }
+    worlds
+}
+
+/// The worldspaces drawn on another's map, by that one, named by
+/// `name_of`.
+fn children_of<'a>(
+    worldspaces: &'a [WorldspaceFacts],
+    host: &dyn Fn(&'a RecordId) -> &'a RecordId,
+    name_of: &dyn Fn(&RecordId) -> String,
+) -> BTreeMap<&'a RecordId, Vec<String>> {
+    let mut children: BTreeMap<&RecordId, Vec<String>> = BTreeMap::new();
+    for world in worldspaces {
+        let drawn_on = host(&world.id);
+        if drawn_on != &world.id {
+            children
+                .entry(drawn_on)
+                .or_default()
+                .push(name_of(&world.id));
+        }
+    }
+    children
+}
+
+/// The worlds that hold a collision spot, which are never folded away.
+fn spot_worlds(spots: &[MapSpot]) -> BTreeSet<&str> {
+    spots
+        .iter()
+        .filter_map(|spot| match &spot.location {
+            SpotLocation::Exterior { world, .. } => Some(world.as_str()),
+            SpotLocation::Interior { .. } => None,
+        })
+        .collect()
+}
+
+/// Marks the game's main world, the largest of its own, and orders the
+/// worlds: the game first, its main world leading, then the Creation Club,
+/// then mods; small worlds last.
+fn order(worlds: &mut [MapWorld]) {
+    if let Some(main) = worlds
+        .iter_mut()
+        .filter(|world| world.origin == WorldOrigin::Game)
+        .max_by_key(|world| world.land_cells)
+    {
+        main.main = true;
+        main.small = false;
+    }
+    worlds.sort_by(|a, b| {
+        (a.small, a.origin, !a.main, a.title.to_lowercase(), &a.name).cmp(&(
+            b.small,
+            b.origin,
+            !b.main,
+            b.title.to_lowercase(),
+            &b.name,
+        ))
+    });
+}
+
+/// The most height samples a world's picture of its land holds.
+const MAX_SAMPLES: usize = 1_000_000;
+
+/// Worlds with fewer cells of land than this are small.
+const SMALL: usize = 64;
+
+/// The worldspace on whose map `worldspace` is drawn: its parent, if it
+/// uses the parent's land, and so on up; else itself.
+fn host_of<'a>(
+    worldspace: &'a RecordId,
+    records: &HashMap<&RecordId, &'a WorldspaceFacts>,
+) -> &'a RecordId {
+    let mut current = worldspace;
+    // A chain of parents is short; a loop in it is not followed for ever.
+    for _ in 0..8 {
+        match records
+            .get(current)
+            .and_then(|record| record.parent.as_ref().filter(|_| record.uses_parent_land))
+        {
+            Some(parent) if parent != current => current = parent,
+            _ => break,
+        }
+    }
+    current
+}
+
+/// The cells with land of a worldspace, as west, south, east, north.
+fn land_bounds(land: &TerrainWorld) -> Option<[i32; 4]> {
+    Some([
+        land.cells.iter().map(|cell| cell.x).min()?,
+        land.cells.iter().map(|cell| cell.y).min()?,
+        land.cells.iter().map(|cell| cell.x).max()?,
+        land.cells.iter().map(|cell| cell.y).max()?,
+    ])
+}
+
+/// The cells whose land is shown: the world's bounds, widened to the
+/// cells where mods place objects or places lie, as west, east, south,
+/// north. `None` for all the land.
+fn spanning(bounds: Option<[i32; 4]>, occupied: &[(i32, i32)]) -> Option<(i32, i32, i32, i32)> {
+    let [west, south, east, north] = bounds?;
+    Some((
+        occupied.iter().map(|(x, _)| *x).fold(west, i32::min),
+        occupied.iter().map(|(x, _)| *x).fold(east, i32::max),
+        occupied.iter().map(|(_, y)| *y).fold(south, i32::min),
+        occupied.iter().map(|(_, y)| *y).fold(north, i32::max),
+    ))
+}
+
+/// A worldspace's internal name made readable, for a world the game gives
+/// no name: known prefixes dropped, words split
+/// (`ccBGSSSE031BlackboneIsle` becomes `Blackbone Isle`).
+fn readable(name: &str) -> String {
+    let mut rest = name;
+    // Creation Club content: `cc`, its author's letters, its number.
+    if let Some(after) = rest.strip_prefix("cc") {
+        let letters = after.trim_start_matches(|c: char| c.is_ascii_uppercase());
+        let digits = letters.trim_start_matches(|c: char| c.is_ascii_digit());
+        if letters.len() < after.len() && digits.len() < letters.len() && !digits.is_empty() {
+            rest = digits;
+        }
+    }
+    // The game's DLC: `DLC1`, `DLC01`, `DLC2`.
+    if let Some(after) = rest.strip_prefix("DLC") {
+        let digits = after.trim_start_matches(|c: char| c.is_ascii_digit());
+        if digits.len() < after.len() && !digits.is_empty() {
+            rest = digits;
+        }
+    }
+    for suffix in ["Worldspace", "World"] {
+        if let Some(before) = rest.strip_suffix(suffix)
+            && !before.is_empty()
+        {
+            rest = before;
+            break;
+        }
+    }
+    let mut words = String::new();
+    let mut previous: Option<char> = None;
+    for character in rest.chars() {
+        let character = if character == '_' { ' ' } else { character };
+        if let Some(before) = previous {
+            let new_word = (character.is_ascii_uppercase() && before.is_ascii_lowercase())
+                || (character.is_ascii_digit() && before.is_ascii_alphabetic())
+                || (character.is_ascii_alphabetic() && before.is_ascii_digit());
+            if new_word && before != ' ' {
+                words.push(' ');
+            }
+        }
+        words.push(character);
+        previous = Some(character);
+    }
+    let words = words.split_whitespace().collect::<Vec<_>>().join(" ");
+    if words.is_empty() {
+        name.to_owned()
+    } else {
+        words
+    }
+}
 
 /// Map markers grouped by their worldspace, each with whose it is.
 type PlacesByWorld<'a> = BTreeMap<&'a RecordId, Vec<(&'a MapMarkerFact, Origin<'a>)>>;
 
-/// The places of the world map by worldspace, and whose they are.
-fn places_by_world(markers: &[MapMarkerFact]) -> PlacesByWorld<'_> {
-    let mut by_world: PlacesByWorld<'_> = BTreeMap::new();
+/// The places of the world map by the worldspace whose map shows them, and
+/// whose they are. `host` gives that worldspace.
+fn places_by_world<'a>(
+    markers: &'a [MapMarkerFact],
+    host: &dyn Fn(&'a RecordId) -> &'a RecordId,
+) -> PlacesByWorld<'a> {
+    let mut by_world: PlacesByWorld<'a> = BTreeMap::new();
     for marker in markers {
         by_world
-            .entry(&marker.worldspace)
+            .entry(host(&marker.worldspace))
             .or_default()
             .push((marker, places::origin(marker)));
     }
@@ -160,19 +388,20 @@ fn place_plugins<'a>(places: &'a PlacesByWorld<'a>) -> impl Iterator<Item = &'a 
         .filter_map(|(_, origin)| origin.plugin)
 }
 
-/// The places of `worldspace`, named `world`, for the report. `owner` gives
-/// the position of a plugin's mod among the owners of the map.
+/// The places shown on the map of `worldspace`, for the report. `name_of`
+/// names the worldspace each lies in; `owner` gives the position of a
+/// plugin's mod among the owners of the map.
 fn world_markers(
     places: &PlacesByWorld<'_>,
     worldspace: &RecordId,
-    world: &str,
+    name_of: &dyn Fn(&RecordId) -> String,
     owner: &impl Fn(&str) -> u32,
 ) -> Vec<MapMarker> {
     places
         .get(worldspace)
         .into_iter()
         .flatten()
-        .map(|(marker, origin)| map_marker(marker, origin, world, owner))
+        .map(|(marker, origin)| map_marker(marker, origin, &name_of(&marker.worldspace), owner))
         .collect()
 }
 
@@ -186,16 +415,6 @@ fn occupied(cells: &[MapCell], markers: &[MapMarker]) -> Vec<(i32, i32)> {
             (x.div_euclid(4096), y.div_euclid(4096))
         }))
         .collect()
-}
-
-/// The cells around the cells of the map, as west, east, south, north.
-fn around(cells: &[(i32, i32)]) -> Option<(i32, i32, i32, i32)> {
-    Some((
-        cells.iter().map(|(x, _)| *x).min()?.saturating_sub(MARGIN),
-        cells.iter().map(|(x, _)| *x).max()?.saturating_add(MARGIN),
-        cells.iter().map(|(_, y)| *y).min()?.saturating_sub(MARGIN),
-        cells.iter().map(|(_, y)| *y).max()?.saturating_add(MARGIN),
-    ))
 }
 
 /// A place of the world map in `world`, for the report. `owner` gives the
@@ -239,7 +458,14 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
     let north = cells.iter().map(|cell| cell.y).max()?;
     let columns = usize::try_from(east - west + 1).ok()?;
     let rows = usize::try_from(north - south + 1).ok()?;
-    let samples = SAMPLES_PER_CELL;
+    // A large world keeps every second or fourth sample, so that its
+    // picture stays small enough to send.
+    let mut step = 1;
+    while step < SAMPLES_PER_CELL && columns * rows * (SAMPLES_PER_CELL / step).pow(2) > MAX_SAMPLES
+    {
+        step *= 2;
+    }
+    let samples = SAMPLES_PER_CELL / step;
     let width = columns * samples;
 
     // Ground below its cell's water shows the water surface instead, so
@@ -262,9 +488,13 @@ fn terrain(land: &TerrainWorld, within: Option<(i32, i32, i32, i32)>) -> Option<
         let column = usize::try_from(cell.x - west).ok()?;
         let row = usize::try_from(north - cell.y).ok()?;
         for (index, height) in cell.heights.iter().enumerate() {
+            let (from_south, from_west) = (index / SAMPLES_PER_CELL, index % SAMPLES_PER_CELL);
+            if from_south % step != 0 || from_west % step != 0 {
+                continue;
+            }
             // Within a cell, samples go from south to north; the image
             // goes from north to south.
-            let (sample_row, sample_column) = (samples - 1 - index / samples, index % samples);
+            let (sample_row, sample_column) = (samples - 1 - from_south / step, from_west / step);
             let at = (row * samples + sample_row) * width + column * samples + sample_column;
             let (height, under_water) = surface(*height, cell.water);
             let share = f64::from(height - lowest) / f64::from(highest - lowest);
@@ -506,5 +736,220 @@ mod tests {
         let cave = &world.markers[1];
         assert_eq!(cave.moved_from, Some([0, 0, 0]));
         assert_eq!(cave.console, "cow Tamriel 2 0");
+    }
+
+    fn worldspace(
+        local_id: u32,
+        plugin: &str,
+        editor_id: &str,
+        origin: WorldOrigin,
+    ) -> WorldspaceFacts {
+        WorldspaceFacts {
+            id: id(plugin, local_id),
+            editor_id: Some(editor_id.to_owned()),
+            title: None,
+            parent: None,
+            uses_parent_land: false,
+            small: false,
+            no_lod_water: false,
+            bounds: None,
+            water: None,
+            origin,
+        }
+    }
+
+    fn land(plugin: &str, local_id: u32, side: i32) -> TerrainWorld {
+        use mallet_core::facts::terrain::TerrainCell;
+        TerrainWorld {
+            worldspace: id(plugin, local_id),
+            cells: (0..side)
+                .flat_map(|x| (0..side).map(move |y| (x, y)))
+                .map(|(x, y)| TerrainCell {
+                    x,
+                    y,
+                    heights: vec![0; 64],
+                    water: None,
+                })
+                .collect(),
+        }
+    }
+
+    /// The game's main world with a city in it, a world of a DLC, one of the
+    /// Creation Club and two of a mod.
+    fn many_worlds() -> Facts {
+        use mallet_core::facts::terrain::TerrainFacts;
+        let tamriel = WorldspaceFacts {
+            title: Some("Skyrim".to_owned()),
+            bounds: Some([-2, -2, 12, 12]),
+            ..worldspace(0x3C, "Skyrim.esm", "Tamriel", WorldOrigin::Game)
+        };
+        let whiterun = WorldspaceFacts {
+            parent: Some(id("Skyrim.esm", 0x3C)),
+            uses_parent_land: true,
+            small: true,
+            ..worldspace(0x1A26F, "Skyrim.esm", "WhiterunWorld", WorldOrigin::Game)
+        };
+        Facts {
+            plugins: vec![PluginFacts {
+                name: "Falskaar.esm".to_owned(),
+                path: GamePath::new("data").join("Falskaar.esm"),
+                masters: Vec::new(),
+                npcs: Vec::new(),
+            }],
+            terrain: TerrainFacts {
+                worlds: vec![
+                    land("Skyrim.esm", 0x3C, 10),
+                    land("Skyrim.esm", 0x1A26F, 2),
+                    land("Dawnguard.esm", 0x800, 9),
+                    land("ccBGSSSE031-Blackbone.esl", 0x801, 9),
+                    land("Falskaar.esm", 0x802, 9),
+                    land("Falskaar.esm", 0x803, 3),
+                ],
+                worldspaces: vec![
+                    tamriel,
+                    whiterun,
+                    worldspace(0x800, "Dawnguard.esm", "DLC01SoulCairn", WorldOrigin::Game),
+                    worldspace(
+                        0x801,
+                        "ccBGSSSE031-Blackbone.esl",
+                        "ccBGSSSE031BlackboneIsle",
+                        WorldOrigin::CreationClub,
+                    ),
+                    WorldspaceFacts {
+                        title: Some("Falskaar".to_owned()),
+                        ..worldspace(0x802, "Falskaar.esm", "Falskaar", WorldOrigin::Mod)
+                    },
+                    worldspace(0x803, "Falskaar.esm", "FalskaarCaveWorld", WorldOrigin::Mod),
+                ],
+            },
+            ..Facts::default()
+        }
+    }
+
+    #[test]
+    fn every_world_with_land_is_listed_named_grouped_and_ordered() {
+        let facts = many_worlds();
+        let map = world_map(&Context::new(&facts, &NoModSource));
+        let listed: Vec<(&str, &str, WorldOrigin, bool, bool)> = map
+            .worlds
+            .iter()
+            .map(|world| {
+                (
+                    world.name.as_str(),
+                    world.title.as_str(),
+                    world.origin,
+                    world.main,
+                    world.small,
+                )
+            })
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("Tamriel", "Skyrim", WorldOrigin::Game, true, false),
+                (
+                    "DLC01SoulCairn",
+                    "Soul Cairn",
+                    WorldOrigin::Game,
+                    false,
+                    false
+                ),
+                (
+                    "ccBGSSSE031BlackboneIsle",
+                    "Blackbone Isle",
+                    WorldOrigin::CreationClub,
+                    false,
+                    false
+                ),
+                ("Falskaar", "Falskaar", WorldOrigin::Mod, false, false),
+                (
+                    "FalskaarCaveWorld",
+                    "Falskaar Cave",
+                    WorldOrigin::Mod,
+                    false,
+                    true
+                ),
+            ]
+        );
+        let skyrim = &map.worlds[0];
+        // The city is part of Skyrim, not a world of its own.
+        assert_eq!(skyrim.children, ["WhiterunWorld"]);
+        assert_eq!(skyrim.land_cells, 100);
+        assert_eq!(
+            skyrim.bounds,
+            Some(MapBounds {
+                west: -2,
+                south: -2,
+                east: 12,
+                north: 12
+            })
+        );
+        // The land is shown over the bounds, not only where mods place.
+        let terrain = skyrim.terrain.as_ref().unwrap();
+        assert_eq!((terrain.west, terrain.columns, terrain.rows), (0, 10, 10));
+        assert_eq!(map.worlds[3].origin_name.as_deref(), Some("Falskaar.esm"));
+        assert_eq!(map.worlds[0].origin_name, None);
+    }
+
+    #[test]
+    fn objects_in_a_city_are_counted_on_its_parents_map() {
+        use mallet_core::facts::terrain::TerrainFacts;
+        let mut object = placed("A.esp", 1, [100, 100, 0]);
+        object.place = Place::Exterior {
+            worldspace: id("Skyrim.esm", 0x1A26F),
+        };
+        let facts = Facts {
+            plugins: vec![PluginFacts {
+                name: "A.esp".to_owned(),
+                path: GamePath::new("data").join("A.esp"),
+                masters: Vec::new(),
+                npcs: Vec::new(),
+            }],
+            objects: ObjectFacts {
+                placed: vec![object],
+                ..ObjectFacts::default()
+            },
+            terrain: TerrainFacts {
+                worlds: vec![land("Skyrim.esm", 0x3C, 2)],
+                worldspaces: vec![
+                    worldspace(0x3C, "Skyrim.esm", "Tamriel", WorldOrigin::Game),
+                    WorldspaceFacts {
+                        parent: Some(id("Skyrim.esm", 0x3C)),
+                        uses_parent_land: true,
+                        ..worldspace(0x1A26F, "Skyrim.esm", "WhiterunWorld", WorldOrigin::Game)
+                    },
+                ],
+            },
+            ..Facts::default()
+        };
+        let map = world_map(&Context::new(&facts, &NoModSource));
+        let [world] = map.worlds.as_slice() else {
+            panic!("expected one world, got {:?}", map.worlds);
+        };
+        assert_eq!(world.name, "Tamriel");
+        assert_eq!(world.cells.len(), 1);
+    }
+
+    #[test]
+    fn internal_names_are_made_readable() {
+        assert_eq!(readable("ccBGSSSE031BlackboneIsle"), "Blackbone Isle");
+        assert_eq!(readable("ccKRTSSE001QNWorld"), "QN");
+        assert_eq!(readable("DLC2SolstheimWorld"), "Solstheim");
+        assert_eq!(readable("DLC01FalmerValley"), "Falmer Valley");
+        assert_eq!(readable("WindhelmPitWorldspace"), "Windhelm Pit");
+        assert_eq!(readable("tos_Arena03Orcs"), "tos Arena 03 Orcs");
+        assert_eq!(readable("Tamriel"), "Tamriel");
+        assert_eq!(readable("World"), "World");
+    }
+
+    #[test]
+    fn a_large_world_keeps_fewer_samples_per_cell() {
+        // 160 by 160 cells: 1.6 million samples at eight a side, 409 600 at four.
+        let big = land("Skyrim.esm", 0x3C, 160);
+        let terrain = terrain(&big, None).unwrap();
+        assert_eq!((terrain.columns, terrain.samples), (160, 4));
+        let small = land("Skyrim.esm", 0x3C, 10);
+        assert_eq!(terrain_columns(&small, None), 10);
+        assert_eq!(super::terrain(&small, None).unwrap().samples, 8);
     }
 }

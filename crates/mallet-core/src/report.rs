@@ -279,11 +279,41 @@ pub struct WorldMap {
 }
 
 /// One worldspace on the map.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MapWorld {
     /// The worldspace's internal name, as the game's console knows it.
     pub name: String,
+    /// What to call it: the name the game shows, or else the internal
+    /// name made readable.
+    #[serde(default)]
+    pub title: String,
+    /// Whether it comes with the game, with its Creation Club content or
+    /// with a mod.
+    #[serde(default)]
+    pub origin: WorldOrigin,
+    /// For a world of a mod or of the Creation Club: the mod, by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_name: Option<String>,
+    /// The worldspaces drawn on this one's map, by internal name: the
+    /// smaller worlds that use its land, such as a city inside its walls.
+    /// Their objects, places and spots are drawn here.
+    #[serde(default)]
+    pub children: Vec<String>,
+    /// The cells the world spans (west, south, east, north), from the
+    /// world's own bounds or else its land.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<MapBounds>,
+    /// How many cells have land.
+    #[serde(default)]
+    pub land_cells: u32,
+    /// Whether it is a small world: flagged so by the game, or with little
+    /// land, and without a collision spot.
+    #[serde(default)]
+    pub small: bool,
+    /// Whether it is the game's main world, which the map opens on.
+    #[serde(default)]
+    pub main: bool,
     /// The cells in which mods place objects.
     pub cells: Vec<MapCell>,
     /// The shape of the land, where it is known.
@@ -293,6 +323,46 @@ pub struct MapWorld {
     /// change or remove.
     #[serde(default)]
     pub markers: Vec<MapMarker>,
+}
+
+/// Where a worldspace comes from.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum WorldOrigin {
+    /// The game itself or its DLC.
+    #[default]
+    Game,
+    /// Creation Club content the game lists as its own.
+    CreationClub,
+    /// A mod.
+    Mod,
+}
+
+/// A rectangle of cells, edges included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MapBounds {
+    /// The westernmost column.
+    pub west: i32,
+    /// The southernmost row.
+    pub south: i32,
+    /// The easternmost column.
+    pub east: i32,
+    /// The northernmost row.
+    pub north: i32,
 }
 
 /// A place of the world map, such as a town or a cave.

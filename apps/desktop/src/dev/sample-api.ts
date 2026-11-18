@@ -15,6 +15,7 @@ import type {
   MapMarker,
   MapSpot,
   MapTerrain,
+  MapWorld,
   ModInfo,
   ObjectRef,
   RenderedFinding,
@@ -492,6 +493,39 @@ function sampleTerrain(): MapTerrain {
   };
 }
 
+/** A made-up world without objects of mods, for the picker's groups. */
+function sampleWorld(
+  name: string,
+  title: string,
+  origin: MapWorld["origin"],
+  originName: string | null,
+  small: boolean,
+  terrain: MapTerrain | null,
+): MapWorld {
+  return {
+    name,
+    title,
+    origin,
+    originName,
+    small,
+    main: false,
+    children: [],
+    landCells: terrain === null ? 12 : terrain.columns * terrain.rows,
+    bounds:
+      terrain === null
+        ? null
+        : {
+            west: terrain.west,
+            south: terrain.south,
+            east: terrain.west + terrain.columns - 1,
+            north: terrain.south + terrain.rows - 1,
+          },
+    cells: [],
+    terrain,
+    markers: [],
+  };
+}
+
 /** A made-up worldspace: a town where two mods meet, and land around it. */
 function sampleMap(): RenderedReport["map"] {
   const cells: MapCell[] = [];
@@ -558,7 +592,31 @@ function sampleMap(): RenderedReport["map"] {
   });
   return {
     owners: ["Old Town", "Texture Pack", "Water Mod"],
-    worlds: [{ name: "Tamriel", cells, terrain, markers: sampleMarkers(at) }],
+    worlds: [
+      {
+        name: "Tamriel",
+        title: "Skyrim",
+        origin: "game",
+        main: true,
+        // A city drawn on the main world's map.
+        children: ["WhiterunWorld"],
+        bounds: {
+          west: terrain.west,
+          south: terrain.south,
+          east: terrain.west + terrain.columns - 1,
+          north: terrain.south + terrain.rows - 1,
+        },
+        landCells: terrain.columns * terrain.rows,
+        small: false,
+        cells,
+        terrain,
+        markers: sampleMarkers(at),
+      },
+      // A world of the game's DLC, one of a mod, and a small one.
+      sampleWorld("DLC2SolstheimWorld", "Solstheim", "game", null, false, sampleTerrain()),
+      sampleWorld("Falskaar", "Falskaar", "mod", "Falskaar", false, sampleTerrain()),
+      sampleWorld("BloatedMansGrottoWorld", "Bloated Man's Grotto", "game", null, true, null),
+    ],
     spots: [
       placed([4, 2, 0.3, 0.6], spot(4, 2, "TownHouse / Tower")),
       placed([4, 2, 0.7, 0.4], spot(4, 2, "Well / Cart")),

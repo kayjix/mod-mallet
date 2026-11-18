@@ -1000,9 +1000,28 @@ export interface ObjectRef1 {
  */
 export interface MapWorld {
   /**
+   * The cells the world spans (west, south, east, north), from the
+   * world's own bounds or else its land.
+   */
+  bounds?: MapBounds | null;
+  /**
    * The cells in which mods place objects.
    */
   cells: MapCell[];
+  /**
+   * The worldspaces drawn on this one's map, by internal name: the
+   * smaller worlds that use its land, such as a city inside its walls.
+   * Their objects, places and spots are drawn here.
+   */
+  children?: string[];
+  /**
+   * How many cells have land.
+   */
+  landCells?: number;
+  /**
+   * Whether it is the game's main world, which the map opens on.
+   */
+  main?: boolean;
   /**
    * The places of the world map: the game's own and those mods add,
    * change or remove.
@@ -1013,9 +1032,49 @@ export interface MapWorld {
    */
   name: string;
   /**
+   * Whether it comes with the game, with its Creation Club content or
+   * with a mod.
+   */
+  origin?: "game" | "creationClub" | "mod";
+  /**
+   * For a world of a mod or of the Creation Club: the mod, by name.
+   */
+  originName?: string | null;
+  /**
+   * Whether it is a small world: flagged so by the game, or with little
+   * land, and without a collision spot.
+   */
+  small?: boolean;
+  /**
    * The shape of the land, where it is known.
    */
   terrain?: MapTerrain | null;
+  /**
+   * What to call it: the name the game shows, or else the internal
+   * name made readable.
+   */
+  title?: string;
+}
+/**
+ * A rectangle of cells, edges included.
+ */
+export interface MapBounds {
+  /**
+   * The easternmost column.
+   */
+  east: number;
+  /**
+   * The northernmost row.
+   */
+  north: number;
+  /**
+   * The southernmost row.
+   */
+  south: number;
+  /**
+   * The westernmost column.
+   */
+  west: number;
 }
 /**
  * One cell of a worldspace: 4096 game units, about 58 metres, square.

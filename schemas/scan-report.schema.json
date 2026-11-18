@@ -621,6 +621,38 @@
         }
       ]
     },
+    "MapBounds": {
+      "description": "A rectangle of cells, edges included.",
+      "type": "object",
+      "properties": {
+        "east": {
+          "description": "The easternmost column.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "north": {
+          "description": "The northernmost row.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "south": {
+          "description": "The southernmost row.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "west": {
+          "description": "The westernmost column.",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "west",
+        "south",
+        "east",
+        "north"
+      ]
+    },
     "MapCell": {
       "description": "One cell of a worldspace: 4096 game units, about 58 metres, square.",
       "type": "object",
@@ -856,12 +888,43 @@
       "description": "One worldspace on the map.",
       "type": "object",
       "properties": {
+        "bounds": {
+          "description": "The cells the world spans (west, south, east, north), from the\nworld's own bounds or else its land.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapBounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cells": {
           "description": "The cells in which mods place objects.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/MapCell"
           }
+        },
+        "children": {
+          "description": "The worldspaces drawn on this one's map, by internal name: the\nsmaller worlds that use its land, such as a city inside its walls.\nTheir objects, places and spots are drawn here.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "landCells": {
+          "description": "How many cells have land.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
+        "main": {
+          "description": "Whether it is the game's main world, which the map opens on.",
+          "type": "boolean",
+          "default": false
         },
         "markers": {
           "description": "The places of the world map: the game's own and those mods add,\nchange or remove.",
@@ -875,6 +938,23 @@
           "description": "The worldspace's internal name, as the game's console knows it.",
           "type": "string"
         },
+        "origin": {
+          "description": "Whether it comes with the game, with its Creation Club content or\nwith a mod.",
+          "$ref": "#/$defs/WorldOrigin",
+          "default": "game"
+        },
+        "originName": {
+          "description": "For a world of a mod or of the Creation Club: the mod, by name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "small": {
+          "description": "Whether it is a small world: flagged so by the game, or with little\nland, and without a collision spot.",
+          "type": "boolean",
+          "default": false
+        },
         "terrain": {
           "description": "The shape of the land, where it is known.",
           "anyOf": [
@@ -885,6 +965,11 @@
               "type": "null"
             }
           ]
+        },
+        "title": {
+          "description": "What to call it: the name the game shows, or else the internal\nname made readable.",
+          "type": "string",
+          "default": ""
         }
       },
       "required": [
@@ -1734,6 +1819,26 @@
         "owners",
         "worlds",
         "spots"
+      ]
+    },
+    "WorldOrigin": {
+      "description": "Where a worldspace comes from.",
+      "oneOf": [
+        {
+          "description": "The game itself or its DLC.",
+          "type": "string",
+          "const": "game"
+        },
+        {
+          "description": "Creation Club content the game lists as its own.",
+          "type": "string",
+          "const": "creationClub"
+        },
+        {
+          "description": "A mod.",
+          "type": "string",
+          "const": "mod"
+        }
       ]
     }
   }

@@ -15,6 +15,9 @@ pub const SAMPLES_PER_CELL: usize = 8;
 pub struct TerrainFacts {
     /// One entry per worldspace that has land.
     pub worlds: Vec<TerrainWorld>,
+    /// What the record of every worldspace says, whether or not it has
+    /// land.
+    pub worldspaces: Vec<WorldspaceFacts>,
 }
 
 /// The land of one worldspace.
@@ -38,4 +41,30 @@ pub struct TerrainCell {
     pub heights: Vec<i32>,
     /// The height of the water surface, if the cell has water.
     pub water: Option<i32>,
+}
+
+/// What a worldspace's own record says about it, in the version the game
+/// uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorldspaceFacts {
+    /// The worldspace.
+    pub id: RecordId,
+    /// Its internal name, if it has one.
+    pub editor_id: Option<String>,
+    /// The name the game shows, if it has one.
+    pub title: Option<String>,
+    /// The worldspace it belongs to, such as Skyrim for a city.
+    pub parent: Option<RecordId>,
+    /// Whether it uses its parent's land.
+    pub uses_parent_land: bool,
+    /// Whether the game calls it a small world.
+    pub small: bool,
+    /// Whether the game draws no water in its distant view.
+    pub no_lod_water: bool,
+    /// The cells it spans, west, south, east, north, from its record.
+    pub bounds: Option<[i32; 4]>,
+    /// The height of its water, where a cell does not set its own.
+    pub water: Option<i32>,
+    /// Whether it comes with the game, the Creation Club or a mod.
+    pub origin: crate::WorldOrigin,
 }
