@@ -1,0 +1,68 @@
+/* The assets page (ADR 0048): the duels about files grouped by what they
+   are about, and the one-line duel other pages link with. */
+
+.assets-intro {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.assets-group {
+  display: grid;
+  gap: 4px;
+}
+
+.assets-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.assets-group-head:hover {
+  background: var(--sunken);
+}
+
+.assets-group-head .aside {
+  margin-left: auto;
+  font-size: 0.8rem;
+}
+
+.assets-elsewhere {
+  margin: var(--space-2) 0 0;
+  font-size: 0.82rem;
+}
+
+.duel-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.duel-line-names {
+  font-weight: 600;
+}
+
+.duel-line-topics {
+  font-size: 0.85rem;
+}
+
+.duel-line-state {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.duel-line[data-decided="true"] .duel-line-state {
+  color: var(--ok);
+}

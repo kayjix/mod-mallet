@@ -181,15 +181,12 @@ export interface Texts {
   previewInGame: string;
   previewLoose: string;
   previewNoPicture: string;
-  viewCompare: string;
   compareOpen: string;
-  compareBack: string;
   compareDuels: string;
   compareRanking: string;
   compareOpenLabel: string;
   compareDecidedLabel: string;
   compareSearch: string;
-  compareAllTopics: string;
   compareShowDecided: string;
   compareFiles: (count: number) => string;
   compareNone: string;
@@ -616,15 +613,12 @@ export const texts: Record<Lang, Texts> = {
     previewInGame: "in the game",
     previewLoose: "loose file",
     previewNoPicture: "no picture",
-    viewCompare: "Compare mods",
     compareOpen: "Open the comparison",
-    compareBack: "Back",
     compareDuels: "Pairs",
     compareRanking: "Ranking",
     compareOpenLabel: "open",
     compareDecidedLabel: "decided",
     compareSearch: "Search mods or objects",
-    compareAllTopics: "Everything",
     compareShowDecided: "Show decided ones",
     compareFiles: (count) => (count === 1 ? "1 file" : `${count} files`),
     compareNone: "There are no two mods that get in each other's way.",
@@ -1165,15 +1159,12 @@ export const texts: Record<Lang, Texts> = {
     previewInGame: "im Spiel",
     previewLoose: "lose Datei",
     previewNoPicture: "kein Bild",
-    viewCompare: "Mods vergleichen",
     compareOpen: "Vergleich öffnen",
-    compareBack: "Zurück",
     compareDuels: "Paare",
     compareRanking: "Rangfolge",
     compareOpenLabel: "offen",
     compareDecidedLabel: "entschieden",
     compareSearch: "Mods oder Objekte suchen",
-    compareAllTopics: "Alles",
     compareShowDecided: "Entschiedene zeigen",
     compareFiles: (count) => (count === 1 ? "1 Datei" : `${count} Dateien`),
     compareNone: "Es gibt keine zwei Mods, die sich in die Quere kommen.",

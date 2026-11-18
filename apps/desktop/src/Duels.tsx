@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { type Session, useSession } from "./Actions";
+import { useAssetsTexts } from "./assets-texts";
 import type {
   DuelSide,
   MapSpot,
@@ -7,6 +8,7 @@ import type {
   RenderedDuel,
   RenderedFinding,
 } from "./generated/rendered-report";
+import "./assets.css";
 import { chooseFinding, decisionAt, type PatchChoices, pairFor, spotKey } from "./patch";
 
 /**
@@ -263,6 +265,39 @@ export function Duels({ duels, findings, topics }: DuelsProps) {
         </details>
       )}
     </section>
+  );
+}
+
+/**
+ * One duel about files in one line, for the pages that only lead to the
+ * assets page (ADR 0048): the two mods, where it stands, and the button that
+ * opens it there.
+ */
+export function DuelLine({ rendered }: { rendered: RenderedDuel }) {
+  const { t, decisions, mods, ranking, openCompare } = useSession();
+  const a = useAssetsTexts();
+  const { duel } = rendered;
+  const names = duelNames(duel, mods);
+  const decided = decisions[duel.id];
+  const suggested = rankedSide(duel, ranking) ?? duel.suggestion?.side ?? null;
+  const files = duel.files?.length ?? 0;
+  const state =
+    decided === 0 || decided === 1
+      ? a.lineDecided(names[decided])
+      : suggested === 0 || suggested === 1
+        ? a.lineSuggested(names[suggested])
+        : a.lineOpen;
+  return (
+    <div className="duel-line" data-decided={decided !== undefined}>
+      <span className="duel-line-names">
+        {names[0]} <span aria-hidden="true">⚔</span> {names[1]}
+      </span>
+      <span className="aside duel-line-topics">{rendered.topicLabels.join(" · ")}</span>
+      <span className="duel-line-state">{state}</span>
+      <button type="button" className="small quiet" onClick={() => openCompare(duel.id)}>
+        {files > 0 ? t.duelCompareFiles(files) : t.duelCompare} ▸
+      </button>
+    </div>
   );
 }
 

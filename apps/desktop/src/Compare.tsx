@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
+import { useAssetsTexts } from "./assets-texts";
 import {
   duelNames,
   OTHERS,
@@ -10,6 +11,7 @@ import {
   useFindings,
   usePick,
 } from "./Duels";
+import "./assets.css";
 import type { FilePreview, PreviewVersion } from "./generated/file-preview";
 import type {
   DuelFile,
@@ -18,6 +20,7 @@ import type {
   RenderedReport,
 } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { fileDuels } from "./Overview";
 import { Stage, type StageItem } from "./Viewer3D";
 
 type Topic = DuelFile["topic"];
@@ -26,25 +29,22 @@ type Topic = DuelFile["topic"];
 type PreviewCache = Map<string, Promise<FilePreview | null>>;
 
 /**
- * Two mods next to each other, three columns: the duels on the left, the
- * thing they disagree about in the middle, seen through one camera, and
- * every file of the duel on the right, by the name of the object.
+ * The assets page (ADR 0048): where two mods bring their own textures,
+ * meshes or faces for the same thing. Three columns: the duels on the
+ * left, grouped by what they are about, or the ranking; the thing they
+ * disagree about in the middle, seen through one camera; and every file of
+ * the duel on the right, by the name of the object. Duels about placed
+ * objects belong to the collisions and are not listed.
  */
-export function CompareView({
-  report,
-  start,
-  onBack,
-}: {
-  report: RenderedReport;
-  start: string | null;
-  onBack: () => void;
-}) {
+export function CompareView({ report, start }: { report: RenderedReport; start: string | null }) {
   const { t, decisions } = useSession();
+  const a = useAssetsTexts();
   const byId = useFindings(report.findings);
+  const duels = useMemo(() => fileDuels(report), [report]);
   const [duelId, setDuelId] = useState<string | null>(
     start ??
-      report.duels.find((rendered) => decisions[rendered.duel.id] === undefined)?.duel.id ??
-      report.duels[0]?.duel.id ??
+      duels.find((rendered) => decisions[rendered.duel.id] === undefined)?.duel.id ??
+      duels[0]?.duel.id ??
       null,
   );
   useEffect(() => {
@@ -60,16 +60,16 @@ export function CompareView({
   if (cache.current.at !== report.scannedAt) {
     cache.current = { at: report.scannedAt, previews: new Map() };
   }
+  // A duel opened from elsewhere is shown even if it is about placed
+  // objects, until the collisions take those over completely.
   const rendered = report.duels.find((candidate) => candidate.duel.id === duelId) ?? null;
 
   return (
     <div className="compare">
       <aside className="compare-left">
+        <p className="aside assets-intro">{a.intro}</p>
         <div className="compare-left-head">
-          <button type="button" className="quiet small" onClick={onBack}>
-            ← {t.compareBack}
-          </button>
-          <fieldset className="segmented" aria-label={t.viewCompare}>
+          <fieldset className="segmented" aria-label={a.tabsLabel}>
             <button type="button" aria-pressed={tab === "duels"} onClick={() => setTab("duels")}>
               {t.compareDuels}
             </button>
@@ -83,13 +83,14 @@ export function CompareView({
           </fieldset>
         </div>
         {tab === "duels" ? (
-          <DuelPicker duels={report.duels} selected={duelId} onSelect={setDuelId} />
+          <DuelPicker duels={duels} selected={duelId} onSelect={setDuelId} />
         ) : (
-          <RankingPanel duels={report.duels} byId={byId} />
+          <RankingPanel duels={duels} byId={byId} />
         )}
+        <ObjectsElsewhere report={report} />
       </aside>
       {rendered === null ? (
-        <p className="aside compare-empty">{t.compareNone}</p>
+        <p className="aside compare-empty">{duels.length === 0 ? a.none : t.compareNone}</p>
       ) : (
         <DuelWorkspace
           key={rendered.duel.id}
@@ -104,7 +105,17 @@ export function CompareView({
 
 // ---- left: the duels ----------------------------------------------------------
 
-const TOPICS: Topic[] = ["faces", "textures", "meshes", "objects", "contained"];
+/** The groups of the duel list, in this order: what a duel is about first. */
+const GROUPS: Topic[] = ["faces", "textures", "meshes"];
+
+/** The group a duel is listed in: the first of its topics that is about files. */
+function groupOf(rendered: RenderedDuel): Topic {
+  return (
+    rendered.duel.topics.find(({ topic }) => GROUPS.includes(topic))?.topic ??
+    rendered.duel.files?.[0]?.topic ??
+    "textures"
+  );
+}
 
 function DuelPicker({
   duels,
@@ -116,9 +127,10 @@ function DuelPicker({
   onSelect: (id: string) => void;
 }) {
   const { t, decisions, mods, ranking } = useSession();
-  const [topic, setTopic] = useState<Topic | "all">("all");
+  const a = useAssetsTexts();
   const [search, setSearch] = useState("");
   const [showDecided, setShowDecided] = useState(false);
+  const [folded, setFolded] = useState<Set<Topic>>(new Set());
   const decidedCount = duels.filter((rendered) => decisions[rendered.duel.id] !== undefined).length;
   const wanted = search.trim().toLowerCase();
   const shown = duels.filter((rendered) => {
@@ -126,19 +138,33 @@ function DuelPicker({
     if (!showDecided && decisions[duel.id] !== undefined && duel.id !== selected) {
       return false;
     }
-    if (topic !== "all" && !duel.topics.some((candidate) => candidate.topic === topic)) {
-      return false;
-    }
     if (wanted === "") {
       return true;
     }
-    const [a, b] = duelNames(duel, mods);
+    const [first, second] = duelNames(duel, mods);
     return (
-      a.toLowerCase().includes(wanted) ||
-      b.toLowerCase().includes(wanted) ||
+      first.toLowerCase().includes(wanted) ||
+      second.toLowerCase().includes(wanted) ||
       (duel.files ?? []).some((file) => file.object?.toLowerCase().includes(wanted))
     );
   });
+  const selectedGroup = duels.find((rendered) => rendered.duel.id === selected);
+  const groups = GROUPS.map((group) => ({
+    group,
+    members: shown.filter((rendered) => groupOf(rendered) === group),
+    open: duels.filter(
+      (rendered) => groupOf(rendered) === group && decisions[rendered.duel.id] === undefined,
+    ).length,
+  })).filter(({ members }) => members.length > 0);
+  const toggle = (group: Topic) => {
+    const next = new Set(folded);
+    if (next.has(group)) {
+      next.delete(group);
+    } else {
+      next.add(group);
+    }
+    setFolded(next);
+  };
 
   return (
     <>
@@ -153,14 +179,6 @@ function DuelPicker({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <select value={topic} onChange={(event) => setTopic(event.target.value as Topic | "all")}>
-          <option value="all">{t.compareAllTopics}</option>
-          {TOPICS.map((candidate) => (
-            <option key={candidate} value={candidate}>
-              {t.topicName[candidate]}
-            </option>
-          ))}
-        </select>
         <label className="compare-check">
           <input
             type="checkbox"
@@ -171,42 +189,119 @@ function DuelPicker({
         </label>
       </div>
       <ul className="compare-duels">
-        {shown.map((rendered) => {
-          const { duel } = rendered;
-          const names = duelNames(duel, mods);
-          const decided = decisions[duel.id];
-          const ranked = rankedSide(duel, ranking);
+        {groups.map(({ group, members, open }) => {
+          // A search, or the duel looked at, keeps its group open.
+          const isOpen =
+            wanted !== "" ||
+            (selectedGroup !== undefined && groupOf(selectedGroup) === group) ||
+            !folded.has(group);
           return (
-            <li key={duel.id}>
+            <li key={group} className="assets-group">
               <button
                 type="button"
-                className="compare-duel"
-                aria-current={duel.id === selected ? "true" : undefined}
-                data-decided={decided !== undefined}
-                onClick={() => onSelect(duel.id)}
+                className="assets-group-head"
+                aria-expanded={isOpen}
+                onClick={() => toggle(group)}
               >
-                <span className="compare-duel-names">
-                  {([0, 1] as const).map((index) => (
-                    <span
-                      key={index}
-                      data-winner={decided === index}
-                      data-ranked={decided === undefined && ranked === index}
-                    >
-                      {names[index]}
-                    </span>
-                  ))}
-                </span>
-                <span className="compare-duel-topics">
-                  {rendered.topicLabels.join(" · ")}
-                  {(duel.files?.length ?? 0) > 0 && ` · ${t.compareFiles(duel.files?.length ?? 0)}`}
-                </span>
+                <span aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+                <strong>{t.topicName[group]}</strong>
+                <span className="aside">{a.groupOpen(open)}</span>
               </button>
+              {isOpen && (
+                <ul className="compare-duels">
+                  {members.map((rendered) => (
+                    <DuelEntry
+                      key={rendered.duel.id}
+                      rendered={rendered}
+                      selected={rendered.duel.id === selected}
+                      decided={decisions[rendered.duel.id]}
+                      ranked={rankedSide(rendered.duel, ranking)}
+                      names={duelNames(rendered.duel, mods)}
+                      onSelect={onSelect}
+                    />
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}
         {shown.length === 0 && <li className="aside">{t.nothingHere}</li>}
       </ul>
     </>
+  );
+}
+
+/** One duel in the list: the two mods, the winner marked, what they compete for. */
+function DuelEntry({
+  rendered,
+  selected,
+  decided,
+  ranked,
+  names,
+  onSelect,
+}: {
+  rendered: RenderedDuel;
+  selected: boolean;
+  decided: number | undefined;
+  ranked: 0 | 1 | null;
+  names: readonly [string, string];
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useSession();
+  const { duel } = rendered;
+  return (
+    <li>
+      <button
+        type="button"
+        className="compare-duel"
+        aria-current={selected ? "true" : undefined}
+        data-decided={decided !== undefined}
+        onClick={() => onSelect(duel.id)}
+      >
+        <span className="compare-duel-names">
+          {([0, 1] as const).map((index) => (
+            <span
+              key={index}
+              data-winner={decided === index}
+              data-ranked={decided === undefined && ranked === index}
+            >
+              {names[index]}
+            </span>
+          ))}
+        </span>
+        <span className="compare-duel-topics">
+          {rendered.topicLabels.join(" · ")}
+          {(duel.files?.length ?? 0) > 0 && ` · ${t.compareFiles(duel.files?.length ?? 0)}`}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * The duels about placed objects are the collisions' to decide: one line
+ * says how many there are and leads there.
+ */
+function ObjectsElsewhere({ report }: { report: RenderedReport }) {
+  const { spots, decideSpot } = useSession();
+  const a = useAssetsTexts();
+  const files = new Set(fileDuels(report).map((rendered) => rendered.duel.id));
+  const objects = report.duels.filter((rendered) => !files.has(rendered.duel.id));
+  if (objects.length === 0) {
+    return null;
+  }
+  const spot = objects
+    .flatMap((rendered) => rendered.duel.findings)
+    .flatMap((id) => spots.get(id) ?? [])[0];
+  return (
+    <p className="aside assets-elsewhere">
+      {a.objectsElsewhere(objects.length)}{" "}
+      {spot !== undefined && (
+        <button type="button" className="small quiet" onClick={() => decideSpot(spot)}>
+          {a.toCollisions}
+        </button>
+      )}
+    </p>
   );
 }
 

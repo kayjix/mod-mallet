@@ -149,12 +149,8 @@ export default function App({ api, startLang }: AppProps) {
     },
     [api],
   );
-  // The duel the assets page is to open at, and the page that led there,
-  // for its way back.
+  // The duel the assets page is to open at.
   const [compareAt, setCompareAt] = useState<string | null>(null);
-  const viewNow = useRef<ViewName>(view);
-  viewNow.current = view;
-  const assetsFrom = useRef<ViewName>("overview");
   // Where the collisions and the map are to open, when another page led there.
   const [pairAt, setPairAt] = useState<[string, string] | null>(null);
   const [mapMod, setMapMod] = useState<string | null>(null);
@@ -315,9 +311,6 @@ export default function App({ api, startLang }: AppProps) {
   // Going to a page: whatever another page asked it to open with is
   // forgotten.
   const go = useCallback((next: ViewName) => {
-    if (next === "assets" && viewNow.current !== "assets") {
-      assetsFrom.current = viewNow.current;
-    }
     setFocus(null);
     setWorkSpot(null);
     setPairAt(null);
@@ -532,7 +525,7 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "collisions" ? (
             <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
-            <CompareView report={report} start={compareAt} onBack={() => go(assetsFrom.current)} />
+            <CompareView report={report} start={compareAt} />
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (
