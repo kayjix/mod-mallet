@@ -5,7 +5,7 @@ import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
 
 /** The steps of the review, in their order. */
-export type ReviewStep = "install" | "order" | "assets" | "map" | "collisions";
+export type ReviewStep = "install" | "order" | "assets" | "map" | "collisions" | "report";
 
 export interface ReviewTexts {
   nav: string;
@@ -14,8 +14,6 @@ export interface ReviewTexts {
   step: Record<ReviewStep, { title: string; hint: string }>;
   stepOf: (index: number, total: number) => string;
   open: (count: number) => string;
-  finish: string;
-  finished: string;
   continueAt: (step: string) => string;
   start: string;
   more: (count: number) => string;
@@ -26,10 +24,8 @@ export interface ReviewTexts {
   nothing: string;
   modsLine: (enabled: number, total: number, newer: number) => string;
   worldLine: (cells: number, places: number) => string;
-  keep: (name: string) => string;
   keepBoth: string;
   undo: string;
-  decidedCount: (decided: number, total: number) => string;
   allDecided: string;
   parts: (name: string, count: number) => string;
   gameParts: (count: number) => string;
@@ -46,7 +42,23 @@ export interface ReviewTexts {
   /** Moving through the structures, and through the steps. */
   previousStructure: string;
   nextStructure: string;
-  spotOf: (index: number, total: number) => string;
+  clusterOf: (index: number, total: number) => string;
+  clusterSpots: (spots: number, segments: number) => string;
+  segmentsTitle: string;
+  segmentName: (index: number, spots: number) => string;
+  segmentParts: (first: string, a: number, second: string, b: number) => string;
+  stateMixed: (open: number) => string;
+  showSegment: string;
+  keepHere: (name: string) => string;
+  keepBothHere: string;
+  reportCollisions: (decided: number, total: number) => string;
+  reportDecidedTitle: string;
+  reportOpenTitle: string;
+  reportModsTitle: string;
+  reportOtherSteps: string;
+  reportLine: (step: string, open: number) => string;
+  goThere: string;
+  restart: string;
   stateOpen: string;
   stateKept: string;
   stateHidden: (name: string) => string;
@@ -83,13 +95,15 @@ const en: ReviewTexts = {
     },
     collisions: {
       title: "Collisions",
-      hint: "Structure by structure: two mods' buildings or bridges standing in each other.",
+      hint: "Place by place: where two mods' buildings or bridges stand in each other, decided for the whole place or section by section.",
+    },
+    report: {
+      title: "Report",
+      hint: "What was decided, which mods were involved, and what is left open.",
     },
   },
   stepOf: (index, total) => `Step ${index} of ${total}`,
   open: (count) => `${count} open`,
-  finish: "Finish",
-  finished: "You have been through everything. New scans may bring new things; come back here.",
   continueAt: (step) => `Continue: ${step}`,
   start: "Go through it",
   more: (count) => `${count} more on the page itself`,
@@ -101,10 +115,8 @@ const en: ReviewTexts = {
   modsLine: (enabled, total, newer) =>
     `${enabled} of ${total} mods switched on${newer > 0 ? `, ${newer} with a newer version` : ""}.`,
   worldLine: (cells, places) => `mods place objects in ${cells} cells · ${places} places`,
-  keep: (name) => `Keep ${name}'s`,
   keepBoth: "Keep both",
   undo: "Undo",
-  decidedCount: (decided, total) => `${decided} of ${total} spots decided`,
   allDecided: "Every collision is decided.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "part" : "parts"}`,
   gameParts: (count) =>
@@ -122,9 +134,27 @@ const en: ReviewTexts = {
     count === 1 ? "One more mod built here:" : `${count} more mods built here:`,
   othersShow: (name) => `Pick out what ${name} places here`,
   othersCount: (name, count) => `${name} (${count})`,
-  previousStructure: "‹ Previous structure",
-  nextStructure: "Next structure ›",
-  spotOf: (index, total) => `Spot ${index} of ${total}`,
+  previousStructure: "‹ Previous place",
+  nextStructure: "Next place ›",
+  clusterOf: (index, total) => `Place ${index} of ${total}`,
+  clusterSpots: (spots, segments) =>
+    `${spots} ${spots === 1 ? "spot" : "spots"} in ${segments} ${segments === 1 ? "section" : "sections"}`,
+  segmentsTitle: "Sections of this place",
+  segmentName: (index, spots) => `Section ${index} · ${spots} ${spots === 1 ? "spot" : "spots"}`,
+  segmentParts: (first, a, second, b) => `${first} ${a} · ${second} ${b} parts`,
+  stateMixed: (open) =>
+    open > 0 ? `partly decided, ${open} open` : "decided differently by section",
+  showSegment: "Show",
+  keepHere: (name) => `Keep ${name}'s here`,
+  keepBothHere: "Keep both here",
+  reportCollisions: (decided, total) => `${decided} of ${total} places decided`,
+  reportDecidedTitle: "Decided",
+  reportOpenTitle: "Still open",
+  reportModsTitle: "Mods involved",
+  reportOtherSteps: "The other steps",
+  reportLine: (step, open) => (open === 0 ? `${step}: nothing open` : `${step}: ${open} open`),
+  goThere: "Go there",
+  restart: "Start again from the first step",
   stateOpen: "not decided yet",
   stateKept: "decided: both stay",
   stateHidden: (name) => `decided: ${name}'s is hidden`,
@@ -161,14 +191,15 @@ const de: ReviewTexts = {
     },
     collisions: {
       title: "Kollisionen",
-      hint: "Bauwerk für Bauwerk: Gebäude oder Brücken zweier Mods, die ineinander stehen.",
+      hint: "Ort für Ort: wo Gebäude oder Brücken zweier Mods ineinander stehen, für den ganzen Bereich oder Abschnitt für Abschnitt entschieden.",
+    },
+    report: {
+      title: "Bericht",
+      hint: "Was entschieden ist, welche Mods beteiligt waren, und was noch offen ist.",
     },
   },
   stepOf: (index, total) => `Schritt ${index} von ${total}`,
   open: (count) => `${count} offen`,
-  finish: "Fertig",
-  finished:
-    "Du bist alles durchgegangen. Neue Scans können Neues bringen; dann geht es hier weiter.",
   continueAt: (step) => `Weiter: ${step}`,
   start: "Durchgehen",
   more: (count) => `${count} weitere auf der Seite selbst`,
@@ -180,10 +211,8 @@ const de: ReviewTexts = {
   modsLine: (enabled, total, newer) =>
     `${enabled} von ${total} Mods eingeschaltet${newer > 0 ? `, ${newer} mit neuerer Version` : ""}.`,
   worldLine: (cells, places) => `Mods stellen Objekte in ${cells} Zellen · ${places} Orte`,
-  keep: (name) => `${name} behalten`,
   keepBoth: "Beide behalten",
   undo: "Rückgängig",
-  decidedCount: (decided, total) => `${decided} von ${total} Stellen entschieden`,
   allDecided: "Jede Kollision ist entschieden.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "Teil" : "Teile"}`,
   gameParts: (count) =>
@@ -201,9 +230,28 @@ const de: ReviewTexts = {
     count === 1 ? "Ein weiterer Mod baut hier:" : `${count} weitere Mods bauen hier:`,
   othersShow: (name) => `Hervorheben, was ${name} hier platziert`,
   othersCount: (name, count) => `${name} (${count})`,
-  previousStructure: "‹ Vorheriges Bauwerk",
-  nextStructure: "Nächstes Bauwerk ›",
-  spotOf: (index, total) => `Stelle ${index} von ${total}`,
+  previousStructure: "‹ Vorheriger Bereich",
+  nextStructure: "Nächster Bereich ›",
+  clusterOf: (index, total) => `Bereich ${index} von ${total}`,
+  clusterSpots: (spots, segments) =>
+    `${spots} ${spots === 1 ? "Stelle" : "Stellen"} in ${segments} ${segments === 1 ? "Abschnitt" : "Abschnitten"}`,
+  segmentsTitle: "Abschnitte dieses Bereichs",
+  segmentName: (index, spots) =>
+    `Abschnitt ${index} · ${spots} ${spots === 1 ? "Stelle" : "Stellen"}`,
+  segmentParts: (first, a, second, b) => `${first} ${a} · ${second} ${b} Teile`,
+  stateMixed: (open) =>
+    open > 0 ? `teils entschieden, ${open} offen` : "je Abschnitt verschieden entschieden",
+  showSegment: "Zeigen",
+  keepHere: (name) => `Hier ${name} behalten`,
+  keepBothHere: "Hier beide behalten",
+  reportCollisions: (decided, total) => `${decided} von ${total} Bereichen entschieden`,
+  reportDecidedTitle: "Entschieden",
+  reportOpenTitle: "Noch offen",
+  reportModsTitle: "Beteiligte Mods",
+  reportOtherSteps: "Die anderen Schritte",
+  reportLine: (step, open) => (open === 0 ? `${step}: nichts offen` : `${step}: ${open} offen`),
+  goThere: "Hingehen",
+  restart: "Noch einmal von vorn",
   stateOpen: "noch nicht entschieden",
   stateKept: "entschieden: beide bleiben",
   stateHidden: (name) => `entschieden: ${name} wird ausgeblendet`,

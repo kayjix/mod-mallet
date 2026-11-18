@@ -20,17 +20,47 @@ export interface CompareStage3DProps {
   place: StagePlace;
   /** The point between the structures, in game units. */
   centre: [number, number, number];
-  /** The parts each structure starts from: the first mod's, the second's. */
-  seeds: [ObjectRef[], ObjectRef[]];
+  /**
+   * The spots shown, each with the parts its structures start from: the
+   * first mod's and the second's. One spot, or all spots of a cluster.
+   */
+  groups: StageGroup[];
+  /** How far from the point the structures reach, in game units. */
+  reach?: number;
+  /** How far around the point objects are read, in game units. */
+  radius?: number;
+  /** Objects to pick out and frame, by {@link objectKey}, such as one segment's. */
+  focus?: string[] | null;
   /** The two mods' names. */
   names: [string, string];
   /** What the patch hides now, by {@link objectKey}. */
   hidden: Set<string>;
   /** Told about the two structures whenever they are known better. */
   onStructures?: (structures: [AreaObject[], AreaObject[]]) => void;
+  /** Told about the segments whenever they are known better. */
+  onSegments?: (segments: StageSegment[]) => void;
   /** The height of the stage, in pixels. */
   height?: number;
 }
+
+/** One spot of the stage, with the parts its structures start from. */
+export interface StageGroup {
+  key: string;
+  seeds: [ObjectRef[], ObjectRef[]];
+}
+
+/**
+ * A segment: the structures of the two mods that hang together around one
+ * or more spots, and those spots (ADR 0050).
+ */
+export interface StageSegment {
+  /** The spots, by their groups' keys. */
+  groups: string[];
+  parts: [AreaObject[], AreaObject[]];
+}
+
+/** How long finding the segments rests between two tries while models arrive, in milliseconds. */
+const FIND_EVERY = 400;
 
 /** How far around the point objects are read, in game units (about two cells across). */
 const RADIUS = CELL;
@@ -79,12 +109,20 @@ const signature = (parts: AreaObject[]) =>
 export function CompareStage3D({
   place,
   centre,
-  seeds,
+  groups,
+  reach = STRUCTURE_REACH,
+  radius = RADIUS,
+  focus = null,
   names,
   hidden,
   onStructures,
+  onSegments,
   height = 420,
 }: CompareStage3DProps) {
+  const seeds: [ObjectRef[], ObjectRef[]] = [
+    groups.flatMap((group) => group.seeds[0]),
+    groups.flatMap((group) => group.seeds[1]),
+  ];
   const { api } = useSession();
   const r = useReviewTexts();
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -107,10 +145,16 @@ export function CompareStage3D({
   const settle = useRef<number | undefined>(undefined);
   // What is known of the structures, and whether the camera framed them
   // yet: roughly while models are still read, or for good.
-  const known = useRef<{ signature: string; framed: "no" | "rough" | "done"; done: number }>({
+  const known = useRef<{
+    signature: string;
+    framed: "no" | "rough" | "done";
+    done: number;
+    at: number;
+  }>({
     signature: "",
     framed: "no",
     done: -1,
+    at: 0,
   });
   /** Whether the user moved the camera, which framing then leaves alone. */
   const moved = useRef(false);
@@ -126,6 +170,12 @@ export function CompareStage3D({
   });
   const told = useRef(onStructures);
   told.current = onStructures;
+  const toldSegments = useRef(onSegments);
+  toldSegments.current = onSegments;
+  const reachNow = useRef(reach);
+  reachNow.current = reach;
+  const groupsNow = useRef(groups);
+  groupsNow.current = groups;
   const markingsNow = useRef(markings);
   markingsNow.current = markings;
   const treesNow = useRef(trees);
@@ -157,26 +207,68 @@ export function CompareStage3D({
       return;
     }
     const progress = current.progress;
-    if (progress.done === known.current.done) {
+    const complete = progress.done === progress.total;
+    // Finding the segments costs; while models still arrive it rests a
+    // moment between two tries.
+    if (
+      progress.done === known.current.done ||
+      (!complete && known.current.done >= 0 && Date.now() - known.current.at < FIND_EVERY)
+    ) {
       return;
     }
     known.current.done = progress.done;
-    const [firstSeeds, secondSeeds] = seedsNow.current;
+    known.current.at = Date.now();
+    const [x, y] = centreNow.current;
+    const near = { x, y, radius: reachNow.current };
+    // What grows from each seed, once per seed.
+    const grown = new Map<string, AreaObject[]>();
+    const growFrom = (seed: AreaObject) => {
+      const key = objectKey(seed.id.plugin, seed.id.localId);
+      let parts = grown.get(key);
+      if (parts === undefined) {
+        parts = current.connected(seed, STRUCTURE_MARGIN, near);
+        for (const part of parts) {
+          // A part reached from another seed of the same kind grows the same.
+          grown.set(objectKey(part.id.plugin, part.id.localId), parts);
+        }
+        grown.set(key, parts);
+      }
+      return parts;
+    };
     const grow = (from: AreaObject[]) => {
       const found = new Map<string, AreaObject>();
       for (const seed of from) {
-        const [x, y] = centreNow.current;
-        const near = { x, y, radius: STRUCTURE_REACH };
-        for (const part of current.connected(seed, STRUCTURE_MARGIN, near)) {
+        for (const part of growFrom(seed)) {
           found.set(objectKey(part.id.plugin, part.id.localId), part);
         }
       }
       return [...found.values()];
     };
-    const first = grow(seedObjects(area, firstSeeds));
-    const second = grow(seedObjects(area, secondSeeds));
+    const perGroup = groupsNow.current.map((group) => ({
+      key: group.key,
+      parts: [grow(seedObjects(area, group.seeds[0])), grow(seedObjects(area, group.seeds[1]))] as [
+        AreaObject[],
+        AreaObject[],
+      ],
+    }));
+    const segments = segmentsOf(perGroup);
+    const first = [
+      ...new Map(
+        segments
+          .flatMap((segment) => segment.parts[0])
+          .map((part) => [objectKey(part.id.plugin, part.id.localId), part]),
+      ).values(),
+    ];
+    const second = [
+      ...new Map(
+        segments
+          .flatMap((segment) => segment.parts[1])
+          .map((part) => [objectKey(part.id.plugin, part.id.localId), part]),
+      ).values(),
+    ];
     const now = `${signature(first)}|${signature(second)}`;
     if (now !== known.current.signature) {
+      toldSegments.current?.(segments);
       known.current.signature = now;
       structures.current = [
         new Set(first.map((part) => objectKey(part.id.plugin, part.id.localId))),
@@ -298,7 +390,7 @@ export function CompareStage3D({
     const gl = canvas.current?.getContext("webgl2") ?? null;
     setState("loading");
     structures.current = [new Set(), new Set()];
-    known.current = { signature: "", framed: "no", done: -1 };
+    known.current = { signature: "", framed: "no", done: -1, at: 0 };
     moved.current = false;
     setCounts([0, 0]);
     camera.current = {
@@ -312,14 +404,14 @@ export function CompareStage3D({
     if (place.type === "exterior" && gl !== null) {
       try {
         land.current = new LandLayer(gl, api, place.world, () => redrawNow.current());
-        land.current.load(cx, cy, RADIUS);
+        land.current.load(cx, cy, radius);
       } catch {
         land.current = null;
       }
     }
     const read =
       place.type === "exterior"
-        ? api.areaObjects(place.world, cx, cy, RADIUS)
+        ? api.areaObjects(place.world, cx, cy, radius)
         : api.interiorObjects(place.cell);
     read
       .then((found) => {
@@ -446,11 +538,20 @@ export function CompareStage3D({
     return () => element.removeEventListener("wheel", onWheel);
   }, []);
 
+  const focusKey = focus === null ? "" : focus.join(",");
   // biome-ignore lint/correctness/useExhaustiveDependencies: the keys belong to the mod shown.
   useEffect(() => {
-    layer.current?.select(others.find((other) => other.plugin === shown)?.keys ?? []);
+    const picked = focusKey === "" ? null : focusKey.split(",");
+    layer.current?.select(picked ?? others.find((other) => other.plugin === shown)?.keys ?? []);
+    const current = layer.current;
+    if (picked !== null && current !== null) {
+      const box = boxOf(current, [new Set(picked), new Set()]);
+      if (box !== null) {
+        camera.current = framing(box, camera.current, aspectNow.current);
+      }
+    }
     redraw();
-  }, [shown, redraw]);
+  }, [shown, focusKey, redraw]);
 
   const fit = () => {
     const current = layer.current;
@@ -549,6 +650,53 @@ export function CompareStage3D({
       )}
     </div>
   );
+}
+
+/**
+ * The spots' structures joined where they share a part: each join is one
+ * segment, with the spots it covers and the parts of both mods.
+ */
+function segmentsOf(
+  perGroup: { key: string; parts: [AreaObject[], AreaObject[]] }[],
+): StageSegment[] {
+  const owner = new Map<string, number>();
+  const root = perGroup.map((_, index) => index);
+  const find = (index: number): number => {
+    let at = index;
+    while (root[at] !== at) {
+      at = root[at] ?? at;
+    }
+    return at;
+  };
+  perGroup.forEach((group, index) => {
+    for (const part of [...group.parts[0], ...group.parts[1]]) {
+      const key = objectKey(part.id.plugin, part.id.localId);
+      const before = owner.get(key);
+      if (before === undefined) {
+        owner.set(key, index);
+      } else {
+        root[find(index)] = find(before);
+      }
+    }
+  });
+  const joined = new Map<number, StageSegment>();
+  perGroup.forEach((group, index) => {
+    const at = find(index);
+    const segment = joined.get(at) ?? { groups: [], parts: [[], []] };
+    segment.groups.push(group.key);
+    for (const side of [0, 1] as const) {
+      const known = new Set(
+        segment.parts[side].map((part) => objectKey(part.id.plugin, part.id.localId)),
+      );
+      for (const part of group.parts[side]) {
+        if (!known.has(objectKey(part.id.plugin, part.id.localId))) {
+          segment.parts[side].push(part);
+        }
+      }
+    }
+    joined.set(at, segment);
+  });
+  return [...joined.values()];
 }
 
 /** A plugin's name without its extension. */

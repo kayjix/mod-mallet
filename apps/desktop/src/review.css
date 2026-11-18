@@ -290,3 +290,48 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
+
+/* The sections of a place, each with what is decided there. */
+.review-segments h4,
+.review-report h4 {
+  margin: var(--space-2) 0 4px;
+  font-size: 0.95rem;
+}
+
+.review-segments ol,
+.review-report-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-segment,
+.review-report-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.review-segment[data-focus="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.review-segment-name {
+  font-weight: 600;
+}
+
+.review-segment button[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.review-report {
+  display: grid;
+  gap: var(--space-2);
+}

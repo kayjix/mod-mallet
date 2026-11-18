@@ -29,7 +29,7 @@ a colour of its own.
 1. **The review is a page of its own, *Go through it* (*Durchgehen*)**,
    in the sidebar right under the overview. The start page and the
    overview lead to it, with the step where the user stopped.
-2. **Five steps, in this order:**
+2. **Five steps, in this order, and a report:**
    1. *Installation*: the mods, how many are switched on, which have a
       newer version, and the open findings about what is installed
       (missing masters and requirements, installer options, script
@@ -42,7 +42,10 @@ a colour of its own.
       to its comparison on the assets page.
    4. *World map*: the worldspaces with what mods add to them, each
       leading to the map.
-   5. *Collisions*: one structure at a time, decided in the review itself.
+   5. *Collisions*: place by place, decided in the review itself (point
+      7).
+   6. *Report*: the places decided and how, the mods involved, and what
+      is left open in every step, each with the way there.
 3. **The review owns nothing.** It shows the homes' own rows (the task
    page's finding rows, the assets page's duel lines) and writes into the
    same state (patch choices, duel decisions, findings set aside). What is
@@ -53,8 +56,19 @@ a colour of its own.
 4. **A structure is the parts of one mod that hang together**: starting
    from the parts of a collision spot, every part of the same plugin whose
    model box (turned and placed as the game places it) meets another
-   within a hand's breadth, transitively (`AreaLayer.connected`, ADR
-   0040). Not the whole mod, not the whole cell.
+   within about 6 cm, transitively, no farther than about 30 m from the
+   spot (`AreaLayer.connected`, ADR 0040). Not the whole mod, not the
+   whole cell. What it grows through depends on what it starts from:
+   - from something built, through what is built; never through trees,
+     rocks or the landscape, and not through clutter (crates, barrels, a
+     `clutter` folder, anything under about 35 cm);
+   - from clutter, through clutter: a pile of crates stays a pile;
+   - decor of the same mod that touches the built parts (clutter and small
+     plants, not trees) is taken along as a leaf, so that hiding a
+     building takes its planters and banners with it; it does not grow on
+     from there.
+   The part started from always belongs to the structure. The object
+   card's *parts that hang together* follows the same rules.
 5. **A structure is shown three times, through one camera**: the place as
    it is now (with what the patch hides left out), with only the first
    mod's structure, and with only the second's. The first mod's parts are
@@ -66,9 +80,28 @@ a colour of its own.
    (`chooseObject`), which decides every spot they are part of (ADR 0040's
    `decisionAt`). *Keep both* marks the spot as decided both ways and shows
    both structures again (`revealObjects`). *Undo* takes the parts out of
-   the patch's choices. The next structure is the next spot still open:
-   the spots a decided structure covered are decided with it.
-7. **Progress is what is decided**, wherever it was decided: open duels,
+   the patch's choices.
+7. **Places and segments.** On the reference setup the bridges at
+   Markarth came up as one small structure after another, 3, then 5, then
+   2 parts, each to be decided anew. So the collisions step works on two
+   levels:
+   - A *place* (cluster) is the spots of the same two mods in one
+     worldspace or cell whose points lie within about 30 m of one another,
+     chained: the bridges at Markarth. The three views show the whole
+     place, and one choice decides it (*keep JK's here*).
+   - A *segment* is what one structure decision covers: the structures of
+     the two mods around one or more of the place's spots, joined where
+     they share a part. Below the views each segment is listed with what
+     is decided there, as it is now; each can be shown on its own and
+     decided differently.
+   Deciding a place or a segment hides the losing side's structures and
+   decides every spot in it, also where the losing side's parts there are
+   the game's own and stay. Deciding a place moves on to the next place
+   with an open spot. *Previous* and *next* go place by place, decided
+   ones included, and say what was decided. Other mods with objects among
+   the structures (at Riften's gate a third and fourth) are listed and can
+   be picked out.
+8. **Progress is what is decided**, wherever it was decided: open duels,
    open spots, open findings. Steps that are only looked at (the
    installation, the load order, the map) are marked as seen, and the
    step the user was on is remembered, both in the window's storage per
@@ -80,8 +113,13 @@ a colour of its own.
   worklist stays for spots one by one and the pairs for a mod against a
   mod as a whole. Three ways now lead to the same choices; the review is
   the guided one, the other two stay the pages to look things up.
-- The three views draw the area three times per frame. For a few
-  thousand objects that is fluid; the models are read once.
+- The three views draw the area three times per frame, through one
+  drawing context with the models read once; the looks of a model are
+  rewritten in place between the views, and the stage draws at half
+  resolution while the camera moves.
+- A place is found by distance alone. Two unrelated buildings of the same
+  two mods within 30 m of each other are one place; its segments keep
+  them apart where they do not touch.
 - Finding a structure needs the models' boxes, so it is known only once
   the area's models are read; until then the view shows the spot's own
   parts.

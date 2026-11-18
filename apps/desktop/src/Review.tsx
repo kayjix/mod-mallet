@@ -6,29 +6,33 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
 import { objectKey } from "./area-layer";
 import { isCollision, stepOf } from "./arrange";
-import { CompareStage3D, type StagePlace } from "./CompareStage3D";
+import {
+  CompareStage3D,
+  type StageGroup,
+  type StagePlace,
+  type StageSegment,
+} from "./CompareStage3D";
 import { DuelLine } from "./Duels";
-import type { AreaObject } from "./generated/area-objects";
 import type { MapSpot, RenderedFinding, RenderedReport } from "./generated/rendered-report";
 import { reportSpots } from "./health";
-import { CELL, type WorkKind } from "./map-places";
+import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
 import { isGameObject } from "./object-actions";
-import {
-  chooseObject,
-  chooseSpot,
-  decisionAt,
-  hiddenKeysOf,
-  type PatchChoices,
-  revealObjects,
-  spotKey,
-} from "./patch";
+import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
+import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { FindingRow } from "./Tasks";
 import "./review.css";
 
 /** The steps, in their order. */
-export const REVIEW_STEPS: ReviewStep[] = ["install", "order", "assets", "map", "collisions"];
+export const REVIEW_STEPS: ReviewStep[] = [
+  "install",
+  "order",
+  "assets",
+  "map",
+  "collisions",
+  "report",
+];
 
 /** Where the review leads for more than it shows. */
 export type ReviewTarget = "tasks" | "mods" | "assets" | "map";
@@ -52,9 +56,6 @@ const ASSET_KINDS = new Set(["meshes.retexture-bypassed", "npcs.face-mismatch"])
 
 /** How many rows a step shows before it leads to the page itself. */
 const LIMIT = 12;
-
-/** The worst collisions first. */
-const KIND_ORDER: WorkKind[] = ["duplicate", "overlap", "deep", "touch"];
 
 /** What the review remembers per game: the step the user is on, and the steps looked at. */
 interface Stored {
@@ -115,8 +116,9 @@ interface ReviewProps {
 
 /**
  * The setup step by step (ADR 0050): what is installed, the load order,
- * the assets, the world map and the collisions, the last decided here one
- * structure at a time. Where the user was is remembered per game.
+ * the assets, the world map and the collisions, the last decided here
+ * place by place, and a report at the end. Where the user was is
+ * remembered per game.
  */
 export function Review({ report, game, onOpen }: ReviewProps) {
   const { ignored, decisions, patchChoices } = useSession();
@@ -125,6 +127,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
     () => storedReview(game) ?? { step: "install", seen: [] },
   );
   useEffect(() => remember(game, stored), [game, stored]);
+  // The place the collisions step shows, kept here so that the report can lead there.
+  const [clusterAt, setClusterAt] = useState<string | null>(null);
   const index = REVIEW_STEPS.indexOf(stored.step);
   const previous = REVIEW_STEPS[index - 1];
   const following = REVIEW_STEPS[index + 1];
@@ -135,25 +139,24 @@ export function Review({ report, game, onOpen }: ReviewProps) {
     () => fileDuels(report).filter((rendered) => decisions[rendered.duel.id] === undefined),
     [report, decisions],
   );
-  const spots = useMemo(
-    () => reportSpots(report, ignored, patchChoices).filter((spot) => spot.state === "open"),
+  const clusters = useMemo(
+    () => clustersOf(reportSpots(report, ignored, patchChoices)),
     [report, ignored, patchChoices],
   );
+  const openClusters = clusters.filter((cluster) => openIn(cluster) > 0).length;
   const open: Record<ReviewStep, number | null> = {
     install: install.length,
     order: order.length,
     assets: duels.length,
     map: null,
-    collisions: spots.length,
+    collisions: openClusters,
+    report: null,
   };
   const go = (step: ReviewStep) => setStored({ ...stored, step });
   const next = () => {
     const seen = stored.seen.includes(stored.step) ? stored.seen : [...stored.seen, stored.step];
-    const following = REVIEW_STEPS[index + 1];
     setStored({ step: following ?? stored.step, seen });
   };
-  const finished =
-    stored.seen.includes("collisions") || (index === REVIEW_STEPS.length - 1 && spots.length === 0);
 
   return (
     <section className="review">
@@ -205,7 +208,25 @@ export function Review({ report, game, onOpen }: ReviewProps) {
           </Rows>
         )}
         {stored.step === "map" && <MapStep report={report} onOpen={onOpen} />}
-        {stored.step === "collisions" && <CollisionsStep report={report} />}
+        {stored.step === "collisions" && (
+          <CollisionsStep
+            report={report}
+            clusters={clusters}
+            cursor={clusterAt}
+            onCursor={setClusterAt}
+          />
+        )}
+        {stored.step === "report" && (
+          <ReportStep
+            clusters={clusters}
+            open={open}
+            onCluster={(key) => {
+              setClusterAt(key);
+              go("collisions");
+            }}
+            onStep={go}
+          />
+        )}
         {/* Between the steps; moving within a step is the step's own. */}
         <footer className="review-foot">
           {previous !== undefined && (
@@ -214,11 +235,13 @@ export function Review({ report, game, onOpen }: ReviewProps) {
             </button>
           )}
           <span className="spacer" />
-          {finished && stored.step === "collisions" ? (
-            <p className="aside">{r.finished}</p>
+          {following === undefined ? (
+            <button type="button" className="quiet" onClick={() => go("install")}>
+              {r.restart}
+            </button>
           ) : (
             <button type="button" className="primary" onClick={next}>
-              {following === undefined ? r.finish : r.stepNext(r.step[following].title)}
+              {r.stepNext(r.step[following].title)}
             </button>
           )}
         </footer>
@@ -356,49 +379,39 @@ function placeOf(
 }
 
 /**
- * The collisions, one structure at a time: its two mods' structures side
- * by side, the three choices, and the way to the structure before and
- * after, decided ones included, to see or change what was decided there.
- * Deciding hides a whole structure, which decides every spot it is part
- * of, and moves on to the next spot still open.
+ * The collisions, place by place (ADR 0050): a cluster of spots of the
+ * same two mods, its structures side by side, and below them its
+ * segments, each with what is decided there. One choice decides the whole
+ * place; each segment can be decided on its own. Moving goes place by
+ * place, decided ones included; deciding moves on to the next open place.
  */
-function CollisionsStep({ report }: { report: RenderedReport }) {
+function CollisionsStep({
+  report,
+  clusters,
+  cursor,
+  onCursor,
+}: {
+  report: RenderedReport;
+  clusters: Cluster[];
+  cursor: string | null;
+  onCursor: (key: string) => void;
+}) {
   const { ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
-  const [cursor, setCursor] = useState<string | null>(null);
   const [history, setHistory] = useState<PatchChoices[]>([]);
-  const [structures, setStructures] = useState<[AreaObject[], AreaObject[]]>([[], []]);
-  const all = useMemo(
-    () => reportSpots(report, ignored, patchChoices),
-    [report, ignored, patchChoices],
-  );
-  // Every spot that names its objects, the worst first; the order does not
-  // change as spots are decided, so that moving back finds them again.
-  const ordered = useMemo(
-    () =>
-      all
-        .filter((item) => (item.spot.parts ?? []).length > 0)
-        .map((item) => ({ item, key: spotKey(item.spot) ?? item.finding }))
-        .sort(
-          (a, b) =>
-            KIND_ORDER.indexOf(a.item.kind) - KIND_ORDER.indexOf(b.item.kind) ||
-            a.key.localeCompare(b.key),
-        ),
-    [all],
-  );
-  const openCount = ordered.filter(({ item }) => item.state === "open").length;
-  const at = Math.max(
-    0,
-    ordered.findIndex(({ key }) => key === cursor) >= 0
-      ? ordered.findIndex(({ key }) => key === cursor)
-      : ordered.findIndex(({ item }) => item.state === "open"),
-  );
-  const entry = ordered[at];
-  const currentKey = entry?.key ?? null;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the structures belong to the spot.
-  useEffect(() => setStructures([[], []]), [currentKey]);
+  const [segments, setSegments] = useState<StageSegment[]>([]);
+  const [focus, setFocus] = useState<number | null>(null);
+  const found = clusters.findIndex((cluster) => cluster.key === cursor);
+  const at = Math.max(0, found >= 0 ? found : clusters.findIndex((cluster) => openIn(cluster) > 0));
+  const cluster = clusters[at];
+  const currentKey = cluster?.key ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the structures belong to the place.
+  useEffect(() => {
+    setSegments([]);
+    setFocus(null);
+  }, [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
-  const decided = all.filter((item) => item.state !== "open").length;
+  const decidedPlaces = clusters.filter((candidate) => openIn(candidate) === 0).length;
   const undo = (
     <button
       type="button"
@@ -416,7 +429,8 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
     </button>
   );
 
-  if (entry === undefined) {
+  const first = cluster?.spots[0];
+  if (cluster === undefined || first === undefined) {
     return (
       <div className="review-rows">
         <p>{r.allDecided}</p>
@@ -424,154 +438,365 @@ function CollisionsStep({ report }: { report: RenderedReport }) {
       </div>
     );
   }
-  const current = entry.item;
-  const parts = current.spot.parts ?? [];
-  const plugins = [...new Set(parts.map((part) => part.object.plugin))];
-  const sides: [string, string] = [plugins[0] ?? "", plugins[1] ?? plugins[0] ?? ""];
+  const sides = cluster.plugins;
   const names: [string, string] = [short(sides[0]), short(sides[1])];
-  const seeds: [typeof parts, typeof parts] = [
-    parts.filter((part) => part.object.plugin === sides[0]),
-    parts.filter((part) => part.object.plugin === sides[1]),
-  ];
-  const { place, centre } = placeOf(current.spot, report.map.worlds);
-  const decision = decisionAt(patchChoices, current.finding, spotKey(current.spot), parts);
-  const state =
-    decision === undefined
+  const groups: StageGroup[] = cluster.spots.map(({ item, key }) => {
+    const parts = item.spot.parts ?? [];
+    return {
+      key,
+      seeds: [
+        parts.filter((part) => part.object.plugin === sides[0]).map((part) => part.object),
+        parts.filter((part) => part.object.plugin === sides[1]).map((part) => part.object),
+      ],
+    };
+  });
+  const { place } = placeOf(first.item.spot, report.map.worlds);
+  const reach = cluster.radius + 2048;
+  const radius = Math.min(2 * CELL, Math.max(CELL, cluster.radius + 2048));
+  const bySpot = new Map(cluster.spots.map((spot) => [spot.key, spot]));
+  // Until the stage has found them, every spot is a segment of its own.
+  const shownSegments: StageSegment[] =
+    segments.length > 0
+      ? segments
+      : cluster.spots.map(({ key }) => ({ groups: [key], parts: [[], []] }));
+  const spotsOf = (segment: StageSegment) =>
+    segment.groups.flatMap((key) => {
+      const spot = bySpot.get(key);
+      return spot === undefined ? [] : [spot];
+    });
+  const describe = (decided: Decided) =>
+    decided.type === "open"
       ? r.stateOpen
-      : decision === null
+      : decided.type === "kept"
         ? r.stateKept
-        : r.stateHidden(short(decision));
+        : decided.type === "hidden"
+          ? r.stateHidden(short(decided.plugin))
+          : r.stateMixed(decided.open);
+  const keptSideOf = (decided: Decided) =>
+    decided.type !== "hidden"
+      ? null
+      : decided.plugin.toLowerCase() === sides[1].toLowerCase()
+        ? 0
+        : 1;
+  const placeDecided = decidedOf(cluster.spots, patchChoices);
 
-  const go = (index: number) => {
-    const target = ordered[(index + ordered.length) % ordered.length];
-    if (target !== undefined) {
-      setCursor(target.key);
+  /** A side's parts in `chosen`, or the spots' own parts until the structures are known. */
+  const partsOf = (chosen: StageSegment[], side: 0 | 1) => {
+    const known = chosen.flatMap((segment) => segment.parts[side]);
+    if (known.length > 0) {
+      return known.map((object) => ({ id: object.id, game: isGameObject(object) }));
     }
+    return chosen.flatMap((segment) =>
+      spotsOf(segment).flatMap(({ item }) =>
+        (item.spot.parts ?? [])
+          .filter((part) => part.object.plugin === sides[side])
+          .map((part) => ({ id: part.object, game: !part.hideable })),
+      ),
+    );
   };
-  /** A side's structure, or the spot's own parts of it until the structure is known. */
-  const structureOf = (side: 0 | 1) =>
-    structures[side].length > 0
-      ? structures[side].map((object) => ({ id: object.id, game: isGameObject(object) }))
-      : seeds[side].map((part) => ({ id: part.object, game: !part.hideable }));
-  /** Keeps the choices, and moves on to the next spot still open after this one. */
-  const apply = (next: PatchChoices) => {
+  /** Keeps the choices; deciding the whole place moves on to the next open one. */
+  const apply = (next: PatchChoices, moveOn: boolean) => {
     setHistory([...history, patchChoices]);
     setPatchChoices(next);
-    const after = reportSpots(report, ignored, next);
-    const open = new Set(
-      after
-        .filter((item) => item.state === "open")
-        .map((item) => spotKey(item.spot) ?? item.finding),
-    );
-    for (let step = 1; step <= ordered.length; step++) {
-      const candidate = ordered[(at + step) % ordered.length];
-      if (candidate !== undefined && open.has(candidate.key)) {
-        setCursor(candidate.key);
+    if (!moveOn) {
+      return;
+    }
+    const after = clustersOf(reportSpots(report, ignored, next));
+    for (let step = 1; step <= clusters.length; step++) {
+      const candidate = clusters[(at + step) % clusters.length];
+      const now = after.find((other) => other.key === candidate?.key);
+      if (candidate !== undefined && now !== undefined && openIn(now) > 0) {
+        onCursor(candidate.key);
         return;
       }
     }
-    setCursor(entry.key);
   };
-  const keep = (side: 0 | 1) => {
-    const kept = structureOf(side).map((part) => part.id);
-    const gone = structureOf(side === 0 ? 1 : 0).filter((part) => !part.game);
-    let next = revealObjects(patchChoices, spots, kept);
-    for (const part of gone) {
+  const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean) => {
+    const loser = sides[side === 0 ? 1 : 0];
+    let next = revealObjects(
+      patchChoices,
+      spots,
+      partsOf(chosen, side).map((part) => part.id),
+    );
+    for (const part of partsOf(chosen, side === 0 ? 1 : 0).filter((part) => !part.game)) {
       next = chooseObject(next, part.id, true);
     }
-    apply(next);
-  };
-  // Keeping both keeps every spot whose parts all belong to the two structures.
-  const keepBoth = () => {
-    const both = [...structureOf(0), ...structureOf(1)].map((part) => part.id);
-    const inBoth = new Set(both.map((id) => objectKey(id.plugin, id.localId)));
-    let next = revealObjects(patchChoices, spots, both);
-    for (const list of spots.values()) {
-      for (const spot of list) {
-        const key = spotKey(spot);
-        const spotParts = spot.parts ?? [];
-        if (
-          key !== null &&
-          spotParts.length > 0 &&
-          spotParts.every((part) => inBoth.has(objectKey(part.object.plugin, part.object.localId)))
-        ) {
-          next = chooseSpot(next, key, null);
-        }
+    // Every spot of the segments is decided, also where the losing side's
+    // parts there are the game's own and stay.
+    for (const segment of chosen) {
+      for (const { key } of spotsOf(segment)) {
+        next = chooseSpot(next, key, loser);
       }
     }
-    const own = spotKey(current.spot);
-    apply(own === null ? next : chooseSpot(next, own, null));
+    apply(next, moveOn);
   };
-  const gameParts = [...structureOf(0), ...structureOf(1)].filter((part) => part.game).length;
-  const keptSide =
-    decision === undefined || decision === null
+  const keepBoth = (chosen: StageSegment[], moveOn: boolean) => {
+    const both = [...partsOf(chosen, 0), ...partsOf(chosen, 1)].map((part) => part.id);
+    let next = revealObjects(patchChoices, spots, both);
+    for (const segment of chosen) {
+      for (const { key } of spotsOf(segment)) {
+        next = chooseSpot(next, key, null);
+      }
+    }
+    apply(next, moveOn);
+  };
+  const focused = focus === null ? null : shownSegments[focus];
+  const focusKeys =
+    focused == null
       ? null
-      : decision.toLowerCase() === sides[1].toLowerCase()
-        ? 0
-        : 1;
+      : [...focused.parts[0], ...focused.parts[1]].map((part) =>
+          objectKey(part.id.plugin, part.id.localId),
+        );
+  const gameParts = [...partsOf(shownSegments, 0), ...partsOf(shownSegments, 1)].filter(
+    (part) => part.game,
+  ).length;
+  const placeKept = keptSideOf(placeDecided);
 
   return (
     <div className="review-collision">
-      <nav className="review-structures" aria-label={r.spotOf(at + 1, ordered.length)}>
-        <button type="button" className="small" onClick={() => go(at - 1)}>
+      <nav className="review-structures" aria-label={r.clusterOf(at + 1, clusters.length)}>
+        <button
+          type="button"
+          className="small"
+          onClick={() =>
+            onCursor(clusters[(at - 1 + clusters.length) % clusters.length]?.key ?? "")
+          }
+        >
           {r.previousStructure}
         </button>
         <span className="review-structures-where">
-          <strong>{r.spotOf(at + 1, ordered.length)}</strong>
-          <span className="aside">{r.decidedCount(decided, all.length)}</span>
+          <strong>{r.clusterOf(at + 1, clusters.length)}</strong>
+          <span className="aside">{r.reportCollisions(decidedPlaces, clusters.length)}</span>
         </span>
-        <button type="button" className="small" onClick={() => go(at + 1)}>
+        <button
+          type="button"
+          className="small"
+          onClick={() => onCursor(clusters[(at + 1) % clusters.length]?.key ?? "")}
+        >
           {r.nextStructure}
         </button>
       </nav>
-      {openCount === 0 && <p className="aside">{r.allDecided}</p>}
+      {decidedPlaces === clusters.length && <p className="aside">{r.allDecided}</p>}
       <div className="review-collision-head">
         <strong>
           {names[0]} ⟷ {names[1]}
         </strong>
         <span className="aside">
-          {current.spot.objects} · <code>{current.spot.console}</code>
+          {r.clusterSpots(cluster.spots.length, shownSegments.length)} ·{" "}
+          <code>{first.item.spot.console}</code>
         </span>
         <span className="spacer" />
-        <span className="review-state" data-decided={decision !== undefined}>
-          {state}
+        <span className="review-state" data-decided={placeDecided.type !== "open"}>
+          {describe(placeDecided)}
         </span>
       </div>
       <CompareStage3D
         place={place}
-        centre={centre}
-        seeds={[seeds[0].map((part) => part.object), seeds[1].map((part) => part.object)]}
+        centre={cluster.centre}
+        groups={groups}
+        reach={reach}
+        radius={radius}
+        focus={focusKeys}
         names={names}
         hidden={hidden}
-        onStructures={setStructures}
+        onSegments={setSegments}
       />
       {gameParts > 0 && <p className="aside">{r.gameParts(gameParts)}</p>}
       <div className="review-choices">
         <button
           type="button"
           className="primary"
-          aria-pressed={keptSide === 0}
-          onClick={() => keep(0)}
+          aria-pressed={placeKept === 0}
+          onClick={() => keep(0, shownSegments, true)}
         >
-          {keptSide === 0 ? "✓ " : ""}
-          {r.keep(names[0])}
+          {placeKept === 0 ? "✓ " : ""}
+          {r.keepHere(names[0])}
         </button>
         <button
           type="button"
           className="primary"
-          aria-pressed={keptSide === 1}
-          onClick={() => keep(1)}
+          aria-pressed={placeKept === 1}
+          onClick={() => keep(1, shownSegments, true)}
         >
-          {keptSide === 1 ? "✓ " : ""}
-          {r.keep(names[1])}
+          {placeKept === 1 ? "✓ " : ""}
+          {r.keepHere(names[1])}
         </button>
-        <button type="button" aria-pressed={decision === null} onClick={keepBoth}>
-          {decision === null ? "✓ " : ""}
-          {r.keepBoth}
+        <button
+          type="button"
+          aria-pressed={placeDecided.type === "kept"}
+          onClick={() => keepBoth(shownSegments, true)}
+        >
+          {placeDecided.type === "kept" ? "✓ " : ""}
+          {r.keepBothHere}
         </button>
         <span className="spacer" />
         {undo}
       </div>
+      <section className="review-segments">
+        <h4>{r.segmentsTitle}</h4>
+        <ol>
+          {shownSegments.map((segment, index) => {
+            const decided = decidedOf(spotsOf(segment), patchChoices);
+            const kept = keptSideOf(decided);
+            return (
+              <li
+                key={segment.groups.join(",")}
+                className="review-segment"
+                data-focus={focus === index}
+              >
+                <span className="review-segment-name">
+                  {r.segmentName(index + 1, segment.groups.length)}
+                </span>
+                <span className="aside">
+                  {r.segmentParts(
+                    names[0],
+                    segment.parts[0].length,
+                    names[1],
+                    segment.parts[1].length,
+                  )}
+                </span>
+                <span className="review-state" data-decided={decided.type !== "open"}>
+                  {describe(decided)}
+                </span>
+                <span className="spacer" />
+                <button
+                  type="button"
+                  className="small quiet"
+                  aria-pressed={focus === index}
+                  onClick={() => setFocus(focus === index ? null : index)}
+                >
+                  {r.showSegment}
+                </button>
+                <button
+                  type="button"
+                  className="small"
+                  aria-pressed={kept === 0}
+                  onClick={() => keep(0, [segment], false)}
+                >
+                  {names[0]}
+                </button>
+                <button
+                  type="button"
+                  className="small"
+                  aria-pressed={kept === 1}
+                  onClick={() => keep(1, [segment], false)}
+                >
+                  {names[1]}
+                </button>
+                <button
+                  type="button"
+                  className="small"
+                  aria-pressed={decided.type === "kept"}
+                  onClick={() => keepBoth([segment], false)}
+                >
+                  {r.keepBoth}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * The report at the end (ADR 0050): the places decided and how, the mods
+ * involved, and what is left open, in this step and in the others.
+ */
+function ReportStep({
+  clusters,
+  open,
+  onCluster,
+  onStep,
+}: {
+  clusters: Cluster[];
+  open: Record<ReviewStep, number | null>;
+  onCluster: (key: string) => void;
+  onStep: (step: ReviewStep) => void;
+}) {
+  const { patchChoices } = useSession();
+  const r = useReviewTexts();
+  const decided = clusters.filter((cluster) => openIn(cluster) === 0);
+  const pending = clusters.filter((cluster) => openIn(cluster) > 0);
+  const mods = new Map<string, number>();
+  for (const cluster of clusters) {
+    for (const plugin of cluster.plugins) {
+      mods.set(short(plugin), (mods.get(short(plugin)) ?? 0) + 1);
+    }
+  }
+  const line = (cluster: Cluster) => {
+    const state = decidedOf(cluster.spots, patchChoices);
+    const what =
+      state.type === "open"
+        ? r.stateOpen
+        : state.type === "kept"
+          ? r.stateKept
+          : state.type === "hidden"
+            ? r.stateHidden(short(state.plugin))
+            : r.stateMixed(state.open);
+    return (
+      <li key={cluster.key} className="review-report-line">
+        <strong>
+          {short(cluster.plugins[0])} ⟷ {short(cluster.plugins[1])}
+        </strong>
+        <code className="aside">{cluster.spots[0]?.item.spot.console}</code>
+        <span className="aside">{cluster.spots.length}×</span>
+        <span className="review-state" data-decided={state.type !== "open"}>
+          {what}
+        </span>
+        <span className="spacer" />
+        <button type="button" className="small quiet" onClick={() => onCluster(cluster.key)}>
+          {r.goThere}
+        </button>
+      </li>
+    );
+  };
+  const steps: ReviewStep[] = ["install", "order", "assets"];
+  return (
+    <div className="review-report">
+      <p>
+        <strong>{r.reportCollisions(decided.length, clusters.length)}</strong>
+      </p>
+      {pending.length > 0 && (
+        <section>
+          <h4>{r.reportOpenTitle}</h4>
+          <ul className="review-report-list">{pending.map(line)}</ul>
+        </section>
+      )}
+      {decided.length > 0 && (
+        <section>
+          <h4>{r.reportDecidedTitle}</h4>
+          <ul className="review-report-list">{decided.map(line)}</ul>
+        </section>
+      )}
+      {mods.size > 0 && (
+        <section>
+          <h4>{r.reportModsTitle}</h4>
+          <p className="aside">
+            {[...mods.entries()]
+              .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+              .map(([name, count]) => `${name} (${count})`)
+              .join(" · ")}
+          </p>
+        </section>
+      )}
+      <section>
+        <h4>{r.reportOtherSteps}</h4>
+        <ul className="review-report-list">
+          {steps.map((step) => (
+            <li key={step} className="review-report-line">
+              <span>{r.reportLine(r.step[step].title, open[step] ?? 0)}</span>
+              <span className="spacer" />
+              {(open[step] ?? 0) > 0 && (
+                <button type="button" className="small quiet" onClick={() => onStep(step)}>
+                  {r.goThere}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

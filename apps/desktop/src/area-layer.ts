@@ -270,6 +270,12 @@ export const TOUCHING = 14;
 const NATURE =
   /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
 
+/** Folders of trees, which stay out of structures even as leaves. */
+const TREES = /(^|[\\/])trees[\\/]/i;
+
+/** Folders of small plants: decor a mod puts on what it builds. */
+const PLANTS = /(^|[\\/])(plants|flora|grass)[\\/]/i;
+
 /** The folder of clutter: crates, barrels, sacks and whatever else lies about. */
 const CLUTTER = /(^|[\\/])clutter[\\/]/i;
 
@@ -288,6 +294,17 @@ export function isNature(model: string): boolean {
 
 /** Below this longest side, in game units (about 35 cm), a part is clutter, not building. */
 const SMALL = 24;
+
+/**
+ * Whether a part is decor that a built structure takes along where it
+ * touches it: clutter, or small plants; never trees, rocks or landscape.
+ */
+function isDecor(model: string, kind: "nature" | "clutter" | "built"): boolean {
+  if (TREES.test(model)) {
+    return false;
+  }
+  return kind === "clutter" || PLANTS.test(model);
+}
 
 /**
  * What a part is, for growing a structure: nature, clutter lying about
@@ -528,6 +545,10 @@ export class AreaLayer {
         ? "built"
         : kindOf(object.model, sizeOf(startModel.box, object.scale));
     const grows = startKind === "clutter" ? "clutter" : "built";
+    // Decor of the same mod on what it builds (plants in a planter, a
+    // banner, a basket) is taken along as leaves: it belongs to the
+    // structure it touches, but the structure does not grow on from it.
+    const leaves: { object: AreaObject; box: PlacedBox }[] = [];
     const candidates = this.instances
       .filter(
         (instance) => instance.object.id.plugin.toLowerCase() === plugin && isNear(instance.object),
@@ -537,13 +558,15 @@ export class AreaLayer {
         if (model === undefined || !Array.isArray(model.surfaces)) {
           return [];
         }
-        if (
-          !isStart(instance.object) &&
-          kindOf(instance.object.model, sizeOf(model.box, instance.object.scale)) !== grows
-        ) {
+        const kind = kindOf(instance.object.model, sizeOf(model.box, instance.object.scale));
+        const box = placedBox(model.box, instance.matrix);
+        if (!isStart(instance.object) && kind !== grows) {
+          if (grows === "built" && isDecor(instance.object.model, kind)) {
+            leaves.push({ object: instance.object, box });
+          }
           return [];
         }
-        return [{ object: instance.object, box: placedBox(model.box, instance.matrix) }];
+        return [{ object: instance.object, box }];
       });
     const start = candidates.find(
       (candidate) =>
@@ -567,7 +590,10 @@ export class AreaLayer {
         }
       }
     }
-    return found.map((candidate) => candidate.object);
+    const touching = leaves.filter((leaf) =>
+      found.some((part) => boxesMeet(part.box, leaf.box, margin)),
+    );
+    return [...found, ...touching].map((candidate) => candidate.object);
   }
 
   /** How many of the area's models are there, of how many. */
