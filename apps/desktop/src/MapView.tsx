@@ -20,6 +20,7 @@ import type { PlaceKind, PlaceOrigin } from "./i18n";
 import { MapView3D } from "./MapView3D";
 import {
   CELL,
+  contentBounds,
   drawLabels,
   isMajor,
   isShown,
@@ -592,6 +593,44 @@ function waterOver(terrain: MapTerrain, colours: Palette): HTMLCanvasElement | n
   return canvas;
 }
 
+/** The picture with the parts where the land is not known left out. */
+function onLand(picture: Picture, terrain: MapTerrain): HTMLCanvasElement | null {
+  const land = readLand(terrain);
+  const { image, meta } = picture;
+  if (land === null || image.naturalWidth === 0 || meta.columns === 0) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    return null;
+  }
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const perCell = canvas.width / meta.columns;
+  const north = terrain.south + terrain.rows;
+  for (let row = 0; row < canvas.height; row++) {
+    // Rows run from north to south, in the picture as in the land.
+    const sampleRow = Math.floor(
+      (north - (meta.south + meta.rows - (row + 0.5) / perCell)) * terrain.samples,
+    );
+    for (let column = 0; column < canvas.width; column++) {
+      const sampleColumn = Math.floor(
+        (meta.west + (column + 0.5) / perCell - terrain.west) * terrain.samples,
+      );
+      const inside =
+        sampleRow >= 0 && sampleRow < land.height && sampleColumn >= 0 && sampleColumn < land.width;
+      if (!inside || land.kinds[sampleRow * land.width + sampleColumn] === 0) {
+        pixels.data[(row * canvas.width + column) * 4 + 3] = 0;
+      }
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
 interface GridProps {
   cells: MapCell[];
   /** Whether the cells with objects of mods are tinted. */
@@ -678,20 +717,29 @@ function Grid({
     setLand(relief(terrain, colours));
     setWater(waterOver(terrain, colours));
   }, [terrain]);
+  // The game's picture only where there is land: some worlds' pictures are
+  // filled with a flat colour around it, as Blackreach's with green.
+  const [pictureOnLand, setPictureOnLand] = useState<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    setPictureOnLand(picture === null || terrain === null ? null : onLand(picture, terrain));
+  }, [picture, terrain]);
 
+  // The view opens on where the places and mods' cells are, which can be a
+  // small part of the world's grid.
   const fit = useCallback((): View => {
-    const columns = bounds.maxX - bounds.minX + 1;
-    const rows = bounds.maxY - bounds.minY + 1;
+    const area = contentBounds({ cells, markers }) ?? bounds;
+    const columns = area.maxX - area.minX + 1;
+    const rows = area.maxY - area.minY + 1;
     const fitted = Math.max(
       MIN_SIZE,
       Math.min(MAX_SIZE, (width - 24) / columns, (height - 24) / rows),
     );
     return {
       size: fitted,
-      x: (width - columns * fitted) / 2,
-      y: (height - rows * fitted) / 2,
+      x: (width - columns * fitted) / 2 - (area.minX - bounds.minX) * fitted,
+      y: (height - rows * fitted) / 2 - (bounds.maxY - area.maxY) * fitted,
     };
-  }, [bounds, width, height]);
+  }, [bounds, cells, markers, width, height]);
 
   const [view, setView] = useState<View>(() => fit());
   const drag = useRef<{ x: number; y: number; view: View; moved: boolean } | null>(null);
@@ -799,7 +847,7 @@ function Grid({
     if (picture !== null) {
       context.imageSmoothingEnabled = view.size < 8;
       context.drawImage(
-        picture.image,
+        pictureOnLand ?? picture.image,
         view.x + (picture.meta.west - bounds.minX) * view.size,
         view.y + (bounds.maxY - (picture.meta.south + picture.meta.rows - 1)) * view.size,
         picture.meta.columns * view.size,
@@ -993,6 +1041,7 @@ function Grid({
     hover,
     picked,
     toScreen,
+    pictureOnLand,
   ]);
 
   const zoom = (factor: number, aroundX = width / 2, aroundY = height / 2) => {

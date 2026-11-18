@@ -102,6 +102,7 @@ pub fn world_image(data_dir: &Path, world: &str, pixels_per_cell: u32) -> Option
     let found = tiles(data_dir, world);
     assemble(&found, pixels_per_cell, |path| {
         read_tile(path, pixels_per_cell)
+            .or_else(|| tile_from_bytes(&std::fs::read(path).ok()?, pixels_per_cell))
     })
 }
 
@@ -116,13 +117,52 @@ pub fn world_image_in(library: &LodLibrary, pixels_per_cell: u32) -> Option<Worl
     })
 }
 
-/// One level of a tile held in memory, `pixels_per_cell` to a cell.
+/// One level of a tile held in memory, `pixels_per_cell` to a cell. A
+/// tile without the smaller levels, as some mods ship them, is shrunk from
+/// its full size.
 fn tile_from_bytes(bytes: &[u8], pixels_per_cell: u32) -> Option<dds::Rgb> {
     let size = dds::size(bytes).ok()?;
     let wanted = u32::try_from(TILE_CELLS).ok()? * pixels_per_cell;
     let level = (size.width / wanted.max(1)).max(1).ilog2();
-    let image = dds::decode_level(bytes, level).ok()?;
+    let image = match dds::decode_level(bytes, level) {
+        Ok(image) => image,
+        Err(_) => shrink(&dds::decode_level(bytes, 0).ok()?, wanted)?,
+    };
     (image.width == wanted && image.height == wanted).then_some(image)
+}
+
+/// A square picture shrunk to `side` pixels a side, each pixel the average
+/// of the pixels it covers; `None` unless its side is a multiple of `side`.
+fn shrink(image: &dds::Rgb, side: u32) -> Option<dds::Rgb> {
+    if side == 0 || image.width != image.height || !image.width.is_multiple_of(side) {
+        return None;
+    }
+    let factor = (image.width / side) as usize;
+    let (width, side) = (image.width as usize, side as usize);
+    let mut pixels = Vec::with_capacity(side * side * 3);
+    for row in 0..side {
+        for column in 0..side {
+            let mut sum = [0usize; 3];
+            for y in row * factor..(row + 1) * factor {
+                let start = (y * width + column * factor) * 3;
+                let source = image.pixels.get(start..start + factor * 3)?;
+                for (channel, value) in source.iter().enumerate() {
+                    if let Some(total) = sum.get_mut(channel % 3) {
+                        *total += usize::from(*value);
+                    }
+                }
+            }
+            let count = factor * factor;
+            pixels.extend(sum.map(|total| u8::try_from(total / count).unwrap_or(u8::MAX)));
+        }
+    }
+    let side = u32::try_from(side).ok()?;
+    Some(dds::Rgb {
+        width: side,
+        height: side,
+        alpha: vec![u8::MAX; pixels.len() / 3],
+        pixels,
+    })
 }
 
 /// The picture put together from the tiles `found`, each read by `read`.
@@ -231,6 +271,17 @@ mod tests {
         assert_eq!(&image.pixels[..3], &[255, 0, 0]);
         // Larger than the tile itself: none.
         assert_eq!(tile_from_bytes(&tile(0xf800), 4), None);
+    }
+
+    #[test]
+    fn a_tile_without_smaller_levels_is_shrunk() {
+        // Only its full size, 64 pixels a side: shrunk to 32.
+        let mut bytes = tile(0x001f);
+        bytes[28..32].copy_from_slice(&1u32.to_le_bytes());
+        bytes.truncate(dds::HEADER_SIZE + 16 * 16 * 8);
+        let image = tile_from_bytes(&bytes, 1).unwrap();
+        assert_eq!((image.width, image.height), (32, 32));
+        assert_eq!(&image.pixels[..3], &[0, 0, 255]);
     }
 
     proptest::proptest! {

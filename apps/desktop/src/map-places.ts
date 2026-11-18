@@ -286,3 +286,38 @@ export const kindVariable = (kind: WorkKind) => `--spot-${kind}`;
 export function worstKind(spots: MapSpot[]): SpotKind {
   return SPOT_KINDS.find((kind) => spots.some((spot) => kindOf(spot) === kind)) ?? "overlap";
 }
+
+/** A rectangle of cells, edges included. */
+export interface CellBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/**
+ * Where most of a world's places and mods' cells lie, in cells, with a
+ * little around them; `null` if it has none. A few stray ones are left out,
+ * so that a world whose grid reaches far beyond its land, as Solstheim's
+ * does, opens on the land that matters.
+ */
+export function contentBounds(world: Pick<MapWorld, "cells" | "markers">): CellBounds | null {
+  const xs = world.cells.map((cell) => cell.x);
+  const ys = world.cells.map((cell) => cell.y);
+  for (const marker of world.markers ?? []) {
+    xs.push(Math.floor(marker.position[0] / CELL));
+    ys.push(Math.floor(marker.position[1] / CELL));
+  }
+  if (xs.length === 0) {
+    return null;
+  }
+  const trimmed = (values: number[]): [number, number] => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const stray = Math.floor(sorted.length * 0.03);
+    return [sorted[stray] ?? 0, sorted[sorted.length - 1 - stray] ?? 0];
+  };
+  const [minX, maxX] = trimmed(xs);
+  const [minY, maxY] = trimmed(ys);
+  const margin = 2;
+  return { minX: minX - margin, maxX: maxX + margin, minY: minY - margin, maxY: maxY + margin };
+}

@@ -25,6 +25,7 @@ import { LandLayer } from "./land-layer";
 import { LodLayer } from "./lod-layer";
 import {
   CELL,
+  contentBounds,
   drawLabels,
   isMajor,
   type Label,
@@ -515,19 +516,28 @@ export function MapView3D({
   const told = useRef(onArea);
   told.current = onArea;
 
-  const fitted = useCallback(
-    (): Camera => ({
+  // The camera looks at where the places and mods' cells are, which can
+  // be a small part of the world's land.
+  const fitted = useCallback((): Camera => {
+    const area = contentBounds({ cells: world.cells, markers: world.markers }) ?? {
+      minX: terrain.west,
+      maxX: terrain.west + terrain.columns - 1,
+      minY: terrain.south,
+      maxY: terrain.south + terrain.rows - 1,
+    };
+    const columns = area.maxX - area.minX + 1;
+    const rows = area.maxY - area.minY + 1;
+    return {
       target: [
-        terrain.west + terrain.columns / 2,
-        terrain.south + terrain.rows / 2,
+        area.minX + columns / 2,
+        area.minY + rows / 2,
         (((terrain.lowest + terrain.highest) / 2) * exaggeration) / CELL,
       ],
-      distance: Math.max(terrain.columns, terrain.rows) * 1.05,
+      distance: Math.max(columns, rows) * 1.05,
       yaw: 0,
       pitch: 0.95,
-    }),
-    [terrain, exaggeration],
-  );
+    };
+  }, [terrain, exaggeration, world.cells, world.markers]);
   const camera = useRef<Camera>(fitted());
   const animation = useRef<number | null>(null);
   const pending = useRef<number | null>(null);

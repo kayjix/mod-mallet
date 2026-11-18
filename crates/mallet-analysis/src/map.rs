@@ -30,17 +30,7 @@ pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
     let facts: &'a mallet_core::Facts = context.facts;
     let objects = &facts.objects;
     let terrain_facts = &facts.terrain;
-    let names: HashMap<&RecordId, &str> = objects
-        .place_names
-        .iter()
-        .map(|name| (&name.id, name.editor_id.as_str()))
-        .chain(
-            terrain_facts
-                .worldspaces
-                .iter()
-                .filter_map(|world| Some((&world.id, world.editor_id.as_deref()?))),
-        )
-        .collect();
+    let names = internal_names(facts);
     let name_of = |worldspace: &RecordId| {
         names
             .get(worldspace)
@@ -101,10 +91,19 @@ pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
             .unwrap_or_default()
     };
 
+    // The worlds the game's first master defines: its main world is one.
+    let first_master = facts
+        .plugins
+        .first()
+        .map(|plugin| plugin.name.to_lowercase());
+    let mut of_first_master: BTreeSet<String> = BTreeSet::new();
     let mut map_worlds: Vec<MapWorld> = worlds
         .into_iter()
         .map(|(worldspace, cells)| {
             let name = name_of(worldspace);
+            if first_master.as_deref() == Some(worldspace.plugin.as_str()) {
+                of_first_master.insert(name.clone());
+            }
             let children = children.remove(worldspace).unwrap_or_default();
             let has_spot = std::iter::once(&name)
                 .chain(&children)
@@ -123,13 +122,31 @@ pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
             world
         })
         .collect();
-    order(&mut map_worlds);
+    order(&mut map_worlds, &of_first_master);
 
     WorldMap {
         owners: names_of_owners,
         worlds: map_worlds,
         spots: spots.clone(),
     }
+}
+
+/// The internal names of places and worldspaces, a worldspace's own record
+/// having the last word.
+fn internal_names(facts: &mallet_core::Facts) -> HashMap<&RecordId, &str> {
+    facts
+        .objects
+        .place_names
+        .iter()
+        .map(|name| (&name.id, name.editor_id.as_str()))
+        .chain(
+            facts
+                .terrain
+                .worldspaces
+                .iter()
+                .filter_map(|world| Some((&world.id, world.editor_id.as_deref()?))),
+        )
+        .collect()
 }
 
 /// The cells of a world for the report, each with its owners' positions
@@ -238,14 +255,16 @@ fn spot_worlds(spots: &[MapSpot]) -> BTreeSet<&str> {
         .collect()
 }
 
-/// Marks the game's main world, the largest of its own, and orders the
-/// worlds: the game first, its main world leading, then the Creation Club,
-/// then mods; small worlds last.
-fn order(worlds: &mut [MapWorld]) {
+/// Marks the game's main world and orders the worlds: the game first, its
+/// main world leading, then the Creation Club, then mods; small worlds
+/// last. The main world is the largest of those the game's first master
+/// defines (`of_first_master`, by name), else of all the game's: not
+/// Solstheim, whose grid of distant land is larger than Skyrim's.
+fn order(worlds: &mut [MapWorld], of_first_master: &BTreeSet<String>) {
     if let Some(main) = worlds
         .iter_mut()
         .filter(|world| world.origin == WorldOrigin::Game)
-        .max_by_key(|world| world.land_cells)
+        .max_by_key(|world| (of_first_master.contains(&world.name), world.land_cells))
     {
         main.main = true;
         main.small = false;
@@ -951,5 +970,40 @@ mod tests {
         let small = land("Skyrim.esm", 0x3C, 10);
         assert_eq!(terrain_columns(&small, None), 10);
         assert_eq!(super::terrain(&small, None).unwrap().samples, 8);
+    }
+
+    #[test]
+    fn the_main_world_is_the_first_masters_not_the_largest() {
+        use mallet_core::facts::terrain::TerrainFacts;
+        let plugin = |name: &str| PluginFacts {
+            name: name.to_owned(),
+            path: GamePath::new("data").join(name),
+            masters: Vec::new(),
+            npcs: Vec::new(),
+        };
+        let facts = Facts {
+            plugins: vec![plugin("Skyrim.esm"), plugin("Dragonborn.esm")],
+            terrain: TerrainFacts {
+                // Solstheim's grid of distant land is the larger.
+                worlds: vec![
+                    land("Skyrim.esm", 0x3C, 8),
+                    land("Dragonborn.esm", 0x800, 12),
+                ],
+                worldspaces: vec![
+                    worldspace(0x3C, "Skyrim.esm", "Tamriel", WorldOrigin::Game),
+                    worldspace(
+                        0x800,
+                        "Dragonborn.esm",
+                        "DLC2SolstheimWorld",
+                        WorldOrigin::Game,
+                    ),
+                ],
+            },
+            ..Facts::default()
+        };
+        let map = world_map(&Context::new(&facts, &NoModSource));
+        let first = &map.worlds[0];
+        assert_eq!((first.name.as_str(), first.main), ("Tamriel", true));
+        assert!(!map.worlds[1].main);
     }
 }
