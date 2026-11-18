@@ -92,14 +92,20 @@ impl Analysis for WideCollisions {
                 tally.spots += 1;
                 tally.objects.insert(own.object.clone());
                 *tally.others.entry(other_owner.name()).or_default() += 1;
+                if !tally.partners.contains(other_owner) {
+                    tally.partners.push(other_owner.clone());
+                }
             }
         }
 
+        let rooms = Rooms::new(context, &mods);
         tallies
             .into_iter()
             .filter(|(_, tally)| tally.spots >= MIN_SPOTS)
             .map(|(owner, tally)| {
                 let total = placed_by(&Owner::Mod(owner.clone()));
+                let (interiors, interior_objects) = rooms.only(&owner, &tally.partners);
+                let loot = loot_about(context, &mods, &owner, &tally.partners);
                 let needed = mods.needed_by_others(&owner);
                 let finding = Finding::new(&kinds::MODS_COLLIDES_WIDELY, mod_subject(&owner))
                     .with_arg("mod", owner.name.clone())
@@ -108,10 +114,21 @@ impl Analysis for WideCollisions {
                     .with_arg("others", ranked(&tally.others))
                     .with_arg("objects", number(tally.objects.len()))
                     .with_arg("total", number(total))
+                    .with_arg("interiors", number(interiors))
+                    .with_arg("interiorObjects", number(interior_objects))
+                    .with_arg("lootCount", number(loot.len()))
+                    .with_arg(
+                        "loot",
+                        loot.join(
+                            "
+",
+                        ),
+                    )
                     .with_provider(Some(owner));
                 // Switching off a mod other mods build on would stop the
-                // game from starting.
-                if needed {
+                // game from starting, and one that furnishes rooms of its
+                // own would take them away.
+                if needed || interiors > 0 {
                     finding
                 } else {
                     offer_disabling(finding)
@@ -175,6 +192,12 @@ impl Analysis for DuplicateMods {
                     plugins.truncate(EXAMPLE_LIMIT);
                     plugins.join(", ")
                 };
+                let loot = loot_about(
+                    context,
+                    &mods,
+                    &pair.owner,
+                    std::slice::from_ref(&pair.other),
+                );
                 Finding::new(&kinds::MODS_DUPLICATES_ANOTHER, mod_subject(&pair.owner))
                     .with_arg("mod", pair.owner.name.clone())
                     .with_arg("other", pair.other.name())
@@ -184,6 +207,14 @@ impl Analysis for DuplicateMods {
                     .with_arg("patches", names(&patches))
                     .with_arg("otherPatchCount", number(other_patches.len()))
                     .with_arg("otherPatches", names(&other_patches))
+                    .with_arg("lootCount", number(loot.len()))
+                    .with_arg(
+                        "loot",
+                        loot.join(
+                            "
+",
+                        ),
+                    )
                     .with_provider(Some(pair.owner))
             })
             .collect()
@@ -312,6 +343,129 @@ fn close(a: [i32; 3], b: [i32; 3]) -> bool {
     square(0) + square(1) + square(2) <= i64::from(TWIN_DISTANCE) * i64::from(TWIN_DISTANCE)
 }
 
+/// How many of LOOT's messages a suggestion quotes.
+const LOOT_LIMIT: usize = 3;
+
+/// An interior counts as a mod's own room if it places at least this many
+/// objects there...
+const MIN_ROOM_OBJECTS: usize = 10;
+
+/// ... and this many times as many as the mods it collides with together:
+/// an AI overhaul's chair or a fix of the unofficial patch does not make
+/// a room theirs.
+const ROOM_SHARE: usize = 4;
+
+/// Who furnishes which interior: by interior cell, how many objects each
+/// mod or plugin places there.
+struct Rooms<'a> {
+    cells: HashMap<&'a RecordId, HashMap<Owner, usize>>,
+}
+
+impl<'a> Rooms<'a> {
+    fn new(context: &'a Context<'_>, mods: &PluginMods) -> Self {
+        let mut cells: HashMap<&RecordId, HashMap<Owner, usize>> = HashMap::new();
+        for object in &context.facts.objects.placed {
+            if let Place::Interior { cell } = &object.place {
+                *cells
+                    .entry(cell)
+                    .or_default()
+                    .entry(mods.owner(object.owner()))
+                    .or_default() += 1;
+            }
+        }
+        Self { cells }
+    }
+
+    /// The interiors `owner` furnishes and `others` hardly touch, and how
+    /// many objects it places there: rooms of its own, which switching it
+    /// off would take away.
+    fn only(&self, owner: &ModRef, others: &[Owner]) -> (usize, usize) {
+        let owner = Owner::Mod(owner.clone());
+        self.cells
+            .values()
+            .filter_map(|furnishers| {
+                let own = furnishers.get(&owner).copied().unwrap_or_default();
+                let theirs: usize = others
+                    .iter()
+                    .filter_map(|other| furnishers.get(other))
+                    .sum();
+                (own >= MIN_ROOM_OBJECTS && own >= theirs * ROOM_SHARE).then_some(own)
+            })
+            .fold((0, 0), |(rooms, objects), count| {
+                (rooms + 1, objects + count)
+            })
+    }
+}
+
+/// What LOOT says about `owner` and the mods it collides with: its general
+/// messages that name a plugin of `owner`, and the messages on a plugin of
+/// either side that name the other side. Each once, at most
+/// [`LOOT_LIMIT`].
+fn loot_about(
+    context: &Context<'_>,
+    mods: &PluginMods,
+    owner: &ModRef,
+    others: &[Owner],
+) -> Vec<String> {
+    let own = Owner::Mod(owner.clone());
+    let knowledge = &context.facts.knowledge;
+    let names_of = |side: &Owner| -> Vec<String> {
+        let mut names: Vec<String> = mods
+            .plugins_of(side)
+            .iter()
+            .map(|plugin| plugin_stem(plugin).to_lowercase())
+            .collect();
+        if let Owner::Mod(side) = side {
+            names.push(side.name.to_lowercase());
+        }
+        names.retain(|name| name.len() >= 4);
+        names
+    };
+    let own_names = names_of(&own);
+    let other_names: Vec<String> = others.iter().flat_map(names_of).collect();
+    let mentions = |text: &str, names: &[String]| {
+        let text = text.to_lowercase();
+        names.iter().any(|name| text.contains(name.as_str()))
+    };
+
+    let mut texts: Vec<String> = Vec::new();
+    let mut add = |text: &str| {
+        if texts.len() < LOOT_LIMIT && !texts.iter().any(|known| known == text) {
+            texts.push(text.to_owned());
+        }
+    };
+    for general in &knowledge.general {
+        if general
+            .plugins
+            .iter()
+            .any(|plugin| mods.owner(plugin) == own)
+        {
+            add(&general.message.text);
+        }
+    }
+    for plugin in &knowledge.plugins {
+        let side = mods.owner(&plugin.plugin);
+        let about = if side == own {
+            &other_names
+        } else if others.contains(&side) {
+            &own_names
+        } else {
+            continue;
+        };
+        for message in &plugin.messages {
+            if mentions(&message.text, about) {
+                add(&message.text);
+            }
+        }
+    }
+    texts
+}
+
+/// A plugin's file name without its extension.
+fn plugin_stem(plugin: &str) -> &str {
+    plugin.rsplit_once('.').map_or(plugin, |(stem, _)| stem)
+}
+
 /// What one mod's objects collide with.
 #[derive(Default)]
 struct Tally {
@@ -321,6 +475,8 @@ struct Tally {
     objects: BTreeSet<ObjectRef>,
     /// How many spots it shares with each other mod, by name.
     others: BTreeMap<String, usize>,
+    /// The mods and plugins it collides with.
+    partners: Vec<Owner>,
 }
 
 /// Suggests mods most of whose content does not reach the game.
@@ -512,6 +668,18 @@ impl PluginMods {
         Self { plugins }
     }
 
+    /// The file names of the active plugins whose content is `owner`'s.
+    fn plugins_of(&self, owner: &Owner) -> Vec<String> {
+        self.plugins
+            .values()
+            .filter(|(file, plugin_mod, _)| match owner {
+                Owner::Mod(owner) => plugin_mod.as_ref() == Some(owner),
+                Owner::Plugin(plugin) => file.eq_ignore_ascii_case(plugin),
+            })
+            .map(|(file, _, _)| file.clone())
+            .collect()
+    }
+
     /// Whose the content of the plugin named `plugin` is, in any spelling.
     fn owner(&self, plugin: &str) -> Owner {
         match self.plugins.get(&plugin.to_lowercase()) {
@@ -611,6 +779,7 @@ fn number(value: usize) -> i64 {
 
 #[cfg(test)]
 mod tests {
+    use mallet_core::facts::knowledge::{GeneralMessage, KnownMessage, MessageLevel};
     use mallet_core::facts::objects::{
         BaseKind, BaseObject, Bounds, ObjectFacts, Place, PlacedObject,
     };
@@ -728,6 +897,45 @@ mod tests {
             finding.actions.as_slice(),
             [Action::DisableMod { .. }]
         ));
+    }
+
+    #[test]
+    fn a_mod_with_rooms_of_its_own_is_kept_and_loot_is_quoted() {
+        // Besides its houses outside, the small mod furnishes a room in
+        // which the large mod places a single object.
+        let mut facts = colliding(25, 100, Vec::new());
+        let room = Place::Interior {
+            cell: id("Small.esp", 0x900),
+        };
+        for spot in 0..12 {
+            let mut object = house("Small.esp", "Small.esp", 200 + spot);
+            object.place = room.clone();
+            facts.objects.placed.push(object);
+        }
+        let mut theirs = house("Large.esp", "Large.esp", 300);
+        theirs.place = room;
+        facts.objects.placed.push(theirs);
+        facts.knowledge.general.push(GeneralMessage {
+            message: KnownMessage {
+                level: MessageLevel::Note,
+                text: "Use the Village Patch Collection.".to_owned(),
+            },
+            plugins: vec!["Small.esp".to_owned()],
+        });
+        let mods = mods();
+        let findings = WideCollisions.run(&Context::new(&facts, &mods));
+        let [finding] = findings.as_slice() else {
+            panic!("expected one suggestion, got {findings:?}");
+        };
+        assert_eq!(finding.args["interiors"], ArgValue::Number(1));
+        assert_eq!(finding.args["interiorObjects"], ArgValue::Number(12));
+        assert_eq!(finding.args["lootCount"], ArgValue::Number(1));
+        assert_eq!(
+            finding.args["loot"],
+            ArgValue::from("Use the Village Patch Collection.")
+        );
+        // Switching it off would take the room away.
+        assert_eq!(finding.actions, []);
     }
 
     #[test]

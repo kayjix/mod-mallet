@@ -14,6 +14,20 @@ pub struct KnowledgeFacts {
     /// One entry per active plugin the rules say something about, in load
     /// order.
     pub plugins: Vec<PluginKnowledge>,
+    /// LOOT's general messages that apply to this setup and name active
+    /// plugins in their conditions, such as a patch collection for a
+    /// series of mods.
+    pub general: Vec<GeneralMessage>,
+}
+
+/// A general message of LOOT, with the active plugins it is about.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneralMessage {
+    /// The message.
+    pub message: KnownMessage,
+    /// The active plugins its condition names, by file name in the
+    /// spelling of the load order.
+    pub plugins: Vec<String>,
 }
 
 /// What the rules say about one active plugin.

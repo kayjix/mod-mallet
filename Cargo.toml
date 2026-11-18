@@ -38,6 +38,7 @@ flate2 = "1.1.11"
 fluent-bundle = "0.16.0"
 libloot = "0.29.7"
 libloadorder = "18.8.2"
+regex = "1.13.1"
 lz4_flex = "0.14.2"
 roxmltree = "0.21.2"
 rusqlite = { version = "0.43.0", features = ["bundled"] }

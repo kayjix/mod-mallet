@@ -348,7 +348,18 @@ pub const MODS_COLLIDES_WIDELY: KindInfo = KindInfo {
     id: "mods.collides-widely",
     severity: Severity::Info,
     confidence: Confidence::Hint,
-    args: &["mod", "count", "modCount", "others", "objects", "total"],
+    args: &[
+        "mod",
+        "count",
+        "modCount",
+        "others",
+        "objects",
+        "total",
+        "interiors",
+        "interiorObjects",
+        "lootCount",
+        "loot",
+    ],
 };
 
 /// A mod most of whose content does not reach the game, because mods
@@ -375,6 +386,8 @@ pub const MODS_DUPLICATES_ANOTHER: KindInfo = KindInfo {
         "patches",
         "otherPatchCount",
         "otherPatches",
+        "lootCount",
+        "loot",
     ],
 };
 

@@ -239,7 +239,10 @@ mod tests {
     fn findings(plugins: &[&str], knowledge: Vec<PluginKnowledge>) -> Vec<Finding> {
         let facts = Facts {
             plugins: plugins.iter().map(|name| plugin(name)).collect(),
-            knowledge: KnowledgeFacts { plugins: knowledge },
+            knowledge: KnowledgeFacts {
+                plugins: knowledge,
+                ..KnowledgeFacts::default()
+            },
             ..Facts::default()
         };
         run_all(&Context::new(&facts, &NoModSource))

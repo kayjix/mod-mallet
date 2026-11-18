@@ -12,6 +12,7 @@ publish.workspace = true
 dirs.workspace = true
 libloot.workspace = true
 mallet-core.workspace = true
+regex.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 

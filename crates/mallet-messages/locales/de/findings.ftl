@@ -383,9 +383,16 @@ mods-collides-widely = Vorschlag: Eine Mod kollidiert an vielen Orten mit andere
         { $objects } der { $total } Objekte, die { $mod } in die Welt stellt, stehen in oder an Objekten { $modCount ->
             [one] einer anderen Mod
            *[other] von { $modCount } anderen Mods
-        }, an { $count } Orten: { $others }. Die Zahl hinter jeder Mod sagt, an wie vielen Orten sie mit { $mod } zusammenstößt.
-    .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Zwei Mods, die denselben Teil der Welt verändern, ohne voneinander zu wissen, stellen ihre Gebäude, Bäume und Zäune dorthin, wo die andere schon etwas hat. Ein paar solcher Orte sind normal und stehen einzeln unter den Kollisionen. Kollidiert eine Mod so oft, waren sie und die anderen Mods wahrscheinlich nicht dafür gemacht, zusammen benutzt zu werden.
-    .remedy = Entscheide, welche Fassung dieser Orte dir lieber ist. Ist es die der anderen Mods, kannst du die Mod in deinem Mod-Manager ausschalten, oder sie behalten und in der Liste der Kollisionen an allen Orten auf einmal gegen die anderen Mods verlieren lassen. Gefällt dir die Mod, behalte sie und suche auf ihrer Seite nach einem Patch, der sie mit den anderen Mods verträglich macht.
+        }, an { $count } Orten: { $others }. Die Zahl hinter jeder Mod sagt, an wie vielen Orten sie mit { $mod } zusammenstößt. { $interiors ->
+            [0] {""}
+            [one] { $mod } richtet außerdem 1 eigenen Innenraum ein, den diese Mods kaum berühren, mit { $interiorObjects } Objekten: Schaltest du sie aus, ist dieser Raum weg. Behalte sie also und entscheide nur die Orte, an denen sie zusammenstoßen.
+           *[other] { $mod } richtet außerdem { $interiors } eigene Innenräume ein, die diese Mods kaum berühren, mit { $interiorObjects } Objekten: Schaltest du sie aus, sind diese Räume weg. Behalte sie also und entscheide nur die Orte, an denen sie zusammenstoßen.
+        } { $lootCount ->
+            [0] {""}
+           *[other] LOOT sagt dazu: { $loot }
+        }
+    .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Zwei Mods, die denselben Teil der Welt verändern, stellen ihre Gebäude, Bäume und Zäune dorthin, wo die andere schon etwas hat, auch Mods desselben Autors, wenn die eine dort nicht auf die andere abgestimmt ist. Ein paar solcher Orte sind normal und stehen einzeln unter den Kollisionen. Kollidiert eine Mod so oft, passen die beiden an diesen Orten so nicht zusammen, oder es fehlt ein Patch, der sie aufeinander abstimmt.
+    .remedy = Entscheide, welche Fassung dieser Orte dir lieber ist. Nennt LOOT einen Patch, installiere ihn zuerst und scanne erneut. Ist dir die Fassung der anderen Mods lieber, behalte die Mod und lass sie in der Liste der Kollisionen an allen Orten auf einmal gegen die anderen Mods verlieren; schalte sie nur aus, wenn sie sonst nichts mitbringt, was du willst, etwa eigene Räume. Gefällt dir die Mod, behalte sie und suche auf ihrer Seite nach einem Patch, der sie mit den anderen Mods verträglich macht.
 
 mods-mostly-overridden = Vorschlag: Von einer Mod kommt kaum etwas im Spiel an
     .headline = Vorschlag: Nur { $percent } % von { $mod } kommen im Spiel an
@@ -404,6 +411,9 @@ mods-duplicates-another = Vorschlag: Eine Mod stellt größtenteils dieselben Ob
             [0] Für { $other } allein ist keine andere Mod gemacht.
             [one] Für { $other } allein ist ein Plugin gemacht: { $otherPatches }.
            *[other] Für { $other } allein sind { $otherPatchCount } Plugins gemacht: { $otherPatches }.
+        } { $lootCount ->
+            [0] {""}
+           *[other] LOOT sagt dazu: { $loot }
         }
     .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Sammlungen („all in one“) enthalten oft Mods, die es auch einzeln gibt, und zwei Mods können denselben Ort auf dieselbe Weise umbauen. Sind beide installiert, stehen dieselben Gebäude doppelt am selben Ort, und ihre Oberflächen flackern. Ein Plugin, das für eine der beiden gemacht ist, etwa ein Kompatibilitäts-Patch, funktioniert nur mit dieser, und das ist ein guter Grund, sie zu behalten.
     .remedy = Behalte die, die dir lieber ist, und schalte die andere in deinem Mod-Manager aus; nimm lieber die, für die die Patches gemacht sind, die du benutzt. Bevor du eine ausschaltest, sieh nach, ob sie etwas mitbringt, das der anderen fehlt, etwa einen Innenraum: Dann behalte beide und lass in der Liste der Kollisionen eine von ihnen an allen Orten auf einmal verlieren.

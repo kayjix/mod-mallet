@@ -2393,6 +2393,7 @@ dependencies = [
  "libloot",
  "mallet-core",
  "proptest",
+ "regex",
  "tempfile",
  "thiserror 2.0.21",
  "tracing",

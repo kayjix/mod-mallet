@@ -389,9 +389,16 @@ mods-collides-widely = Suggestion: a mod collides with many places of other mods
         { $objects } of the { $total } objects { $mod } puts into the world stand in or against objects of { $modCount ->
             [one] another mod
            *[other] { $modCount } other mods
-        }, in { $count } places: { $others }. The number after each mod is how many places it shares with { $mod }.
-    .explanation = This is only a suggestion; nothing is broken. Two mods that change the same part of the world without knowing of each other put their buildings, trees and fences where the other already has something. A few such places are normal and are listed one by one under collisions. When one mod collides this often, it and the other mods were probably not made to be used together.
-    .remedy = Decide which version of these places you prefer. If it is the other mods', you can switch the mod off in your mod manager, or keep it and, in the list of collisions, let it lose against the other mods in every place at once. If you like the mod, keep it, and look on its page for a patch that makes it work with the other mods.
+        }, in { $count } places: { $others }. The number after each mod is how many places it shares with { $mod }. { $interiors ->
+            [0] {""}
+            [one] { $mod } also furnishes 1 interior of its own that these mods hardly touch, with { $interiorObjects } objects: switching it off would lose that room, so keep it and decide only the places where they collide.
+           *[other] { $mod } also furnishes { $interiors } interiors of its own that these mods hardly touch, with { $interiorObjects } objects: switching it off would lose these rooms, so keep it and decide only the places where they collide.
+        } { $lootCount ->
+            [0] {""}
+           *[other] LOOT says: { $loot }
+        }
+    .explanation = This is only a suggestion; nothing is broken. Two mods that change the same part of the world put their buildings, trees and fences where the other already has something, even mods by the same author when one was not made to fit the other there. A few such places are normal and are listed one by one under collisions. When one mod collides this often, the two do not fit together in these places as they are, or a patch that makes them fit is missing.
+    .remedy = Decide which version of these places you prefer. If LOOT names a patch, install it first and scan again. If you prefer the other mods' version, keep the mod and, in the list of collisions, let it lose against the other mods in every place at once; switch it off only if it brings nothing else you want, such as rooms of its own. If you like the mod, keep it, and look on its page for a patch that makes it work with the other mods.
 
 mods-mostly-overridden = Suggestion: hardly anything of a mod reaches the game
     .headline = Suggestion: only { $percent } % of { $mod } reaches the game
@@ -410,6 +417,9 @@ mods-duplicates-another = Suggestion: a mod places largely the same objects as a
             [0] No other mod is made for { $other } alone.
             [one] One plugin is made for { $other } alone: { $otherPatches }.
            *[other] { $otherPatchCount } plugins are made for { $other } alone: { $otherPatches }.
+        } { $lootCount ->
+            [0] {""}
+           *[other] LOOT says: { $loot }
         }
     .explanation = This is only a suggestion; nothing is broken. Collections ("all in one") often contain mods that are also offered on their own, and two mods can rebuild the same place in the same way. With both installed, the same buildings stand twice in the same spot and their surfaces flicker. A plugin made for one of the two, such as a compatibility patch, only works with that one, which is a good reason to keep it.
     .remedy = Keep the one you prefer and switch the other off in your mod manager; prefer the one the patches you use are made for. Before you switch one off, check whether it brings something the other lacks, such as an interior: then keep both, and in the list of collisions let one of them lose in every place at once.

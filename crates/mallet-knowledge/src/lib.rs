@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use libloot::metadata::{File, Message, MessageType, PluginCleaningData, select_message_content};
 use libloot::{EvalMode, Game, GameType, MergeMode};
 use mallet_core::facts::knowledge::{
-    Cleaning, KnownFile, KnownMessage, MessageLevel, PluginKnowledge,
+    Cleaning, GeneralMessage, KnownFile, KnownMessage, MessageLevel, PluginKnowledge,
 };
 use mallet_core::facts::{KnowledgeFacts, PluginFacts};
 
@@ -190,7 +190,52 @@ pub fn read(
             knowledge.plugins.push(entry);
         }
     }
+    match database.general_messages(MergeMode::WithoutUserMetadata, EvalMode::Evaluate) {
+        Ok(general) => {
+            knowledge.general = general
+                .iter()
+                .filter_map(|general| {
+                    let named = plugins_named(general.condition()?, plugins);
+                    let message = message(general)?;
+                    (!named.is_empty()).then_some(GeneralMessage {
+                        message,
+                        plugins: named,
+                    })
+                })
+                .collect();
+        }
+        Err(error) => tracing::warn!(%error, "LOOT's general messages could not be evaluated"),
+    }
     Ok(knowledge)
+}
+
+/// The active `plugins` a LOOT condition names in its `active("…")` calls,
+/// by file name. Each name is matched as LOOT matches it: as a regular
+/// expression for the whole file name, ignoring case, which a plain name
+/// matches by itself.
+fn plugins_named(condition: &str, plugins: &[PluginFacts]) -> Vec<String> {
+    let mut named = Vec::new();
+    let mut rest = condition;
+    while let Some(start) = rest.find("active(\"") {
+        let after = rest.get(start + "active(\"".len()..).unwrap_or_default();
+        let Some(end) = after.find("\")") else {
+            break;
+        };
+        let pattern = after.get(..end).unwrap_or_default();
+        rest = after.get(end..).unwrap_or_default();
+        let Ok(regex) = regex::RegexBuilder::new(&format!("^(?:{pattern})$"))
+            .case_insensitive(true)
+            .build()
+        else {
+            continue;
+        };
+        for plugin in plugins {
+            if regex.is_match(&plugin.name) && !named.contains(&plugin.name) {
+                named.push(plugin.name.clone());
+            }
+        }
+    }
+    named
 }
 
 /// A message of LOOT as plain English text, or `None` if it has none.
@@ -477,6 +522,32 @@ plugins:
             &[],
         );
         assert!(matches!(result, Err(KnowledgeError::Masterlist { .. })));
+    }
+
+    #[test]
+    fn general_messages_are_read_with_the_plugins_their_condition_names() {
+        let setup = Setup::new(&["Hall.esp", "Inn.esp", "Road.esp"], &[]);
+        let masterlist = setup.masterlist(
+            r#"
+globals:
+  - type: say
+    content: 'Use the [Series Patch Collection](https://example.org/series).'
+    condition: 'active("(hall|Inn|Tower)\.esp") and not active("Other.esp")'
+  - type: say
+    content: 'Only with a mod that is not there.'
+    condition: 'active("Missing.esp")'
+"#,
+        );
+        let knowledge = setup.read(&masterlist, &["Hall.esp", "Inn.esp", "Road.esp"]);
+
+        let [general] = knowledge.general.as_slice() else {
+            panic!("expected one general message, got {knowledge:?}");
+        };
+        assert_eq!(
+            general.message.text,
+            "Use the Series Patch Collection (https://example.org/series)."
+        );
+        assert_eq!(general.plugins, ["Hall.esp", "Inn.esp"]);
     }
 
     #[test]

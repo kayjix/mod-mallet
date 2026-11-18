@@ -82,16 +82,46 @@ None is a fault. All are suggestions the user may ignore.
    there. If two mods duplicate each other, the one that places fewer
    objects is named. The finding names, for each of the two, the plugins
    of other mods made for it alone (that build on it and not on the
-   other): patches only work with the mod they are made for. LOOT's notes
-   about either mod are reported by their own kinds. Spots between two
+   other): patches only work with the mod they are made for, and what LOOT
+   says about the two (point 8). Spots between two
    such mods do not count towards colliding widely; they are suggested
    once, as duplicates.
+   Amended on 2026-11-18, after the comparison of JK's standalone mods
+   with JK's Skyrim:
+7. **Rooms of its own.** A suggestion that a mod collides widely counts
+   the interiors it furnishes and the mods it collides with hardly touch:
+   at least **10** of its objects there, and at least **four times** as
+   many as those mods place there together, so that an AI overhaul's chair
+   or an unofficial patch's fix does not make a room theirs. If there are
+   any, the suggestion says that switching the mod off would take these
+   rooms away and that only the places where they collide need deciding,
+   and it offers no button to switch the mod off.
+8. **LOOT's word.** Both suggestions about two mods quote what LOOT says
+   about them, at most three messages: LOOT's general messages whose
+   conditions name a plugin of the mod (such as a patch collection for a
+   series of mods), and the messages on a plugin of either side that name
+   the other side. Mod Mallet now reads LOOT's general messages for that,
+   with the active plugins their `active("…")` conditions name, matched as
+   LOOT matches them.
 
 ## Consequences
 
-- On the reference setup of about 400 plugins, nine mods collide widely,
-  among them the three cases above, and Cutting Room Floor, Lux Via and No
-  Snow Under The Roof against JK's interiors and outskirts.
+- On the reference setup of about 400 plugins, eight to nine mods collide
+  widely (the number moves with the collision analysis), among them the
+  three cases above, and Cutting Room Floor and Lux Via against JK's
+  interiors and outskirts.
+- JK's Skyrim and the 55 of JK's standalone mods active next to it on the
+  reference setup complement each other: JK's Skyrim changes no interior,
+  and none of the standalones shares an EditorID or an object with it,
+  except Sky Haven Temple (33 of its 134 EditorIDs, 157 of its 850 objects
+  outside). Three standalones collide widely with it: Candlehearth Hall
+  (42 spots), Haelga's Bunkhouse (36) and Sky Haven Temple (698), all
+  outside, while each furnishes a room of its own (872, 459 and 711
+  objects). For each LOOT names a patch collection: JK's Interiors Patch
+  Collection for the first two, JK's Guild HQ Interiors Patch Collection
+  for Sky Haven Temple. The right suggestion is to keep both, install the
+  collection, and decide the remaining outside spots, letting JK's Skyrim
+  win; it is what the suggestion now says.
 - On the same setup no mod duplicates another. JK's Sky Haven Temple,
   which the user saw as part of JK's Skyrim, places 1,585 objects: 711 in
   the temple's interior, where JK's Skyrim places nothing, and 874
