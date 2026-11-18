@@ -50,6 +50,14 @@ export interface ReviewTexts {
   stateMixed: (open: number) => string;
   showSegment: string;
   keepHere: (name: string) => string;
+  checkingTies: string;
+  keepEffect: (loser: string, go: number, total: number) => string;
+  nothingCanGo: (loser: string) => string;
+  carefulNote: (count: number) => string;
+  lockedNote: (count: number) => string;
+  whyTheyStay: (count: number) => string;
+  neededByGame: string;
+  hideAnyway: (loser: string, count: number) => string;
   keepBothHere: string;
   reportCollisions: (decided: number, total: number) => string;
   reportDecidedTitle: string;
@@ -146,6 +154,25 @@ const en: ReviewTexts = {
     open > 0 ? `partly decided, ${open} open` : "decided differently by section",
   showSegment: "Show",
   keepHere: (name) => `Keep ${name}'s here`,
+  checkingTies: "Looking at what the game needs here…",
+  keepEffect: (loser, go, total) =>
+    go === total
+      ? `all ${total} ${total === 1 ? "part" : "parts"} of ${loser} can go.`
+      : `${go} of ${total} parts of ${loser} can go.`,
+  nothingCanGo: (loser) =>
+    `nothing of ${loser} can go here: the game needs these parts. "Keep both here" settles the place without hiding anything.`,
+  carefulNote: (count) =>
+    count === 1
+      ? "1 part is tied into the game: hiding it is possible, but may break something."
+      : `${count} parts are tied into the game: hiding them is possible, but may break something.`,
+  lockedNote: (count) =>
+    count === 1 ? "1 part stays: the game needs it." : `${count} parts stay: the game needs them.`,
+  whyTheyStay: (count) => (count === 1 ? "Why 1 part stays" : `Why ${count} parts stay`),
+  neededByGame: "the scan marks it as needed by the game",
+  hideAnyway: (loser, count) =>
+    count === 1
+      ? `Hide the tied part of ${loser} anyway`
+      : `Hide the ${count} tied parts of ${loser} anyway`,
   keepBothHere: "Keep both here",
   reportCollisions: (decided, total) => `${decided} of ${total} places decided`,
   reportDecidedTitle: "Decided",
@@ -243,6 +270,27 @@ const de: ReviewTexts = {
     open > 0 ? `teils entschieden, ${open} offen` : "je Abschnitt verschieden entschieden",
   showSegment: "Zeigen",
   keepHere: (name) => `Hier ${name} behalten`,
+  checkingTies: "Prüfe, was das Spiel hier braucht …",
+  keepEffect: (loser, go, total) =>
+    go === total
+      ? `alle ${total} ${total === 1 ? "Teil" : "Teile"} von ${loser} können weg.`
+      : `${go} von ${total} Teilen von ${loser} können weg.`,
+  nothingCanGo: (loser) =>
+    `von ${loser} kann hier nichts weg: das Spiel braucht diese Teile. „Hier beide behalten“ entscheidet die Stelle, ohne etwas auszublenden.`,
+  carefulNote: (count) =>
+    count === 1
+      ? "1 Teil ist ins Spiel eingebunden: ausblenden geht, kann aber etwas stören."
+      : `${count} Teile sind ins Spiel eingebunden: ausblenden geht, kann aber etwas stören.`,
+  lockedNote: (count) =>
+    count === 1
+      ? "1 Teil bleibt: das Spiel braucht es."
+      : `${count} Teile bleiben: das Spiel braucht sie.`,
+  whyTheyStay: (count) => (count === 1 ? "Warum 1 Teil bleibt" : `Warum ${count} Teile bleiben`),
+  neededByGame: "der Scan kennzeichnet es als vom Spiel gebraucht",
+  hideAnyway: (loser, count) =>
+    count === 1
+      ? `Das eingebundene Teil von ${loser} trotzdem ausblenden`
+      : `Die ${count} eingebundenen Teile von ${loser} trotzdem ausblenden`,
   keepBothHere: "Hier beide behalten",
   reportCollisions: (decided, total) => `${decided} von ${total} Bereichen entschieden`,
   reportDecidedTitle: "Entschieden",

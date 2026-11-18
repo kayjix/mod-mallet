@@ -80,7 +80,14 @@ a colour of its own.
    (`chooseObject`), which decides every spot they are part of (ADR 0040's
    `decisionAt`). *Keep both* marks the spot as decided both ways and shows
    both structures again (`revealObjects`). *Undo* takes the parts out of
-   the patch's choices.
+   the patch's choices. A keep button is never silent about what it cannot
+   do: before deciding, the review asks the game's ties of the other side's
+   parts (ADR 0046) and says how many can go ("3 of 5 parts of Immersive
+   Citizens can go"). Parts the game needs (*locked*, or marked by the scan
+   as not to be hidden) stay, with the reasons listed, parts with the same
+   reasons together. Parts that are only tied in (*careful*) stay unless the
+   user says *hide anyway*. Where nothing can go, the button is off and
+   says so, and *keep both* is suggested.
 7. **Places and segments.** On the reference setup the bridges at
    Markarth came up as one small structure after another, 3, then 5, then
    2 parts, each to be decided anew. So the collisions step works on two

@@ -13,11 +13,12 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { DuelLine } from "./Duels";
+import type { ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, RenderedFinding, RenderedReport } from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
-import { isGameObject } from "./object-actions";
+import { AnchorReasons, isGameObject } from "./object-actions";
 import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
@@ -396,10 +397,16 @@ function CollisionsStep({
   cursor: string | null;
   onCursor: (key: string) => void;
 }) {
-  const { ignored, patchChoices, setPatchChoices, spots } = useSession();
+  const { api, ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
   const [history, setHistory] = useState<PatchChoices[]>([]);
   const [segments, setSegments] = useState<StageSegment[]>([]);
+  // Why the game may rely on the parts of the place (ADR 0046), by key, for
+  // the parts asked last; null while asking.
+  const [anchors, setAnchors] = useState<{
+    key: string;
+    byPart: Map<string, ObjectAnchors>;
+  } | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
   const found = clusters.findIndex((cluster) => cluster.key === cursor);
   const at = Math.max(0, found >= 0 ? found : clusters.findIndex((cluster) => openIn(cluster) > 0));
@@ -411,6 +418,38 @@ function CollisionsStep({
     setFocus(null);
   }, [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+  // The parts of the place that a decision might hide, to ask the game's ties of.
+  const asking = cluster === undefined ? null : partsToAsk(cluster, segments);
+  const askingKey = asking === null ? "" : `${asking.place}|${asking.keys.join(",")}`;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the parts are compared by their keys.
+  useEffect(() => {
+    if (asking === null || asking.refs.length === 0) {
+      setAnchors({ key: askingKey, byPart: new Map() });
+      return;
+    }
+    let outdated = false;
+    setAnchors(null);
+    api
+      .objectAnchors(asking.place, asking.refs)
+      .then((found) => {
+        if (!outdated) {
+          setAnchors({
+            key: askingKey,
+            byPart: new Map(
+              (found ?? []).map((one) => [objectKey(one.object.plugin, one.object.localId), one]),
+            ),
+          });
+        }
+      })
+      .catch(() => {
+        if (!outdated) {
+          setAnchors({ key: askingKey, byPart: new Map() });
+        }
+      });
+    return () => {
+      outdated = true;
+    };
+  }, [api, askingKey]);
   const decidedPlaces = clusters.filter((candidate) => openIn(candidate) === 0).length;
   const undo = (
     <button
@@ -481,18 +520,48 @@ function CollisionsStep({
   const placeDecided = decidedOf(cluster.spots, patchChoices);
 
   /** A side's parts in `chosen`, or the spots' own parts until the structures are known. */
-  const partsOf = (chosen: StageSegment[], side: 0 | 1) => {
+  const partsOf = (chosen: StageSegment[], side: 0 | 1): Part[] => {
     const known = chosen.flatMap((segment) => segment.parts[side]);
     if (known.length > 0) {
-      return known.map((object) => ({ id: object.id, game: isGameObject(object) }));
+      return known.map((object) => ({
+        id: object.id,
+        game: isGameObject(object),
+        name: object.name ?? object.model.split(/[\\/]/).pop() ?? object.model,
+      }));
     }
     return chosen.flatMap((segment) =>
       spotsOf(segment).flatMap(({ item }) =>
         (item.spot.parts ?? [])
           .filter((part) => part.object.plugin === sides[side])
-          .map((part) => ({ id: part.object, game: !part.hideable })),
+          .map((part) => ({
+            id: part.object,
+            game: isGameObject({ id: part.object }),
+            name: part.name,
+            hideable: part.hideable,
+          })),
       ),
     );
+  };
+  /**
+   * What becomes of a part the patch would hide: it goes; it is tied into
+   * the game and goes only when the user says so (careful); the game needs
+   * it (locked); or it is the game's own. Unknown while the ties are asked.
+   */
+  const fateOf = (part: Part): Fate => {
+    if (part.game) {
+      return "game";
+    }
+    const tie = anchors?.byPart.get(objectKey(part.id.plugin, part.id.localId));
+    if (tie?.verdict === "locked" || (tie === undefined && part.hideable === false)) {
+      return "locked";
+    }
+    return tie?.verdict === "careful" ? "careful" : "go";
+  };
+  /** What keeping `side` in `chosen` does to the other side's parts. */
+  const effectOf = (side: 0 | 1, chosen: StageSegment[]) => {
+    const parts = partsOf(chosen, side === 0 ? 1 : 0);
+    const by = (fate: Fate) => parts.filter((part) => fateOf(part) === fate);
+    return { parts, go: by("go"), careful: by("careful"), locked: by("locked"), game: by("game") };
   };
   /** Keeps the choices; deciding the whole place moves on to the next open one. */
   const apply = (next: PatchChoices, moveOn: boolean) => {
@@ -511,14 +580,19 @@ function CollisionsStep({
       }
     }
   };
-  const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean) => {
+  /**
+   * Keeps `side` in `chosen`: the other side's parts that may go are
+   * hidden, the careful ones only when `anyway`; what the game needs stays.
+   */
+  const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean, anyway = false) => {
     const loser = sides[side === 0 ? 1 : 0];
+    const effect = effectOf(side, chosen);
     let next = revealObjects(
       patchChoices,
       spots,
       partsOf(chosen, side).map((part) => part.id),
     );
-    for (const part of partsOf(chosen, side === 0 ? 1 : 0).filter((part) => !part.game)) {
+    for (const part of anyway ? [...effect.go, ...effect.careful] : effect.go) {
       next = chooseObject(next, part.id, true);
     }
     // Every spot of the segments is decided, also where the losing side's
@@ -551,6 +625,10 @@ function CollisionsStep({
     (part) => part.game,
   ).length;
   const placeKept = keptSideOf(placeDecided);
+  const asked = anchors !== null && anchors.key === askingKey;
+  const effects = [effectOf(0, shownSegments), effectOf(1, shownSegments)] as const;
+  /** Whether keeping `side` can hide anything of the other side at all. */
+  const canGo = (effect: (typeof effects)[number]) => effect.go.length + effect.careful.length > 0;
 
   return (
     <div className="review-collision">
@@ -607,6 +685,7 @@ function CollisionsStep({
           type="button"
           className="primary"
           aria-pressed={placeKept === 0}
+          disabled={!asked || !canGo(effects[0])}
           onClick={() => keep(0, shownSegments, true)}
         >
           {placeKept === 0 ? "✓ " : ""}
@@ -616,6 +695,7 @@ function CollisionsStep({
           type="button"
           className="primary"
           aria-pressed={placeKept === 1}
+          disabled={!asked || !canGo(effects[1])}
           onClick={() => keep(1, shownSegments, true)}
         >
           {placeKept === 1 ? "✓ " : ""}
@@ -632,6 +712,22 @@ function CollisionsStep({
         <span className="spacer" />
         {undo}
       </div>
+      {!asked ? (
+        <p className="aside">{r.checkingTies}</p>
+      ) : (
+        <div className="review-effects">
+          {([0, 1] as const).map((side) => (
+            <KeepEffect
+              key={side}
+              winner={names[side]}
+              loser={names[side === 0 ? 1 : 0]}
+              effect={effects[side]}
+              anchors={anchors.byPart}
+              onAnyway={() => keep(side, shownSegments, true, true)}
+            />
+          ))}
+        </div>
+      )}
       <section className="review-segments">
         <h4>{r.segmentsTitle}</h4>
         <ol>
@@ -671,6 +767,7 @@ function CollisionsStep({
                   type="button"
                   className="small"
                   aria-pressed={kept === 0}
+                  disabled={!asked || !canGo(effectOf(0, [segment]))}
                   onClick={() => keep(0, [segment], false)}
                 >
                   {names[0]}
@@ -679,6 +776,7 @@ function CollisionsStep({
                   type="button"
                   className="small"
                   aria-pressed={kept === 1}
+                  disabled={!asked || !canGo(effectOf(1, [segment]))}
                   onClick={() => keep(1, [segment], false)}
                 >
                   {names[1]}
@@ -696,6 +794,145 @@ function CollisionsStep({
           })}
         </ol>
       </section>
+    </div>
+  );
+}
+
+/** A part a decision might hide, with what is known of it. */
+interface Part {
+  id: { plugin: string; localId: number };
+  game: boolean;
+  name: string;
+  /** What the scan says of the spot's own parts: whether the patch may hide it. */
+  hideable?: boolean;
+}
+
+/** What becomes of a part the patch would hide. */
+type Fate = "go" | "careful" | "locked" | "game";
+
+/**
+ * The parts of a place that a decision might hide, not the game's own, to
+ * ask the game's ties of (ADR 0046), in the world or cell of its spots.
+ */
+function partsToAsk(
+  cluster: Cluster,
+  segments: StageSegment[],
+): { place: string; refs: { plugin: string; localId: number }[]; keys: string[] } | null {
+  const first = cluster.spots[0];
+  if (first === undefined) {
+    return null;
+  }
+  const { location } = first.item.spot;
+  const place = location.type === "interior" ? location.cell : location.world;
+  const found = new Map<string, { plugin: string; localId: number }>();
+  const add = (id: { plugin: string; localId: number }) => {
+    if (!isGameObject({ id })) {
+      found.set(objectKey(id.plugin, id.localId), { plugin: id.plugin, localId: id.localId });
+    }
+  };
+  for (const segment of segments) {
+    for (const part of [...segment.parts[0], ...segment.parts[1]]) {
+      add(part.id);
+    }
+  }
+  for (const { item } of cluster.spots) {
+    for (const part of item.spot.parts ?? []) {
+      add(part.object);
+    }
+  }
+  const keys = [...found.keys()].sort();
+  return { place, refs: keys.flatMap((key) => found.get(key) ?? []), keys };
+}
+
+/**
+ * Parts with the same ties together, so that forty planks tied alike read
+ * as one line: their names with how many of each, and the ties once.
+ */
+function tiedTogether(
+  parts: Part[],
+  anchors: Map<string, ObjectAnchors>,
+): { key: string; names: string; tie: ObjectAnchors | undefined }[] {
+  const groups = new Map<string, { tie: ObjectAnchors | undefined; names: Map<string, number> }>();
+  for (const part of parts) {
+    const tie = anchors.get(objectKey(part.id.plugin, part.id.localId));
+    const key =
+      tie === undefined
+        ? "needed"
+        : `${tie.verdict}|${tie.reasons
+            .map(
+              (reason) => `${reason.kind}:${reason.other?.name ?? ""}:${reason.other?.state ?? ""}`,
+            )
+            .join(",")}`;
+    const group = groups.get(key) ?? { tie, names: new Map() };
+    group.names.set(part.name, (group.names.get(part.name) ?? 0) + 1);
+    groups.set(key, group);
+  }
+  return [...groups.entries()].map(([key, group]) => ({
+    key,
+    tie: group.tie,
+    names: [...group.names.entries()]
+      .map(([name, count]) => (count === 1 ? name : `${name} ×${count}`))
+      .join(" · "),
+  }));
+}
+
+/**
+ * What keeping one side does to the other: how many of its parts can go,
+ * which the game needs and why, with "hide anyway" for the careful ones,
+ * and keeping both suggested where nothing can go.
+ */
+function KeepEffect({
+  winner,
+  loser,
+  effect,
+  anchors,
+  onAnyway,
+}: {
+  winner: string;
+  loser: string;
+  effect: { parts: Part[]; go: Part[]; careful: Part[]; locked: Part[]; game: Part[] };
+  anchors: Map<string, ObjectAnchors>;
+  onAnyway: () => void;
+}) {
+  const r = useReviewTexts();
+  const staying = [...effect.careful, ...effect.locked];
+  if (effect.parts.length === 0) {
+    return null;
+  }
+  const nothing = effect.go.length + effect.careful.length === 0;
+  return (
+    <div className="review-effect" data-nothing={nothing}>
+      <p>
+        <strong>{r.keepHere(winner)}:</strong>{" "}
+        {nothing
+          ? r.nothingCanGo(loser)
+          : r.keepEffect(loser, effect.go.length, effect.parts.length)}
+        {effect.careful.length > 0 && ` ${r.carefulNote(effect.careful.length)}`}
+        {effect.locked.length > 0 && ` ${r.lockedNote(effect.locked.length)}`}
+        {effect.game.length > 0 && ` ${r.gameParts(effect.game.length)}`}
+      </p>
+      {staying.length > 0 && (
+        <details className="review-ties">
+          <summary className="more">{r.whyTheyStay(staying.length)}</summary>
+          <ul>
+            {tiedTogether(staying, anchors).map(({ key, names, tie }) => (
+              <li key={key}>
+                <strong>{names}</strong>
+                {tie === undefined ? (
+                  <span className="aside"> {r.neededByGame}</span>
+                ) : (
+                  <AnchorReasons anchors={tie} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {effect.careful.length > 0 && (
+        <button type="button" className="small" onClick={onAnyway}>
+          {r.hideAnyway(loser, effect.careful.length)}
+        </button>
+      )}
     </div>
   );
 }
