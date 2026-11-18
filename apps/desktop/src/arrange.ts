@@ -232,12 +232,15 @@ export function stepOf(rendered: RenderedFinding, ignored: Set<string>): Step | 
   return STEP_OF_KIND[kind] ?? "check";
 }
 
+/** Whether a finding is a thing to do: in a step before the optional ones, not a collision. */
+export function isTask(rendered: RenderedFinding, ignored: Set<string>): boolean {
+  const step = stepOf(rendered, ignored);
+  return step !== null && step !== "advice" && step !== "notes" && step !== "ignored";
+}
+
 /** How many things there are to do outside the collisions: the steps before the optional ones. */
 export function openTaskCount(findings: RenderedFinding[], ignored: Set<string>): number {
-  return findings.filter((rendered) => {
-    const step = stepOf(rendered, ignored);
-    return step !== null && step !== "advice" && step !== "notes" && step !== "ignored";
-  }).length;
+  return findings.filter((rendered) => isTask(rendered, ignored)).length;
 }
 
 /** The findings of each step, grouped by kind, the errors first. */

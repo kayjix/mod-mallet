@@ -32,18 +32,21 @@ const CONFIDENCE: Record<RenderedFinding["finding"]["confidence"], number> = {
   hint: 0.4,
 };
 
-/** The most each impact can take off, so that one sort cannot hide the others. */
-const CAP: Record<Impact, number> = {
+/**
+ * The share of the score, in points of 100, that each group can take at
+ * most. A group comes close to it only gently (see {@link saturate}), and
+ * the groups take their shares one after the other, so the score never
+ * reaches 0 and every fix moves it.
+ */
+const CAP: Record<Impact | "collisions", number> = {
   crash: 60,
   broken: 30,
+  collisions: 30,
   quality: 15,
   note: 5,
   advice: 0,
   scan: 0,
 };
-
-/** The most the collisions can take off together. */
-const COLLISION_CAP = 30;
 
 /** How much one open spot weighs, by its kind in the worklist. */
 const SPOT_WEIGHT: Record<WorkKind, number> = {
@@ -61,6 +64,15 @@ const CRASH_BELOW = 40;
 
 /** Below this score the game is playable, but the quality suffers. */
 const GOOD_FROM = 80;
+
+/**
+ * What a group's raw points take off: close to the raw points while they
+ * are small, never more than the cap, and still moving when they are
+ * large, so that fixing one of many shows.
+ */
+export function saturate(raw: number, cap: number): number {
+  return cap <= 0 ? 0 : cap * (1 - Math.exp(-raw / cap));
+}
 
 const numberArg = (rendered: RenderedFinding, name: string): number => {
   const value = rendered.finding.args[name];
@@ -278,16 +290,6 @@ export function healthOf(
     points: (entry.sum / entry.count) * Math.sqrt(entry.count),
     target: "tasks",
   }));
-  // Each impact up to its cap; its reasons shrink alike.
-  for (const impact of Object.keys(CAP) as Impact[]) {
-    const members = raw.filter((reason) => reason.impact === impact);
-    const total = members.reduce((sum, reason) => sum + reason.points, 0);
-    const factor = total > CAP[impact] ? CAP[impact] / total : 1;
-    for (const reason of members) {
-      reasons.push({ ...reason, points: reason.points * factor });
-    }
-  }
-
   const spots = reportSpots(report, ignored, choices);
   const states: Record<SpotState, number> = { open: 0, kept: 0, waiting: 0, patched: 0 };
   let openWeight = 0;
@@ -301,14 +303,11 @@ export function healthOf(
       waitingWeight += SPOT_WEIGHT[spot.kind] / 2;
     }
   }
-  const collisionPoints = Math.min(
-    COLLISION_CAP,
-    COLLISION_SCALE * Math.sqrt(openWeight + waitingWeight),
-  );
+  const collisionPoints = COLLISION_SCALE * Math.sqrt(openWeight + waitingWeight);
   const share = (part: number) =>
     openWeight + waitingWeight === 0 ? 0 : (collisionPoints * part) / (openWeight + waitingWeight);
   if (states.open > 0) {
-    reasons.push({
+    raw.push({
       key: "collisions|open",
       impact: "collisions",
       kind: "open-spots",
@@ -319,7 +318,7 @@ export function healthOf(
     });
   }
   if (states.waiting > 0) {
-    reasons.push({
+    raw.push({
       key: "collisions|waiting",
       impact: "collisions",
       kind: "waiting-spots",
@@ -330,7 +329,28 @@ export function healthOf(
     });
   }
 
-  const lost = reasons.reduce((sum, reason) => sum + reason.points, 0);
+  // Each group takes off its saturated share of what is left of the score;
+  // what is lost in all is shared out to the reasons by their part in it.
+  const groups = new Map<Reason["impact"], number>();
+  for (const reason of raw) {
+    groups.set(reason.impact, (groups.get(reason.impact) ?? 0) + reason.points);
+  }
+  let kept = 1;
+  const taken = new Map<Reason["impact"], number>();
+  for (const [impact, points] of groups) {
+    const loss = saturate(points, CAP[impact]);
+    taken.set(impact, loss);
+    kept *= 1 - loss / 100;
+  }
+  const lost = 100 * (1 - kept);
+  const takenSum = [...taken.values()].reduce((sum, loss) => sum + loss, 0);
+  for (const reason of raw) {
+    const group = groups.get(reason.impact) ?? 0;
+    const loss = taken.get(reason.impact) ?? 0;
+    const points =
+      group === 0 || takenSum === 0 ? 0 : (lost * (loss / takenSum) * reason.points) / group;
+    reasons.push({ ...reason, points });
+  }
   const score = Math.max(0, Math.min(100, Math.round(100 - lost)));
   const broken = reasons.some((reason) => reason.impact === "broken" && reason.points > 0);
   const verdict: Verdict =

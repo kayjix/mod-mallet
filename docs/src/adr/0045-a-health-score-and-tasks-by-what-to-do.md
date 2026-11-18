@@ -44,14 +44,23 @@ navigation meshes may make the game crash.
      0.8, a guess 0.4.
    - The findings of one kind count √n times their mean, so that dozens
      of notes do not weigh like dozens of crashes.
-   - Each impact takes off at most: crash 60, broken 30, quality 15, note
-     5. Its reasons shrink alike when the cap is reached.
    - Collision spots count by their kind in the worklist: a duplicate 1,
      an overlap 0.4, a deep touch 0.15, a touch 0.01. An undecided spot
      counts fully; a spot decided to hide one side counts half until the
      patch in the game hides it, then not at all; a spot where both stay
-     does not count. Together they take off 1.5 × √(sum), at most 30.
-   - The score is 100 minus everything taken off, rounded.
+     does not count. Together they make 1.5 × √(sum) raw points.
+   - The raw points of each group (the impacts crash, broken, quality and
+     note, and the collisions) are *saturated*: a group with *r* raw
+     points and a cap *c* takes `c × (1 − e^(−r/c))`. While *r* is small
+     that is nearly *r*; it never reaches *c*, and it still moves when *r*
+     is large. The caps: crash 60, broken 30, collisions 30, quality 15,
+     note 5.
+   - The groups take their shares one after the other, of what the
+     previous ones left: the score is `100 × ∏ (1 − taken / 100)`,
+     rounded. It cannot reach 0 (with every group at its cap it is about
+     16), and fixing one of many findings raises it.
+   - What is lost in all is shared out to the reasons by their part in it,
+     so the points the home page shows add up to 100 minus the score.
    - The verdict is *crashes likely* when a finding with a heavy crash
      weight (marked `severe`) is open and not a guess, or the score is
      below 40; *the quality suffers* when a broken finding is open or the
@@ -101,6 +110,14 @@ navigation meshes may make the game crash.
 - **A penalty per finding without √n and caps.** One large setup has
   hundreds of collision spots and dozens of navigation mesh notes; the
   score sat at 0 whatever else was fixed.
+- **Hard caps, added up** (the first version of this record: each group
+  took off its raw points up to its cap, and the score was 100 minus the
+  sum). The caps added up to 140, so a real setup with cut-off doors, a
+  recent crash, dark faces and 963 undecided spots scored 0, and fixing
+  the doors left it at 0 because the crash group stayed at its cap. The
+  gentle saturation and the shares one after the other replaced them on
+  2026-11-18: the same setup scores about 30, and about 38 once the doors
+  are fixed.
 - **Set-aside findings counting a little.** It made the score drop for
   things the user had explicitly decided to accept, which reads as
   Mod Mallet not listening.

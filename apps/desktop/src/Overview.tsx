@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useSession } from "./Actions";
 import { useGameArt } from "./AllGames";
-import { isCollision, openTaskCount } from "./arrange";
+import { isTask, openTaskCount } from "./arrange";
 import type { Games } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
@@ -94,11 +94,10 @@ export function Overview({
   }
 
   const open = openTaskCount(report.findings, ignored);
+  // Of the things to do, those that can crash the game: counted alike, so
+  // that the part is never more than the whole.
   const crashes = report.findings.filter(
-    (rendered) =>
-      !ignored.has(rendered.finding.id) &&
-      !isCollision(rendered) &&
-      weightOf(rendered).impact === "crash",
+    (rendered) => isTask(rendered, ignored) && weightOf(rendered).impact === "crash",
   ).length;
   const installed = report.installedPatch?.objects.length;
   const enabled = report.mods.filter((info) => info.enabled).length;
