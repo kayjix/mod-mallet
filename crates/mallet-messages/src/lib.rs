@@ -185,6 +185,8 @@ pub struct RenderedTool {
     pub state_label: String,
     /// How much the setup depends on it, in a word.
     pub need_label: String,
+    /// Which tool brings it along, in words, if one does.
+    pub provided_label: Option<String>,
 }
 
 /// Everything the setup needs besides its mods, in words.
@@ -547,6 +549,13 @@ impl Messages {
                     },
                     &[],
                 ),
+                provided_label: tool.provided_by.as_ref().map(|provider| {
+                    let provider = self.text(&format!("tool-{provider}-name"), &[]);
+                    self.text(
+                        "tool-provided-by",
+                        &[("tool", ArgValue::from(provider.as_str()))],
+                    )
+                }),
             })
             .collect();
         let attention = tools.iter().filter(|tool| tool.wants_attention()).count();

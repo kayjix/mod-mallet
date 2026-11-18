@@ -35,6 +35,13 @@
           "description": "How much the setup depends on it, in a word.",
           "type": "string"
         },
+        "providedLabel": {
+          "description": "Which tool brings it along, in words, if one does.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "purpose": {
           "description": "What it is for, in a sentence or two.",
           "type": "string"
@@ -86,6 +93,14 @@
             "string",
             "null"
           ]
+        },
+        "providedBy": {
+          "description": "The tool that brings this one along, when it is not installed on its\nown: `vortex` for the LOOT that Vortex has built in.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "state": {
           "description": "How it stands right now.",

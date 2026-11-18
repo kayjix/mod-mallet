@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSession } from "./Actions";
 import type { RenderedTool, RenderedToolbox } from "./generated/rendered-toolbox";
+import { toolboxTexts } from "./toolbox-texts";
+import "./toolbox.css";
 
 interface ToolboxProps {
   toolbox: RenderedToolbox | null;
@@ -90,6 +92,43 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
     return null;
   };
 
+  const texts = toolboxTexts[lang];
+  // Tools the game or Mod Mallet needs first; the optional ones folded
+  // below, each saying what it is for.
+  const needed = toolbox.tools.filter((rendered) => rendered.tool.need !== "optional");
+  const optional = toolbox.tools.filter((rendered) => rendered.tool.need === "optional");
+
+  const row = (rendered: RenderedTool) => (
+    <li
+      key={rendered.tool.id}
+      className="tool"
+      data-state={rendered.tool.state}
+      data-need={rendered.tool.need}
+    >
+      <span className="tool-dot" data-tone={toneOf(rendered)} aria-hidden="true" />
+      <div className="tool-main">
+        <div className="tool-head">
+          <strong>{rendered.name}</strong>
+          <span className="tool-need">{rendered.needLabel}</span>
+        </div>
+        <p className="tool-purpose">{rendered.purpose}</p>
+        {(rendered.tool.version != null || rendered.tool.path != null) && (
+          <p className="tool-facts">
+            {rendered.tool.version != null && <span>{rendered.tool.version}</span>}
+            {rendered.tool.path != null && <code>{rendered.tool.path}</code>}
+          </p>
+        )}
+      </div>
+      <span className="tool-state">
+        {rendered.stateLabel}
+        {rendered.providedLabel != null && (
+          <span className="tool-provided">{rendered.providedLabel}</span>
+        )}
+      </span>
+      <div className="tool-action">{actionFor(rendered)}</div>
+    </li>
+  );
+
   return (
     <section className="toolbox">
       {note !== null && (
@@ -102,33 +141,16 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
           {failure}
         </p>
       )}
-      <ul className="tool-list">
-        {toolbox.tools.map((rendered) => (
-          <li
-            key={rendered.tool.id}
-            className="tool"
-            data-state={rendered.tool.state}
-            data-need={rendered.tool.need}
-          >
-            <span className="tool-dot" data-tone={toneOf(rendered)} aria-hidden="true" />
-            <div className="tool-main">
-              <div className="tool-head">
-                <strong>{rendered.name}</strong>
-                <span className="tool-need">{rendered.needLabel}</span>
-              </div>
-              <p className="tool-purpose">{rendered.purpose}</p>
-              {(rendered.tool.version != null || rendered.tool.path != null) && (
-                <p className="tool-facts">
-                  {rendered.tool.version != null && <span>{rendered.tool.version}</span>}
-                  {rendered.tool.path != null && <code>{rendered.tool.path}</code>}
-                </p>
-              )}
-            </div>
-            <span className="tool-state">{rendered.stateLabel}</span>
-            <div className="tool-action">{actionFor(rendered)}</div>
-          </li>
-        ))}
-      </ul>
+      <ul className="tool-list">{needed.map(row)}</ul>
+      {optional.length > 0 && (
+        <details className="tool-optional">
+          <summary>
+            {texts.optional(optional.length)}
+            <span className="tool-optional-hint">{texts.optionalHint}</span>
+          </summary>
+          <ul className="tool-list">{optional.map(row)}</ul>
+        </details>
+      )}
     </section>
   );
 }

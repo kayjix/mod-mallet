@@ -27,6 +27,10 @@ pub struct Tool {
     pub path: Option<String>,
     /// Where to get it.
     pub page: Option<String>,
+    /// The tool that brings this one along, when it is not installed on its
+    /// own: `vortex` for the LOOT that Vortex has built in.
+    #[serde(default)]
+    pub provided_by: Option<String>,
 }
 
 /// What kind of tool a tool is.
@@ -81,6 +85,7 @@ impl Tool {
             version: None,
             path: None,
             page: None,
+            provided_by: None,
         }
     }
 
@@ -102,6 +107,13 @@ impl Tool {
     #[must_use]
     pub fn with_path(mut self, path: Option<String>) -> Self {
         self.path = path;
+        self
+    }
+
+    /// The same tool, brought along by the tool `provider`.
+    #[must_use]
+    pub fn provided_by(mut self, provider: &str) -> Self {
+        self.provided_by = Some(provider.to_owned());
         self
     }
 

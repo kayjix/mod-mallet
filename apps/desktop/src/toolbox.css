@@ -1,0 +1,30 @@
+/* The toolbox's own additions (journey, package H): the tool that brings
+   another along, and the folded list of optional tools. */
+
+.tool-provided {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--muted);
+}
+
+.tool-optional {
+  margin-top: 1rem;
+}
+
+.tool-optional > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+
+.tool-optional-hint {
+  margin-left: 0.75rem;
+  font-weight: normal;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.tool-optional > .tool-list {
+  margin-top: 0.5rem;
+}

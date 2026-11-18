@@ -1,6 +1,6 @@
 //! What the setup needs besides its mods, and restarting the mod manager.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
 use mallet_game_bethesda::{locate, skse_log, tools};
@@ -35,6 +35,12 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
             &game_dir,
             game_version.as_deref(),
         ));
+        // Vortex has LOOT built in; then LOOT on its own is not needed.
+        if let Some(built_in) = loot_in_vortex(manager, scan.game_id())
+            && let Some(loot) = found.iter_mut().find(|tool| tool.id == "loot")
+        {
+            *loot = built_in;
+        }
     }
     let unpacker = scan
         .unpacker
@@ -57,6 +63,48 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
         .with_path(unpacker.map(|unpacker| unpacker.program().display().to_string())),
     );
     found
+}
+
+/// LOOT as Vortex has it built in: Vortex sorts plugins with LOOT's
+/// library and keeps LOOT's masterlist for each game, which Mod Mallet
+/// reads for its rules (ADR 0030). Ready when that masterlist is there,
+/// with its date; `None` otherwise.
+fn loot_in_vortex(manager: &ManagerOptions, game_id: &str) -> Option<Tool> {
+    let masterlist = manager
+        .vortex_data_dir()?
+        .join(game_id)
+        .join("masterlist")
+        .join("masterlist.yaml");
+    let modified = std::fs::metadata(&masterlist).ok()?.modified().ok()?;
+    Some(
+        Tool::new("loot", ToolNeed::Recommended, ToolState::Ready)
+            .in_group(ToolGroup::Helper)
+            .provided_by("vortex")
+            .with_version(date(modified))
+            .with_path(Some(masterlist.display().to_string())),
+    )
+}
+
+/// A point in time as its date, `YYYY-MM-DD`, in universal time.
+fn date(time: SystemTime) -> Option<String> {
+    let days = i64::try_from(time.duration_since(UNIX_EPOCH).ok()?.as_secs() / 86_400).ok()?;
+    // Days since 1970-01-01 to a date of the Gregorian calendar, after
+    // Howard Hinnant's `civil_from_days`.
+    let shifted = days + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    Some(format!("{year:04}-{month:02}-{day:02}"))
 }
 
 /// Vortex itself and the link to it.
@@ -123,4 +171,40 @@ pub fn restart_manager() -> Result<(), EngineError> {
         tracing::warn!(%error, "Vortex was not restarted");
         EngineError::Restart(error.to_string())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn dates_are_written_as_the_calendar_has_them() {
+        let at = |seconds: u64| date(UNIX_EPOCH + Duration::from_secs(seconds));
+        assert_eq!(at(0).as_deref(), Some("1970-01-01"));
+        // 2000-02-29, a leap day.
+        assert_eq!(at(951_782_400).as_deref(), Some("2000-02-29"));
+        // 2026-11-17 18:00 UTC.
+        assert_eq!(at(1_794_938_400).as_deref(), Some("2026-11-17"));
+    }
+
+    #[test]
+    fn loot_counts_as_built_into_vortex_when_vortex_keeps_its_masterlist() {
+        let vortex = tempfile::tempdir().unwrap();
+        let manager = ManagerOptions {
+            vortex_data_dir: Some(vortex.path().to_path_buf()),
+            ..ManagerOptions::default()
+        };
+        assert_eq!(loot_in_vortex(&manager, "skyrimse"), None);
+
+        let folder = vortex.path().join("skyrimse").join("masterlist");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("masterlist.yaml"), "plugins: []\n").unwrap();
+        let loot = loot_in_vortex(&manager, "skyrimse").unwrap();
+        assert_eq!(loot.state, ToolState::Ready);
+        assert_eq!(loot.need, ToolNeed::Recommended);
+        assert_eq!(loot.provided_by.as_deref(), Some("vortex"));
+        assert!(loot.version.is_some_and(|date| date.len() == 10));
+    }
 }

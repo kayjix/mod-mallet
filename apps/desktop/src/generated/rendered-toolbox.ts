@@ -26,6 +26,10 @@ export interface RenderedTool {
    */
   needLabel: string;
   /**
+   * Which tool brings it along, in words, if one does.
+   */
+  providedLabel?: string | null;
+  /**
    * What it is for, in a sentence or two.
    */
   purpose: string;
@@ -59,6 +63,11 @@ export interface Tool {
    * Where it was found, where known.
    */
   path?: string | null;
+  /**
+   * The tool that brings this one along, when it is not installed on its
+   * own: `vortex` for the LOOT that Vortex has built in.
+   */
+  providedBy?: string | null;
   /**
    * How it stands right now.
    */

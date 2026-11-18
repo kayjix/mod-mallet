@@ -664,6 +664,8 @@ function toolbox(lang: Lang): RenderedToolbox {
       recommended: de ? "Empfohlen" : "Recommended",
       optional: "Optional",
     }[need],
+    providedLabel:
+      extra.providedBy === "vortex" ? (de ? "In Vortex eingebaut" : "Built into Vortex") : null,
   });
   const tools = [
     tool(
@@ -713,12 +715,52 @@ function toolbox(lang: Lang): RenderedToolbox {
       { version: "14.51.36247.00" },
     ),
     tool(
+      "loot",
+      "LOOT",
+      "recommended",
+      "ready",
+      two(
+        "Sorts plugins and keeps a list of known problems with them.",
+        "Sortiert Plugins und führt eine Liste bekannter Probleme mit ihnen.",
+      ),
+      {
+        group: "helper",
+        version: "2026-11-17",
+        path: "C:\\Users\\Example\\AppData\\Roaming\\Vortex\\skyrimse\\masterlist\\masterlist.yaml",
+        providedBy: "vortex",
+      },
+    ),
+    tool(
+      "seven-zip",
+      "7-Zip",
+      "recommended",
+      "ready",
+      two("Opens mod archives.", "Öffnet Mod-Archive."),
+      {
+        group: "helper",
+        path: "C:\\Program Files\\Vortex\\resources\\app.asar.unpacked\\node_modules\\7z-bin\\win32\\7z.exe",
+      },
+    ),
+    tool(
+      "base-object-swapper",
+      "Base Object Swapper",
+      "optional",
+      "ready",
+      two(
+        "Swaps objects while the game runs; Mod Mallet's patches use it.",
+        "Tauscht Objekte, während das Spiel läuft; die Patches von Mod Mallet nutzen es.",
+      ),
+    ),
+    tool(
       "creation-kit",
       "Creation Kit",
       "optional",
       "missing",
-      two("Bethesda's editor.", "Bethesdas Editor."),
-      { page: "https://store.steampowered.com/app/1946180/" },
+      two(
+        "Bethesda's editor: for repairing navigation meshes, looking at a place with its lighting, and making mods of your own. Not needed to play or to use Mod Mallet.",
+        "Bethesdas Editor: um Navigationsnetze zu reparieren, einen Ort mit seinem Licht anzusehen und eigene Mods zu bauen. Zum Spielen und für Mod Mallet nicht nötig.",
+      ),
+      { group: "helper", page: "https://store.steampowered.com/app/1946180/" },
     ),
   ];
   return {
