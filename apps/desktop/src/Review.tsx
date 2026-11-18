@@ -22,7 +22,15 @@ import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
-import { chooseObject, chooseSpot, hiddenKeysOf, type PatchChoices, revealObjects } from "./patch";
+import {
+  chooseObject,
+  chooseSpot,
+  hiddenKeysOf,
+  type PatchChoices,
+  pinsOf,
+  revealObjects,
+} from "./patch";
+import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
@@ -1043,6 +1051,9 @@ function CollisionsStep({
           {r.keepBothHere}
         </button>
         <span className="spacer" />
+        <PinButton
+          keys={cluster.spots.filter(({ item }) => item.state === "open").map(({ key }) => key)}
+        />
         {undo}
       </div>
       {!asked ? (
@@ -1128,6 +1139,11 @@ function CollisionsStep({
                 >
                   {r.keepBoth}
                 </button>
+                <PinButton
+                  keys={spotsOf(segment)
+                    .filter(({ item }) => item.state === "open")
+                    .map(({ key }) => key)}
+                />
                 <details className="review-segment-parts">
                   <summary className="more">
                     {r.partsTitle(segment.parts[0].length + segment.parts[1].length)}
@@ -1352,8 +1368,10 @@ function ReportStep({
   onCluster: (key: string) => void;
   onStep: (step: ReviewStep) => void;
 }) {
-  const { patchChoices } = useSession();
+  const { patchChoices, showPinned } = useSession();
   const r = useReviewTexts();
+  const pinText = usePinTexts();
+  const pinned = pinsOf(patchChoices).size;
   const decided = clusters.filter((cluster) => openIn(cluster) === 0);
   const pending = clusters.filter((cluster) => openIn(cluster) > 0);
   const mods = new Map<string, number>();
@@ -1434,6 +1452,15 @@ function ReportStep({
           ))}
         </ul>
       </section>
+      {pinned > 0 && (
+        <p className="review-report-line">
+          <PinIcon /> <strong>{pinText.reportPinned(pinned)}</strong>
+          <span className="spacer" />
+          <button type="button" className="small" onClick={showPinned}>
+            {pinText.showPinned}
+          </button>
+        </p>
+      )}
       <PairReport report={report} game={game} />
     </div>
   );

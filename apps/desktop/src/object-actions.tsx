@@ -13,7 +13,16 @@ import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
-import { chooseObject, hiddenKeysOf, matchKey, objectChoiceKey, revealObjects } from "./patch";
+import {
+  chooseObject,
+  decisionAt,
+  hiddenKeysOf,
+  matchKey,
+  objectChoiceKey,
+  revealObjects,
+  spotKey,
+} from "./patch";
+import { PinButton } from "./pins";
 
 /** The plugins of the games themselves, whose objects quests may need. */
 const GAME_PLUGIN =
@@ -346,8 +355,14 @@ export function MapObjectActions({
   tools: PartTools;
   place: string;
 }) {
-  const { t, spots, decideSpot } = useSession();
+  const { t, spots, decideSpot, patchChoices } = useSession();
   const spot = spotOf(spots, object);
+  const key = spot === null ? null : spotKey(spot);
+  // A collision still open can be pinned to solve later (ADR 0050).
+  const open =
+    spot !== null &&
+    key !== null &&
+    decisionAt(patchChoices, spot.finding, key, spot.parts ?? []) === undefined;
   return (
     <>
       {spot !== null && (
@@ -359,6 +374,7 @@ export function MapObjectActions({
           {t.workDecideHere}
         </button>
       )}
+      {open && key !== null && <PinButton keys={[key]} />}
       <FreeObjectActions object={object} tools={tools} place={place} />
     </>
   );

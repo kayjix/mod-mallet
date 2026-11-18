@@ -48,6 +48,8 @@ import {
   worstKind,
 } from "./map-places";
 import { MapObjectActions } from "./object-actions";
+import { pinsOf, spotKey } from "./patch";
+import { drawPin, PIN_COLOUR } from "./pins";
 import { type WorldTexts, worldTexts } from "./world-texts";
 
 interface MapViewProps {
@@ -661,7 +663,9 @@ function Grid({
   onHover,
   focus,
 }: GridProps) {
-  const { t } = useSession();
+  const { t, patchChoices } = useSession();
+  // Spots pinned to solve later get a pushpin (ADR 0050).
+  const pins = useMemo(() => pinsOf(patchChoices), [patchChoices]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -932,6 +936,9 @@ function Grid({
         context.fill();
         context.strokeStyle = colours.line;
         context.stroke();
+        if (pins.has(spotKey(spot) ?? "")) {
+          drawPin(context, x, y, PIN_COLOUR);
+        }
       }
     } else {
       for (const [at, found] of spotsByCell) {
@@ -949,6 +956,9 @@ function Grid({
         context.fill();
         context.strokeStyle = colours.line;
         context.stroke();
+        if (found.some((spot) => pins.has(spotKey(spot) ?? ""))) {
+          drawPin(context, px, py, PIN_COLOUR);
+        }
       }
     }
 
@@ -1037,6 +1047,7 @@ function Grid({
     bounds,
     spots,
     spotsByCell,
+    pins,
     markers,
     hover,
     picked,

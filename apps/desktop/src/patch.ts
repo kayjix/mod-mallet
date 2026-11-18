@@ -508,3 +508,65 @@ export function spotsByKey(report: RenderedReport): Map<string, MapSpot> {
   }
   return found;
 }
+
+/**
+ * The prefix of a pin among the choices: a spot the user marked to solve
+ * later by hand. A pin is no decision; the patch reads none.
+ */
+const PIN = "pin:";
+
+/** The spots pinned to solve later, by their keys (see {@link spotKey}). */
+export function pinsOf(choices: PatchChoices): Set<string> {
+  return new Set(
+    Object.keys(choices)
+      .filter((key) => key.startsWith(PIN))
+      .map((key) => key.slice(PIN.length)),
+  );
+}
+
+/** The choices with the spots `keys` pinned, or no longer. */
+export function setPins(choices: PatchChoices, keys: string[], pinned: boolean): PatchChoices {
+  const next = { ...choices };
+  for (const key of keys) {
+    if (pinned) {
+      next[`${PIN}${key}`] = "pinned";
+    } else {
+      delete next[`${PIN}${key}`];
+    }
+  }
+  return next;
+}
+
+/** Only the pins of the choices, to keep them when the decisions are replaced. */
+export function pinsOnly(choices: PatchChoices): PatchChoices {
+  return Object.fromEntries(Object.entries(choices).filter(([key]) => key.startsWith(PIN)));
+}
+
+/**
+ * The choices without the pins of spots that are decided now: a pin is
+ * there to find a spot again, and a decided spot needs it no more. Also
+ * says how many were cleared.
+ */
+export function withoutDecidedPins(
+  choices: PatchChoices,
+  spots: Map<string, MapSpot[]>,
+): { choices: PatchChoices; cleared: number } {
+  const pinned = pinsOf(choices);
+  if (pinned.size === 0) {
+    return { choices, cleared: 0 };
+  }
+  const decided: string[] = [];
+  for (const [finding, list] of spots) {
+    for (const spot of list) {
+      const key = spotKey(spot);
+      if (key !== null && pinned.has(key)) {
+        if (decisionAt(choices, finding, key, spot.parts ?? []) !== undefined) {
+          decided.push(key);
+        }
+      }
+    }
+  }
+  return decided.length === 0
+    ? { choices, cleared: 0 }
+    : { choices: setPins(choices, decided, false), cleared: decided.length };
+}

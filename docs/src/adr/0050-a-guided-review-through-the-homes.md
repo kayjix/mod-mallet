@@ -165,6 +165,19 @@ a colour of its own.
     stay, and a place where only those could go stays open), and one
     *undo* takes the whole batch back. The ratios are a first guess, to be
     tuned on the user's places.
+13. **Pins: solve later by hand.** A spot that cannot be settled in the
+    review can be pinned: on a place or segment in the review, at the spot
+    in the collisions' worklist, and on a collision's object card on the
+    map. One click pins, one click clears. A pin is no decision: the spot
+    stays open and counts as open. Pins are kept with the patch's choices,
+    per game, under keys of their own (`pin:` and the spot's key), which
+    the patch reads none of; resetting the patch keeps them. The worklist
+    has a filter *pinned only* and marks pinned rows; both maps draw a
+    pushpin (a round head on a needle, in reddish purple with a dark rim)
+    on pinned spots; the review's report says how many spots are pinned
+    and leads to the filtered list. Only open spots are pinned. When a
+    pinned spot is decided, wherever that happens, its pin is cleared and
+    a short note says so: the pin was there to find the spot again.
 
 ## Consequences
 

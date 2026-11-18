@@ -36,6 +36,8 @@ import {
   shapeOf,
   spotPosition,
 } from "./map-places";
+import { pinsOf, spotKey } from "./patch";
+import { drawPin, PIN_COLOUR } from "./pins";
 
 interface MapView3DProps {
   world: MapWorld;
@@ -457,7 +459,10 @@ export function MapView3D({
   plain = false,
   onArea,
 }: MapView3DProps) {
-  const { t, api } = useSession();
+  const { t, api, patchChoices } = useSession();
+  // The spots pinned to solve later, read while drawing.
+  const pinsNow = useRef<Set<string>>(new Set());
+  pinsNow.current = pinsOf(patchChoices);
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -833,6 +838,12 @@ export function MapView3D({
       }
     }
     heads.current = placed;
+    // Spots pinned to solve later get a pushpin of their own (ADR 0050).
+    for (const { pin, x, y } of placed) {
+      if (pin.picked.type === "spot" && pinsNow.current.has(spotKey(pin.picked.spot) ?? "")) {
+        drawPin(context, x, y, PIN_COLOUR);
+      }
+    }
     // The parts of collisions among the objects, by name: of the one
     // looked at, if one is.
     if (shownArea !== null && area.current !== null && !state.current.plain) {
@@ -924,6 +935,12 @@ export function MapView3D({
       draw();
     });
   }, [draw]);
+
+  // A pin set or cleared shows at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the pins are read from the choices.
+  useEffect(() => {
+    redraw();
+  }, [patchChoices, redraw]);
 
   // The context and the land are made once per worldspace.
   useEffect(() => {

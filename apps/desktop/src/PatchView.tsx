@@ -14,6 +14,7 @@ import {
   type PairDecision,
   type PatchChoices,
   pairsOf,
+  pinsOnly,
   signatureOf,
   spotsByKey,
   undoDecision,
@@ -140,7 +141,11 @@ export function PatchView({ report }: { report: RenderedReport }) {
               className="primary"
               onClick={() => {
                 setBefore(choices);
-                setChoices(asking === "clear" ? {} : fromInstalled);
+                // Pins are no decisions; they stay (ADR 0050).
+                setChoices({
+                  ...(asking === "clear" ? {} : fromInstalled),
+                  ...pinsOnly(choices),
+                });
                 setAsking(null);
               }}
             >

@@ -23,7 +23,15 @@ import { Overview, openFileDuels } from "./Overview";
 import { reportFile } from "./PairReport";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
-import { choicesOf, installedKeys, type PatchChoices, pairsOf, withoutMisspelt } from "./patch";
+import {
+  choicesOf,
+  installedKeys,
+  type PatchChoices,
+  pairsOf,
+  withoutDecidedPins,
+  withoutMisspelt,
+} from "./patch";
+import { pinTexts } from "./pins";
 import { Review } from "./Review";
 import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
@@ -68,6 +76,13 @@ export default function App({ api, startLang }: AppProps) {
   const [view, setView] = useState<ViewName>("overview");
   const [places, setPlaces] = useState<RenderedPlaces | null>(null);
   const [report, setReport] = useState<RenderedReport | null>(null);
+  const reportRef = useRef(report);
+  reportRef.current = report;
+  // What became of pins when their spots were decided, shown a moment.
+  const [pinNote, setPinNote] = useState<number | null>(null);
+  const pinNoteTimer = useRef<number | undefined>(undefined);
+  // Whether the collisions are to open with only the pinned spots.
+  const [pinnedAsked, setPinnedAsked] = useState(false);
   const [link, setLink] = useState<RenderedLink | null>(null);
   const [ignored, setIgnoredList] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
@@ -108,7 +123,18 @@ export default function App({ api, startLang }: AppProps) {
       .catch((error: unknown) => setFailure(String(error)));
   }, [api]);
   const setPatchChoices = useCallback(
-    (next: PatchChoices) => {
+    (wanted: PatchChoices) => {
+      // A pin marks a spot to solve later; once the spot is decided, the
+      // pin has done its work and goes, with a short note (ADR 0050).
+      const { choices: next, cleared } = withoutDecidedPins(
+        wanted,
+        spotsByFinding(reportRef.current),
+      );
+      if (cleared > 0) {
+        setPinNote(cleared);
+        window.clearTimeout(pinNoteTimer.current);
+        pinNoteTimer.current = window.setTimeout(() => setPinNote(null), 6000);
+      }
       setPatchChoicesNow(next);
       unsaved.current = next;
       window.clearTimeout(saveTimer.current);
@@ -324,8 +350,14 @@ export default function App({ api, startLang }: AppProps) {
     setPairAt(null);
     setMapMod(null);
     setCompareAt(null);
+    setPinnedAsked(false);
     setView(next);
   }, []);
+
+  const showPinned = useCallback(() => {
+    go("collisions");
+    setPinnedAsked(true);
+  }, [go]);
 
   const showPatch = useCallback(() => go("patch"), [go]);
 
@@ -421,6 +453,8 @@ export default function App({ api, startLang }: AppProps) {
       showModOnMap,
       mapMod,
       showToolbox,
+      showPinned,
+      pinnedAsked,
     }),
     [
       sessionApi,
@@ -447,6 +481,8 @@ export default function App({ api, startLang }: AppProps) {
       showModOnMap,
       mapMod,
       showToolbox,
+      showPinned,
+      pinnedAsked,
     ],
   );
   const counts = useMemo(
@@ -510,6 +546,11 @@ export default function App({ api, startLang }: AppProps) {
             <p className="progress" role="status">
               <span className="bar" aria-hidden="true" />
               {changed ? t.changedRescanning : t.scanningNote}
+            </p>
+          )}
+          {pinNote !== null && (
+            <p className="pin-note" role="status">
+              {pinTexts[lang].cleared(pinNote)}
             </p>
           )}
           {failure !== null && (

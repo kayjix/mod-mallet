@@ -33,9 +33,11 @@ import {
   type Pair,
   type PatchChoices,
   pairsOf,
+  pinsOf,
   spotKey,
   undecideSpot,
 } from "./patch";
+import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { TaskList } from "./Tasks";
 
 /** One plugin's objects at a spot. */
@@ -348,9 +350,21 @@ export function Collisions({
     setPatchChoices,
     showPatch,
     pairAt,
+    pinnedAsked,
     decide: decideDuel,
   } = useSession();
   const own = collisionsTexts[lang];
+  const pinText = usePinTexts();
+  // Spots pinned to solve later by hand (ADR 0050): a filter of their own.
+  const pins = useMemo(() => pinsOf(choices), [choices]);
+  const [pinnedOnly, setPinnedOnly] = useState(
+    () => pinnedAsked || remembered("mallet.workPinned", false, (value) => value === "on"),
+  );
+  useEffect(() => {
+    if (pinnedAsked) {
+      setPinnedOnly(true);
+    }
+  }, [pinnedAsked]);
   const items = useItems(report);
   // The pair to open with, from the names of its two mods (ADR 0048).
   const focusPair = useMemo(() => {
@@ -451,7 +465,9 @@ export function Collisions({
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
   const shown = (item: Item) =>
-    (!hideDecided || decision(item) === undefined) && (needle === "" || item.text.includes(needle));
+    (!hideDecided || decision(item) === undefined) &&
+    (!pinnedOnly || pins.has(item.key)) &&
+    (needle === "" || item.text.includes(needle));
 
   const byKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
   const passages = useMemo(() => {
@@ -773,6 +789,19 @@ export function Collisions({
               />
               {t.workHideDecided}
             </label>
+            {(pins.size > 0 || pinnedOnly) && (
+              <label className="control-check">
+                <input
+                  type="checkbox"
+                  checked={pinnedOnly}
+                  onChange={(event) => {
+                    setPinnedOnly(event.target.checked);
+                    remember("mallet.workPinned", event.target.checked ? "on" : "off");
+                  }}
+                />
+                <PinIcon /> {pinText.filter(pins.size)}
+              </label>
+            )}
           </div>
           <WorkList
             groups={groups}
@@ -781,6 +810,7 @@ export function Collisions({
             shown={shown}
             searching={needle !== ""}
             decision={decision}
+            pins={pins}
             onPick={go}
           />
         </div>
@@ -842,11 +872,23 @@ interface WorkListProps {
   /** Whether a search is on: every group with a find is open. */
   searching: boolean;
   decision: (item: Item) => string | null | undefined;
+  /** The spots pinned to solve later, by key. */
+  pins: Set<string>;
   onPick: (item: Item) => void;
 }
 
 /** The spots by group; the group of the current spot is open, others open on a click. */
-function WorkList({ groups, by, current, shown, searching, decision, onPick }: WorkListProps) {
+function WorkList({
+  groups,
+  by,
+  current,
+  shown,
+  searching,
+  decision,
+  pins,
+  onPick,
+}: WorkListProps) {
+  const pinText = usePinTexts();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const currentGroup = current === null ? null : current[by === "region" ? "region" : "mods"].key;
   const list = useRef<HTMLDivElement>(null);
@@ -937,6 +979,11 @@ function WorkList({ groups, by, current, shown, searching, decision, onPick }: W
                             : item.region.label}
                         </span>
                       </span>
+                      {pins.has(item.key) && (
+                        <span className="work-pin" title={pinText.pinned}>
+                          <PinIcon />
+                        </span>
+                      )}
                       <Status decided={decision(item)} />
                     </button>
                   </li>
@@ -1287,6 +1334,7 @@ function Spot(props: SpotProps) {
           >
             <Eye open={marks} /> {t.workMarks}
           </button>
+          <PinButton keys={decided === undefined ? [item.key] : []} />
           <label className="control-check aside">
             <input
               type="checkbox"

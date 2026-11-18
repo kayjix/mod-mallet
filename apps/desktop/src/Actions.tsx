@@ -7,6 +7,10 @@ import type { PatchChoices } from "./patch";
 
 /** What the components of a report need from the window around them. */
 export interface Session {
+  /** Switches to the collisions, showing only the spots pinned to solve later. */
+  showPinned: () => void;
+  /** Whether the collisions are to open with only the pinned spots. */
+  pinnedAsked: boolean;
   api: Api;
   lang: Lang;
   /** The game in use, by its identity; empty until known. */
