@@ -3356,3 +3356,14 @@ button.quiet {
 .parts-hint {
   font-size: 0.75rem;
 }
+
+.patch-confirm {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}

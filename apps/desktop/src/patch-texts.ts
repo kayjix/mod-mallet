@@ -17,6 +17,14 @@ export interface PatchTexts {
   stale: string;
   useInstalled: string;
   useInstalledHint: string;
+  differsHow: string;
+  confirmClear: (objects: number) => string;
+  confirmClearYes: string;
+  confirmInstalled: (waiting: number) => string;
+  confirmInstalledYes: string;
+  cancel: string;
+  replaced: string;
+  undoReplace: string;
   decided: string;
   nothingDecided: string;
   /** What was decided for a pair as a whole. */
@@ -59,8 +67,20 @@ const en: PatchTexts = {
   clearHint: "Forget every decision; the patch then hides nothing.",
   created: "Created:",
   stale: "The decisions changed since. Create the patch again before installing it.",
-  useInstalled: "Use what is installed",
-  useInstalledHint: "Replace the decisions with what the installed patch hides.",
+  useInstalled: "Go back to the installed patch",
+  useInstalledHint:
+    "Throws away what you decided since the patch was installed, and takes the installed patch's choices instead.",
+  differsHow:
+    "Your decisions differ from the installed patch. To bring them into the game: Create, then Install through Vortex.",
+  confirmClear: (objects) =>
+    `Forget every decision? The patch would then hide nothing instead of ${objects} objects. You can undo it right after.`,
+  confirmClearYes: "Forget every decision",
+  confirmInstalled: (waiting) =>
+    `Throw away what you decided since the patch was installed (${waiting} objects not in the game yet), and go back to it? To keep your decisions instead, create and install the patch. You can undo it right after.`,
+  confirmInstalledYes: "Go back to the installed patch",
+  cancel: "Cancel",
+  replaced: "Your decisions were replaced.",
+  undoReplace: "Undo",
   decided: "Decided",
   nothingDecided:
     "Nothing is decided yet. Decide the collisions in Collisions; what you decide is listed here.",
@@ -109,8 +129,20 @@ const de: PatchTexts = {
   created: "Erstellt:",
   stale:
     "Die Entscheidungen haben sich seitdem geändert. Erstelle den Patch neu, bevor du ihn installierst.",
-  useInstalled: "Installierten Stand übernehmen",
-  useInstalledHint: "Die Entscheidungen durch das ersetzen, was der installierte Patch ausblendet.",
+  useInstalled: "Zurück zum installierten Patch",
+  useInstalledHint:
+    "Verwirft, was du seit dem Installieren entschieden hast, und nimmt stattdessen die Auswahl des installierten Patches.",
+  differsHow:
+    "Deine Entscheidungen weichen vom installierten Patch ab. Um sie ins Spiel zu bringen: Erstellen, dann Über Vortex installieren.",
+  confirmClear: (objects) =>
+    `Alle Entscheidungen vergessen? Der Patch würde dann nichts mehr ausblenden statt ${objects} Objekte. Du kannst es direkt danach rückgängig machen.`,
+  confirmClearYes: "Alle Entscheidungen vergessen",
+  confirmInstalled: (waiting) =>
+    `Verwerfen, was du seit dem Installieren entschieden hast (${waiting} Objekte noch nicht im Spiel), und zum installierten Patch zurück? Um deine Entscheidungen zu behalten, erstelle und installiere stattdessen den Patch. Du kannst es direkt danach rückgängig machen.`,
+  confirmInstalledYes: "Zurück zum installierten Patch",
+  cancel: "Abbrechen",
+  replaced: "Deine Entscheidungen wurden ersetzt.",
+  undoReplace: "Rückgängig",
   decided: "Entschieden",
   nothingDecided:
     "Noch ist nichts entschieden. Entscheide die Kollisionen unter Kollisionen; was du entscheidest, steht dann hier.",

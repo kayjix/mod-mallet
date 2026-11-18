@@ -11,6 +11,7 @@ import {
   objectsOf,
   openSpots,
   type PairDecision,
+  type PatchChoices,
   pairsOf,
   signatureOf,
   spotsByKey,
@@ -54,6 +55,9 @@ export function PatchView({ report }: { report: RenderedReport }) {
     decision.hidden.some((object) => !installed.has(matchKey(object)));
   const waitingPairs = decisions.filter(isWaiting).length;
   const open = openSpots(pairs, choices);
+  // A question before decisions are replaced, and the way back after.
+  const [asking, setAsking] = useState<"clear" | "installed" | null>(null);
+  const [before, setBefore] = useState<PatchChoices | null>(null);
   const fromInstalled = useMemo(
     () => choicesOf(pairs, installed, installedObjects ?? []),
     [pairs, installed, installedObjects],
@@ -121,11 +125,46 @@ export function PatchView({ report }: { report: RenderedReport }) {
           type="button"
           disabled={Object.keys(choices).length === 0}
           title={p.clearHint}
-          onClick={() => setChoices({})}
+          onClick={() => setAsking("clear")}
         >
           {p.clear}
         </button>
       </div>
+      {asking !== null && (
+        <div className="patch-confirm" role="alertdialog">
+          <p>{asking === "clear" ? p.confirmClear(chosen.size) : p.confirmInstalled(waiting)}</p>
+          <span className="relief-object-buttons">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setBefore(choices);
+                setChoices(asking === "clear" ? {} : fromInstalled);
+                setAsking(null);
+              }}
+            >
+              {asking === "clear" ? p.confirmClearYes : p.confirmInstalledYes}
+            </button>
+            <button type="button" onClick={() => setAsking(null)}>
+              {p.cancel}
+            </button>
+          </span>
+        </div>
+      )}
+      {before !== null && (
+        <div className="patch-confirm" role="status">
+          <p>{p.replaced}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setChoices(before);
+              setBefore(null);
+            }}
+          >
+            {p.undoReplace}
+          </button>
+        </div>
+      )}
       {installedObjects !== null && (
         <div
           className={
@@ -136,13 +175,16 @@ export function PatchView({ report }: { report: RenderedReport }) {
             <p className="patch-line">{p.installedBy(report.installedPatch.provider.name)}</p>
           )}
           {!sameAsInstalled && (
-            <button
-              type="button"
-              title={p.useInstalledHint}
-              onClick={() => setChoices(fromInstalled)}
-            >
-              {p.useInstalled}
-            </button>
+            <>
+              <p className="patch-line">{p.differsHow}</p>
+              <button
+                type="button"
+                title={p.useInstalledHint}
+                onClick={() => setAsking("installed")}
+              >
+                {p.useInstalled}
+              </button>
+            </>
           )}
         </div>
       )}
