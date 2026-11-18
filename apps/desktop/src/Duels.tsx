@@ -27,7 +27,7 @@ function collisionWinner(
       if (key === null) {
         continue;
       }
-      const decided = decisionAt(choices, id, key);
+      const decided = decisionAt(choices, id, key, spot.parts ?? []);
       if (decided === undefined || decided === null) {
         return null;
       }

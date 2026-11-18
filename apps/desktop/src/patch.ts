@@ -189,19 +189,44 @@ export function signatureOf(objects: ObjectRef[]): string {
   return [...new Set(objects.map(keyOf))].sort().join(",");
 }
 
+/** The objects hidden on their own, by {@link matchKey}, once per set of choices. */
+const freeKeys = new WeakMap<PatchChoices, Set<string>>();
+
+function freeKeysOf(choices: PatchChoices): Set<string> {
+  let found = freeKeys.get(choices);
+  if (found === undefined) {
+    found = new Set(freeObjects(choices).map(matchKey));
+    freeKeys.set(choices, found);
+  }
+  return found;
+}
+
 /**
  * What is decided for a spot: the plugin whose objects go, null to keep
- * both, undefined while nothing is decided.
+ * both, undefined while nothing is decided. Where neither the spot nor
+ * its finding has a choice, a part of it hidden on its own (with the parts
+ * it hangs together with, say) decides it for that part's plugin.
  */
 export function decisionAt(
   choices: PatchChoices,
   finding: string,
   key: string | null,
+  parts: SpotPart[] = [],
 ): string | null | undefined {
   if (key !== null && key in choices) {
     return choices[key] ?? null;
   }
-  return finding in choices ? (choices[finding] ?? null) : undefined;
+  if (finding in choices) {
+    return choices[finding] ?? null;
+  }
+  if (parts.length > 0) {
+    const free = freeKeysOf(choices);
+    const hidden = parts.find((part) => free.has(matchKey(part.object)));
+    if (hidden !== undefined) {
+      return hidden.object.plugin;
+    }
+  }
+  return undefined;
 }
 
 /** The choices with `plugin` chosen for a whole finding, its spots' own choices dropped. */
@@ -405,7 +430,7 @@ export function openSpots(pairs: Pair[], choices: PatchChoices): { keys: string[
   const open = new Set<string>();
   for (const pair of pairs) {
     for (const spot of pair.spots) {
-      if (decisionAt(choices, pair.id, spot.key) === undefined) {
+      if (decisionAt(choices, pair.id, spot.key, spot.parts) === undefined) {
         keys.push(spot.key);
         open.add([...pair.mods].sort().join("\u0000"));
       }

@@ -183,7 +183,7 @@ export function collisionSpots(
       continue;
     }
     seen.add(identity);
-    const decided = decisionAt(choices, spot.finding, key);
+    const decided = decisionAt(choices, spot.finding, key, spot.parts ?? []);
     let state: SpotState;
     if (decided === undefined) {
       state = "open";

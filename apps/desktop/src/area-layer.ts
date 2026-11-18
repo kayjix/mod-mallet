@@ -259,6 +259,83 @@ export function placement(object: AreaObject): Float32Array {
   ]);
 }
 
+/** How close two parts' boxes must come to hang together, in game units (about 20 cm). */
+const TOUCHING = 14;
+
+/** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
+interface PlacedBox {
+  centre: [number, number, number];
+  axes: [[number, number, number], [number, number, number], [number, number, number]];
+  half: [number, number, number];
+}
+
+/** A model's box as `matrix` (column by column, with scale) places it. */
+export function placedBox(
+  box: [[number, number, number], [number, number, number]],
+  matrix: Float32Array,
+): PlacedBox {
+  const [low, high] = box;
+  const middle = [0, 1, 2].map((axis) => ((low[axis] ?? 0) + (high[axis] ?? 0)) / 2);
+  const at = (row: number) =>
+    (matrix[row] ?? 0) * (middle[0] ?? 0) +
+    (matrix[4 + row] ?? 0) * (middle[1] ?? 0) +
+    (matrix[8 + row] ?? 0) * (middle[2] ?? 0) +
+    (matrix[12 + row] ?? 0);
+  const column = (index: number): [number, number, number] => [
+    matrix[index * 4] ?? 0,
+    matrix[index * 4 + 1] ?? 0,
+    matrix[index * 4 + 2] ?? 0,
+  ];
+  const axes = [column(0), column(1), column(2)];
+  const lengths = axes.map((axis) => Math.hypot(...axis) || 1);
+  return {
+    centre: [at(0), at(1), at(2)],
+    axes: axes.map((axis, index) => axis.map((value) => value / (lengths[index] ?? 1))) as [
+      [number, number, number],
+      [number, number, number],
+      [number, number, number],
+    ],
+    half: [0, 1, 2].map(
+      (axis) => (((high[axis] ?? 0) - (low[axis] ?? 0)) / 2) * (lengths[axis] ?? 1),
+    ) as [number, number, number],
+  };
+}
+
+const dot = (a: readonly number[], b: readonly number[]) =>
+  (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
+
+const cross = (a: readonly number[], b: readonly number[]): [number, number, number] => [
+  (a[1] ?? 0) * (b[2] ?? 0) - (a[2] ?? 0) * (b[1] ?? 0),
+  (a[2] ?? 0) * (b[0] ?? 0) - (a[0] ?? 0) * (b[2] ?? 0),
+  (a[0] ?? 0) * (b[1] ?? 0) - (a[1] ?? 0) * (b[0] ?? 0),
+];
+
+/**
+ * Whether two placed boxes overlap or come within `margin` of each other:
+ * no axis separates them (the separating axis test, fifteen axes).
+ */
+export function boxesMeet(a: PlacedBox, b: PlacedBox, margin: number): boolean {
+  const between = [0, 1, 2].map((axis) => (b.centre[axis] ?? 0) - (a.centre[axis] ?? 0));
+  const reach = (box: PlacedBox, axis: readonly number[]) =>
+    box.axes.reduce(
+      (sum, own, index) => sum + Math.abs(dot(own, axis)) * (box.half[index] ?? 0),
+      0,
+    );
+  const axes: [number, number, number][] = [...a.axes, ...b.axes];
+  for (const own of a.axes) {
+    for (const other of b.axes) {
+      const axis = cross(own, other);
+      const length = Math.hypot(...axis);
+      if (length > 1e-6) {
+        axes.push(axis.map((value) => value / length) as [number, number, number]);
+      }
+    }
+  }
+  return axes.every(
+    (axis) => Math.abs(dot(between, axis)) <= reach(a, axis) + reach(b, axis) + margin,
+  );
+}
+
 /**
  * How an object is drawn: plainly, as part of a collision, picked, as part
  * of the collision looked at, as hidden by the patch, or not at all.
@@ -273,6 +350,8 @@ interface Model {
   centre: [number, number, number];
   /** Half the diagonal of the box around its points, in its own units. */
   radius: number;
+  /** The box around its points, in its own units: lowest and highest corner. */
+  box: [[number, number, number], [number, number, number]];
   /** Its objects: one matrix and one look each, in one buffer. */
   instances: WebGLBuffer | null;
   count: number;
@@ -349,24 +428,20 @@ export class AreaLayer {
 
   /**
    * The objects placed by the same plugin as `object` that hang together
-   * with it: each touches another of them (their models' spheres meet), as
-   * far as the area shows them. A bridge or a scaffold built of parts.
+   * with it: each touches another of them, their models' boxes, turned and
+   * placed as the game places them, meeting within a hand's breadth, as far
+   * as the area shows them. A bridge or a scaffold built of parts.
    */
   connected(object: AreaObject): AreaObject[] {
     const plugin = object.id.plugin.toLowerCase();
     const candidates = this.instances
       .filter((instance) => instance.object.id.plugin.toLowerCase() === plugin)
-      .map((instance) => {
+      .flatMap((instance) => {
         const model = this.models.get(instance.object.model);
-        const [x, y, z] = model?.centre ?? [0, 0, 0];
-        const m = instance.matrix;
-        const at = (row: number) =>
-          (m[row] ?? 0) * x + (m[4 + row] ?? 0) * y + (m[8 + row] ?? 0) * z + (m[12 + row] ?? 0);
-        return {
-          object: instance.object,
-          centre: [at(0), at(1), at(2)],
-          radius: (model?.radius ?? 0) * instance.object.scale,
-        };
+        if (model === undefined || !Array.isArray(model.surfaces)) {
+          return [];
+        }
+        return [{ object: instance.object, box: placedBox(model.box, instance.matrix) }];
       });
     const start = candidates.find(
       (candidate) =>
@@ -384,12 +459,7 @@ export class AreaLayer {
         break;
       }
       for (const other of [...left]) {
-        const distance = Math.hypot(
-          (from.centre[0] ?? 0) - (other.centre[0] ?? 0),
-          (from.centre[1] ?? 0) - (other.centre[1] ?? 0),
-          (from.centre[2] ?? 0) - (other.centre[2] ?? 0),
-        );
-        if (distance <= (from.radius + other.radius) * 0.8) {
+        if (boxesMeet(from.box, other.box, TOUCHING)) {
           found.push(other);
           left.delete(other);
         }
@@ -443,6 +513,10 @@ export class AreaLayer {
         surfaces: "loading",
         centre: [0, 0, 0],
         radius: 0,
+        box: [
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
         instances: null,
         count: 0,
         own: [],
@@ -581,6 +655,10 @@ export class AreaLayer {
           (high[1] ?? 0) - (low[1] ?? 0),
           (high[2] ?? 0) - (low[2] ?? 0),
         ) / 2;
+      model.box = [
+        [low[0] ?? 0, low[1] ?? 0, low[2] ?? 0],
+        [high[0] ?? 0, high[1] ?? 0, high[2] ?? 0],
+      ];
     }
   }
 

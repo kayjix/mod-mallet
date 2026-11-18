@@ -102,10 +102,10 @@ const UNITS_PER_METRE = 70;
 const DEEP = 140;
 
 /** Spots of the same two mods this close (14 m) belong to one passage. */
-const PASSAGE = 1000;
+const PASSAGE = 600;
 
-/** How far around a passage's spots its objects count, in game units. */
-const PASSAGE_MARGIN = 300;
+/** The radius around a spot to hide one mod's objects in, at first, in metres. */
+const AROUND = 10;
 
 /** How far from a spot the camera comes, in cells: the two objects fill the view. */
 const CLOSE = 0.9;
@@ -423,7 +423,8 @@ export function Collisions({
   const [marks, setMarks] = useState(true);
 
   const decision = useCallback(
-    (item: Item, from: PatchChoices = choices) => decisionAt(from, item.spot.finding, item.key),
+    (item: Item, from: PatchChoices = choices) =>
+      decisionAt(from, item.spot.finding, item.key, item.spot.parts ?? []),
     [choices],
   );
   const counts = useMemo(() => {
@@ -1014,7 +1015,56 @@ function Spot(props: SpotProps) {
   const modSides = sidesOfMods(pairs);
   // The objects of the area, to hide a whole passage of one mod.
   const [area, setArea] = useState<AreaObjects | null>(null);
-  const around = useMemo(() => passageObjects(passage, area), [passage, area]);
+  // One mod's objects around the spot: how far, and which mod is looked at
+  // without them, before deciding.
+  const [metres, setMetres] = useState(AROUND);
+  const [aroundPreview, setAroundPreview] = useState<string | null>(null);
+  const nearby = useMemo(() => objectsAround(spot, area, metres), [spot, area, metres]);
+  // Of the tied objects around, those the game can do without (ADR 0046).
+  const { api } = useSession();
+  const place = spot.location.type === "interior" ? spot.location.cell : spot.location.world;
+  const tiedList = useMemo(() => [...nearby.tied.values()].flat(), [nearby]);
+  const [letGo, setLetGo] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setLetGo(new Set());
+    if (tiedList.length === 0) {
+      return;
+    }
+    let outdated = false;
+    api
+      .objectAnchors(place, tiedList)
+      .then((answers) => {
+        if (!outdated && answers !== null) {
+          setLetGo(
+            new Set(
+              answers
+                .filter((answer) => answer.verdict !== "locked")
+                .map((answer) => matchKey(answer.object)),
+            ),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      outdated = true;
+    };
+  }, [api, place, tiedList]);
+  const around = useMemo(() => {
+    const all = new Map<string, { objects: ObjectRef[]; careful: number }>();
+    for (const [plugin, objects] of nearby.free) {
+      all.set(plugin, { objects: [...objects], careful: 0 });
+    }
+    for (const [plugin, objects] of nearby.tied) {
+      const allowed = objects.filter((object) => letGo.has(matchKey(object)));
+      const entry = all.get(plugin) ?? { objects: [], careful: 0 };
+      all.set(plugin, {
+        objects: [...entry.objects, ...allowed],
+        careful: entry.careful + allowed.length,
+      });
+    }
+    return all;
+  }, [nearby, letGo]);
+  const previewObjects = aroundPreview === null ? [] : (around.get(aroundPreview)?.objects ?? []);
   const [first, second] = modSides;
 
   return (
@@ -1133,7 +1183,6 @@ function Spot(props: SpotProps) {
             <span className="work-section-label">{t.workScopePassage(passage.length)}</span>
             <div className="work-line">
               {item.sides.map((side) => {
-                const extra = around.get(side.plugin.toLowerCase()) ?? [];
                 return (
                   <span key={side.plugin} className="work-line-group">
                     <button
@@ -1144,18 +1193,65 @@ function Spot(props: SpotProps) {
                     >
                       {t.workPassageHide(side.plugin)}
                     </button>
-                    {extra.length > 0 && (
-                      <button
-                        type="button"
-                        className="small"
-                        onClick={() => props.onDecidePassage(passage, side.plugin, extra)}
-                      >
-                        {t.workPassageAll(side.plugin, extra.length)}
-                      </button>
-                    )}
                   </span>
                 );
               })}
+            </div>
+          </div>
+        )}
+        {spot.location.type === "exterior" && (
+          <div className="work-section">
+            <label className="work-section-label work-around-label">
+              {own.around(metres)}
+              <input
+                type="range"
+                min={3}
+                max={40}
+                step={1}
+                value={metres}
+                onChange={(event) => setMetres(Number(event.target.value))}
+              />
+            </label>
+            <div className="work-line">
+              {area === null ? (
+                <span className="aside">{own.aroundWaiting}</span>
+              ) : (
+                item.sides.map((side) => {
+                  const plugin = side.plugin.toLowerCase();
+                  const objects = around.get(plugin)?.objects ?? [];
+                  const careful = around.get(plugin)?.careful ?? 0;
+                  return (
+                    <span key={side.plugin} className="work-line-group">
+                      <button
+                        type="button"
+                        className="small work-eye-button"
+                        aria-pressed={aroundPreview === plugin}
+                        disabled={objects.length === 0}
+                        title={own.aroundPreview(side.plugin)}
+                        onClick={() => setAroundPreview(aroundPreview === plugin ? null : plugin)}
+                      >
+                        <Eye open={aroundPreview !== plugin} /> {own.aroundPreviewShort}
+                      </button>
+                      <button
+                        type="button"
+                        className="small"
+                        disabled={objects.length === 0}
+                        onClick={() => {
+                          setAroundPreview(null);
+                          props.onDecidePassage([], side.plugin, objects);
+                        }}
+                      >
+                        {own.aroundHide(side.plugin, objects.length)}
+                      </button>
+                      {careful > 0 && (
+                        <span className="aside relief-object-warning" title={own.aroundCarefulHint}>
+                          {own.aroundCareful(careful)}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -1203,37 +1299,39 @@ function Spot(props: SpotProps) {
           <span className="aside work-keys">{t.workKeys}</span>
         </div>
       </div>
-      <Stage {...props} onArea={setArea} />
+      <Stage {...props} onArea={setArea} previewObjects={previewObjects} />
     </>
   );
 }
 
 /**
- * The objects of each plugin (by lower-case name) placed around a passage's
- * spots, as far as the area read so far shows them, that may be hidden.
+ * The objects of each plugin that placed them (by lower-case name) within
+ * `metres` of a spot, as far as the area read so far shows them: those
+ * nothing ties (`free`), and those whose flags tie them (`tied`), which
+ * ADR 0046 may still let go.
  */
-function passageObjects(passage: Item[], area: AreaObjects | null): Map<string, ObjectRef[]> {
-  const found = new Map<string, ObjectRef[]>();
-  const at = passage.flatMap((item) => {
-    const position = spotPosition(item.spot);
-    return position === null || item.spot.location.type !== "exterior" ? [] : [position];
-  });
-  if (area === null || at.length < 2) {
-    return found;
+function objectsAround(
+  spot: MapSpot,
+  area: AreaObjects | null,
+  metres: number,
+): { free: Map<string, ObjectRef[]>; tied: Map<string, ObjectRef[]> } {
+  const free = new Map<string, ObjectRef[]>();
+  const tied = new Map<string, ObjectRef[]>();
+  const at = spotPosition(spot);
+  if (area === null || at === null) {
+    return { free, tied };
   }
-  const xs = at.map((point) => point[0]);
-  const ys = at.map((point) => point[1]);
-  const [west, east] = [Math.min(...xs) - PASSAGE_MARGIN, Math.max(...xs) + PASSAGE_MARGIN];
-  const [south, north] = [Math.min(...ys) - PASSAGE_MARGIN, Math.max(...ys) + PASSAGE_MARGIN];
+  const reach = metres * UNITS_PER_METRE;
   for (const object of area.objects) {
-    const [x, y] = object.position;
-    if (object.anchored || x < west || x > east || y < south || y > north) {
+    const [x, y, z] = object.position;
+    if (Math.hypot(x - at[0], y - at[1], (z - at[2]) / 2) > reach) {
       continue;
     }
     const plugin = object.id.plugin.toLowerCase();
-    found.set(plugin, [...(found.get(plugin) ?? []), object.id]);
+    const into = object.anchored ? tied : free;
+    into.set(plugin, [...(into.get(plugin) ?? []), object.id]);
   }
-  return found;
+  return { free, tied };
 }
 
 /** An eye, open or struck through. */
@@ -1258,7 +1356,12 @@ function Stage({
   onPick,
   onDecide,
   onArea,
-}: SpotProps & { onArea: (area: AreaObjects | null) => void }) {
+  previewObjects,
+}: SpotProps & {
+  onArea: (area: AreaObjects | null) => void;
+  /** Objects left out to look at, without deciding. */
+  previewObjects: ObjectRef[];
+}) {
   const { t } = useSession();
   const location = item.spot.location;
   const worldName = location.type === "exterior" ? location.world : undefined;
@@ -1289,8 +1392,11 @@ function Stage({
         keys.add(objectKey(part.object.plugin, part.object.localId));
       }
     }
+    for (const object of previewObjects) {
+      keys.add(objectKey(object.plugin, object.localId));
+    }
     return keys;
-  }, [hiddenObjects, parts, preview]);
+  }, [hiddenObjects, parts, preview, previewObjects]);
   const hiddenKeys = useMemo(() => new Set(hiddenObjects.map(matchKey)), [hiddenObjects]);
 
   // What can be done with an object picked in the view.
