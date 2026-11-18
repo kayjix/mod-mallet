@@ -153,6 +153,37 @@ export function keyOf(object: ObjectRef): string {
   return `${object.plugin}:${object.localId}`;
 }
 
+/**
+ * One object as a text to match by: plugin names are compared without
+ * regard to case, as the game does (the installed patch writes them in
+ * lower case).
+ */
+export function matchKey(object: ObjectRef): string {
+  return keyOf(object).toLowerCase();
+}
+
+/**
+ * The choices without objects hidden on their own that a collision names
+ * under another spelling of the plugin: an earlier reading of the
+ * installed patch made them, and the collision's own choice covers them.
+ */
+export function withoutMisspelt(choices: PatchChoices, pairs: Pair[]): PatchChoices {
+  const named = new Map<string, string>();
+  for (const part of pairs.flatMap((pair) => pair.spots.flatMap((spot) => spot.parts))) {
+    named.set(matchKey(part.object), part.object.plugin);
+  }
+  const next: PatchChoices = {};
+  for (const [key, value] of Object.entries(choices)) {
+    const object = freeObjects({ [key]: value })[0];
+    const spelt = object === undefined ? undefined : named.get(matchKey(object));
+    if (object !== undefined && spelt !== undefined && spelt !== object.plugin) {
+      continue;
+    }
+    next[key] = value;
+  }
+  return next;
+}
+
 /** A text that is the same for the same choice of objects, in any order. */
 export function signatureOf(objects: ObjectRef[]): string {
   return [...new Set(objects.map(keyOf))].sort().join(",");
@@ -223,18 +254,18 @@ export function choicesOf(
   // What no collision names was hidden on its own.
   const named = new Set(
     pairs.flatMap((pair) =>
-      pair.spots.flatMap((spot) => spot.parts.map((part) => keyOf(part.object))),
+      pair.spots.flatMap((spot) => spot.parts.map((part) => matchKey(part.object))),
     ),
   );
   for (const object of installedObjects) {
-    if (!named.has(keyOf(object))) {
+    if (!named.has(matchKey(object))) {
       choices[objectChoiceKey(object)] = object.plugin;
     }
   }
   const hiddenSide = (sides: { plugin: string; objects: ObjectRef[] }[]) => {
     let best: { plugin: string; hidden: number } | null = null;
     for (const side of sides) {
-      const hidden = side.objects.filter((object) => installed.has(keyOf(object))).length;
+      const hidden = side.objects.filter((object) => installed.has(matchKey(object))).length;
       if (hidden > 0 && (best === null || hidden > best.hidden)) {
         best = { plugin: side.plugin, hidden };
       }
@@ -265,7 +296,7 @@ export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
   const found = new Map<string, ObjectRef>();
   const add = (objects: ObjectRef[]) => {
     for (const object of objects) {
-      found.set(keyOf(object), object);
+      found.set(matchKey(object), object);
     }
   };
   for (const pair of pairs) {
@@ -285,7 +316,7 @@ export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
 
 /** The objects of the patch in the game, by key. */
 export function installedKeys(report: RenderedReport): Set<string> {
-  return new Set((report.installedPatch?.objects ?? []).map(keyOf));
+  return new Set((report.installedPatch?.objects ?? []).map(matchKey));
 }
 
 /**

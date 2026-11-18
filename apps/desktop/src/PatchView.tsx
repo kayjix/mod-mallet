@@ -7,6 +7,7 @@ import {
   decisionsOf,
   freeObjects,
   keyOf,
+  matchKey,
   objectsOf,
   openSpots,
   type PairDecision,
@@ -33,7 +34,10 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const pairs = useMemo(() => pairsOf(report, ignored), [report, ignored]);
   const spots = useMemo(() => spotsByKey(report), [report]);
   const installedObjects = report.installedPatch?.objects ?? null;
-  const installed = useMemo(() => new Set((installedObjects ?? []).map(keyOf)), [installedObjects]);
+  const installed = useMemo(
+    () => new Set((installedObjects ?? []).map(matchKey)),
+    [installedObjects],
+  );
   const own = freeObjects(choices);
   const [created, setCreated] = useState<{ path: string; signature: string } | null>(null);
   const [creating, setCreating] = useState(false);
@@ -43,11 +47,11 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const objects = objectsOf(pairs, choices);
   const signature = signatureOf(objects);
   const upToDate = created !== null && created.signature === signature;
-  const chosen = new Set(objects.map(keyOf));
+  const chosen = new Set(objects.map(matchKey));
   const waiting = [...chosen].filter((key) => !installed.has(key)).length;
   const decisions = decisionsOf(pairs, choices);
   const isWaiting = (decision: PairDecision) =>
-    decision.hidden.some((object) => !installed.has(keyOf(object)));
+    decision.hidden.some((object) => !installed.has(matchKey(object)));
   const waitingPairs = decisions.filter(isWaiting).length;
   const open = openSpots(pairs, choices);
   const fromInstalled = useMemo(

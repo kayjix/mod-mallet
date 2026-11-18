@@ -28,7 +28,7 @@ import {
   chooseObject,
   chooseSpot,
   decisionAt,
-  keyOf,
+  matchKey,
   objectsOf,
   type Pair,
   type PatchChoices,
@@ -1291,7 +1291,7 @@ function Stage({
     }
     return keys;
   }, [hiddenObjects, parts, preview]);
-  const hiddenKeys = useMemo(() => new Set(hiddenObjects.map(keyOf)), [hiddenObjects]);
+  const hiddenKeys = useMemo(() => new Set(hiddenObjects.map(matchKey)), [hiddenObjects]);
 
   // What can be done with an object picked in the view.
   const extra = (object: AreaObject, group: AreaObject[]) => {
@@ -1317,7 +1317,7 @@ function Stage({
         object={object}
         group={group}
         place={location.type === "interior" ? location.cell : location.world}
-        hiddenOtherwise={hiddenKeys.has(keyOf(object.id))}
+        hiddenOtherwise={hiddenKeys.has(matchKey(object.id))}
       />
     );
   };

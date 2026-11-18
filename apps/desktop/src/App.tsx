@@ -21,7 +21,7 @@ import { ModsView } from "./ModsView";
 import { Overview, openFileDuels } from "./Overview";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
-import { choicesOf, installedKeys, type PatchChoices, pairsOf } from "./patch";
+import { choicesOf, installedKeys, type PatchChoices, pairsOf, withoutMisspelt } from "./patch";
 import { SettingsView } from "./Settings";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
@@ -165,7 +165,10 @@ export default function App({ api, startLang }: AppProps) {
       installedKeys(report),
       report.installedPatch?.objects ?? [],
     );
-    setPatchChoicesNow({ ...installed, ...(storedChoices ?? {}) });
+    // Objects an earlier reading of the patch kept under another spelling go.
+    setPatchChoicesNow(
+      withoutMisspelt({ ...installed, ...(storedChoices ?? {}) }, pairsOf(report, ignored)),
+    );
   }, [patchChoices, storedChoices, report, ignored]);
   const t = texts[lang];
   const j = journeyTexts[lang];
