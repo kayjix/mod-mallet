@@ -53,6 +53,12 @@ export interface Session {
   showModOnMap: (mod: string) => void;
   /** The mod the map is to be filtered to, until the user goes elsewhere. */
   mapMod: string | null;
+  /**
+   * Switches to the toolbox, for a tool that does what Mod Mallet cannot,
+   * such as the Creation Kit repairing navigation meshes. Absent where the
+   * window has no toolbox to go to.
+   */
+  showToolbox?: () => void;
 }
 
 export const SessionContext = createContext<Session | null>(null);

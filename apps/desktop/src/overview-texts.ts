@@ -46,6 +46,17 @@ export interface OverviewTexts {
   collisionsToPatch: string;
   adviceEmpty: string;
   showFolded: (count: number) => string;
+  worklistChoice: string;
+  worklistChoiceNote: string;
+  worklistOpen: string;
+  pairOpen: string;
+  spotToWorklist: string;
+  duelsLine: (open: number, total: number) => string;
+  duelsAllDecided: (total: number) => string;
+  toAssets: string;
+  navmeshChoice: string;
+  navmeshChoiceNote: string;
+  toToolbox: string;
 
   modsSearch: string;
   modsSort: string;
@@ -184,6 +195,25 @@ const en: OverviewTexts = {
   collisionsToPatch: "To the patch",
   adviceEmpty: "No recommendations at the moment.",
   showFolded: (count) => (count === 1 ? "Show 1" : `Show ${count}`),
+  worklistChoice: "Decide in the collisions' worklist",
+  worklistChoiceNote:
+    "There you see each spot in 3D and decide which object goes, spot by spot or for the whole pair of mods at once. What you decide goes into the patch.",
+  worklistOpen: "Open in the worklist",
+  pairOpen: "Open the pair",
+  spotToWorklist: "In the worklist",
+  duelsLine: (open, total) =>
+    open === total
+      ? `${total} ${total === 1 ? "pair of mods brings its" : "pairs of mods bring their"} own textures, meshes or faces for the same things. Decide whose the game shows.`
+      : `${open} of ${total} pairs of mods with their own textures, meshes or faces for the same things are still to decide.`,
+  duelsAllDecided: (total) =>
+    total === 1
+      ? "The one pair of mods with their own textures, meshes or faces for the same things is decided."
+      : `All ${total} pairs of mods with their own textures, meshes or faces for the same things are decided.`,
+  toAssets: "To the assets",
+  navmeshChoice: "Repair the paths in the Creation Kit",
+  navmeshChoiceNote:
+    "A patch of Mod Mallet cannot join the paths of characters (navigation meshes). If you want to repair them by hand, Bethesda's Creation Kit does it; the toolbox says what it is for and where to get it.",
+  toToolbox: "To the toolbox",
 
   modsSearch: "Search mods",
   modsSort: "Sort",
@@ -330,6 +360,25 @@ const de: OverviewTexts = {
   collisionsToPatch: "Zum Patch",
   adviceEmpty: "Gerade keine Empfehlungen.",
   showFolded: (count) => (count === 1 ? "1 zeigen" : `${count} zeigen`),
+  worklistChoice: "In der Kollisionsliste entscheiden",
+  worklistChoiceNote:
+    "Dort siehst du jede Stelle in 3D und entscheidest, welches Objekt weicht, Stelle für Stelle oder für das ganze Mod-Paar auf einmal. Was du entscheidest, kommt in den Patch.",
+  worklistOpen: "In der Kollisionsliste öffnen",
+  pairOpen: "Das Paar öffnen",
+  spotToWorklist: "In der Kollisionsliste",
+  duelsLine: (open, total) =>
+    open === total
+      ? `${total} ${total === 1 ? "Mod-Paar bringt" : "Mod-Paare bringen"} eigene Texturen, Modelle oder Gesichter für dieselben Dinge mit. Entscheide, welche das Spiel zeigt.`
+      : `${open} von ${total} Mod-Paaren mit eigenen Texturen, Modellen oder Gesichtern für dieselben Dinge sind noch zu entscheiden.`,
+  duelsAllDecided: (total) =>
+    total === 1
+      ? "Das eine Mod-Paar mit eigenen Texturen, Modellen oder Gesichtern für dieselben Dinge ist entschieden."
+      : `Alle ${total} Mod-Paare mit eigenen Texturen, Modellen oder Gesichtern für dieselben Dinge sind entschieden.`,
+  toAssets: "Zu den Assets",
+  navmeshChoice: "Die Wege im Creation Kit reparieren",
+  navmeshChoiceNote:
+    "Die Wege der Figuren (Navigationsnetze) kann ein Patch von Mod Mallet nicht verbinden. Wer sie von Hand reparieren will, macht das mit Bethesdas Creation Kit; der Werkzeugkasten sagt, wofür es da ist und woher es kommt.",
+  toToolbox: "Zum Werkzeugkasten",
 
   modsSearch: "Mods suchen",
   modsSort: "Sortieren",

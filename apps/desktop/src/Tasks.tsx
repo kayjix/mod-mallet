@@ -19,10 +19,10 @@ import {
   sectionsFor,
   stepsFor,
 } from "./arrange";
-import { Duels } from "./Duels";
 import type {
   MapSpot,
   RenderedAction,
+  RenderedDuel,
   RenderedFinding,
   RenderedReport,
 } from "./generated/rendered-report";
@@ -30,7 +30,6 @@ import { reportSpots, type SpotState, weightOf } from "./health";
 import type { Texts } from "./i18n";
 import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
-import { chooseFinding, pairFor } from "./patch";
 import "./overview.css";
 
 /** A group with more findings than this starts folded. */
@@ -217,7 +216,7 @@ export function FindingRow({
                   ))}
                 </div>
               )}
-              {where.length > 0 && <Spots spots={where} />}
+              {where.length > 0 && <Spots spots={where} collision={isCollision(rendered)} />}
               <details>
                 <summary className="more">{t.moreAbout}</summary>
                 <h3>{t.whatToDo}</h3>
@@ -248,18 +247,15 @@ export function FindingRow({
  * hand, and leaving it as it is. Each with what it does, and one button.
  */
 function Choices({ rendered, action }: { rendered: RenderedFinding; action: ActionState }) {
-  const { t, ignored, setIgnored, spots, patchChoices, setPatchChoices, showPatch } = useSession();
+  const { t, ignored, setIgnored, spots, decideSpot, openPair, showToolbox } = useSession();
+  const o = useOverviewTexts();
   const { finding } = rendered;
   const aside = ignored.has(finding.id);
-  const pair = isCollision(rendered)
-    ? pairFor(finding.id, rendered.headline, spots.get(finding.id) ?? [])
-    : null;
-  const chosen = pair === null ? null : (patchChoices[pair.id] ?? null);
-  const choose = (plugin: string | null) => {
-    if (pair !== null) {
-      setPatchChoices(chooseFinding(patchChoices, pair, plugin));
-    }
-  };
+  const collision = isCollision(rendered);
+  // The first spot to open, or the pair of mods where no spot names its objects.
+  const first = collision ? (spots.get(finding.id) ?? [])[0] : undefined;
+  const pair = collision ? pairOf(rendered) : null;
+  const navmesh = finding.kind.startsWith("navmeshes.") && showToolbox !== undefined;
 
   return (
     <div className="choices">
@@ -281,37 +277,38 @@ function Choices({ rendered, action }: { rendered: RenderedFinding; action: Acti
             </button>
           </div>
         ))}
-        {pair !== null && (
+        {collision && (first !== undefined || pair !== null) && (
           <div className="choice">
             <div className="choice-text">
-              <strong>{t.choiceHide}</strong>
-              <p className="choice-note">{t.choiceHideNote(chosen)}</p>
-              <fieldset className="segmented" aria-label={t.choiceHide}>
-                {pair.sides.map((side) => (
-                  <button
-                    type="button"
-                    key={side.plugin}
-                    aria-pressed={chosen === side.plugin}
-                    disabled={side.objects.length === 0}
-                    onClick={() => choose(side.plugin)}
-                  >
-                    {t.patchHide(side.plugin, side.objects.length)}
-                    {pair.suggested === side.plugin && (
-                      <span className="suggested-mark">{t.patchSuggested}</span>
-                    )}
-                  </button>
-                ))}
-                <button type="button" aria-pressed={chosen === null} onClick={() => choose(null)}>
-                  {t.patchKeepBoth}
-                </button>
-              </fieldset>
+              <strong>{o.worklistChoice}</strong>
+              <p className="choice-note">{o.worklistChoiceNote}</p>
             </div>
-            <button type="button" onClick={showPatch}>
-              {t.choiceToPatch}
+            <div className="choice-buttons">
+              {first !== undefined && (
+                <button type="button" className="primary" onClick={() => decideSpot(first)}>
+                  {o.worklistOpen}
+                </button>
+              )}
+              {pair !== null && (
+                <button type="button" onClick={() => openPair(pair[0], pair[1])}>
+                  {o.pairOpen}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {navmesh && (
+          <div className="choice">
+            <div className="choice-text">
+              <strong>{o.navmeshChoice}</strong>
+              <p className="choice-note">{o.navmeshChoiceNote}</p>
+            </div>
+            <button type="button" onClick={showToolbox}>
+              {o.toToolbox}
             </button>
           </div>
         )}
-        {rendered.actions.length === 0 && pair === null && (
+        {rendered.actions.length === 0 && !collision && !navmesh && (
           <div className="choice">
             <div className="choice-text">
               <strong>{t.choiceByHand}</strong>
@@ -364,9 +361,13 @@ function Guide({ action }: { action: RenderedAction }) {
   );
 }
 
-/** Where the collisions of a finding are, with the way there in the game. */
-function Spots({ spots }: { spots: MapSpot[] }) {
-  const { t, showOnMap } = useSession();
+/**
+ * Where a finding is, with the way there in the game: a collision's spots
+ * open in the worklist, where they are decided; any other place on the map.
+ */
+function Spots({ spots, collision }: { spots: MapSpot[]; collision: boolean }) {
+  const { t, showOnMap, decideSpot } = useSession();
+  const o = useOverviewTexts();
   const shown = spots.slice(0, SPOT_LIMIT);
   return (
     <div className="spots">
@@ -379,10 +380,16 @@ function Spots({ spots }: { spots: MapSpot[] }) {
               {spot.console}
             </code>
             <CopyButton text={spot.console} />
-            {spot.location.type === "exterior" && (
-              <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
-                {t.showOnMap}
+            {collision ? (
+              <button type="button" className="small quiet" onClick={() => decideSpot(spot)}>
+                {o.spotToWorklist}
               </button>
+            ) : (
+              spot.location.type === "exterior" && (
+                <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
+                  {t.showOnMap}
+                </button>
+              )
             )}
           </li>
         ))}
@@ -402,9 +409,9 @@ const FOLDED: Step[] = ["notes", "ignored"];
 export function TasksPage({ report }: { report: RenderedReport }) {
   const { ignored } = useSession();
   const o = useOverviewTexts();
-  // Duels about the same thing in two mods are decided as a whole; their
-  // findings are shown in the duel, not again on their own. Duels about
-  // placed objects belong to the collisions.
+  // Duels about the same files in two mods are decided on Assets; their
+  // findings are not listed again here, only one line leads there. Duels
+  // about placed objects belong to the collisions.
   const duels = useMemo(
     () =>
       report.duels.filter((rendered) =>
@@ -442,15 +449,13 @@ export function TasksPage({ report }: { report: RenderedReport }) {
           count={step === "choose" ? count + duels.length : count}
           folded={FOLDED.includes(step)}
         >
-          {step === "choose" && duels.length > 0 && (
-            <Duels duels={duels} findings={report.findings} />
-          )}
+          {step === "choose" && duels.length > 0 && <DuelsLine duels={duels} />}
           {groups.length > 0 && <GroupList groups={groups} />}
         </StepSection>
       ))}
       {!hasChoose && duels.length > 0 && (
         <StepSection step="choose" count={duels.length} folded={false}>
-          <Duels duels={duels} findings={report.findings} />
+          <DuelsLine duels={duels} />
         </StepSection>
       )}
       {!hasAdvice && (
@@ -585,6 +590,40 @@ function CollisionsCard({ report }: { report: RenderedReport }) {
           {o.collisionsOpen}
         </button>
       )}
+    </section>
+  );
+}
+
+/** The names of the two mods a collision finding is about, if it names them. */
+function pairOf(rendered: RenderedFinding): [string, string] | null {
+  const { args } = rendered.finding;
+  const first = args.first ?? args.plugin;
+  const second = args.second ?? args.container;
+  return typeof first === "string" && typeof second === "string" ? [first, second] : null;
+}
+
+/**
+ * The duels about files in one line, like the collisions' line: how many
+ * are still to decide, and the way to Assets, where they are decided.
+ */
+function DuelsLine({ duels }: { duels: RenderedDuel[] }) {
+  const { decisions, openCompare } = useSession();
+  const o = useOverviewTexts();
+  const open = duels.filter((rendered) => decisions[rendered.duel.id] === undefined).length;
+  return (
+    <section className="panel collisions-card duels-line" data-open={open > 0}>
+      <div className="collisions-card-text">
+        <span>
+          {open === 0 ? o.duelsAllDecided(duels.length) : o.duelsLine(open, duels.length)}
+        </span>
+      </div>
+      <button
+        type="button"
+        className={open > 0 ? "primary" : undefined}
+        onClick={() => openCompare(null)}
+      >
+        {o.toAssets}
+      </button>
     </section>
   );
 }
