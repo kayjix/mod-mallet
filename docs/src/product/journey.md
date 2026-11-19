@@ -92,10 +92,11 @@ scan finds belongs to one game, so every page but *all games* and
 
 ```text
 All games ──▶ Overview of a game ──▶ Tasks
-                      │             ├─▶ Collisions  (Spots | Mod against mod)
+                      │             ├─▶ Map collisions    (Spots | Mod against mod)
+                      │             ├─▶ Asset collisions  (Duels | Ranking)
                       │             ├─▶ Patch
                       │             ├─▶ Map
-                      │             ├─▶ Assets      (Duels | Ranking)
+                      │             ├─▶ Assets            (by kind, material or as sets)
                       │             └─▶ Mods
                       └─ the sidebar reaches every page directly
 Toolbox, Settings: beside the game's pages, always reachable
@@ -113,10 +114,11 @@ Toolbox, Settings: beside the game's pages, always reachable
 │ ▣ Overview               │
 │ ➜ Go through it   3/5    │  ← the guided review (ADR 0050)
 │ ☑ Tasks              12  │  ← open tasks (ADR 0045 counts.tasks)
-│ ⧉ Collisions         37  │  ← open spots
+│ ⧉ Map collisions     37  │  ← open spots
+│ ▨ Asset collisions    4  │  ← duels about files without a side picked
 │ ✎ Patch               ●  │  ← dot: decided but not in the patch
 │ ⌖ Map                    │
-│ ▨ Assets              4  │  ← duels about files without a side picked
+│ ▥ Assets                 │  ← every thing of the game and the mods
 │ ≡ Mods                   │
 │ ──────────────────────── │
 │ ⚒ Toolbox             2  │  ← tools needing attention
@@ -132,9 +134,9 @@ Toolbox, Settings: beside the game's pages, always reachable
 - The game's card shows its name and art; version and script extender
   move to the overview.
 - Badges count what the page itself lists first, so the numbers agree:
-  Tasks the open tasks, Collisions the open spots, Patch a dot when
-  choices are not yet in the installed patch, Assets the duels about files
-  with no side picked, Toolbox the tools needing attention. The toolbox pill goes; the manager line stays.
+  Tasks the open tasks, Map collisions the open spots, Patch a dot when
+  choices are not yet in the installed patch, Asset collisions the duels
+  about files with no side picked, Toolbox the tools needing attention. The toolbox pill goes; the manager line stays.
 - Before a scan, every game page shows the same empty state with the scan
   button; before the places are confirmed, only Settings and the first-run
   page are open (as today).
@@ -147,10 +149,11 @@ Toolbox, Settings: beside the game's pages, always reachable
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
 | **Go through it** | Lead through the setup step by step, and remember how far | the steps in order; a step's own items, shown by the homes' own rows | own any item: it is a path through the homes (ADR 0050) |
 | **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
-| **Collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
+| **Map collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
 | **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
 | **Map** | Look at the places of any worldspace | flat or relief | decide; a spot links to the worklist |
-| **Assets** | Decide whose textures, meshes and faces the game shows where two mods bring their own | *Duels*: two mods side by side on the comparison stage; *Ranking*: which mods to prefer, which suggests every duel's side | decide placed objects (Collisions does) |
+| **Asset collisions** | Decide whose textures, meshes and faces the game shows where two mods bring their own | *Duels*: two mods side by side on the comparison stage; *Ranking*: which mods to prefer, which suggests every duel's side | decide placed objects (Map collisions does) |
+| **Assets** | Look at every thing of the game and the mods, and choose the version of one thing (ADR 0053) | the list, by kind, material or as sets; a thing's versions side by side | decide whole pairs of mods (Asset collisions does) |
 | **Mods** | Know the mods, one at a time | the list; a mod's details | decide collisions or duels in place |
 | **Toolbox** | Have the tools the setup needs | the list; the one button a tool offers | – |
 | **Settings** | Where Mod Mallet reads, language, theme | tabs | – |
@@ -171,11 +174,13 @@ them.
 | Collision spot | Collisions · Spots | counts (sidebar, overview, Tasks' collisions line, a mod's details); a pin on the map with *open in the worklist* |
 | Pair of mods whose objects collide | Collisions · Mod against mod | a line in each mod's details with *open the pair* |
 | Duel about placed objects | merged into its pair on *Mod against mod* | – |
-| Duel about files (textures, meshes, faces) | Assets · Duels | a count on the overview and in Tasks' *choose* step, a line in each mod's details, each with *compare*, which opens Assets at the duel |
-| The comparison stage | Assets · Duels | – |
-| Ranking of mods | Assets · Ranking | the reason given under a duel's decision |
+| Duel about files (textures, meshes, faces) | Asset collisions · Duels | a count on the overview and in Tasks' *choose* step, a line in each mod's details, each with *compare*, which opens Asset collisions at the duel |
+| The comparison stage | Asset collisions · Duels | the same stage shows a thing's versions on Assets |
+| Ranking of mods | Asset collisions · Ranking | the reason given under a duel's decision |
 | Patch choices | made in Collisions; listed in Patch | the dot on Patch; *waiting* spots in the worklist |
 | Places and worldspaces | Map | the place named on a spot |
+| A thing of the game (weapon, armour, character, item), its versions and the version chosen for it | Assets | – |
+| Outfit (a set of things characters wear) | Assets, *as sets* | a line under each of its things |
 | Tools | Toolbox | the manager line; a finding's *needs tool* link |
 | Scan statistics, *what was read* | Overview, folded at the bottom | – |
 
