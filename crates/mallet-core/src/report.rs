@@ -229,15 +229,19 @@ pub struct MapImage {
     pub image: String,
 }
 
-/// A patch of Mod Mallet that is in the game: the objects it hides, and
-/// which mod brought it.
+/// The patches of Mod Mallet that are in the game: the objects they hide,
+/// and each patch with its parts and the mod that brought it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledPatch {
-    /// The objects it hides.
+    /// The objects they hide, each once.
     pub objects: Vec<ObjectRef>,
-    /// The mod the file belongs to, if the mod manager knows it.
+    /// The mod the first patch belongs to, if the mod manager knows it.
     pub provider: Option<ModRef>,
+    /// Each patch by its name, with the parts that are installed
+    /// (ADR 0053).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub patches: Vec<crate::PatchInGame>,
 }
 
 /// What a mod manager knows about one installed mod.

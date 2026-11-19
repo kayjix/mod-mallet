@@ -42,6 +42,8 @@ use mallet_core::facts::installer::{
 };
 use roxmltree::{Document, Node};
 
+pub mod write;
+
 /// The path of the installer description inside a mod archive, in lower
 /// case. Archives spell it in every mix of cases, and often below one
 /// top-level folder.

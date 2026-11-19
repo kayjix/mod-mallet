@@ -317,20 +317,100 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
     })
 }
 
-/// The patch Mod Mallet wrote earlier, as the game sees it now: the swap
-/// file in the data directory, and the mod it came with.
+/// Swap files larger than this are not read: a part of a patch is a few
+/// kilobytes.
+const MAX_SWAP_FILE_BYTES: u64 = 4 * 1024 * 1024;
+
+/// The patches Mod Mallet wrote, here or elsewhere, as the game sees them
+/// now: the swap files in the data directory that describe themselves as
+/// parts of a patch (ADR 0053), and the one file of patches written before
+/// patches had parts. Each patch with the parts that are installed and the
+/// mod it came with. Only reads.
 fn installed_patch(game_dir: &Path, mods: &dyn ModSource) -> Option<InstalledPatch> {
-    let file = mallet_game_bethesda::swap::SWAP_FILE;
-    let text = std::fs::read_to_string(game_dir.join("Data").join(file)).ok()?;
-    let objects = mallet_game_bethesda::swap::hidden_objects(&text);
+    use mallet_game_bethesda::swap;
+
+    let data = game_dir.join("Data");
+    let mut names: Vec<String> = std::fs::read_dir(&data)
+        .map_err(|error| tracing::warn!(%error, "data directory not listed"))
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .metadata()
+                .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_SWAP_FILE_BYTES)
+        })
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| swap::is_swap_file(name))
+        .collect();
+    names.sort_by_key(|name| name.to_lowercase());
+
+    let mut patches: Vec<mallet_core::PatchInGame> = Vec::new();
+    for name in names {
+        let Ok(bytes) = std::fs::read(data.join(&name)) else {
+            continue;
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let patch = if let Some(part) = swap::read_part(&text) {
+            part
+        } else if name.eq_ignore_ascii_case(swap::SWAP_FILE) {
+            old_patch(&text)
+        } else {
+            continue;
+        };
+        let provider = || mods.provider_of(&GamePath::new(&format!("data/{name}")));
+        match patches
+            .iter_mut()
+            .find(|known| known.patch.name == patch.name)
+        {
+            Some(known) => known.patch.parts.extend(patch.parts),
+            None => patches.push(mallet_core::PatchInGame {
+                provider: provider(),
+                patch,
+            }),
+        }
+    }
+    let first = patches.first()?;
+    let provider = first.provider.clone();
+    let objects: std::collections::BTreeSet<mallet_core::ObjectRef> = patches
+        .iter()
+        .flat_map(|known| known.patch.objects())
+        .collect();
     tracing::info!(
+        patches = patches.len(),
+        parts = patches
+            .iter()
+            .map(|known| known.patch.parts.len())
+            .sum::<usize>(),
         objects = objects.len(),
-        "found Mod Mallet's patch in the game"
+        "found Mod Mallet's patches in the game"
     );
     Some(InstalledPatch {
-        objects,
-        provider: mods.provider_of(&GamePath::new(&format!("data/{file}"))),
+        objects: objects.into_iter().collect(),
+        provider,
+        patches,
     })
+}
+
+/// A patch written before patches had parts, from its one swap file: one
+/// part per plugin, against none.
+fn old_patch(text: &str) -> mallet_core::Patch {
+    let mut parts: Vec<mallet_core::PatchPart> = Vec::new();
+    for object in mallet_game_bethesda::swap::hidden_objects(text) {
+        match parts.iter_mut().find(|part| part.plugin == object.plugin) {
+            Some(part) => part.objects.push(object),
+            None => parts.push(mallet_core::PatchPart {
+                plugin: object.plugin.clone(),
+                against: None,
+                objects: vec![object],
+            }),
+        }
+    }
+    mallet_core::Patch {
+        name: mallet_core::DEFAULT_PATCH_NAME.to_owned(),
+        author: None,
+        version: None,
+        parts,
+    }
 }
 
 /// Pixels per cell of the map's picture.

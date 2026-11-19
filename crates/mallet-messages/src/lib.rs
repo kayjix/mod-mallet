@@ -382,11 +382,11 @@ impl Messages {
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 tick,
             ),
-            Action::HideObjects { objects } => (
+            Action::HideObjects { patch } => (
                 "action-hide-objects",
                 vec![(
                     "count",
-                    ArgValue::Number(i64::try_from(objects.len()).unwrap_or(i64::MAX)),
+                    ArgValue::Number(i64::try_from(patch.objects().len()).unwrap_or(i64::MAX)),
                 )],
                 &no_ticks,
             ),

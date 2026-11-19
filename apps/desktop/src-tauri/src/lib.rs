@@ -251,12 +251,13 @@ fn save_patch_report(text: String) -> Result<String, String> {
         })
 }
 
-/// Writes the patch that hides `objects` and returns where it is. Nothing
-/// is installed. Only ever called because the user pressed a button.
+/// Writes `patch`, with an installer for its parts, and returns where it
+/// is. Nothing is installed. Only ever called because the user pressed a
+/// button.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
-fn create_patch(objects: Vec<ObjectRef>) -> Result<String, String> {
-    mallet_engine::create_patch(&objects, &manager_options())
+fn create_patch(patch: mallet_core::Patch) -> Result<String, String> {
+    mallet_engine::create_patch(&patch, &manager_options())
         .map(|created| created.path.display().to_string())
         .map_err(|error| {
             tracing::warn!(%error, "patch not written");

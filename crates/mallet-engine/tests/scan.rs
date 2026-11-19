@@ -954,6 +954,60 @@ fn the_patch_in_the_game_is_reported_with_its_mod() {
 }
 
 #[test]
+fn patches_in_parts_are_reported_by_name_and_other_swap_files_left_out() {
+    let mut setup = Setup::new();
+    setup.deploy(
+        "Tidy Roads",
+        "Tidy Roads - Roads - Town_SWAP.ini",
+        b"; mod-mallet-patch: Tidy Roads\n; author: Someone\n; version: 1.2\n\
+          ; plugin: Roads.esp\n; against: Town.esp\n\
+          [References]\n0x10~Roads.esp|0x3B~Skyrim.esm\n",
+    );
+    setup.deploy(
+        "Tidy Roads",
+        "Tidy Roads - Roads_SWAP.ini",
+        b"; mod-mallet-patch: Tidy Roads\n; author: Someone\n; version: 1.2\n\
+          ; plugin: Roads.esp\n[References]\n0x11~Roads.esp|0x3B~Skyrim.esm\n",
+    );
+    setup.deploy(
+        "Some Swaps",
+        "Trees_SWAP.ini",
+        b"[References]\n0x12~Roads.esp|0x3B~Skyrim.esm\n",
+    );
+    let setup = setup.with_vortex_deployment();
+    let report = scan(&setup.options()).unwrap();
+
+    let installed = report.installed_patch.unwrap();
+    let ids: Vec<u32> = installed
+        .objects
+        .iter()
+        .map(|object| object.local_id)
+        .collect();
+    assert_eq!(ids, [0x10, 0x11]);
+    let [tidy] = installed.patches.as_slice() else {
+        panic!("one patch expected: {:?}", installed.patches);
+    };
+    assert_eq!(tidy.patch.name, "Tidy Roads");
+    assert_eq!(tidy.patch.author.as_deref(), Some("Someone"));
+    let parts: Vec<(&str, Option<&str>)> = tidy
+        .patch
+        .parts
+        .iter()
+        .map(|part| (part.plugin.as_str(), part.against.as_deref()))
+        .collect();
+    assert_eq!(
+        parts,
+        [("Roads.esp", Some("Town.esp")), ("Roads.esp", None)]
+    );
+    assert_eq!(
+        tidy.provider
+            .as_ref()
+            .map(|provider| provider.name.as_str()),
+        Some("Tidy Roads")
+    );
+}
+
+#[test]
 fn without_a_patch_none_is_reported() {
     let report = scan(&Setup::new().options()).unwrap();
     assert_eq!(report.installed_patch, None);

@@ -8,8 +8,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use mallet_core::ObjectRef;
 use mallet_core::action::{Action, ActionOutcome, ActionStatus, OptionToTick};
+use mallet_core::{DEFAULT_PATCH_NAME, Patch};
 use mallet_source_vortex::SOURCE_ID;
 use mallet_source_vortex::link::{self, Link, LinkError};
 
@@ -120,7 +120,7 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
         Action::ReinstallMod { mod_ref, tick } if mod_ref.source == SOURCE_ID => {
             reinstall_in_vortex(&mod_ref.id, tick, options)
         }
-        Action::HideObjects { objects } => hide_objects(objects, options),
+        Action::HideObjects { patch } => hide_objects(patch, options),
         Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
             tracing::info!(plugin, after, "asking Vortex for a plugin rule");
             link.load_after(options.vortex_game(), plugin, after, timeout)
@@ -161,16 +161,19 @@ fn in_vortex(
     outcome_of(request(&Link::new(link_dir), timeout))
 }
 
-/// The name of the archive of the patch that hides objects. Vortex names
-/// the mod after it.
-const HIDE_PATCH: &str = "Mod Mallet Patch.zip";
-
-/// Where the patch that hides objects is written, in its standard place.
+/// Where the patch with the standard name is written. The folder holds
+/// every patch Mod Mallet writes.
 pub fn patch_file(options: &ManagerOptions) -> Option<PathBuf> {
+    patch_file_named(DEFAULT_PATCH_NAME, options)
+}
+
+/// Where the patch named `name` is written. Vortex names the mod after the
+/// archive, so patches with different names become different mods.
+fn patch_file_named(name: &str, options: &ManagerOptions) -> Option<PathBuf> {
     Some(
         Link::new(options.link_dir()?)
             .patches_dir()
-            .join(HIDE_PATCH),
+            .join(mallet_game_bethesda::swap::archive_name(name)),
     )
 }
 
@@ -183,40 +186,45 @@ pub struct CreatedPatch {
     pub objects: usize,
 }
 
-/// Writes the patch that hides `objects` into Mod Mallet's own folder,
-/// replacing the one written before. Nothing is installed: that is
-/// [`Action::HideObjects`].
+/// Writes `patch` into Mod Mallet's own folder, with an installer that
+/// offers its parts (ADR 0053), replacing the patch of the same name
+/// written before. Parts that hide nothing are left out. Nothing is
+/// installed: that is [`Action::HideObjects`].
 ///
 /// # Errors
 ///
 /// If there is nothing to hide, or the archive cannot be written.
-pub fn create_patch(
-    objects: &[ObjectRef],
-    options: &ManagerOptions,
-) -> Result<CreatedPatch, EngineError> {
-    let path = patch_file(options).ok_or(EngineError::ManagerNotFound)?;
+pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPatch, EngineError> {
+    let mut patch = patch.clone();
+    patch.parts.retain(|part| !part.objects.is_empty());
+    if patch.name.trim().is_empty() {
+        DEFAULT_PATCH_NAME.clone_into(&mut patch.name);
+    }
+    let objects = patch.objects();
     if objects.is_empty() {
         return Err(EngineError::NothingToHide);
     }
-    let text = mallet_game_bethesda::swap::swap_ini(objects);
-    if let Some(dir) = path.parent() {
+    let archive = patch_file_named(&patch.name, options).ok_or(EngineError::ManagerNotFound)?;
+    if let Some(dir) = archive.parent() {
         std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
             path: dir.to_path_buf(),
             source,
         })?;
     }
-    crate::patch::write_zip(
-        &path,
-        mallet_game_bethesda::swap::SWAP_FILE,
-        text.as_bytes(),
-    )
-    .map_err(|source| EngineError::Write {
-        path: path.clone(),
-        source,
+    crate::patch::write_zip(&archive, &crate::patch::patch_files(&patch)).map_err(|source| {
+        EngineError::Write {
+            path: archive.clone(),
+            source,
+        }
     })?;
-    tracing::info!(path = %path.display(), objects = objects.len(), "patch written");
+    tracing::info!(
+        path = %archive.display(),
+        parts = patch.parts.len(),
+        objects = objects.len(),
+        "patch written"
+    );
     Ok(CreatedPatch {
-        path,
+        path: archive,
         objects: objects.len(),
     })
 }
@@ -249,8 +257,8 @@ pub fn save_patch_report(text: &str, options: &ManagerOptions) -> Result<PathBuf
     Ok(path)
 }
 
-/// Writes the patch that hides `objects` and asks Vortex to install it.
-fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcome {
+/// Writes `patch` and asks Vortex to install it.
+fn hide_objects(patch: &Patch, options: &ManagerOptions) -> ActionOutcome {
     let swaps = mallet_game_bethesda::Game::from_id(options.vortex_game())
         .is_some_and(mallet_game_bethesda::Game::has_object_swapper);
     if !swaps {
@@ -259,7 +267,7 @@ fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcom
             detail: Some(EngineError::NoObjectSwapper.to_string()),
         };
     }
-    if objects.is_empty() {
+    if patch.parts.iter().all(|part| part.objects.is_empty()) {
         return ActionOutcome {
             status: ActionStatus::Failed,
             detail: Some(EngineError::NothingToHide.to_string()),
@@ -272,7 +280,7 @@ fn hide_objects(objects: &[ObjectRef], options: &ManagerOptions) -> ActionOutcom
     let Some(link_dir) = options.link_dir() else {
         return ActionOutcome::new(ActionStatus::ManagerNotRunning);
     };
-    let created = match create_patch(objects, options) {
+    let created = match create_patch(patch, options) {
         Ok(created) => created,
         Err(error) => {
             tracing::warn!(%error, "patch not written");

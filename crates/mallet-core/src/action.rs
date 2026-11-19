@@ -26,12 +26,13 @@ pub enum Action {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         tick: Vec<OptionToTick>,
     },
-    /// Hide placed objects in the game, through a small mod that the mod
+    /// Hide placed objects in the game, through a patch that the mod
     /// manager installs: each object is swapped for an invisible marker
-    /// while the game runs. Removing that mod brings them back.
+    /// while the game runs. Removing the patch brings them back. Its parts
+    /// can be left out in its installer (ADR 0053).
     HideObjects {
-        /// The objects to hide.
-        objects: Vec<ObjectRef>,
+        /// The patch, with the objects to hide in its parts.
+        patch: crate::Patch,
     },
     /// Load a plugin after another one, through a rule in the mod
     /// manager's plugin list, so that its version of what both change wins.

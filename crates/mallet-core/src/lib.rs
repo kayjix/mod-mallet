@@ -25,6 +25,7 @@ pub mod finding;
 pub mod kinds;
 pub mod mesh;
 pub mod mods;
+pub mod patch;
 pub mod path;
 pub mod report;
 pub mod toolbox;
@@ -35,6 +36,7 @@ pub use facts::Facts;
 pub use finding::{ArgValue, Confidence, Finding, FindingId, Party, Severity, Subject};
 pub use kinds::KindInfo;
 pub use mods::{ModRef, ModSource, NoModSource};
+pub use patch::{DEFAULT_PATCH_NAME, Patch, PatchInGame, PatchPart};
 pub use path::GamePath;
 pub use report::{
     FilePreview, GameChoice, GameInfo, GameSupport, InstalledPatch, KnownGame, LocationOrigin,

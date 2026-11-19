@@ -12,6 +12,8 @@ import { isCollision } from "./arrange";
 import type {
   MapSpot,
   ObjectRef,
+  Patch,
+  PatchPart,
   RenderedFinding,
   RenderedReport,
   SpotPart,
@@ -316,27 +318,84 @@ export function choicesOf(
   return choices;
 }
 
-/** The objects hidden by a choice, each once. */
-export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
-  const found = new Map<string, ObjectRef>();
-  const add = (objects: ObjectRef[]) => {
-    for (const object of objects) {
-      found.set(matchKey(object), object);
-    }
-  };
+/**
+ * Calls `visit` with what each choice hides: the plugin whose objects go,
+ * the plugin of the pair it was decided against (null for objects hidden
+ * on their own), and the objects.
+ */
+function eachHidden(
+  pairs: Pair[],
+  choices: PatchChoices,
+  visit: (plugin: string, against: string | null, objects: ObjectRef[]) => void,
+) {
   for (const pair of pairs) {
     const whole = choices[pair.id] ?? null;
+    const against = (plugin: string) =>
+      pair.sides.find((side) => side.plugin !== plugin)?.plugin ?? null;
     if (pair.spots.length === 0) {
-      add(pair.sides.find((side) => side.plugin === whole)?.objects ?? []);
+      const side = pair.sides.find((side) => side.plugin === whole);
+      if (side !== undefined) {
+        visit(side.plugin, against(side.plugin), side.objects);
+      }
       continue;
     }
     for (const spot of pair.spots) {
       const plugin = spot.key in choices ? (choices[spot.key] ?? null) : whole;
-      add(hiddenAt(spot.parts, plugin));
+      if (plugin !== null) {
+        visit(plugin, against(plugin), hiddenAt(spot.parts, plugin));
+      }
     }
   }
-  add(freeObjects(choices));
+  for (const object of freeObjects(choices)) {
+    visit(object.plugin, null, [object]);
+  }
+}
+
+/** The objects hidden by a choice, each once. */
+export function objectsOf(pairs: Pair[], choices: PatchChoices): ObjectRef[] {
+  const found = new Map<string, ObjectRef>();
+  eachHidden(pairs, choices, (_plugin, _against, objects) => {
+    for (const object of objects) {
+      found.set(matchKey(object), object);
+    }
+  });
   return [...found.values()];
+}
+
+/** The name of the patch, until the patch page lets the user choose one. */
+export const PATCH_NAME = "Mod Mallet Patch";
+
+/**
+ * The choices as the parts of a patch (ADR 0053): per plugin whose objects
+ * go and the plugin they were decided against, or none for objects hidden
+ * on their own. Each object once per part; parts in a fixed order.
+ */
+export function partsOf(pairs: Pair[], choices: PatchChoices): PatchPart[] {
+  const parts = new Map<string, { part: PatchPart; keys: Set<string> }>();
+  eachHidden(pairs, choices, (plugin, against, objects) => {
+    const id = `${plugin}\u0000${against ?? ""}`;
+    let entry = parts.get(id);
+    if (entry === undefined) {
+      entry = { part: { plugin, against, objects: [] }, keys: new Set() };
+      parts.set(id, entry);
+    }
+    for (const object of objects) {
+      const key = matchKey(object);
+      if (!entry.keys.has(key)) {
+        entry.keys.add(key);
+        entry.part.objects.push(object);
+      }
+    }
+  });
+  return [...parts.entries()]
+    .filter(([, entry]) => entry.part.objects.length > 0)
+    .sort(([x], [y]) => x.localeCompare(y))
+    .map(([, entry]) => entry.part);
+}
+
+/** The patch the choices make, under its name. */
+export function patchOf(pairs: Pair[], choices: PatchChoices): Patch {
+  return { name: PATCH_NAME, parts: partsOf(pairs, choices) };
 }
 
 /** What the choices hide, by {@link matchKey}, from the spots of the collisions. */

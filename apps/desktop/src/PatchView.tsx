@@ -14,6 +14,7 @@ import {
   type PairDecision,
   type PatchChoices,
   pairsOf,
+  patchOf,
   pinsOnly,
   signatureOf,
   spotsByKey,
@@ -78,7 +79,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
     setCreating(true);
     setCreateError(null);
     try {
-      const path = await api.createPatch(objects);
+      const path = await api.createPatch(patchOf(pairs, choices));
       setCreated({ path, signature });
     } catch (error: unknown) {
       setCreateError(String(error));
@@ -119,7 +120,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
           className="primary"
           disabled={!upToDate || action.busy}
           title={p.installHint}
-          onClick={() => action.run({ type: "hide-objects", objects })}
+          onClick={() => action.run({ type: "hide-objects", patch: patchOf(pairs, choices) })}
         >
           {p.install}
         </button>

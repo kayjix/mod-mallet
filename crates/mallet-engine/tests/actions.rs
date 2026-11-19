@@ -204,11 +204,20 @@ fn hiding_objects_writes_a_patch_and_hands_it_to_vortex() {
     vortex.start_extension();
 
     let extension = vortex.answer_next_request(r#"{"ok":true,"code":"installing"}"#);
-    let objects = vec![mallet_core::ObjectRef {
-        plugin: "Village.esp".to_owned(),
-        local_id: 0x812,
-    }];
-    let outcome = run_action(&Action::HideObjects { objects }, &vortex.options());
+    let patch = mallet_core::Patch {
+        name: mallet_core::DEFAULT_PATCH_NAME.to_owned(),
+        author: None,
+        version: None,
+        parts: vec![mallet_core::PatchPart {
+            plugin: "Village.esp".to_owned(),
+            against: Some("Town.esp".to_owned()),
+            objects: vec![mallet_core::ObjectRef {
+                plugin: "Village.esp".to_owned(),
+                local_id: 0x812,
+            }],
+        }],
+    };
+    let outcome = run_action(&Action::HideObjects { patch }, &vortex.options());
 
     assert_eq!(outcome.status, ActionStatus::Installing);
     let archive = PathBuf::from(extension.join().unwrap());
@@ -219,7 +228,12 @@ fn hiding_objects_writes_a_patch_and_hands_it_to_vortex() {
     );
     let bytes = fs::read(&archive).unwrap();
     let text = String::from_utf8_lossy(&bytes);
-    assert!(text.contains("ModMallet_SWAP.ini"));
+    assert_eq!(
+        archive.file_name().and_then(|name| name.to_str()),
+        Some("Mod Mallet Patch.zip")
+    );
+    assert!(text.contains("Mod Mallet Patch - Village - Town_SWAP.ini"));
+    assert!(text.contains("fomod/ModuleConfig.xml"));
     assert!(text.contains("0x812~Village.esp|0x3B~Skyrim.esm"));
 }
 
@@ -228,7 +242,12 @@ fn nothing_to_hide_asks_nothing_of_vortex() {
     let vortex = Vortex::new();
     let outcome = run_action(
         &Action::HideObjects {
-            objects: Vec::new(),
+            patch: mallet_core::Patch {
+                name: mallet_core::DEFAULT_PATCH_NAME.to_owned(),
+                author: None,
+                version: None,
+                parts: Vec::new(),
+            },
         },
         &vortex.options(),
     );

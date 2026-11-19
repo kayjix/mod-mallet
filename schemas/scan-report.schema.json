@@ -149,15 +149,12 @@
           ]
         },
         {
-          "description": "Hide placed objects in the game, through a small mod that the mod\nmanager installs: each object is swapped for an invisible marker\nwhile the game runs. Removing that mod brings them back.",
+          "description": "Hide placed objects in the game, through a patch that the mod\nmanager installs: each object is swapped for an invisible marker\nwhile the game runs. Removing the patch brings them back. Its parts\ncan be left out in its installer (ADR 0053).",
           "type": "object",
           "properties": {
-            "objects": {
-              "description": "The objects to hide.",
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ObjectRef"
-              }
+            "patch": {
+              "description": "The patch, with the objects to hide in its parts.",
+              "$ref": "#/$defs/Patch"
             },
             "type": {
               "type": "string",
@@ -166,7 +163,7 @@
           },
           "required": [
             "type",
-            "objects"
+            "patch"
           ]
         },
         {
@@ -523,18 +520,25 @@
       "type": "string"
     },
     "InstalledPatch": {
-      "description": "A patch of Mod Mallet that is in the game: the objects it hides, and\nwhich mod brought it.",
+      "description": "The patches of Mod Mallet that are in the game: the objects they hide,\nand each patch with its parts and the mod that brought it.",
       "type": "object",
       "properties": {
         "objects": {
-          "description": "The objects it hides.",
+          "description": "The objects they hide, each once.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/ObjectRef"
           }
         },
+        "patches": {
+          "description": "Each patch by its name, with the parts that are installed\n(ADR 0053).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PatchInGame"
+          }
+        },
         "provider": {
-          "description": "The mod the file belongs to, if the mod manager knows it.",
+          "description": "The mod the first patch belongs to, if the mod manager knows it.",
           "anyOf": [
             {
               "$ref": "#/$defs/ModRef"
@@ -1256,6 +1260,93 @@
             "type"
           ]
         }
+      ]
+    },
+    "Patch": {
+      "description": "A patch as it is made and passed on.",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made it; `None` for the user's own. Plain text: nothing proves\nit yet.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Its name. Patches with different names can be installed side by\nside; one with the same name replaces the one before.",
+          "type": "string"
+        },
+        "parts": {
+          "description": "Its parts.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PatchPart"
+          }
+        },
+        "version": {
+          "description": "Its version, as its maker numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "parts"
+      ]
+    },
+    "PatchInGame": {
+      "description": "A patch of Mod Mallet that is in the game, with the parts of it that\nwere installed.",
+      "type": "object",
+      "properties": {
+        "patch": {
+          "description": "The patch, with the parts that are installed. A patch written before\npatches had parts has one part per plugin, against none.",
+          "$ref": "#/$defs/Patch"
+        },
+        "provider": {
+          "description": "The mod its files belong to, if the mod manager knows it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "patch"
+      ]
+    },
+    "PatchPart": {
+      "description": "One part of a patch: what it hides of one plugin, and the plugin that\nwas the reason, if any.",
+      "type": "object",
+      "properties": {
+        "against": {
+          "description": "The plugin the part was decided against, as in a collision; `None`\nfor objects hidden for their own sake. A part with one applies only\nwhere both plugins are active.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "objects": {
+          "description": "The objects it hides.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectRef"
+          }
+        },
+        "plugin": {
+          "description": "The plugin whose objects the part hides, by its file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "objects"
       ]
     },
     "PlaceKind": {

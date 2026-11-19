@@ -18,7 +18,7 @@ import type { ObjectAnchors } from "./generated/object-anchors";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
-import type { Action, ObjectRef, RenderedReport } from "./generated/rendered-report";
+import type { Action, ObjectRef, Patch, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { Lang } from "./i18n";
 
@@ -48,8 +48,8 @@ export interface Api {
   setupFingerprint(): Promise<string>;
   /** Opens a mod's page in the browser. */
   openPage(url: string): Promise<void>;
-  /** Writes the patch that hides `objects`; resolves to where it is. */
-  createPatch(objects: ObjectRef[]): Promise<string>;
+  /** Writes `patch`, with an installer for its parts (ADR 0053); resolves to where it is. */
+  createPatch(patch: Patch): Promise<string>;
   /** Writes the report of what the patch hides next to it, and returns where it is. */
   savePatchReport(text: string): Promise<string>;
   /** Shows one of Mod Mallet's own folders in the file explorer. */
@@ -150,7 +150,7 @@ const tauriApi: Api = {
   setIgnored: (id, ignored) => invoke<string[]>("set_ignored", { id, ignored }),
   setupFingerprint: () => invoke<string>("setup_fingerprint"),
   openPage: (url) => invoke<void>("open_page", { url }),
-  createPatch: (objects) => invoke<string>("create_patch", { objects }),
+  createPatch: (patch) => invoke<string>("create_patch", { patch }),
   savePatchReport: (text) => invoke<string>("save_patch_report", { text }),
   openFolder: (which) => invoke<void>("open_folder", { which }),
   logFile: () => invoke<string | null>("log_file"),

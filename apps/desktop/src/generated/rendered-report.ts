@@ -27,10 +27,7 @@ export type Action =
       type: "reinstall-mod";
     }
   | {
-      /**
-       * The objects to hide.
-       */
-      objects: ObjectRef[];
+      patch: Patch;
       type: "hide-objects";
     }
   | {
@@ -230,10 +227,7 @@ export interface DuelResolution {
         type: "reinstall-mod";
       }
     | {
-        /**
-         * The objects to hide.
-         */
-        objects: ObjectRef[];
+        patch: Patch;
         type: "hide-objects";
       }
     | {
@@ -319,6 +313,49 @@ export interface OptionToTick {
    * The title of the page.
    */
   step: string;
+}
+/**
+ * The patch, with the objects to hide in its parts.
+ */
+export interface Patch {
+  /**
+   * Who made it; `None` for the user's own. Plain text: nothing proves
+   * it yet.
+   */
+  author?: string | null;
+  /**
+   * Its name. Patches with different names can be installed side by
+   * side; one with the same name replaces the one before.
+   */
+  name: string;
+  /**
+   * Its parts.
+   */
+  parts: PatchPart[];
+  /**
+   * Its version, as its maker numbers it.
+   */
+  version?: string | null;
+}
+/**
+ * One part of a patch: what it hides of one plugin, and the plugin that
+ * was the reason, if any.
+ */
+export interface PatchPart {
+  /**
+   * The plugin the part was decided against, as in a collision; `None`
+   * for objects hidden for their own sake. A part with one applies only
+   * where both plugins are active.
+   */
+  against?: string | null;
+  /**
+   * The objects it hides.
+   */
+  objects: ObjectRef[];
+  /**
+   * The plugin whose objects the part hides, by its file name.
+   */
+  plugin: string;
 }
 /**
  * A placed object, by the plugin that placed it first and its number in
@@ -496,10 +533,7 @@ export interface RenderedAction {
         type: "reinstall-mod";
       }
     | {
-        /**
-         * The objects to hide.
-         */
-        objects: ObjectRef[];
+        patch: Patch;
         type: "hide-objects";
       }
     | {
@@ -844,18 +878,58 @@ export interface GameInfo {
   version?: string | null;
 }
 /**
- * A patch of Mod Mallet that is in the game: the objects it hides, and
- * which mod brought it.
+ * The patches of Mod Mallet that are in the game: the objects they hide,
+ * and each patch with its parts and the mod that brought it.
  */
 export interface InstalledPatch {
   /**
-   * The objects it hides.
+   * The objects they hide, each once.
    */
   objects: ObjectRef[];
   /**
-   * The mod the file belongs to, if the mod manager knows it.
+   * Each patch by its name, with the parts that are installed
+   * (ADR 0053).
+   */
+  patches?: PatchInGame[];
+  /**
+   * The mod the first patch belongs to, if the mod manager knows it.
    */
   provider?: ModRef3 | null;
+}
+/**
+ * A patch of Mod Mallet that is in the game, with the parts of it that
+ * were installed.
+ */
+export interface PatchInGame {
+  patch: Patch1;
+  /**
+   * The mod its files belong to, if the mod manager knows it.
+   */
+  provider?: ModRef3 | null;
+}
+/**
+ * The patch, with the parts that are installed. A patch written before
+ * patches had parts has one part per plugin, against none.
+ */
+export interface Patch1 {
+  /**
+   * Who made it; `None` for the user's own. Plain text: nothing proves
+   * it yet.
+   */
+  author?: string | null;
+  /**
+   * Its name. Patches with different names can be installed side by
+   * side; one with the same name replaces the one before.
+   */
+  name: string;
+  /**
+   * Its parts.
+   */
+  parts: PatchPart[];
+  /**
+   * Its version, as its maker numbers it.
+   */
+  version?: string | null;
 }
 /**
  * A place the scan looked at, with its role and origin in words.
