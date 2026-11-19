@@ -31,6 +31,9 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // The extension was just put into Vortex's folder: Vortex loads it only
+  // after a restart, so the restart button asks for attention until then.
+  const [placed, setPlaced] = useState(false);
 
   if (toolbox === null) {
     return <p className="empty">{t.scanning}</p>;
@@ -53,6 +56,7 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
 
   const restart = () =>
     attempt(async () => {
+      setPlaced(false);
       setNote(t.restartingVortex);
       await api.restartManager();
       // Vortex takes a few seconds before its link answers again.
@@ -63,14 +67,34 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
       return t.restartedVortex;
     });
 
-  const installLink = () => attempt(() => api.installManagerLink(lang));
+  const installLink = () =>
+    attempt(async () => {
+      const done = await api.installManagerLink(lang);
+      setPlaced(true);
+      return done;
+    });
+
+  const texts = toolboxTexts[lang];
 
   const actionFor = (rendered: RenderedTool) => {
     const { tool } = rendered;
     if (tool.id === "vortex" && tool.state !== "missing") {
       return (
-        <button type="button" disabled={busy} title={t.restartHint} onClick={restart}>
+        <button
+          type="button"
+          className={placed ? "primary tool-wanted" : undefined}
+          disabled={busy}
+          title={t.restartHint}
+          onClick={restart}
+        >
           {tool.state === "stopped" ? t.startVortex : t.restartVortex}
+        </button>
+      );
+    }
+    if (tool.id === "mallet-link" && placed) {
+      return (
+        <button type="button" className="tool-placed" disabled title={texts.placedHint}>
+          {texts.placed}
         </button>
       );
     }
@@ -92,7 +116,6 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
     return null;
   };
 
-  const texts = toolboxTexts[lang];
   // Tools the game or Mod Mallet needs first; the optional ones folded
   // below, each saying what it is for.
   const needed = toolbox.tools.filter((rendered) => rendered.tool.need !== "optional");

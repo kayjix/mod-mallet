@@ -28,3 +28,50 @@
 .tool-optional > .tool-list {
   margin-top: 0.5rem;
 }
+
+/* The update button, once the extension is placed: it greys and draws
+   together for a moment, so the click visibly did something. */
+.tool-placed:disabled {
+  border-color: var(--border);
+  background: none;
+  color: var(--muted);
+  opacity: 1;
+  cursor: default;
+  animation: tool-placed 600ms ease-out;
+}
+
+@keyframes tool-placed {
+  0% {
+    transform: scale(1);
+    color: var(--accent-text);
+    background: var(--accent);
+  }
+  40% {
+    transform: scale(0.86);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The restart button lights up a few times: the next thing to do. */
+.tool-wanted {
+  animation: tool-wanted 1.2s ease-in-out 3;
+}
+
+@keyframes tool-wanted {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-placed:disabled,
+  .tool-wanted {
+    animation: none;
+  }
+}
