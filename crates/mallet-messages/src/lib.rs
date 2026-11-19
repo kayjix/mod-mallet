@@ -408,6 +408,29 @@ impl Messages {
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 &no_ticks,
             ),
+            Action::FileOverrides {
+                files,
+                leave_out,
+                provide,
+            } => {
+                let id = match (leave_out.is_empty(), provide.first()) {
+                    (true, _) => "action-file-overrides-reset",
+                    (false, Some(_)) => "action-file-overrides",
+                    (false, None) => "action-file-overrides-archives",
+                };
+                let winner = provide.first().map_or("", |mod_ref| mod_ref.name.as_str());
+                (
+                    id,
+                    vec![
+                        ("mod", ArgValue::from(winner)),
+                        (
+                            "count",
+                            ArgValue::Number(i64::try_from(files.len()).unwrap_or(i64::MAX)),
+                        ),
+                    ],
+                    &no_ticks,
+                )
+            }
         };
         let args: Vec<_> = args.iter().map(|(name, value)| (*name, value)).collect();
         RenderedAction {

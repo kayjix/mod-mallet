@@ -290,3 +290,28 @@
 .catalogue-middle .stage-panes[data-count="4"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+.catalogue-versions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.catalogue-versions li {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.catalogue-version-take {
+  font-size: 0.8rem;
+}
+
+.catalogue-version-chosen,
+.catalogue-chosen {
+  grid-column: 2;
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 600;
+}

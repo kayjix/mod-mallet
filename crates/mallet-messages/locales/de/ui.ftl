@@ -103,6 +103,24 @@ action-disable-mod = { $mod } deaktivieren
 action-enable-mod = { $mod } einschalten
     .description = Vortex schaltet { $mod } im verwendeten Profil ein und bittet ums Bereitstellen. Schalte die Mod in Vortex wieder ab, um es rückgängig zu machen.
 
+action-file-overrides = Fassung von { $mod } nehmen
+    .description = Vortex lässt { $count } { $count ->
+        [one] Datei
+       *[other] Dateien
+    } dieses Gegenstands bei den anderen Mods weg, die sie mitbringen, sodass die von { $mod } ins Spiel kommen, und stellt neu bereit. Nur diese Dateien wechseln. In Vortex findest du es unter den Dateikonflikten der Mods und kannst es dort zurücknehmen.
+
+action-file-overrides-archives = Fassung aus den Archiven nehmen
+    .description = Vortex lässt { $count } { $count ->
+        [one] Datei
+       *[other] Dateien
+    } dieses Gegenstands bei den Mods weg, die sie lose mitbringen, sodass die Fassung aus den Archiven zu sehen ist, und stellt neu bereit. In Vortex findest du es unter den Dateikonflikten der Mods und kannst es dort zurücknehmen.
+
+action-file-overrides-reset = Wahl zurücknehmen
+    .description = Vortex stellt { $count } { $count ->
+        [one] Datei
+       *[other] Dateien
+    } dieses Gegenstands wieder von allen Mods bereit, die sie mitbringen; dann entscheidet wieder die Reihenfolge der Mods.
+
 ## Duelle: alles, worin zwei Mods sich uneins sind.
 
 duel-topic-faces = { $count ->

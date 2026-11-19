@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use mallet_core::catalogue::AssetSource;
+use mallet_core::{Action, ModRef};
 use mallet_engine::{ScanOptions, asset_versions};
 use mallet_formats_bethesda::fixture;
 
@@ -92,4 +93,35 @@ fn every_mod_with_a_copy_is_a_version_and_the_deployed_one_is_shown() {
         ["meshes/weapons/sword.nif", "textures/weapons/sword_b.dds"]
     );
     assert_eq!(kept_back.shown, Vec::<String>::new());
+
+    // Taking Mod B's version leaves its files out of Mod A and gives them
+    // back to Mod B; Mod A's version is in the game already.
+    let names = |mods: &[ModRef]| -> Vec<String> { mods.iter().map(|m| m.id.clone()).collect() };
+    let Some(Action::FileOverrides {
+        files,
+        leave_out,
+        provide,
+    }) = &kept_back.choice
+    else {
+        unreachable!("a choice for the version kept back")
+    };
+    assert_eq!(files, &kept_back.files);
+    assert_eq!(names(leave_out), ["Mod A"]);
+    assert_eq!(names(provide), ["Mod B"]);
+    assert_eq!(shown.choice, None);
+
+    let Some(Action::FileOverrides {
+        files,
+        leave_out,
+        provide,
+    }) = &versions.reset
+    else {
+        unreachable!("a way back")
+    };
+    assert_eq!(
+        files,
+        &["meshes/weapons/sword.nif", "textures/weapons/sword_b.dds"]
+    );
+    assert_eq!(leave_out, &Vec::<ModRef>::new());
+    assert_eq!(names(provide), ["Mod A", "Mod B"]);
 }

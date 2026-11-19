@@ -48,6 +48,21 @@ export type Action =
   | {
       mod: ModRef2;
       type: "enable-mod";
+    }
+  | {
+      /**
+       * The files, below the data directory (`meshes/...`).
+       */
+      files: string[];
+      /**
+       * The mods that are to leave the files out.
+       */
+      leave_out?: ModRef3[];
+      /**
+       * The mods that are to deploy the files again.
+       */
+      provide?: ModRef3[];
+      type: "file-overrides";
     };
 /**
  * A value substituted into the text of a finding.
@@ -248,6 +263,21 @@ export interface DuelResolution {
     | {
         mod: ModRef2;
         type: "enable-mod";
+      }
+    | {
+        /**
+         * The files, below the data directory (`meshes/...`).
+         */
+        files: string[];
+        /**
+         * The mods that are to leave the files out.
+         */
+        leave_out?: ModRef3[];
+        /**
+         * The mods that are to deploy the files again.
+         */
+        provide?: ModRef3[];
+        type: "file-overrides";
       };
   /**
    * The identity of a finding across scans.
@@ -407,23 +437,6 @@ export interface ModRef2 {
   source: string;
 }
 /**
- * One of the two mods of a duel.
- */
-export interface DuelSide {
-  /**
-   * The mod, if a mod manager knows it.
-   */
-  mod?: ModRef3 | null;
-  /**
-   * What to call this side: the mod's name, or the file's.
-   */
-  name: string;
-  /**
-   * The plugins of this side that the duel's findings name.
-   */
-  plugins?: string[];
-}
-/**
  * A mod as a mod manager knows it.
  */
 export interface ModRef3 {
@@ -439,6 +452,23 @@ export interface ModRef3 {
    * The manager that knows this mod, for example `vortex`.
    */
   source: string;
+}
+/**
+ * One of the two mods of a duel.
+ */
+export interface DuelSide {
+  /**
+   * The mod, if a mod manager knows it.
+   */
+  mod?: ModRef3 | null;
+  /**
+   * What to call this side: the mod's name, or the file's.
+   */
+  name: string;
+  /**
+   * The plugins of this side that the duel's findings name.
+   */
+  plugins?: string[];
 }
 /**
  * The side Mod Mallet would pick, and why.
@@ -554,6 +584,21 @@ export interface RenderedAction {
     | {
         mod: ModRef2;
         type: "enable-mod";
+      }
+    | {
+        /**
+         * The files, below the data directory (`meshes/...`).
+         */
+        files: string[];
+        /**
+         * The mods that are to leave the files out.
+         */
+        leave_out?: ModRef3[];
+        /**
+         * The mods that are to deploy the files again.
+         */
+        provide?: ModRef3[];
+        type: "file-overrides";
       };
   /**
    * What will happen, in a sentence or two.

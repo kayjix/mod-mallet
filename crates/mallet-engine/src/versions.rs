@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use mallet_core::catalogue::{AssetSource, AssetVersion, AssetVersions};
 use mallet_core::mesh::MeshView;
-use mallet_core::{GamePath, ModRef, ModSource};
+use mallet_core::{Action, GamePath, ModRef, ModSource};
 use mallet_game_bethesda::Game;
 use mallet_game_bethesda::files;
 use mallet_game_bethesda::lod_library::LodLibrary;
@@ -228,6 +228,99 @@ impl Sources {
         self.read(path, &self.winner(path)?)
     }
 
+    fn mod_ref(&self, folder: &str) -> ModRef {
+        self.deployment.as_ref().map_or_else(
+            || ModRef {
+                source: "vortex".to_owned(),
+                id: folder.to_owned(),
+                name: folder.to_owned(),
+            },
+            |deployment| deployment.mod_ref(folder),
+        )
+    }
+
+    /// The mods whose folders hold a loose copy of `path`.
+    fn loose_mods(&self, path: &str) -> &[String] {
+        self.staged.get(path).map_or(&[], Vec::as_slice)
+    }
+
+    /// What makes the game show `version` where file overrides can: the
+    /// other mods' loose copies left out, the version's own put back.
+    /// `None` if the game shows it already or overrides cannot help.
+    fn choice(&self, version: &AssetVersion) -> Option<Action> {
+        if version.shown.len() == version.files.len() {
+            return None;
+        }
+        let own = version.id.strip_prefix("mod:");
+        let mut files = Vec::new();
+        let mut leave_out: Vec<String> = Vec::new();
+        let mut provide: Vec<String> = Vec::new();
+        for path in &version.files {
+            let loose = self.loose_mods(path);
+            let own_loose = own.is_some_and(|own| loose.iter().any(|folder| folder == own));
+            // Loose files no mod manager knows cannot be left out.
+            let unmanaged = self.library.has_loose(path) && self.mod_of(path).is_none();
+            // Without a loose copy of its own, the version shows only if
+            // its archive is the last to hold the file.
+            let reachable = !unmanaged
+                && (own_loose
+                    || self
+                        .library
+                        .archives_with(path)
+                        .last()
+                        .is_some_and(|archive| self.archive_version(archive) == version.id));
+            if !reachable {
+                continue;
+            }
+            files.push(path.clone());
+            for folder in loose {
+                let list = if Some(folder.as_str()) == own {
+                    &mut provide
+                } else {
+                    &mut leave_out
+                };
+                if !list.contains(folder) {
+                    list.push(folder.clone());
+                }
+            }
+        }
+        if leave_out.is_empty() {
+            return None;
+        }
+        Some(Action::FileOverrides {
+            files,
+            leave_out: leave_out
+                .iter()
+                .map(|folder| self.mod_ref(folder))
+                .collect(),
+            provide: provide.iter().map(|folder| self.mod_ref(folder)).collect(),
+        })
+    }
+
+    /// What gives every mod's loose copies of `paths` back to the mod
+    /// manager's order.
+    fn reset(&self, paths: &[String]) -> Option<Action> {
+        let mut provide: Vec<String> = Vec::new();
+        let mut files = Vec::new();
+        for path in paths {
+            let loose = self.loose_mods(path);
+            if loose.is_empty() {
+                continue;
+            }
+            files.push(path.clone());
+            for folder in loose {
+                if !provide.contains(folder) {
+                    provide.push(folder.clone());
+                }
+            }
+        }
+        (!files.is_empty()).then(|| Action::FileOverrides {
+            files,
+            leave_out: Vec::new(),
+            provide: provide.iter().map(|folder| self.mod_ref(folder)).collect(),
+        })
+    }
+
     fn source(&self, version: &str) -> AssetSource {
         if version == "game" {
             AssetSource::Game
@@ -240,14 +333,7 @@ impl Sources {
         } else {
             let folder = version.strip_prefix("mod:").unwrap_or(version);
             AssetSource::Mod {
-                mod_ref: self.deployment.as_ref().map_or_else(
-                    || ModRef {
-                        source: "vortex".to_owned(),
-                        id: folder.to_owned(),
-                        name: folder.to_owned(),
-                    },
-                    |deployment| deployment.mod_ref(folder),
-                ),
+                mod_ref: self.mod_ref(folder),
             }
         }
     }
@@ -302,6 +388,7 @@ pub fn asset_versions(options: &ScanOptions, models: &[String]) -> Option<AssetV
                     source: sources.source(&version),
                     files: Vec::new(),
                     shown: Vec::new(),
+                    choice: None,
                 });
             entry.files.push(path.clone());
             if winner.as_deref() == Some(version.as_str()) {
@@ -309,7 +396,13 @@ pub fn asset_versions(options: &ScanOptions, models: &[String]) -> Option<AssetV
             }
         }
     }
-    let mut versions: Vec<AssetVersion> = by_version.into_values().collect();
+    let mut versions: Vec<AssetVersion> = by_version
+        .into_values()
+        .map(|version| AssetVersion {
+            choice: sources.choice(&version),
+            ..version
+        })
+        .collect();
     versions.sort_by(|a, b| {
         b.shown
             .len()
@@ -317,9 +410,11 @@ pub fn asset_versions(options: &ScanOptions, models: &[String]) -> Option<AssetV
             .then_with(|| (b.source == AssetSource::Game).cmp(&(a.source == AssetSource::Game)))
             .then_with(|| a.id.cmp(&b.id))
     });
+    let reset = sources.reset(&paths);
     Some(AssetVersions {
         files: paths,
         versions,
+        reset,
     })
 }
 

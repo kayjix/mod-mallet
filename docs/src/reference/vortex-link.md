@@ -105,12 +105,13 @@ newer of the two. The file stays when Vortex is closed.
 |---|---|
 | `protocol` | Version of this format. The extension refuses other versions. |
 | `id` | The name of the file without `.json`. |
-| `action` | `reinstall-mod`, `install-archive`, `load-after` or `set-mod-enabled`. |
+| `action` | `reinstall-mod`, `install-archive`, `load-after`, `set-mod-enabled` or `file-overrides`. |
 | `game` | Vortex's identifier of the game. The request is refused if Vortex is managing another game. |
 | `modId` | For `reinstall-mod` and `set-mod-enabled`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
 | `plugin`, `after` | For `load-after`: two plugin file names (`.esp`, `.esm`, `.esl`). |
 | `enabled` | For `set-mod-enabled`: `true` or `false`. |
 | `tick` | For `reinstall-mod`, optional: installer options to tick in advance, each `{ "step", "group", "option", "index" }`, with `index` the option's position in its group, counting from 0, in the order the installer shows them. Since extension 0.6.0. |
+| `files`, `leaveOut`, `provide` | For `file-overrides`: files below the data directory (at most 200, relative, without `..`), and the mods (folder or Vortex's id) that are to leave them out and to deploy them again. Since extension 0.7.0. |
 | `path` | For `install-archive`: a zip archive in `%LOCALAPPDATA%\mod-mallet\patches`. Archives anywhere else are refused (`not-allowed`). |
 | `createdAt` | When the request was written. A request older than a minute is refused. |
 
@@ -168,6 +169,17 @@ plugin list and can be removed there.
 The extension switches the mod on or off in the profile in use, as the
 switch in Vortex's mod list does (`SET_MOD_ENABLED`, then `mods-enabled`),
 and answers `applied`. Vortex then deploys, or asks to.
+
+### file-overrides
+
+The extension adds the files, as full paths into the game's `Data` folder
+(which is how Vortex's own editor of file conflicts keeps them), to the
+`fileOverrides` of each mod in `leaveOut`, and takes them out of those of
+each mod in `provide`, with `SET_FILE_OVERRIDE`; a mod's other overrides
+stay. Vortex does not deploy a file that is in a mod's overrides. The
+extension then emits `deploy-mods`, as Vortex's *Deploy* button does. The
+user finds the overrides among the mods' file conflicts in Vortex and can
+change them there (ADR 0053).
 
 ## A result
 

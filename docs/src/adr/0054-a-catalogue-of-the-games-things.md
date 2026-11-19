@@ -100,6 +100,19 @@ collisions too.
 - Reading files in the staging folder means the place's description on the
   first-run page changes from "only the names of their files" to "the files
   of the things you look at".
+- Vortex keeps a mod's file overrides as the files it leaves out, as full
+  paths into the game's `Data` folder; its own editor of file conflicts
+  writes them the same way. Choosing a version adds the thing's files to
+  the overrides of every other mod with a loose copy and takes them out of
+  the chosen mod's, then deploys. Where the chosen copy lies only in an
+  archive that a later archive covers, overrides cannot help; that version
+  offers no choice, since only the order of plugins would.
+- The request needs the Vortex extension 0.7.0; an older one refuses it,
+  and the window offers to update the link, as for any new action.
+- Mod Mallet remembers which version it put into the game for each thing,
+  in the settings next to the duels' decisions, so that the list can show
+  and filter what was chosen. A change made in Vortex's own editor is not
+  seen there; the versions themselves always show what the game uses.
 - A thing decided by a file override and the duel of the same two mods can
   disagree: the override wins for its files. The asset collisions show the
   pair's rule, the catalogue the thing's.

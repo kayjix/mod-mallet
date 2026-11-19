@@ -43,6 +43,10 @@ export interface Api {
   assetVersions(models: string[]): Promise<AssetVersions | null>;
   /** The mesh at `path` as one version of a thing makes it look. */
   assetView(path: string, version: string): Promise<MeshView | null>;
+  /** The versions of things the user put into the game, by thing. */
+  assetChoices(): Promise<Record<string, string>>;
+  /** Remembers the version of a thing put into the game, or forgets it with null. */
+  setAssetChoice(id: string, version: string | null): Promise<Record<string, string>>;
   /** Hands an action to the mod manager and says what became of it. */
   runAction(action: Action, lang: Lang): Promise<RenderedOutcome>;
   /** Whether the link to the mod manager is installed and answering. */
@@ -176,6 +180,9 @@ const tauriApi: Api = {
   catalogue: (lang) => invoke<Catalogue | null>("catalogue", { lang }),
   assetVersions: (models) => invoke<AssetVersions | null>("asset_versions", { models }),
   assetView: (path, version) => invoke<MeshView | null>("asset_view", { path, version }),
+  assetChoices: () => invoke<Record<string, string>>("asset_choices"),
+  setAssetChoice: (id, version) =>
+    invoke<Record<string, string>>("set_asset_choice", { id, version }),
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
   interiorObjects: (cell) => invoke<AreaObjects | null>("interior_objects", { cell }),

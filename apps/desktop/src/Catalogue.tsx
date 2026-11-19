@@ -2,8 +2,8 @@
 // armour and other thing of the game and the mods, alone or as the sets
 // characters wear, on the same stage as the comparison of duels.
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { useSession } from "./Actions";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ActionResult, useAction, useSession } from "./Actions";
 import {
   type CatalogueTexts,
   GROUP_OF,
@@ -18,14 +18,14 @@ import type {
   CatalogueOutfit,
   CatalogueSource,
 } from "./generated/catalogue";
-import type { ModRef } from "./generated/rendered-report";
+import type { Action, ModRef } from "./generated/rendered-report";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
 
 type Arrange = "category" | "material" | "outfit";
 
 /** Where things come from, as the filter has it; `mod:` names one mod. */
-type Origin = "all" | "game" | "creation-club" | "mods" | "changed" | `mod:${string}`;
+type Origin = "all" | "chosen" | "game" | "creation-club" | "mods" | "changed" | `mod:${string}`;
 
 type Selection = { kind: "item"; id: string } | { kind: "outfit"; id: string };
 
@@ -111,13 +111,20 @@ function outfitTitle(outfit: CatalogueOutfit, index: Index): string {
 }
 
 /** Whether a thing comes from where the filter asks. */
-function fromOrigin(item: CatalogueItem, origin: Origin, index: Index): boolean {
+function fromOrigin(
+  item: CatalogueItem,
+  origin: Origin,
+  index: Index,
+  choices: Record<string, string>,
+): boolean {
   const source = index.sources.get(item.plugin);
   const changers = (item.changedBy ?? []).map((plugin) => index.sources.get(plugin));
   const changedByMod = changers.some((changer) => changer?.origin === "mod");
   switch (origin) {
     case "all":
       return true;
+    case "chosen":
+      return choices[item.id] !== undefined;
     case "game":
       return source?.origin === "game" && !changedByMod;
     case "creation-club":
@@ -152,6 +159,17 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
   const [origin, setOrigin] = useState<Origin>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Selection | null>(null);
+  // The versions of things the user put into the game, by thing.
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  useEffect(() => {
+    api.assetChoices().then(setChoices, () => setChoices({}));
+  }, [api]);
+  const choose = useCallback(
+    (id: string, version: string | null) => {
+      api.setAssetChoice(id, version).then(setChoices, () => undefined);
+    },
+    [api],
+  );
 
   useEffect(() => {
     let live = true;
@@ -218,6 +236,7 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
             <span>{c.originLabel}</span>
             <select value={origin} onChange={(event) => setOrigin(event.target.value as Origin)}>
               <option value="all">{c.originAll}</option>
+              <option value="chosen">{c.originChosen}</option>
               <option value="game">{c.originGame}</option>
               <option value="creation-club">{c.originCreationClub}</option>
               <option value="mods">{c.originMods}</option>
@@ -255,6 +274,7 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
         {shownArrange === "outfit" ? (
           <OutfitList
             index={index}
+            choices={choices}
             group={group}
             origin={origin}
             search={search.trim().toLowerCase()}
@@ -264,6 +284,7 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
         ) : (
           <ItemList
             index={index}
+            choices={choices}
             group={group}
             arrange={shownArrange}
             origin={origin}
@@ -276,7 +297,13 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
       {selected === null ? (
         <p className="aside catalogue-message catalogue-pick">{c.pickSomething}</p>
       ) : selected.kind === "item" ? (
-        <ItemView index={index} id={selected.id} onSelect={setSelected} />
+        <ItemView
+          index={index}
+          id={selected.id}
+          onSelect={setSelected}
+          choices={choices}
+          onChoice={choose}
+        />
       ) : (
         <OutfitView index={index} id={selected.id} onSelect={setSelected} />
       )}
@@ -288,6 +315,7 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
 
 interface ListProps {
   index: Index;
+  choices: Record<string, string>;
   group: Group;
   origin: Origin;
   search: string;
@@ -297,6 +325,7 @@ interface ListProps {
 
 function ItemList({
   index,
+  choices,
   group,
   arrange,
   origin,
@@ -311,7 +340,7 @@ function ItemList({
       if (
         GROUP_OF[item.category] !== group ||
         !matchesSearch(item, search) ||
-        !fromOrigin(item, origin, index)
+        !fromOrigin(item, origin, index, choices)
       ) {
         continue;
       }
@@ -319,7 +348,7 @@ function ItemList({
       found.set(key, [...(found.get(key) ?? []), item]);
     }
     return [...found].sort(([a], [b]) => a.localeCompare(b));
-  }, [index, group, arrange, origin, search, c]);
+  }, [index, choices, group, arrange, origin, search, c]);
 
   if (sections.length === 0) {
     return <p className="aside">{c.nothingFound}</p>;
@@ -342,6 +371,7 @@ function ItemList({
                 <ItemRow
                   item={item}
                   index={index}
+                  chosen={choices[item.id] !== undefined}
                   selected={item.id === selectedId}
                   onClick={() => onSelect({ kind: "item", id: item.id })}
                 />
@@ -421,14 +451,17 @@ function Paged({ rows }: { rows: ReactNode[] }) {
 function ItemRow({
   item,
   index,
+  chosen,
   selected,
   onClick,
 }: {
   item: CatalogueItem;
   index: Index;
+  chosen: boolean;
   selected: boolean;
   onClick: () => void;
 }) {
+  const c = useCatalogueTexts();
   const source = index.sources.get(item.plugin);
   const changers = (item.changedBy ?? [])
     .map((plugin) => index.sources.get(plugin))
@@ -439,12 +472,13 @@ function ItemRow({
       <span className="catalogue-row-from">
         {source?.origin === "mod" && <span>{modName(source, index.modNames)}</span>}
         {changers.length > 0 && <span className="catalogue-changed">✎ {changers.length}</span>}
+        {chosen && <span className="catalogue-chosen">✓ {c.versionChosen}</span>}
       </span>
     </button>
   );
 }
 
-function OutfitList({ index, group, origin, search, selected, onSelect }: ListProps) {
+function OutfitList({ index, choices, group, origin, search, selected, onSelect }: ListProps) {
   const c = useCatalogueTexts();
   const outfits = useMemo(() => {
     // A set is listed with the things the page lists: under weapons, sets
@@ -461,13 +495,14 @@ function OutfitList({ index, group, origin, search, selected, onSelect }: ListPr
           outfitTitle(outfit, index).toLowerCase().includes(search) ||
           pieces.some((piece) => matchesSearch(piece, search));
         return (
-          searched && (origin === "all" || pieces.some((piece) => fromOrigin(piece, origin, index)))
+          searched &&
+          (origin === "all" || pieces.some((piece) => fromOrigin(piece, origin, index, choices)))
         );
       })
       .sort(
         (a, b) => b.characters - a.characters || (a.editorId ?? "").localeCompare(b.editorId ?? ""),
       );
-  }, [index, group, origin, search]);
+  }, [index, choices, group, origin, search]);
 
   if (outfits.length === 0) {
     return <p className="aside">{c.nothingFound}</p>;
@@ -504,17 +539,30 @@ function ItemView({
   index,
   id,
   onSelect,
+  choices,
+  onChoice,
 }: {
   index: Index;
   id: string;
   onSelect: (selection: Selection) => void;
+  choices: Record<string, string>;
+  onChoice: (id: string, version: string | null) => void;
 }) {
   const c = useCatalogueTexts();
   const item = index.items.get(id);
   if (item === undefined) {
     return <p className="aside catalogue-message catalogue-pick">{c.pickSomething}</p>;
   }
-  return <ItemPage key={item.id} item={item} index={index} onSelect={onSelect} />;
+  return (
+    <ItemPage
+      key={item.id}
+      item={item}
+      index={index}
+      onSelect={onSelect}
+      choices={choices}
+      onChoice={onChoice}
+    />
+  );
 }
 
 /** The name of a version: the game, the mod, the archive or loose files. */
@@ -535,13 +583,34 @@ function ItemPage({
   item,
   index,
   onSelect,
+  choices,
+  onChoice,
 }: {
   item: CatalogueItem;
   index: Index;
   onSelect: (selection: Selection) => void;
+  choices: Record<string, string>;
+  onChoice: (id: string, version: string | null) => void;
 }) {
   const c = useCatalogueTexts();
   const { api } = useSession();
+  const action = useAction();
+  // The version being put into the game, or `null` while the choice is
+  // being taken back; remembered once the mod manager has done it.
+  const [pending, setPending] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (pending === undefined || action.busy || action.outcome === null) {
+      return;
+    }
+    if (action.outcome.outcome.status === "applied") {
+      onChoice(item.id, pending);
+    }
+    setPending(undefined);
+  }, [action.busy, action.outcome, pending, item.id, onChoice]);
+  const choose = (version: string | null, choice: Action) => {
+    setPending(version);
+    void action.run(choice);
+  };
   const [versions, setVersions] = useState<AssetVersions | null | undefined>(undefined);
   const [model, setModel] = useState(0);
   // The versions on the stage; until the user picks, the first ones.
@@ -615,7 +684,19 @@ function ItemPage({
         )}
         {all.length > 0 && (
           <div className="catalogue-versions">
-            <h3>{c.versionsTitle}</h3>
+            <div className="catalogue-versions-head">
+              <h3>{c.versionsTitle}</h3>
+              {choices[item.id] !== undefined && versions?.reset && (
+                <button
+                  type="button"
+                  disabled={action.busy}
+                  title={c.resetHint}
+                  onClick={() => versions.reset && choose(null, versions.reset)}
+                >
+                  {c.reset}
+                </button>
+              )}
+            </div>
             <p className="aside">
               {all.length === 1 ? c.versionsOnlyOne : c.versionsHint(SIDE_BY_SIDE)}
             </p>
@@ -655,11 +736,26 @@ function ItemPage({
                             : c.versionPartlyInGame(version.shown.length, version.files.length)}
                         </span>
                       )}
+                      {choices[item.id] === version.id && (
+                        <span className="catalogue-version-chosen">{c.versionChosen}</span>
+                      )}
                     </label>
+                    {version.choice && (
+                      <button
+                        type="button"
+                        className="catalogue-version-take"
+                        disabled={action.busy}
+                        title={c.takeHint}
+                        onClick={() => version.choice && choose(version.id, version.choice)}
+                      >
+                        {c.take}
+                      </button>
+                    )}
                   </li>
                 );
               })}
             </ul>
+            <ActionResult state={action} />
           </div>
         )}
       </section>

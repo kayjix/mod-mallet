@@ -1172,23 +1172,31 @@ function sampleGames(): GameChoice {
 export const sampleApi: Api = {
   scan: (lang) => later(report(lang)),
   lastReport: () => later(null),
-  runAction: (_action, lang) =>
+  runAction: (action, lang) =>
     later(
-      linkInstalled
+      linkInstalled && action.type === "file-overrides"
         ? {
-            outcome: { status: "started" as const },
+            outcome: { status: "applied" as const },
             message:
               lang === "de"
-                ? "Vortex hat den Installer geöffnet. Mach dort weiter und scanne danach erneut."
-                : "Vortex has opened the installer. Continue there, and scan again when you are done.",
+                ? "Vortex hat die Dateien umgestellt und stellt neu bereit."
+                : "Vortex has switched the files and is deploying.",
           }
-        : {
-            outcome: { status: "link-missing" as const },
-            message:
-              lang === "de"
-                ? "Dafür braucht es eine kleine Erweiterung in Vortex, die noch nicht installiert ist."
-                : "This needs a small extension in Vortex, which is not installed yet.",
-          },
+        : linkInstalled
+          ? {
+              outcome: { status: "started" as const },
+              message:
+                lang === "de"
+                  ? "Vortex hat den Installer geöffnet. Mach dort weiter und scanne danach erneut."
+                  : "Vortex has opened the installer. Continue there, and scan again when you are done.",
+            }
+          : {
+              outcome: { status: "link-missing" as const },
+              message:
+                lang === "de"
+                  ? "Dafür braucht es eine kleine Erweiterung in Vortex, die noch nicht installiert ist."
+                  : "This needs a small extension in Vortex, which is not installed yet.",
+            },
     ),
   managerLink: (lang) =>
     later({
@@ -1236,8 +1244,17 @@ export const sampleApi: Api = {
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
   catalogue: () => later(sampleCatalogue()),
-  assetVersions: (models) => later(sampleVersions(models)),
+  assetVersions: (models) => later(withChoices(sampleVersions(models))),
   assetView: (path, version) => later(sampleCube(path, SAMPLE_COLOURS[version] ?? "#8a8a8a")),
+  assetChoices: () => later({ ...assetChoices }),
+  setAssetChoice: (id, version) => {
+    if (version === null) {
+      delete assetChoices[id];
+    } else {
+      assetChoices[id] = version;
+    }
+    return later({ ...assetChoices });
+  },
   // Up close, made-up bridges at every collision spot; no level of detail.
   areaObjects: (world, x, y, radius) => later(sampleArea(world, x, y, radius)),
   areaLand: () => later(null),
@@ -1800,6 +1817,35 @@ const SAMPLE_COLOURS: Record<string, string> = {
   "mod:Blood Stains-1234-1-0": "#8b1a1a",
   "archive:ccbgssse001-fish.bsa": "#3fa7a7",
 };
+
+/** The versions of things put into the game in the sample, by thing. */
+const assetChoices: Record<string, string> = {};
+
+/** The versions with what would put each into the game, and the way back. */
+function withChoices(versions: AssetVersions): AssetVersions {
+  const loose = versions.versions.flatMap((version) =>
+    version.source.type === "mod" ? [version.source.mod] : [],
+  );
+  return {
+    ...versions,
+    reset:
+      loose.length === 0 ? null : { type: "file-overrides", files: versions.files, provide: loose },
+    versions: versions.versions.map((version) => ({
+      ...version,
+      choice:
+        version.shown.length === version.files.length
+          ? null
+          : {
+              type: "file-overrides",
+              files: version.files,
+              leaveOut: loose.filter(
+                (mod) => version.source.type !== "mod" || mod.id !== version.source.mod.id,
+              ),
+              provide: version.source.type === "mod" ? [version.source.mod] : [],
+            },
+    })),
+  };
+}
 
 /** Made-up versions of a thing: the steel sword has many, others one or two. */
 function sampleVersions(models: string[]): AssetVersions {

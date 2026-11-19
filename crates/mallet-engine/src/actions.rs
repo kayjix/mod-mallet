@@ -137,6 +137,33 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
                 link.set_mod_enabled(options.vortex_game(), &mod_ref.id, true, timeout)
             })
         }
+        Action::FileOverrides {
+            files,
+            leave_out,
+            provide,
+        } => {
+            fn ids(mods: &[mallet_core::ModRef]) -> Option<Vec<&str>> {
+                mods.iter()
+                    .map(|mod_ref| (mod_ref.source == SOURCE_ID).then_some(mod_ref.id.as_str()))
+                    .collect()
+            }
+            let (Some(leave_out), Some(provide)) = (ids(leave_out), ids(provide)) else {
+                return ActionOutcome {
+                    status: ActionStatus::Unsupported,
+                    detail: Some("file overrides only through Vortex".to_owned()),
+                };
+            };
+            let files: Vec<&str> = files.iter().map(String::as_str).collect();
+            in_vortex(options, |link, timeout| {
+                tracing::info!(
+                    files = files.len(),
+                    leave_out = leave_out.len(),
+                    provide = provide.len(),
+                    "asking Vortex for file overrides"
+                );
+                link.file_overrides(options.vortex_game(), &files, &leave_out, &provide, timeout)
+            })
+        }
         Action::ReinstallMod { mod_ref, .. }
         | Action::DisableMod { mod_ref }
         | Action::EnableMod { mod_ref } => ActionOutcome {

@@ -57,6 +57,22 @@ pub enum Action {
         #[serde(rename = "mod")]
         mod_ref: ModRef,
     },
+    /// Decide whose copies of some loose files reach the game, through the
+    /// mod manager's file overrides (ADR 0053): the mods in `leave_out` no
+    /// longer deploy the files, those in `provide` deploy them again. With
+    /// every mod in `leave_out` but one, that one's copies win; with every
+    /// mod in `leave_out`, the copies in the archives show. Removing the
+    /// overrides in the mod manager undoes it.
+    FileOverrides {
+        /// The files, below the data directory (`meshes/...`).
+        files: Vec<String>,
+        /// The mods that are to leave the files out.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        leave_out: Vec<ModRef>,
+        /// The mods that are to deploy the files again.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        provide: Vec<ModRef>,
+    },
 }
 
 /// A placed object, by the plugin that placed it first and its number in

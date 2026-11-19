@@ -25,7 +25,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const PROTOCOL = 1;
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 
 /** How often status.json is refreshed. */
 const HEARTBEAT_MS = 5000;
@@ -54,7 +54,16 @@ function patchesDir(env) {
 const PATCH_FILE = /^[^\\/:*?"<>|]{1,120}\.zip$/i;
 
 /** The actions this version of the extension carries out. */
-const ACTIONS = ["reinstall-mod", "install-archive", "load-after", "set-mod-enabled"];
+const ACTIONS = [
+  "reinstall-mod",
+  "install-archive",
+  "load-after",
+  "set-mod-enabled",
+  "file-overrides",
+];
+
+/** How many files one request for file overrides may name. */
+const MAX_OVERRIDE_FILES = 200;
 
 /** A plugin's file name, as a rule in the plugin list may name it. */
 const PLUGIN_FILE = /^[^\\/:*?"<>|]{1,200}\.(esp|esm|esl)$/i;
@@ -106,6 +115,9 @@ function plan(state, request, now, env = process.env) {
   }
   if (request.action === "load-after") {
     return planLoadAfter(state, request);
+  }
+  if (request.action === "file-overrides") {
+    return planFileOverrides(state, request, game);
   }
   const modId = findModId(state, game, request.modId);
   if (modId === undefined) {
@@ -222,6 +234,67 @@ function planLoadAfter(state, request) {
   return { code: "applied", rule: known ? undefined : { pluginId, reference } };
 }
 
+/** A file below the data directory, as Mod Mallet names it: relative, without `..`. */
+function isDataFile(value) {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 260 &&
+    !path.win32.isAbsolute(value) &&
+    !/[:*?"<>|]/.test(value) &&
+    !value.split(/[\\/]/).includes("..")
+  );
+}
+
+/**
+ * Which files the mods are to leave out (ADR 0053): `files` (below the data
+ * directory) are added to the file overrides of the mods in `leaveOut`, so
+ * that Vortex does not deploy their copies, and taken out of those of the
+ * mods in `provide`, so that it deploys theirs again. Vortex keeps the
+ * overrides as full paths into the folder it deploys to, as its own editor
+ * of file conflicts does.
+ */
+function planFileOverrides(state, request, game) {
+  const { files } = request;
+  const leaveOut = request.leaveOut ?? [];
+  const provide = request.provide ?? [];
+  if (
+    !Array.isArray(files) ||
+    files.length === 0 ||
+    files.length > MAX_OVERRIDE_FILES ||
+    !files.every(isDataFile) ||
+    !Array.isArray(leaveOut) ||
+    !Array.isArray(provide)
+  ) {
+    return { code: "failed", detail: "files, leaveOut or provide are not lists of names" };
+  }
+  const discovered = state?.settings?.gameMode?.discovered?.[game]?.path;
+  if (typeof discovered !== "string" || discovered.length === 0) {
+    return { code: "failed", detail: "Vortex does not know where the game is" };
+  }
+  const full = files.map((file) => path.win32.join(discovered, "Data", file));
+  const named = (entry) =>
+    typeof entry === "string" && full.some((file) => file.toLowerCase() === entry.toLowerCase());
+  const overrides = [];
+  for (const [ids, leave] of [
+    [leaveOut, true],
+    [provide, false],
+  ]) {
+    for (const id of ids) {
+      const modId = typeof id === "string" ? findModId(state, game, id) : undefined;
+      if (modId === undefined) {
+        return { code: "unknown-mod", detail: String(id) };
+      }
+      const existing = state.persistent.mods[game][modId].fileOverrides ?? [];
+      const kept = (Array.isArray(existing) ? existing : []).filter(
+        (entry) => typeof entry === "string" && !named(entry),
+      );
+      overrides.push({ modId, files: leave ? [...kept, ...full] : kept });
+    }
+  }
+  return { code: "applied", overrides };
+}
+
 /**
  * Whether an archive may be installed: only a zip file that Mod Mallet put
  * into its own patches folder, so that a request cannot make Vortex
@@ -330,6 +403,23 @@ function handle(
   }
   if (request?.action === "load-after" && planned.code === "applied") {
     api.events.emit("autosort-plugins", true);
+  }
+  if (planned.overrides !== undefined) {
+    // What Vortex's editor of file conflicts does when it saves.
+    for (const { modId, files } of planned.overrides) {
+      api.store?.dispatch({
+        type: "SET_FILE_OVERRIDE",
+        payload: { gameId: request.game, modId, files },
+      });
+    }
+    // What Vortex's own "Deploy" button does.
+    api.events.emit("deploy-mods", (error) => {
+      if (error) {
+        log("warn", "deployment after file overrides failed", {
+          error: String(error?.message ?? error),
+        });
+      }
+    });
   }
   if (planned.enable !== undefined) {
     const { profileId, modId, game, enabled } = planned.enable;

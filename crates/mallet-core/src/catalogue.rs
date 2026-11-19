@@ -8,7 +8,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{ModRef, WorldOrigin};
+use crate::{Action, ModRef, WorldOrigin};
 
 /// Every thing of the setup worth looking at, with the sets it forms.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -246,6 +246,11 @@ pub struct AssetVersions {
     pub files: Vec<String>,
     /// The versions, the one the game shows most of first.
     pub versions: Vec<AssetVersion>,
+    /// What puts back the mod manager's own order for the thing's loose
+    /// files, taking back a version chosen before; `None` where no mod
+    /// brings them loose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset: Option<Action>,
 }
 
 /// One version of a thing: the copies of its files one source brings.
@@ -261,6 +266,11 @@ pub struct AssetVersion {
     pub files: Vec<String>,
     /// Of those, the ones whose copy the game uses.
     pub shown: Vec<String>,
+    /// What makes the game show this version, where the mod manager can:
+    /// for loose files of other mods in the way. `None` where nothing is in
+    /// the way, or where only the order of plugins would help.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choice: Option<Action>,
 }
 
 /// Where the copies of a version come from.

@@ -128,6 +128,29 @@ fn set_ignored(id: String, ignored: bool) -> Result<Vec<String>, String> {
     Ok(settings.ignored.into_iter().collect())
 }
 
+/// The versions of things the user put into the game, by thing.
+#[tauri::command(async)]
+fn asset_choices() -> Result<BTreeMap<String, String>, String> {
+    Ok(settings()?.asset_choices)
+}
+
+/// Remembers the version of a thing the user put into the game, or forgets
+/// it with `None`, and returns all such choices afterwards. Only ever
+/// called after the mod manager carried out the choice.
+#[tauri::command(async)]
+fn set_asset_choice(
+    id: String,
+    version: Option<String>,
+) -> Result<BTreeMap<String, String>, String> {
+    let settings = change_settings(|settings| {
+        match version {
+            Some(version) => settings.asset_choices.insert(id, version),
+            None => settings.asset_choices.remove(&id),
+        };
+    })?;
+    Ok(settings.asset_choices)
+}
+
 /// The sides the user picked in duels between mods, by duel.
 #[tauri::command(async)]
 fn decisions() -> Result<BTreeMap<String, u8>, String> {
@@ -669,6 +692,8 @@ pub fn run() -> tauri::Result<()> {
             mesh_view,
             catalogue,
             asset_versions,
+            asset_choices,
+            set_asset_choice,
             asset_view,
             lod_tiles,
             lod_mesh,

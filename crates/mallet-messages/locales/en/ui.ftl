@@ -103,6 +103,33 @@ action-disable-mod = Disable { $mod }
 action-enable-mod = Switch on { $mod }
     .description = Vortex switches { $mod } on in the profile you use, and asks to deploy. Switch it off again in Vortex to undo it.
 
+action-file-overrides = Use { $mod }'s version
+    .description = Vortex leaves { $count } { $count ->
+        [one] file
+       *[other] files
+    } of this thing out of the other mods that bring { $count ->
+        [one] it
+       *[other] them
+    }, so that those of { $mod } reach the game, and deploys again. Only these files change. You find this, and can take it back, among the mods' file conflicts in Vortex.
+
+action-file-overrides-archives = Use the version in the archives
+    .description = Vortex leaves { $count } { $count ->
+        [one] file
+       *[other] files
+    } of this thing out of the mods that bring { $count ->
+        [one] it
+       *[other] them
+    } loose, so that the version in the archives shows, and deploys again. You find this, and can take it back, among the mods' file conflicts in Vortex.
+
+action-file-overrides-reset = Take the choice back
+    .description = Vortex deploys { $count } { $count ->
+        [one] file
+       *[other] files
+    } of this thing from every mod that brings { $count ->
+        [one] it
+       *[other] them
+    } again; the order of the mods decides once more.
+
 ## Duels: everything two mods disagree about.
 
 duel-topic-faces = { $count ->

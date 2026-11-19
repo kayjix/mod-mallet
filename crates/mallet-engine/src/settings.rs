@@ -50,6 +50,11 @@ pub struct Settings {
     /// game.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub patch_choices: Option<BTreeMap<String, Option<String>>>,
+    /// Which version of a thing of the catalogue the user had the mod
+    /// manager put into the game, by the thing's identity: the version's
+    /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0053).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub asset_choices: BTreeMap<String, String>,
 }
 
 impl Settings {
@@ -570,6 +575,10 @@ mod tests {
                 ),
                 ("spot:objects.overlapping:pair:a+b|a.esp:1".to_owned(), None),
             ])),
+            asset_choices: BTreeMap::from([(
+                "skyrim.esm/00013989".to_owned(),
+                "mod:Better Blades".to_owned(),
+            )]),
         };
 
         save_settings(&path, &settings).unwrap();

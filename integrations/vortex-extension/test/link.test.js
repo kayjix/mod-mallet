@@ -577,3 +577,70 @@ test("a reinstall without options to tick saves nothing with the mod", () => {
   link.handle(api, request(), NOW);
   assert.deepEqual(api.dispatched, []);
 });
+
+/** A file in the game's data folder, as Vortex keeps it in an override. */
+const inData = (file) => path.win32.join("C:/Games/Skyrim/Data", file);
+
+/** A state in which Vortex knows the game and two mods bring the same sword. */
+function swordState() {
+  const current = state();
+  current.settings.gameMode = { discovered: { skyrimse: { path: "C:/Games/Skyrim" } } };
+  current.persistent.mods.skyrimse.Plain.fileOverrides = [
+    inData("meshes/weapons/sword.nif"),
+    inData("meshes/other.nif"),
+  ];
+  return current;
+}
+
+function overrides(extra = {}) {
+  return {
+    ...request(),
+    action: "file-overrides",
+    files: ["meshes/weapons/sword.nif", "textures/weapons/sword.dds"],
+    leaveOut: ["Patch Hub 1.0"],
+    provide: ["Plain"],
+    ...extra,
+  };
+}
+
+test("file overrides leave the files out of some mods and give them back to others", () => {
+  const planned = link.plan(swordState(), overrides(), NOW);
+  assert.equal(planned.code, "applied");
+  assert.deepEqual(planned.overrides, [
+    {
+      modId: "patch-hub",
+      files: [inData("meshes/weapons/sword.nif"), inData("textures/weapons/sword.dds")],
+    },
+    // Only the files asked about are taken out; other overrides stay.
+    { modId: "Plain", files: [inData("meshes/other.nif")] },
+  ]);
+});
+
+test("file overrides are dispatched as Vortex's editor does and the mods deployed", () => {
+  const api = fakeApi(swordState());
+  const dispatched = [];
+  api.store = { dispatch: (action) => dispatched.push(action) };
+  const result = link.handle(api, overrides(), NOW);
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    dispatched.map((action) => [action.type, action.payload.modId]),
+    [
+      ["SET_FILE_OVERRIDE", "patch-hub"],
+      ["SET_FILE_OVERRIDE", "Plain"],
+    ],
+  );
+  assert.equal(api.emitted.length, 1);
+  assert.equal(api.emitted[0][0], "deploy-mods");
+  assert.equal(typeof api.emitted[0][1], "function");
+});
+
+test("file overrides are refused for paths out of the data folder, unknown mods and unknown games", () => {
+  for (const files of [[], ["../Skyrim.ini"], ["C:/Windows/x.dll"], "meshes/x.nif"]) {
+    assert.equal(link.plan(swordState(), overrides({ files }), NOW).code, "failed");
+  }
+  assert.equal(
+    link.plan(swordState(), overrides({ leaveOut: ["Nobody"] }), NOW).code,
+    "unknown-mod",
+  );
+  assert.equal(link.plan(state(), overrides(), NOW).code, "failed");
+});

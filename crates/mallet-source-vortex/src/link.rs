@@ -97,6 +97,12 @@ struct Request<'a> {
     enabled: Option<bool>,
     #[serde(skip_serializing_if = "<[TickRequest<'a>]>::is_empty")]
     tick: Vec<TickRequest<'a>>,
+    #[serde(skip_serializing_if = "<[&str]>::is_empty")]
+    files: &'a [&'a str],
+    #[serde(skip_serializing_if = "<[&str]>::is_empty")]
+    leave_out: &'a [&'a str],
+    #[serde(skip_serializing_if = "<[&str]>::is_empty")]
+    provide: &'a [&'a str],
     created_at: u64,
 }
 
@@ -119,6 +125,9 @@ struct Subject<'a> {
     after: Option<&'a str>,
     enabled: Option<bool>,
     tick: &'a [OptionToTick],
+    files: &'a [&'a str],
+    leave_out: &'a [&'a str],
+    provide: &'a [&'a str],
 }
 
 #[derive(Deserialize)]
@@ -233,6 +242,27 @@ impl Link {
         self.ask("set-mod-enabled", game, &subject, timeout)
     }
 
+    /// Asks Vortex to leave `files` (below the data directory) out of the
+    /// mods `leave_out` and to deploy them again from the mods `provide`,
+    /// through its file overrides, and then to deploy. Mods are named by
+    /// their folder in the staging directory.
+    pub fn file_overrides(
+        &self,
+        game: &str,
+        files: &[&str],
+        leave_out: &[&str],
+        provide: &[&str],
+        timeout: Duration,
+    ) -> Result<Reply, LinkError> {
+        let subject = Subject {
+            files,
+            leave_out,
+            provide,
+            ..Subject::default()
+        };
+        self.ask("file-overrides", game, &subject, timeout)
+    }
+
     fn ask(
         &self,
         action: &str,
@@ -268,6 +298,9 @@ impl Link {
                     index: option.index,
                 })
                 .collect(),
+            files: subject.files,
+            leave_out: subject.leave_out,
+            provide: subject.provide,
             created_at: now_ms(),
         };
 

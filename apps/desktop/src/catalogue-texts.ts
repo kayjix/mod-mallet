@@ -72,6 +72,12 @@ export interface CatalogueTexts {
   versionInGame: string;
   versionPartlyInGame: (shown: number, of: number) => string;
   looseFiles: string;
+  versionChosen: string;
+  take: string;
+  takeHint: string;
+  reset: string;
+  resetHint: string;
+  originChosen: string;
   game: string;
   creationClub: string;
   /** A material by its name in the game's keywords, in the user's language where known. */
@@ -234,6 +240,14 @@ const en: CatalogueTexts = {
   versionInGame: "in the game",
   versionPartlyInGame: (shown, of) => `${shown} of ${of} in the game`,
   looseFiles: "Loose files without a mod",
+  versionChosen: "your choice",
+  take: "Put into the game",
+  takeHint:
+    "Vortex leaves these files out of the other mods that bring them and deploys again. Only this thing's files change; you can take it back here or among the file conflicts in Vortex.",
+  reset: "Take the choice back",
+  resetHint:
+    "Vortex deploys these files from every mod again; the order of the mods decides once more.",
+  originChosen: "Chosen by you",
   game: "The game",
   creationClub: "Creation Club",
   material: (name) => words(name),
@@ -346,6 +360,14 @@ const de: CatalogueTexts = {
   versionInGame: "im Spiel",
   versionPartlyInGame: (shown, of) => `${shown} von ${of} im Spiel`,
   looseFiles: "Lose Dateien ohne Mod",
+  versionChosen: "deine Wahl",
+  take: "Ins Spiel nehmen",
+  takeHint:
+    "Vortex lässt diese Dateien bei den anderen Mods weg, die sie mitbringen, und stellt neu bereit. Nur die Dateien dieses Gegenstands wechseln; zurücknehmen kannst du es hier oder bei den Dateikonflikten in Vortex.",
+  reset: "Wahl zurücknehmen",
+  resetHint:
+    "Vortex stellt diese Dateien wieder von allen Mods bereit; dann entscheidet wieder die Reihenfolge der Mods.",
+  originChosen: "Von dir gewählt",
   game: "Das Spiel",
   creationClub: "Creation Club",
   material: (name) => MATERIALS_DE[name] ?? words(name),
