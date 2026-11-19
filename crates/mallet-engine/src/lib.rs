@@ -29,6 +29,7 @@ mod preview;
 mod settings;
 mod staging;
 mod toolbox;
+mod versions;
 mod walkways;
 
 use std::path::{Path, PathBuf};
@@ -60,6 +61,7 @@ pub use settings::{
     select_game, setup_fingerprint, update_settings,
 };
 pub use toolbox::{game_art, restart_manager, toolbox};
+pub use versions::{asset_versions, asset_view};
 pub use walkways::hidden_walkways;
 
 /// Where to look. Every field that is `None` is detected automatically.

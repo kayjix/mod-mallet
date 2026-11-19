@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
+import type { AssetVersions } from "./generated/asset-versions";
 import type { Catalogue } from "./generated/catalogue";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
@@ -38,6 +39,10 @@ export interface Api {
    * cannot be read.
    */
   catalogue(lang: Lang): Promise<Catalogue | null>;
+  /** Every version of a thing of the catalogue: what the game and each mod make it look like. */
+  assetVersions(models: string[]): Promise<AssetVersions | null>;
+  /** The mesh at `path` as one version of a thing makes it look. */
+  assetView(path: string, version: string): Promise<MeshView | null>;
   /** Hands an action to the mod manager and says what became of it. */
   runAction(action: Action, lang: Lang): Promise<RenderedOutcome>;
   /** Whether the link to the mod manager is installed and answering. */
@@ -169,6 +174,8 @@ const tauriApi: Api = {
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
   catalogue: (lang) => invoke<Catalogue | null>("catalogue", { lang }),
+  assetVersions: (models) => invoke<AssetVersions | null>("asset_versions", { models }),
+  assetView: (path, version) => invoke<MeshView | null>("asset_view", { path, version }),
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
   interiorObjects: (cell) => invoke<AreaObjects | null>("interior_objects", { cell }),

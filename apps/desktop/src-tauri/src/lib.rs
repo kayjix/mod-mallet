@@ -416,6 +416,33 @@ fn catalogue(lang: String) -> Result<Option<mallet_core::catalogue::Catalogue>, 
         .map(|catalogue| (*catalogue).clone()))
 }
 
+/// Every version of a thing of the catalogue whose models are `models`:
+/// what the game and each mod make it look like.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn asset_versions(
+    models: Vec<String>,
+) -> Result<Option<mallet_core::catalogue::AssetVersions>, String> {
+    Ok(mallet_engine::asset_versions(
+        &settings()?.scan_options(),
+        &models,
+    ))
+}
+
+/// The mesh at `path` as the version `version` of a thing makes it look.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn asset_view(
+    path: String,
+    version: String,
+) -> Result<Option<mallet_core::mesh::MeshView>, String> {
+    Ok(mallet_engine::asset_view(
+        &settings()?.scan_options(),
+        &path,
+        &version,
+    ))
+}
+
 /// A mesh of the setup in its own units, with its textures named by path.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -641,6 +668,8 @@ pub fn run() -> tauri::Result<()> {
             set_decision,
             mesh_view,
             catalogue,
+            asset_versions,
+            asset_view,
             lod_tiles,
             lod_mesh,
             lod_texture,

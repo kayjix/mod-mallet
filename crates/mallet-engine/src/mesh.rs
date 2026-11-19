@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use mallet_core::encoding::base64;
 use mallet_core::mesh::{MeshShape, MeshView};
-use mallet_game_bethesda::Game;
+
 use mallet_game_bethesda::files::{self, Origin};
 
 use crate::ScanOptions;
@@ -32,10 +32,33 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         return None;
     }
     let chosen = versions.swap_remove(index);
-    let shapes = files::mesh_shapes(&chosen.bytes);
+    let archive = match chosen.origin {
+        Origin::Loose => None,
+        Origin::Archive(name) => Some(name),
+    };
+    let read = |path: &str| {
+        files::versions(game, &game_dir, local_dir, path)
+            .pop()
+            .map(|version| version.bytes)
+    };
+    render(path, &chosen.bytes, archive, &read)
+}
+
+/// The mesh `bytes`, read from `path` (in `archive`, if it came from one),
+/// ready to draw, with its textures, materials and face tint taken from
+/// `read`, which gives the bytes of a file below the data directory.
+/// For a skeleton, its bones. `None` if it is not a mesh that can be read
+/// or has neither surfaces nor bones.
+pub(crate) fn render(
+    path: &str,
+    bytes: &[u8],
+    archive: Option<String>,
+    read: &dyn Fn(&str) -> Option<Vec<u8>>,
+) -> Option<MeshView> {
+    let shapes = files::mesh_shapes(bytes);
     // A skeleton has bones and no surfaces; its bones are drawn instead.
     let bones = if shapes.is_empty() {
-        files::mesh_bones(&chosen.bytes)
+        files::mesh_bones(bytes)
     } else {
         Vec::new()
     };
@@ -52,7 +75,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         let normalized = texture_path(raw);
         textures
             .entry(normalized.clone())
-            .or_insert_with(|| picture(game, &game_dir, local_dir, &normalized))
+            .or_insert_with(|| picture(&read(&normalized)?))
             .clone()
     };
 
@@ -63,21 +86,11 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         let normalized = below(raw, "materials/");
         materials
             .entry(normalized.clone())
-            .or_insert_with(|| {
-                let version = files::versions(game, &game_dir, local_dir, &normalized).pop()?;
-                files::material_texture(&version.bytes)
-            })
+            .or_insert_with(|| files::material_texture(&read(&normalized)?))
             .clone()
     };
 
-    let lower = path.replace('\\', "/").to_ascii_lowercase();
-    let tint = lower
-        .find(FACE_MESHES)
-        .map(|at| {
-            let rest = lower.get(at + FACE_MESHES.len()..).unwrap_or_default();
-            format!("{FACE_TEXTURES}{}", rest.replace(".nif", ".dds"))
-        })
-        .and_then(|tint_path| picture(game, &game_dir, local_dir, &tint_path));
+    let tint = face_tint(path).and_then(|tint_path| picture(&read(&tint_path)?));
 
     let shapes = shapes
         .into_iter()
@@ -109,10 +122,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         .collect();
     Some(MeshView {
         path: path.to_owned(),
-        archive: match chosen.origin {
-            Origin::Loose => None,
-            Origin::Archive(name) => Some(name),
-        },
+        archive,
         shapes,
         tint,
         bones: base64(&floats(&bones)),
@@ -149,15 +159,18 @@ pub(crate) fn floats(values: &[f32]) -> Vec<u8> {
         .collect()
 }
 
-/// The texture the game uses at `path`, as a PNG `data:` address.
-fn picture(
-    game: Game,
-    game_dir: &std::path::Path,
-    local_dir: Option<&std::path::Path>,
-    path: &str,
-) -> Option<String> {
-    let version = files::versions(game, game_dir, local_dir, path).pop()?;
-    let image = files::thumbnail(&version.bytes, TEXTURE_SIDE)?;
+/// The face tint texture that belongs to the face mesh at `path`, if it
+/// is one.
+pub(crate) fn face_tint(path: &str) -> Option<String> {
+    let lower = path.replace('\\', "/").to_ascii_lowercase();
+    let at = lower.find(FACE_MESHES)?;
+    let rest = lower.get(at + FACE_MESHES.len()..).unwrap_or_default();
+    Some(format!("{FACE_TEXTURES}{}", rest.replace(".nif", ".dds")))
+}
+
+/// A texture as a PNG `data:` address, no larger than the window needs.
+fn picture(bytes: &[u8]) -> Option<String> {
+    let image = files::thumbnail(bytes, TEXTURE_SIDE)?;
     let png =
         crate::png::encode_rgba(image.width, image.height, &image.pixels, &image.alpha).ok()?;
     Some(format!("data:image/png;base64,{}", base64(&png)))

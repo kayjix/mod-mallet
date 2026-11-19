@@ -34,7 +34,7 @@ pub struct FileVersion {
 
 /// A path as the game compares them: lower case, `/` between folders,
 /// without a leading `data/`.
-pub(crate) fn normalize(path: &str) -> String {
+pub fn normalize(path: &str) -> String {
     let lower = path.replace('\\', "/").to_ascii_lowercase();
     let trimmed = lower.trim_start_matches('/');
     trimmed.strip_prefix("data/").unwrap_or(trimmed).to_owned()
@@ -96,6 +96,13 @@ pub fn material_texture(bytes: &[u8]) -> Option<String> {
     mallet_formats_bethesda::material::main_texture(bytes)
         .ok()
         .flatten()
+}
+
+/// The textures the surfaces of a mesh name (the colour and the normal map
+/// of each), as the mesh spells them; empty if it cannot be read.
+pub fn surface_textures(bytes: &[u8]) -> Vec<String> {
+    mallet_formats_bethesda::nif::read_surface_textures(&mut std::io::Cursor::new(bytes))
+        .unwrap_or_default()
 }
 
 /// The surfaces of a mesh, for drawing it; empty if it cannot be read.

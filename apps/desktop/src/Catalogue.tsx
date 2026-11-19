@@ -11,12 +11,14 @@ import {
   outfitWords,
   useCatalogueTexts,
 } from "./catalogue-texts";
+import type { AssetVersion, AssetVersions } from "./generated/asset-versions";
 import type {
   Catalogue,
   CatalogueItem,
   CatalogueOutfit,
   CatalogueSource,
 } from "./generated/catalogue";
+import type { ModRef } from "./generated/rendered-report";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
 
@@ -35,6 +37,9 @@ const PAGE = 150;
 /** How many weapons a set puts on the stage. */
 const STAGE_WEAPONS = 2;
 
+/** How many versions of a thing stand side by side; the others are picked. */
+const SIDE_BY_SIDE = 4;
+
 /** What the page knows about the catalogue, looked up once. */
 interface Index {
   catalogue: Catalogue;
@@ -45,9 +50,11 @@ interface Index {
   setsOf: Map<string, CatalogueOutfit[]>;
   /** The mods that bring or change things, with how many. */
   mods: [string, number][];
+  /** The name the mod manager shows for each mod, by its identity. */
+  modNames: Map<string, string>;
 }
 
-function indexOf(catalogue: Catalogue): Index {
+function indexOf(catalogue: Catalogue, modNames: Map<string, string>): Index {
   const items = new Map(catalogue.items.map((item) => [item.id, item]));
   const outfits = new Map(catalogue.outfits.map((outfit) => [outfit.id, outfit]));
   const sources = new Map(catalogue.sources.map((source) => [source.plugin, source]));
@@ -63,7 +70,7 @@ function indexOf(catalogue: Catalogue): Index {
     for (const plugin of [item.plugin, ...(item.changedBy ?? [])]) {
       const source = sources.get(plugin);
       if (source?.origin === "mod") {
-        mods.add(modName(source));
+        mods.add(modName(source, modNames));
       }
     }
     for (const mod of mods) {
@@ -71,12 +78,19 @@ function indexOf(catalogue: Catalogue): Index {
     }
   }
   const mods = [...counts].sort(([a], [b]) => a.localeCompare(b));
-  return { catalogue, items, outfits, sources, setsOf, mods };
+  return { catalogue, items, outfits, sources, setsOf, mods, modNames };
 }
 
 /** The name of the mod that brings a plugin, or the plugin's own name. */
-function modName(source: CatalogueSource): string {
-  return source.mod ?? source.plugin;
+function modName(source: CatalogueSource, modNames: Map<string, string>): string {
+  return source.mod === null || source.mod === undefined
+    ? source.plugin
+    : modLabel(source.mod, modNames);
+}
+
+/** The name the mod manager shows for a mod, else its folder's. */
+export function modLabel(mod: ModRef, modNames: Map<string, string>): string {
+  return modNames.get(mod.id) ?? mod.name;
 }
 
 function nameOf(item: CatalogueItem): string {
@@ -115,7 +129,7 @@ function fromOrigin(item: CatalogueItem, origin: Origin, index: Index): boolean 
     default: {
       const wanted = origin.slice("mod:".length);
       return [source, ...changers].some(
-        (found) => found?.origin === "mod" && modName(found) === wanted,
+        (found) => found?.origin === "mod" && modName(found, index.modNames) === wanted,
       );
     }
   }
@@ -130,7 +144,7 @@ function matchesSearch(item: CatalogueItem, wanted: string): boolean {
 }
 
 export function CatalogueView({ scannedAt }: { scannedAt: number }) {
-  const { api, lang } = useSession();
+  const { api, lang, mods } = useSession();
   const c = useCatalogueTexts();
   const [catalogue, setCatalogue] = useState<Catalogue | null | "loading">("loading");
   const [group, setGroup] = useState<Group>("weapons");
@@ -153,8 +167,14 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
   }, [api, lang, scannedAt]);
 
   const index = useMemo(
-    () => (catalogue === null || catalogue === "loading" ? null : indexOf(catalogue)),
-    [catalogue],
+    () =>
+      catalogue === null || catalogue === "loading"
+        ? null
+        : indexOf(
+            catalogue,
+            new Map([...mods.values()].map((info) => [info.mod.id, info.mod.name])),
+          ),
+    [catalogue, mods],
   );
 
   if (catalogue === "loading") {
@@ -417,7 +437,7 @@ function ItemRow({
     <button type="button" className="catalogue-row" aria-current={selected} onClick={onClick}>
       <span className="catalogue-row-name">{nameOf(item)}</span>
       <span className="catalogue-row-from">
-        {source?.origin === "mod" && <span>{modName(source)}</span>}
+        {source?.origin === "mod" && <span>{modName(source, index.modNames)}</span>}
         {changers.length > 0 && <span className="catalogue-changed">✎ {changers.length}</span>}
       </span>
     </button>
@@ -494,22 +514,154 @@ function ItemView({
   if (item === undefined) {
     return <p className="aside catalogue-message catalogue-pick">{c.pickSomething}</p>;
   }
-  const stage: StageItem[] =
-    item.category === "character"
-      ? item.models.slice(0, 1).map((path) => ({ kind: "mesh", label: c.face, path }))
-      : item.models.slice(0, 2).map((path, at) => ({
-          kind: "mesh",
-          label: item.models.length > 1 ? (at === 0 ? c.onGround : c.asWorn) : nameOf(item),
-          path,
-        }));
+  return <ItemPage key={item.id} item={item} index={index} onSelect={onSelect} />;
+}
+
+/** The name of a version: the game, the mod, the archive or loose files. */
+function versionLabel(version: AssetVersion, index: Index, c: CatalogueTexts): string {
+  switch (version.source.type) {
+    case "game":
+      return c.game;
+    case "mod":
+      return modLabel(version.source.mod, index.modNames);
+    case "archive":
+      return version.source.name;
+    default:
+      return c.looseFiles;
+  }
+}
+
+function ItemPage({
+  item,
+  index,
+  onSelect,
+}: {
+  item: CatalogueItem;
+  index: Index;
+  onSelect: (selection: Selection) => void;
+}) {
+  const c = useCatalogueTexts();
+  const { api } = useSession();
+  const [versions, setVersions] = useState<AssetVersions | null | undefined>(undefined);
+  const [model, setModel] = useState(0);
+  // The versions on the stage; until the user picks, the first ones.
+  const [chosen, setChosen] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.assetVersions(item.models).then(
+      (found) => live && setVersions(found),
+      () => live && setVersions(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, item]);
+
+  const all = versions?.versions ?? [];
+  const onStage = (chosen ?? all.slice(0, SIDE_BY_SIDE).map((version) => version.id)).filter((id) =>
+    all.some((version) => version.id === id),
+  );
+  const path = item.models[model] ?? item.models[0] ?? "";
+  const onStageKey = onStage.join("|");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key stands for the chosen versions
+  const stage = useMemo<StageItem[]>(() => {
+    if (versions === undefined) {
+      return [];
+    }
+    const shown = all.filter((version) => onStage.includes(version.id));
+    if (shown.length === 0) {
+      return [{ kind: "mesh", label: nameOf(item), path }];
+    }
+    return shown.map((version) => ({
+      kind: "mesh",
+      label: versionLabel(version, index, c),
+      path,
+      assetVersion: version.id,
+    }));
+  }, [versions, onStageKey, path, item, index, c]);
+  const toggle = (id: string) => {
+    setChosen(onStage.includes(id) ? onStage.filter((known) => known !== id) : [...onStage, id]);
+  };
+
   const outfit =
     item.outfit === null || item.outfit === undefined ? undefined : index.outfits.get(item.outfit);
   const sets = index.setsOf.get(item.id) ?? [];
+  const models =
+    item.category === "character" ? [c.face] : item.models.length > 1 ? [c.onGround, c.asWorn] : [];
   return (
     <>
       <section className="catalogue-middle">
-        <h2 className="catalogue-title">{nameOf(item)}</h2>
-        <Stage key={item.id} items={stage} />
+        <div className="catalogue-middle-head">
+          <h2 className="catalogue-title">{nameOf(item)}</h2>
+          {models.length > 1 && (
+            <fieldset className="segmented" aria-label={c.modelLabel}>
+              {models.map((label, at) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={model === at}
+                  onClick={() => setModel(at)}
+                >
+                  {label}
+                </button>
+              ))}
+            </fieldset>
+          )}
+        </div>
+        {versions === undefined ? (
+          <p className="aside catalogue-message">{c.versionsLoading}</p>
+        ) : (
+          <Stage key={`${item.id}/${path}`} items={stage} />
+        )}
+        {all.length > 0 && (
+          <div className="catalogue-versions">
+            <h3>{c.versionsTitle}</h3>
+            <p className="aside">
+              {all.length === 1 ? c.versionsOnlyOne : c.versionsHint(SIDE_BY_SIDE)}
+            </p>
+            <ul>
+              {all.map((version) => {
+                const on = onStage.includes(version.id);
+                const meshes = version.files.filter((file) => file.startsWith("meshes/")).length;
+                const textures = version.files.length - meshes;
+                return (
+                  <li key={version.id}>
+                    <label
+                      className="catalogue-version"
+                      data-shown={
+                        version.shown.length === 0
+                          ? "no"
+                          : version.shown.length === version.files.length
+                            ? "all"
+                            : "some"
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        disabled={all.length === 1 || (!on && onStage.length >= SIDE_BY_SIDE)}
+                        onChange={() => toggle(version.id)}
+                      />
+                      <span className="catalogue-version-name">
+                        {versionLabel(version, index, c)}
+                      </span>
+                      <span className="catalogue-version-files">
+                        {c.versionBrings(meshes, textures)}
+                      </span>
+                      {version.shown.length > 0 && (
+                        <span className="catalogue-version-shown">
+                          {version.shown.length === version.files.length
+                            ? c.versionInGame
+                            : c.versionPartlyInGame(version.shown.length, version.files.length)}
+                        </span>
+                      )}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </section>
       <aside className="catalogue-right">
         <dl className="catalogue-details">
@@ -685,7 +837,7 @@ function SourceName({ plugin, index }: { plugin: string; index: Index }) {
         ? c.creationClub
         : source === undefined
           ? plugin
-          : modName(source);
+          : modName(source, index.modNames);
   return (
     <span>
       {name} <span className="catalogue-internal">{plugin}</span>

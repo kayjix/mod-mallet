@@ -151,7 +151,7 @@ impl Collector {
             .map(|plugin| CatalogueSource {
                 plugin: plugin.clone(),
                 origin: origin(plugin),
-                mod_name: None,
+                mod_ref: None,
             })
             .collect();
         let candidates: HashMap<&RecordId, CatalogueItem> = self

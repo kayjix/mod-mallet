@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AssetVersions",
+  "description": "Every version of a thing the setup has: what the game and each mod\nmake it look like (ADR 0053).",
+  "type": "object",
+  "properties": {
+    "files": {
+      "description": "The files the thing is made of, below the data directory: its\nmodels, then the textures they name.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "versions": {
+      "description": "The versions, the one the game shows most of first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AssetVersion"
+      }
+    }
+  },
+  "required": [
+    "files",
+    "versions"
+  ],
+  "$defs": {
+    "AssetSource": {
+      "description": "Where the copies of a version come from.",
+      "oneOf": [
+        {
+          "description": "The game's own archives.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "game"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "A mod, from its folder in the mod manager or its archives.",
+          "type": "object",
+          "properties": {
+            "mod": {
+              "description": "The mod.",
+              "$ref": "#/$defs/ModRef"
+            },
+            "type": {
+              "type": "string",
+              "const": "mod"
+            }
+          },
+          "required": [
+            "type",
+            "mod"
+          ]
+        },
+        {
+          "description": "An archive no mod manager knows, such as Creation Club content.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "Its file name.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "archive"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ]
+        },
+        {
+          "description": "Loose files in the data directory no mod manager knows.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "loose"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "AssetVersion": {
+      "description": "One version of a thing: the copies of its files one source brings.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "description": "The thing's files it has a copy of.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "description": "Identity, for asking for the version's view: `game`, `mod:<id>`,\n`archive:<name>` or `loose`.",
+          "type": "string"
+        },
+        "shown": {
+          "description": "Of those, the ones whose copy the game uses.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "description": "Where its copies come from.",
+          "$ref": "#/$defs/AssetSource"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "files",
+        "shown"
+      ]
+    },
+    "ModRef": {
+      "description": "A mod as a mod manager knows it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The manager's own identifier of the mod.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name to show to people.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The manager that knows this mod, for example `vortex`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "name"
+      ]
+    }
+  }
+}

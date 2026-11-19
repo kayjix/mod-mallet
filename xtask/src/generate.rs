@@ -18,7 +18,7 @@ use crate::tools;
 
 /// The contracts of the desktop app: for each, the schema and the file its
 /// TypeScript types are written to.
-const DESKTOP_CONTRACTS: [(&str, &str); 16] = [
+const DESKTOP_CONTRACTS: [(&str, &str); 17] = [
     (
         "schemas/rendered-report.schema.json",
         "apps/desktop/src/generated/rendered-report.ts",
@@ -54,6 +54,10 @@ const DESKTOP_CONTRACTS: [(&str, &str); 16] = [
     (
         "schemas/catalogue.schema.json",
         "apps/desktop/src/generated/catalogue.ts",
+    ),
+    (
+        "schemas/asset-versions.schema.json",
+        "apps/desktop/src/generated/asset-versions.ts",
     ),
     (
         "schemas/game-choice.schema.json",
@@ -131,10 +135,6 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
             content: schema(&schemars::schema_for!(mallet_core::mesh::MeshView))?,
         },
         Generated {
-            path: "schemas/catalogue.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::catalogue::Catalogue))?,
-        },
-        Generated {
             path: "schemas/game-choice.schema.json",
             content: schema(&schemars::schema_for!(mallet_core::GameChoice))?,
         },
@@ -171,6 +171,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
             content: cli_reference(),
         },
     ];
+    files.extend(catalogue_schemas()?);
 
     // The TypeScript types are derived from a schema, which therefore has to
     // be on disk before the converter runs.
@@ -195,6 +196,22 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         println!("generated {} files", files.len());
         Ok(())
     }
+}
+
+/// The schemas of the catalogue of things and their versions (ADR 0053).
+fn catalogue_schemas() -> Result<Vec<Generated>> {
+    Ok(vec![
+        Generated {
+            path: "schemas/catalogue.schema.json",
+            content: schema(&schemars::schema_for!(mallet_core::catalogue::Catalogue))?,
+        },
+        Generated {
+            path: "schemas/asset-versions.schema.json",
+            content: schema(&schemars::schema_for!(
+                mallet_core::catalogue::AssetVersions
+            ))?,
+        },
+    ])
 }
 
 fn write_all(root: &Path, files: &[Generated]) -> Result<()> {

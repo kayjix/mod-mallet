@@ -164,10 +164,14 @@
       "type": "object",
       "properties": {
         "mod": {
-          "description": "The name the mod manager shows for the mod that brings it, if known.",
-          "type": [
-            "string",
-            "null"
+          "description": "The mod that brings it, if the mod manager says so.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "origin": {
@@ -347,6 +351,29 @@
           "type": "string",
           "const": "light"
         }
+      ]
+    },
+    "ModRef": {
+      "description": "A mod as a mod manager knows it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The manager's own identifier of the mod.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name to show to people.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The manager that knows this mod, for example `vortex`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "name"
       ]
     },
     "WorldOrigin": {

@@ -10,6 +10,8 @@ export type StageItem =
       path: string;
       /** Counted from the version lowest in precedence; absent for the one in the game. */
       version?: number;
+      /** A version of a catalogue thing (ADR 0053), by its identity; it wins over `version`. */
+      assetVersion?: string;
     }
   | { kind: "texture"; label: string; path: string; image: string | null };
 
@@ -119,7 +121,7 @@ export function Stage({ items }: { items: StageItem[] }) {
       <div className="stage-panes" data-count={items.length}>
         {items.map((item) => (
           <StagePane
-            key={`${item.kind}/${item.path}/${item.kind === "mesh" ? (item.version ?? "game") : item.label}`}
+            key={`${item.kind}/${item.path}/${item.kind === "mesh" ? (item.assetVersion ?? item.version ?? "game") : item.label}`}
             item={item}
             camera={camera}
             lighting={lightingRef}
@@ -208,8 +210,10 @@ function StagePane({
     }
     let outdated = false;
     setMesh(undefined);
-    api
-      .meshView(item.path, item.version ?? null)
+    (item.assetVersion === undefined
+      ? api.meshView(item.path, item.version ?? null)
+      : api.assetView(item.path, item.assetVersion)
+    )
       .then((found) => {
         if (!outdated) {
           setMesh(found);

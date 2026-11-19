@@ -8,7 +8,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::WorldOrigin;
+use crate::{ModRef, WorldOrigin};
 
 /// Every thing of the setup worth looking at, with the sets it forms.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -30,9 +30,9 @@ pub struct CatalogueSource {
     pub plugin: String,
     /// Whether it comes with the game, the Creation Club or a mod.
     pub origin: WorldOrigin,
-    /// The name the mod manager shows for the mod that brings it, if known.
-    #[serde(rename = "mod")]
-    pub mod_name: Option<String>,
+    /// The mod that brings it, if the mod manager says so.
+    #[serde(rename = "mod", default, skip_serializing_if = "Option::is_none")]
+    pub mod_ref: Option<ModRef>,
 }
 
 /// One thing: a weapon, a piece of armour, a character, an item.
@@ -234,4 +234,52 @@ pub struct CatalogueOutfit {
     pub weapons: Vec<String>,
     /// How many characters wear it unless told otherwise.
     pub characters: u32,
+}
+
+/// Every version of a thing the setup has: what the game and each mod
+/// make it look like (ADR 0053).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetVersions {
+    /// The files the thing is made of, below the data directory: its
+    /// models, then the textures they name.
+    pub files: Vec<String>,
+    /// The versions, the one the game shows most of first.
+    pub versions: Vec<AssetVersion>,
+}
+
+/// One version of a thing: the copies of its files one source brings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetVersion {
+    /// Identity, for asking for the version's view: `game`, `mod:<id>`,
+    /// `archive:<name>` or `loose`.
+    pub id: String,
+    /// Where its copies come from.
+    pub source: AssetSource,
+    /// The thing's files it has a copy of.
+    pub files: Vec<String>,
+    /// Of those, the ones whose copy the game uses.
+    pub shown: Vec<String>,
+}
+
+/// Where the copies of a version come from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum AssetSource {
+    /// The game's own archives.
+    Game,
+    /// A mod, from its folder in the mod manager or its archives.
+    Mod {
+        /// The mod.
+        #[serde(rename = "mod")]
+        mod_ref: ModRef,
+    },
+    /// An archive no mod manager knows, such as Creation Club content.
+    Archive {
+        /// Its file name.
+        name: String,
+    },
+    /// Loose files in the data directory no mod manager knows.
+    Loose,
 }

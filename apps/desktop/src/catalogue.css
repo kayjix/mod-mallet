@@ -49,7 +49,7 @@
 .catalogue-middle {
   grid-area: middle;
   display: grid;
-  grid-template-rows: auto minmax(340px, 1fr);
+  grid-template-rows: auto minmax(340px, 1fr) auto;
   gap: var(--space-2);
 }
 
@@ -222,4 +222,71 @@
   font-family: var(--font-mono, monospace);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
+}
+
+.catalogue-middle-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.catalogue-versions h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.catalogue-versions p {
+  margin: 2px 0 var(--space-2);
+  font-size: 0.82rem;
+}
+
+.catalogue-versions ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalogue-version {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 6px;
+  align-items: baseline;
+  max-width: 260px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.catalogue-version:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--surface);
+}
+
+.catalogue-version-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.catalogue-version-files,
+.catalogue-version-shown {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.catalogue-version[data-shown="all"] .catalogue-version-shown {
+  color: var(--ok);
+}
+
+/* Four versions stand two by two rather than three and one. */
+.catalogue-middle .stage-panes[data-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }

@@ -145,9 +145,9 @@ export interface CatalogueOutfit {
  */
 export interface CatalogueSource {
   /**
-   * The name the mod manager shows for the mod that brings it, if known.
+   * The mod that brings it, if the mod manager says so.
    */
-  mod?: string | null;
+  mod?: ModRef | null;
   /**
    * Whether it comes with the game, the Creation Club or a mod.
    */
@@ -156,4 +156,21 @@ export interface CatalogueSource {
    * The plugin's file name, in lower case.
    */
   plugin: string;
+}
+/**
+ * A mod as a mod manager knows it.
+ */
+export interface ModRef {
+  /**
+   * The manager's own identifier of the mod.
+   */
+  id: string;
+  /**
+   * The name to show to people.
+   */
+  name: string;
+  /**
+   * The manager that knows this mod, for example `vortex`.
+   */
+  source: string;
 }

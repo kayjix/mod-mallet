@@ -62,6 +62,16 @@ export interface CatalogueTexts {
   detailWeapons: string;
   detailWeaponsHint: string;
   detailInternal: string;
+  modelLabel: string;
+  versionsTitle: string;
+  versionsLoading: string;
+  versionsOnlyOne: string;
+  versionsHint: (count: number) => string;
+  /** Which of a thing's files a version brings its own copy of. */
+  versionBrings: (meshes: number, textures: number) => string;
+  versionInGame: string;
+  versionPartlyInGame: (shown: number, of: number) => string;
+  looseFiles: string;
   game: string;
   creationClub: string;
   /** A material by its name in the game's keywords, in the user's language where known. */
@@ -209,6 +219,21 @@ const en: CatalogueTexts = {
   detailWeapons: "Carried",
   detailWeaponsHint: "What the characters wearing it carry, the most common first.",
   detailInternal: "Internal name",
+  modelLabel: "Which model",
+  versionsTitle: "Versions",
+  versionsLoading: "Looking for every version in the game and the mods …",
+  versionsOnlyOne: "The setup has only this one version.",
+  versionsHint: (count) => `Up to ${count} stand side by side; tick which.`,
+  versionBrings: (meshes, textures) =>
+    [
+      meshes === 0 ? "" : meshes === 1 ? "model" : `${meshes} models`,
+      textures === 0 ? "" : textures === 1 ? "1 texture" : `${textures} textures`,
+    ]
+      .filter((part) => part !== "")
+      .join(" and "),
+  versionInGame: "in the game",
+  versionPartlyInGame: (shown, of) => `${shown} of ${of} in the game`,
+  looseFiles: "Loose files without a mod",
   game: "The game",
   creationClub: "Creation Club",
   material: (name) => words(name),
@@ -306,6 +331,21 @@ const de: CatalogueTexts = {
   detailWeapons: "Dabei",
   detailWeaponsHint: "Was die Figuren mit diesem Set bei sich tragen, das Häufigste zuerst.",
   detailInternal: "Interner Name",
+  modelLabel: "Welches Modell",
+  versionsTitle: "Fassungen",
+  versionsLoading: "Alle Fassungen in Spiel und Mods werden gesucht …",
+  versionsOnlyOne: "Das Setup hat nur diese eine Fassung.",
+  versionsHint: (count) => `Bis zu ${count} stehen nebeneinander; hake an, welche.`,
+  versionBrings: (meshes, textures) =>
+    [
+      meshes === 0 ? "" : meshes === 1 ? "Modell" : `${meshes} Modelle`,
+      textures === 0 ? "" : textures === 1 ? "1 Textur" : `${textures} Texturen`,
+    ]
+      .filter((part) => part !== "")
+      .join(" und "),
+  versionInGame: "im Spiel",
+  versionPartlyInGame: (shown, of) => `${shown} von ${of} im Spiel`,
+  looseFiles: "Lose Dateien ohne Mod",
   game: "Das Spiel",
   creationClub: "Creation Club",
   material: (name) => MATERIALS_DE[name] ?? words(name),

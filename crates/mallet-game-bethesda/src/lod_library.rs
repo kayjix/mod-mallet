@@ -179,6 +179,58 @@ impl LodLibrary {
         self.files.keys().map(String::as_str)
     }
 
+    /// The file names of the archives that hold `path`, lowest precedence
+    /// first.
+    pub fn archives_with(&self, path: &str) -> Vec<String> {
+        self.files
+            .get(&files::normalize(path))
+            .into_iter()
+            .flatten()
+            .filter_map(|source| match source {
+                Source::Archive { archive, .. } => self
+                    .archives
+                    .get(*archive)
+                    .and_then(|(file, _)| file.file_name())
+                    .map(|name| name.to_string_lossy().into_owned()),
+                Source::Loose => None,
+            })
+            .collect()
+    }
+
+    /// Whether `path` lies as a loose file in the data directory.
+    pub fn has_loose(&self, path: &str) -> bool {
+        self.files
+            .get(&files::normalize(path))
+            .is_some_and(|sources| sources.contains(&Source::Loose))
+    }
+
+    /// The file at `path` from the archive named `archive`, if it has it.
+    pub fn read_from_archive(&self, path: &str, archive: &str) -> Option<Vec<u8>> {
+        let path = files::normalize(path);
+        self.files
+            .get(&path)?
+            .iter()
+            .find_map(|source| match source {
+                Source::Archive { archive: at, .. }
+                    if self
+                        .archives
+                        .get(*at)
+                        .and_then(|(file, _)| file.file_name())
+                        .is_some_and(|name| name.eq_ignore_ascii_case(archive)) =>
+                {
+                    self.read_from(&path, *source)
+                }
+                _ => None,
+            })
+    }
+
+    /// The loose file at `path` in the data directory, if there is one.
+    pub fn read_loose(&self, path: &str) -> Option<Vec<u8>> {
+        let path = files::normalize(path);
+        self.read_from(&path, Source::Loose)
+            .filter(|_| self.has_loose(&path))
+    }
+
     /// The file at `path` below the data directory, if this library has
     /// it: a file below its folders.
     /// The version the game uses comes first; where it cannot be read, the

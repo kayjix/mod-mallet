@@ -41,9 +41,7 @@ pub fn catalogue(options: &ScanOptions, lang: &str) -> Option<Arc<Catalogue>> {
     );
     let mods = crate::preview::deployment(options, &game_dir);
     for source in &mut catalogue.sources {
-        source.mod_name = mods
-            .provider_of(&GamePath::new(&format!("data/{}", source.plugin)))
-            .map(|found| found.name);
+        source.mod_ref = mods.provider_of(&GamePath::new(&format!("data/{}", source.plugin)));
     }
     tracing::info!(
         items = catalogue.items.len(),

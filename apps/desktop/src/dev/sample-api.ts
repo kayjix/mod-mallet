@@ -6,6 +6,7 @@
 
 import type { Api } from "../api";
 import type { AreaObject, AreaObjects } from "../generated/area-objects";
+import type { AssetVersion, AssetVersions } from "../generated/asset-versions";
 import type { Catalogue, CatalogueItem } from "../generated/catalogue";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { LodMesh } from "../generated/lod-mesh";
@@ -1030,7 +1031,7 @@ function sampleSkeleton(path: string): MeshView {
 }
 
 /** A cube, standing in for a mesh; a skeleton for a path that names one. */
-function sampleCube(path: string): MeshView {
+function sampleCube(path: string, colour = "#b07a4a"): MeshView {
   if (path.endsWith("skeleton.nif")) {
     return sampleSkeleton(path);
   }
@@ -1072,7 +1073,7 @@ function sampleCube(path: string): MeshView {
         positions: base64Of(new Float32Array(positions)),
         uvs: base64Of(new Float32Array(uvs)),
         indices: base64Of(new Uint32Array(indices)),
-        texture: samplePicture("#b07a4a"),
+        texture: samplePicture(colour),
         tinted: false,
       },
     ],
@@ -1235,6 +1236,8 @@ export const sampleApi: Api = {
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
   catalogue: () => later(sampleCatalogue()),
+  assetVersions: (models) => later(sampleVersions(models)),
+  assetView: (path, version) => later(sampleCube(path, SAMPLE_COLOURS[version] ?? "#8a8a8a")),
   // Up close, made-up bridges at every collision spot; no level of detail.
   areaObjects: (world, x, y, radius) => later(sampleArea(world, x, y, radius)),
   areaLand: () => later(null),
@@ -1770,12 +1773,85 @@ function sampleCatalogue(): Catalogue {
       },
     ],
     sources: [
-      { plugin: "skyrim.esm", origin: "game", mod: null },
-      { plugin: "ccbgssse001-fish.esm", origin: "creationClub", mod: null },
-      { plugin: "better blades.esp", origin: "mod", mod: "Better Blades" },
-      { plugin: "guard variety.esp", origin: "mod", mod: "Guard Variety" },
-      { plugin: "face overhaul.esp", origin: "mod", mod: "Face Overhaul" },
-      { plugin: "laser blades.esp", origin: "mod", mod: "Laser Blades" },
+      { plugin: "skyrim.esm", origin: "game" },
+      { plugin: "ccbgssse001-fish.esm", origin: "creationClub" },
+      { plugin: "better blades.esp", origin: "mod", mod: sampleModRef("Better Blades") },
+      { plugin: "guard variety.esp", origin: "mod", mod: sampleModRef("Guard Variety") },
+      { plugin: "face overhaul.esp", origin: "mod", mod: sampleModRef("Face Overhaul") },
+      { plugin: "laser blades.esp", origin: "mod", mod: sampleModRef("Laser Blades") },
     ],
   };
+}
+
+/** A mod of the sample, as the mod manager names it. */
+function sampleModRef(name: string) {
+  return { source: "vortex", id: `${name}-1234-1-0`, name };
+}
+
+/** The colour each version of the sample paints its cube in. */
+const SAMPLE_COLOURS: Record<string, string> = {
+  game: "#9a9a9a",
+  "mod:Better Blades-1234-1-0": "#c9a227",
+  "mod:Guard Variety-1234-1-0": "#5b8bd6",
+  "mod:Face Overhaul-1234-1-0": "#d27c5a",
+  "mod:Sharp Steel-1234-1-0": "#5ac08a",
+  "mod:Rusty Steel-1234-1-0": "#a0522d",
+  "mod:Shiny Steel-1234-1-0": "#e0e0ff",
+  "mod:Blood Stains-1234-1-0": "#8b1a1a",
+  "archive:ccbgssse001-fish.bsa": "#3fa7a7",
+};
+
+/** Made-up versions of a thing: the steel sword has many, others one or two. */
+function sampleVersions(models: string[]): AssetVersions {
+  const model = models[0] ?? "meshes/unknown.nif";
+  const texture = model.replace(/^meshes\//, "textures/").replace(/\.nif$/, ".dds");
+  const files = [...models, texture];
+  const mod = (name: string, own: string[], shown: string[] = []): AssetVersion => ({
+    id: `mod:${name}-1234-1-0`,
+    source: { type: "mod", mod: sampleModRef(name) },
+    files: own,
+    shown,
+  });
+  const game = (shown: string[]): AssetVersion => ({
+    id: "game",
+    source: { type: "game" },
+    files,
+    shown,
+  });
+  if (model.includes("steelsword")) {
+    return {
+      files,
+      versions: [
+        mod("Better Blades", [texture], [texture]),
+        game(models),
+        mod("Sharp Steel", files),
+        mod("Rusty Steel", [texture]),
+        mod("Shiny Steel", [texture]),
+        mod("Blood Stains", [texture]),
+      ],
+    };
+  }
+  if (model.includes("guard") || model.includes("facegeom")) {
+    return {
+      files,
+      versions: [
+        mod(model.includes("guard") ? "Guard Variety" : "Face Overhaul", files, files),
+        game([]),
+      ],
+    };
+  }
+  if (model.includes("fishing")) {
+    return {
+      files,
+      versions: [
+        {
+          id: "archive:ccbgssse001-fish.bsa",
+          source: { type: "archive", name: "ccbgssse001-fish.bsa" },
+          files,
+          shown: files,
+        },
+      ],
+    };
+  }
+  return { files, versions: [game(files)] };
 }
