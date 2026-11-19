@@ -18,13 +18,6 @@
   padding: 0.25rem 0;
 }
 
-.tool-optional-hint {
-  margin-left: 0.75rem;
-  font-weight: normal;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
 .tool-optional > .tool-list {
   margin-top: 0.5rem;
 }

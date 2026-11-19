@@ -8,6 +8,7 @@ import { useSession } from "./Actions";
 import { AreaLayer, isFlora, LOOK, type Look, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
+import { InfoTip } from "./info-tip";
 import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
@@ -681,7 +682,7 @@ export function CompareStage3D({
         >
           {r.topView}
         </button>
-        <span className="aside stage3-hint">{r.stageHint}</span>
+        <InfoTip text={r.stageHint} />
       </div>
       {markings && (
         <p className="stage3-legend aside">

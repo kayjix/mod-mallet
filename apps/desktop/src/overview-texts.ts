@@ -14,7 +14,6 @@ export type ModSort = "problems" | "collisions" | "name";
 export type ModFilter = "all" | "problems" | "disabled";
 
 export interface OverviewTexts {
-  healthTitle: string;
   verdict: Record<Verdict, string>;
   verdictNote: Record<Verdict, string>;
   scoreOf: string;
@@ -29,7 +28,6 @@ export interface OverviewTexts {
   incomplete: string;
   setAside: (count: number) => string;
   adviceNotCounted: (count: number) => string;
-  howCounted: string;
   howCountedText: string;
 
   tasksHeadline: (count: number) => string;
@@ -88,7 +86,6 @@ export interface OverviewTexts {
 }
 
 const en: OverviewTexts = {
-  healthTitle: "How your setup is doing",
   verdict: {
     good: "Playable",
     suffers: "Playable, but the quality suffers",
@@ -135,7 +132,6 @@ const en: OverviewTexts = {
     count === 1
       ? "1 recommendation is optional and does not count."
       : `${count} recommendations are optional and do not count.`,
-  howCounted: "How the score is counted",
   howCountedText:
     "It starts at 100. Each open finding takes points off by what it does to the game: whatever can crash it the most, then what looks or behaves wrong, then what only costs quality. Findings Mod Mallet is less sure about count less, and many of one sort count less than one each. Collision spots that are not decided take off points as well; a decided spot no longer counts once the patch is built. Each sort can take only so much, and the more of it there is, the less each one more counts, so the score never drops to 0 and every fix shows. Findings you set aside and recommendations do not count.",
 
@@ -250,7 +246,6 @@ const en: OverviewTexts = {
 };
 
 const de: OverviewTexts = {
-  healthTitle: "So steht es um dein Setup",
   verdict: {
     good: "Spielbar",
     suffers: "Spielbar, aber die Qualität leidet",
@@ -300,7 +295,6 @@ const de: OverviewTexts = {
     count === 1
       ? "1 Empfehlung ist freiwillig und zählt nicht mit."
       : `${count} Empfehlungen sind freiwillig und zählen nicht mit.`,
-  howCounted: "Wie der Wert entsteht",
   howCountedText:
     "Er beginnt bei 100. Jeder offene Befund zieht Punkte ab, je nachdem, was er im Spiel anrichtet: am meisten, was es abstürzen lässt, dann, was falsch aussieht oder sich falsch verhält, dann, was nur Qualität kostet. Befunde, bei denen sich Mod Mallet weniger sicher ist, zählen weniger, und viele einer Sorte zählen weniger als je einer. Nicht entschiedene Kollisionsstellen ziehen ebenfalls Punkte ab; eine entschiedene Stelle zählt nicht mehr, sobald der Patch gebaut ist. Jede Sorte kann nur bis zu einer Grenze abziehen, und je mehr es von ihr gibt, desto weniger zählt jeder weitere Befund. So fällt der Wert nie auf 0, und jede Behebung zeigt sich. Beiseitegelegte Befunde und Empfehlungen zählen nicht.",
 

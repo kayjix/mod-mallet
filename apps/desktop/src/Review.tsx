@@ -184,10 +184,6 @@ export function Review({ report, game, onOpen }: ReviewProps) {
 
   return (
     <section className="review">
-      <header className="review-head">
-        <h2>{r.title}</h2>
-        <p className="aside">{r.intro}</p>
-      </header>
       <ol className="review-steps">
         {REVIEW_STEPS.map((step, at) => {
           const count = open[step];
@@ -216,7 +212,6 @@ export function Review({ report, game, onOpen }: ReviewProps) {
         <div className="review-body-head">
           <span className="aside">{r.stepOf(index + 1, REVIEW_STEPS.length)}</span>
           <h3>{r.step[stored.step].title}</h3>
-          <p className="aside">{r.step[stored.step].hint}</p>
         </div>
         {stored.step === "install" && (
           <InstallStep report={report} findings={install} onOpen={onOpen} />

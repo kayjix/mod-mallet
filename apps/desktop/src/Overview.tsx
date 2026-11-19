@@ -6,6 +6,7 @@ import type { Games } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import { type Health, type Target, weightOf } from "./health";
+import { InfoTip } from "./info-tip";
 import { useJourneyTexts } from "./journey-texts";
 import { useOverviewTexts } from "./overview-texts";
 import { storedReview } from "./Review";
@@ -287,8 +288,9 @@ function HealthPanel({ health, onOpen }: { health: Health; onOpen: (view: Target
       <div className="health-verdict">
         <ScoreRing score={health.score} />
         <div className="health-words">
-          <span className="aside">{o.healthTitle}</span>
-          <h2>{o.verdict[health.verdict]}</h2>
+          <h2>
+            {o.verdict[health.verdict]} <InfoTip text={[o.howCountedText, ...notes].join(" ")} />
+          </h2>
           <p>{o.verdictNote[health.verdict]}</p>
         </div>
       </div>
@@ -318,17 +320,6 @@ function HealthPanel({ health, onOpen }: { health: Health; onOpen: (view: Target
             ))}
           </ul>
         )}
-        {notes.length > 0 && (
-          <p className="aside health-notes">
-            {notes.map((note) => (
-              <span key={note}>{note}</span>
-            ))}
-          </p>
-        )}
-        <details className="health-how">
-          <summary className="more">{o.howCounted}</summary>
-          <p className="aside">{o.howCountedText}</p>
-        </details>
       </div>
     </section>
   );

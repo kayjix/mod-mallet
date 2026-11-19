@@ -16,7 +16,6 @@ export interface CatalogueTexts {
   /** The sidebar entries of the two kinds of collisions. */
   navMapCollisions: string;
   navAssetCollisions: string;
-  intro: string;
   loading: string;
   unreadable: string;
   groupsLabel: string;
@@ -137,8 +136,6 @@ const en: CatalogueTexts = {
   nav: "Assets",
   navMapCollisions: "Map collisions",
   navAssetCollisions: "Asset collisions",
-  intro:
-    "Everything the game and your mods bring to look at: characters, weapons, armour and more, alone or as the sets characters wear.",
   loading: "Reading every plugin. The first time this takes a few seconds.",
   unreadable: "The game's plugins could not be read. Check the places under Settings.",
   groupsLabel: "What to list",
@@ -257,8 +254,6 @@ const de: CatalogueTexts = {
   nav: "Assets",
   navMapCollisions: "Karten-Kollisionen",
   navAssetCollisions: "Asset-Kollisionen",
-  intro:
-    "Alles, was das Spiel und deine Mods zum Anschauen mitbringen: Figuren, Waffen, Rüstungen und mehr, einzeln oder als Sets, wie Figuren sie tragen.",
   loading: "Alle Plugins werden gelesen. Beim ersten Mal dauert das einige Sekunden.",
   unreadable: "Die Plugins des Spiels ließen sich nicht lesen. Prüfe die Orte unter Einstellungen.",
   groupsLabel: "Was aufgelistet wird",

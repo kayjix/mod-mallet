@@ -94,9 +94,7 @@ export interface Texts {
   settingsTabGeneral: string;
   settingsTabPlaces: string;
   settingsTabAbout: string;
-  settingsLanguageNote: string;
   settingsTheme: string;
-  settingsThemeNote: string;
   themeSystem: string;
   themeLight: string;
   themeDark: string;
@@ -310,7 +308,6 @@ export interface Texts {
   workPassageAll: (plugin: string, count: number) => string;
   workPairMany: (first: string, second: string, spots: number) => string;
   workShowSpots: string;
-  workPairsIntro: string;
   workObjectLocked: string;
   workObjectGame: string;
   workObjectHide: string;
@@ -513,9 +510,7 @@ export const texts: Record<Lang, Texts> = {
     settingsTabGeneral: "General",
     settingsTabPlaces: "Places",
     settingsTabAbout: "About",
-    settingsLanguageNote: "The language of the window and of every finding.",
     settingsTheme: "Appearance",
-    settingsThemeNote: "Light or dark, or like Windows.",
     themeSystem: "Like Windows",
     themeLight: "Light",
     themeDark: "Dark",
@@ -792,8 +787,6 @@ export const texts: Record<Lang, Texts> = {
     workPairMany: (first, second, spots) =>
       `${first} and ${second} collide at ${spots} spots. Usually it is better to choose one of them:`,
     workShowSpots: "Show the spots",
-    workPairsIntro:
-      "Pairs of mods whose objects collide, the most first. Decide for a whole pair here, or go through its spots one by one.",
     workObjectLocked:
       "The game relies on this object: other things refer to it, or it is part of the distant view. It cannot be hidden.",
     workObjectGame:
@@ -1065,9 +1058,7 @@ export const texts: Record<Lang, Texts> = {
     settingsTabGeneral: "Allgemein",
     settingsTabPlaces: "Orte",
     settingsTabAbout: "Über",
-    settingsLanguageNote: "Die Sprache des Fensters und aller Befunde.",
     settingsTheme: "Darstellung",
-    settingsThemeNote: "Hell oder dunkel, oder wie Windows.",
     themeSystem: "Wie Windows",
     themeLight: "Hell",
     themeDark: "Dunkel",
@@ -1342,8 +1333,6 @@ export const texts: Record<Lang, Texts> = {
     workPairMany: (first, second, spots) =>
       `${first} und ${second} stoßen an ${spots} Stellen zusammen. Meist ist es besser, dich für eine zu entscheiden:`,
     workShowSpots: "Stellen ansehen",
-    workPairsIntro:
-      "Mod-Paare, deren Objekte zusammenstoßen, die meisten zuerst. Entscheide hier für ein ganzes Paar oder geh seine Stellen einzeln durch.",
     workObjectLocked:
       "Das Spiel braucht dieses Objekt: Anderes verweist darauf, oder es gehört zur Fernansicht. Es lässt sich nicht ausblenden.",
     workObjectGame:

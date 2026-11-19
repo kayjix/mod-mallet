@@ -1,11 +1,6 @@
 /* The assets page (ADR 0048): the duels about files grouped by what they
    are about, and the one-line duel other pages link with. */
 
-.assets-intro {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
 .assets-group {
   display: grid;
   gap: 4px;
@@ -65,4 +60,11 @@
 
 .duel-line[data-decided="true"] .duel-line-state {
   color: var(--ok);
+}
+
+/* The tabs, with the ⓘ of the ranking right beside them. */
+.compare-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }

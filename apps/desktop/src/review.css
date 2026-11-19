@@ -5,14 +5,6 @@
   gap: var(--space-3);
 }
 
-.review-head h2 {
-  font-size: 1.3rem;
-}
-
-.review-head p {
-  margin: 4px 0 0;
-}
-
 .review-steps {
   display: flex;
   flex-wrap: wrap;
@@ -212,10 +204,6 @@
 
 .stage3-swatch[data-side="1"]::before {
   background: #e69f00;
-}
-
-.stage3-hint {
-  font-size: 0.8rem;
 }
 
 .overview-banner-actions {

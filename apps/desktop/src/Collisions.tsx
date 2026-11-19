@@ -1725,7 +1725,6 @@ function ModPairs({ items, decision, sort, duels, focus, onDecideMods, onShow }:
   }
   return (
     <section className="work-pairs">
-      <p className="aside">{t.workPairsIntro}</p>
       <ul className="work-pair-list" ref={list}>
         {pairs.map(({ key, pairs: findings, items: spots }) => {
           const sides = sidesOfMods(findings);

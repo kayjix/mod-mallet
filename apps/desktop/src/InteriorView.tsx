@@ -7,6 +7,7 @@ import { useSession } from "./Actions";
 import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
+import { InfoTip } from "./info-tip";
 import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
 import { CELL } from "./map-places";
@@ -552,7 +553,7 @@ export function InteriorView({
             {own.count(area.objects.length, progress.done, progress.total)}
           </span>
         )}
-        <span className="relief-hint">{own.hint}</span>
+        <InfoTip text={own.hint} above />
       </div>
     </div>
   );

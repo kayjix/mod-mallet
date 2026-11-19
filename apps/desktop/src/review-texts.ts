@@ -9,9 +9,7 @@ export type ReviewStep = "install" | "order" | "assets" | "map" | "collisions" |
 
 export interface ReviewTexts {
   nav: string;
-  title: string;
-  intro: string;
-  step: Record<ReviewStep, { title: string; hint: string }>;
+  step: Record<ReviewStep, { title: string }>;
   stepOf: (index: number, total: number) => string;
   open: (count: number) => string;
   continueAt: (step: string) => string;
@@ -122,33 +120,24 @@ export interface ReviewTexts {
 
 const en: ReviewTexts = {
   nav: "Go through it",
-  title: "Go through your setup",
-  intro:
-    "Step by step: what is installed, the load order, the assets, the map and the collisions. Stop whenever you like; the next time starts where you left off.",
   step: {
     install: {
       title: "Installation",
-      hint: "Which mods are installed, and what is missing or out of date.",
     },
     order: {
       title: "Load order",
-      hint: "What depends on the order of the plugins: LOOT's rules and what one plugin undoes of another.",
     },
     assets: {
       title: "Assets",
-      hint: "Where two mods bring their own textures, meshes or faces for the same thing.",
     },
     map: {
       title: "World map",
-      hint: "The worldspaces, with what mods add to them.",
     },
     collisions: {
       title: "Collisions",
-      hint: "Place by place: where two mods' buildings or bridges stand in each other, decided for the whole place or section by section.",
     },
     report: {
       title: "Report",
-      hint: "What was decided, which mods were involved, and what is left open.",
     },
   },
   stepOf: (index, total) => `Step ${index} of ${total}`,
@@ -280,33 +269,24 @@ const en: ReviewTexts = {
 
 const de: ReviewTexts = {
   nav: "Durchgehen",
-  title: "Dein Setup durchgehen",
-  intro:
-    "Schritt für Schritt: was installiert ist, die Ladereihenfolge, die Assets, die Karte und die Kollisionen. Hör auf, wann du willst; beim nächsten Mal geht es dort weiter.",
   step: {
     install: {
       title: "Installation",
-      hint: "Welche Mods installiert sind, und was fehlt oder veraltet ist.",
     },
     order: {
       title: "Ladereihenfolge",
-      hint: "Was von der Reihenfolge der Plugins abhängt: LOOTs Regeln und was ein Plugin einem anderen rückgängig macht.",
     },
     assets: {
       title: "Assets",
-      hint: "Wo zwei Mods eigene Texturen, Modelle oder Gesichter für dasselbe mitbringen.",
     },
     map: {
       title: "Weltkarte",
-      hint: "Die Weltbereiche, mit dem, was Mods dort hinzufügen.",
     },
     collisions: {
       title: "Kollisionen",
-      hint: "Ort für Ort: wo Gebäude oder Brücken zweier Mods ineinander stehen, für den ganzen Bereich oder Abschnitt für Abschnitt entschieden.",
     },
     report: {
       title: "Bericht",
-      hint: "Was entschieden ist, welche Mods beteiligt waren, und was noch offen ist.",
     },
   },
   stepOf: (index, total) => `Schritt ${index} von ${total}`,

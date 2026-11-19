@@ -158,6 +158,17 @@ Toolbox, Settings: beside the game's pages, always reachable
 | **Toolbox** | Have the tools the setup needs | the list; the one button a tool offers | – |
 | **Settings** | Where Mod Mallet reads, language, theme | tabs | – |
 
+### Explanations
+
+Pages carry no lines of introduction or explanation, and no headings in
+their place. What a control does is said by its label. Where a short text
+really helps, such as how the score is counted, how to order the ranking or
+how to move a 3D view, it sits behind one small ⓘ beside the control; it
+shows on hover and stays open on a click (`info-tip.tsx`). Not
+explanations, and so shown as they are: what an empty panel waits for, and
+notes that belong to a decision, such as a warning that characters walk on
+what a choice would hide.
+
 ### Where each thing lives
 
 Every kind of thing has one **home**, where it is shown in full and

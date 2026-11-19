@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
 import type { MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
+import { InfoTip } from "./info-tip";
 import { PairReport } from "./PairReport";
 import {
   choicesOf,
@@ -335,8 +336,9 @@ function OwnObjects({
 }) {
   return (
     <section className="patch-own">
-      <h3>{p.own(own.length)}</h3>
-      <p className="aside">{p.ownNote}</p>
+      <h3>
+        {p.own(own.length)} <InfoTip text={p.ownNote} />
+      </h3>
       <ul className="patch-own-list">
         {own.map((object) => (
           <li className="patch-own-item" key={keyOf(object)}>

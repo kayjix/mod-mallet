@@ -65,11 +65,6 @@
   grid-column: 2 / -1;
 }
 
-.catalogue-intro {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
 /* The broad groups wrap as chips; a segmented row is too wide for five. */
 .catalogue-groups.segmented {
   gap: 4px;

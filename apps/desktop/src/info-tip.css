@@ -1,0 +1,56 @@
+/* ---- the ⓘ beside a control ------------------------------------------------ */
+
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.info-tip-button {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.72rem;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.info-tip-button:hover,
+.info-tip[data-pinned] .info-tip-button {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* Placed against the window by the component, above every panel. */
+.info-tip-text {
+  position: fixed;
+  z-index: 100;
+  width: max-content;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.4;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+}
+
+.info-tip-text[hidden] {
+  display: none;
+}

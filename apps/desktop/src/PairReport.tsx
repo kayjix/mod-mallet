@@ -4,6 +4,7 @@
 import { useMemo, useState } from "react";
 import { useSession } from "./Actions";
 import type { RenderedReport } from "./generated/rendered-report";
+import { InfoTip } from "./info-tip";
 import { counted, type PatchReport, type PlaceReport, patchReport } from "./pair-report";
 import { type ReportTexts, reportTexts, useReportTexts } from "./report-texts";
 import "./review.css";
@@ -106,7 +107,6 @@ export function PairReport({ report, game }: { report: RenderedReport; game: str
     <section className="pair-report">
       <header className="pair-report-head">
         <h3>{t.title}</h3>
-        <p className="aside">{t.intro}</p>
       </header>
       {data.pairs.length === 0 && <p className="aside">{t.none}</p>}
       {data.leftovers.length > 0 && (
@@ -172,7 +172,11 @@ export function PairReport({ report, game }: { report: RenderedReport; game: str
         <button type="button" className="small" onClick={save}>
           {t.save}
         </button>
-        <span className="aside">{saved ?? t.savedWithPatch}</span>
+        {saved === null ? (
+          <InfoTip text={t.savedWithPatch} />
+        ) : (
+          <span className="aside">{saved}</span>
+        )}
       </p>
     </section>
   );

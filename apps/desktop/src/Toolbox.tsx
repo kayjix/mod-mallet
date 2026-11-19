@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSession } from "./Actions";
 import type { RenderedTool, RenderedToolbox } from "./generated/rendered-toolbox";
+import { InfoTip } from "./info-tip";
 import { LoadingMallet } from "./LoadingMallet";
 import { toolboxTexts } from "./toolbox-texts";
 import "./toolbox.css";
@@ -174,8 +175,7 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
       {optional.length > 0 && (
         <details className="tool-optional">
           <summary>
-            {texts.optional(optional.length)}
-            <span className="tool-optional-hint">{texts.optionalHint}</span>
+            {texts.optional(optional.length)} <InfoTip text={texts.optionalHint} />
           </summary>
           <ul className="tool-list">{optional.map(row)}</ul>
         </details>

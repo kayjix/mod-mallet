@@ -19,6 +19,7 @@ import type {
   CatalogueSource,
 } from "./generated/catalogue";
 import type { Action, ModRef } from "./generated/rendered-report";
+import { InfoTip } from "./info-tip";
 import { LoadingLine, LoadingScreen } from "./LoadingMallet";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
@@ -213,7 +214,6 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
   return (
     <div className="catalogue">
       <aside className="catalogue-left">
-        <p className="aside catalogue-intro">{c.intro}</p>
         <fieldset className="segmented catalogue-groups" aria-label={c.groupsLabel}>
           {GROUPS.map((candidate) => (
             <button
@@ -886,8 +886,9 @@ function OutfitView({
         {pieceList(worn)}
         {weapons.length > 0 && (
           <>
-            <h3>{c.detailWeapons}</h3>
-            <p className="aside">{c.detailWeaponsHint}</p>
+            <h3>
+              {c.detailWeapons} <InfoTip text={c.detailWeaponsHint} />
+            </h3>
             {pieceList(weapons)}
           </>
         )}

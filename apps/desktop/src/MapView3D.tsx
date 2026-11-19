@@ -21,6 +21,7 @@ import {
   project,
   type Vec3,
 } from "./gl";
+import { InfoTip } from "./info-tip";
 import { LoadingMallet } from "./LoadingMallet";
 import { LandLayer } from "./land-layer";
 import { LodLayer } from "./lod-layer";
@@ -1681,7 +1682,7 @@ export function MapView3D({
                     : t.mapNearCount(areaState)}
           </span>
         </label>
-        <span className="relief-hint">{t.mapReliefHint}</span>
+        <InfoTip text={t.mapReliefHint} above />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useSession } from "./Actions";
 import type { NamedPlaces } from "./api";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import { applyTheme, initialTheme, type Lang, languages, type Theme } from "./i18n";
+import { InfoTip } from "./info-tip";
 import { Places } from "./Places";
 
 interface SettingsProps {
@@ -21,8 +22,9 @@ function Row({ label, note, children }: { label: string; note?: string; children
   return (
     <div className="row">
       <div className="row-label">
-        <span>{label}</span>
-        {note !== undefined && <span className="aside">{note}</span>}
+        <span>
+          {label} {note !== undefined && <InfoTip text={note} />}
+        </span>
       </div>
       <div className="row-control">{children}</div>
     </div>
@@ -90,7 +92,7 @@ export function SettingsView({
         <div className="stack">
           <section className="panel">
             <div className="panel-body">
-              <Row label={t.settingsLanguage} note={t.settingsLanguageNote}>
+              <Row label={t.settingsLanguage}>
                 <select
                   aria-label={t.settingsLanguage}
                   value={lang}
@@ -103,7 +105,7 @@ export function SettingsView({
                   ))}
                 </select>
               </Row>
-              <Row label={t.settingsTheme} note={t.settingsThemeNote}>
+              <Row label={t.settingsTheme}>
                 <div className="segmented-small">
                   {themes.map((entry) => (
                     <button

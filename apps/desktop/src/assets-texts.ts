@@ -8,7 +8,6 @@ import type { Lang } from "./i18n";
 export interface AssetsTexts {
   /** The page's tabs, as one group. */
   tabsLabel: string;
-  intro: string;
   /** A group of the duel list, with how many of it are open. */
   groupOpen: (count: number) => string;
   none: string;
@@ -23,8 +22,6 @@ export interface AssetsTexts {
 
 const en: AssetsTexts = {
   tabsLabel: "Assets",
-  intro:
-    "Where two mods bring their own textures, meshes or faces for the same thing, pick whose the game shows.",
   groupOpen: (count) => `${count} open`,
   none: "No two mods bring their own textures, meshes or faces for the same thing.",
   objectsElsewhere: (count) =>
@@ -39,8 +36,6 @@ const en: AssetsTexts = {
 
 const de: AssetsTexts = {
   tabsLabel: "Assets",
-  intro:
-    "Wo zwei Mods eigene Texturen, Modelle oder Gesichter für dasselbe mitbringen, wählst du, wessen das Spiel zeigt.",
   groupOpen: (count) => `${count} offen`,
   none: "Keine zwei Mods bringen eigene Texturen, Modelle oder Gesichter für dasselbe mit.",
   objectsElsewhere: (count) =>

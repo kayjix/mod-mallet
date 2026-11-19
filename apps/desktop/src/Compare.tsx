@@ -22,6 +22,7 @@ import type {
   RenderedReport,
 } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { InfoTip } from "./info-tip";
 import { fileDuels } from "./Overview";
 import { Stage, type StageItem } from "./Viewer3D";
 
@@ -69,20 +70,22 @@ export function CompareView({ report, start }: { report: RenderedReport; start: 
   return (
     <div className="compare">
       <aside className="compare-left">
-        <p className="aside assets-intro">{a.intro}</p>
         <div className="compare-left-head">
-          <fieldset className="segmented" aria-label={a.tabsLabel}>
-            <button type="button" aria-pressed={tab === "duels"} onClick={() => setTab("duels")}>
-              {t.compareDuels}
-            </button>
-            <button
-              type="button"
-              aria-pressed={tab === "ranking"}
-              onClick={() => setTab("ranking")}
-            >
-              {t.compareRanking}
-            </button>
-          </fieldset>
+          <span className="compare-tabs">
+            <fieldset className="segmented" aria-label={a.tabsLabel}>
+              <button type="button" aria-pressed={tab === "duels"} onClick={() => setTab("duels")}>
+                {t.compareDuels}
+              </button>
+              <button
+                type="button"
+                aria-pressed={tab === "ranking"}
+                onClick={() => setTab("ranking")}
+              >
+                {t.compareRanking}
+              </button>
+            </fieldset>
+            {tab === "ranking" && <InfoTip text={t.rankingHint} />}
+          </span>
         </div>
         {tab === "duels" ? (
           <DuelPicker duels={duels} selected={duelId} onSelect={setDuelId} />
@@ -779,7 +782,6 @@ function RankingPanel({
 
   return (
     <div className="ranking">
-      <p className="aside">{t.rankingHint}</p>
       <ol className="ranking-list">
         {list.map((key, index) =>
           key === OTHERS ? (
