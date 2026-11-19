@@ -6,6 +6,15 @@ in [Releases](docs/src/contributing/releases.md).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-19
+
+### Changed
+
+- Fewer words on the pages: introductions and notes that only repeated
+  what the page shows are gone. What still helps, such as how the score
+  comes about or how to steer the 3D views, sits behind a small ⓘ beside
+  the control it belongs to.
+
 ### Fixed
 
 - The bar over a 3D view no longer jumps when the magic wand changes its
@@ -82,7 +91,8 @@ Edition with Vortex.
   to do about it. Updating the link shows that it landed and asks for
   Vortex's restart.
 
-[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/kayjix/mod-mallet/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/kayjix/mod-mallet/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kayjix/mod-mallet/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kayjix/mod-mallet/releases/tag/v0.1.0

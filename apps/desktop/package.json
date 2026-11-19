@@ -2,7 +2,7 @@
   "name": "@mod-mallet/desktop",
   "description": "The Mod Mallet desktop app: a Tauri shell around the Rust engine.",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
