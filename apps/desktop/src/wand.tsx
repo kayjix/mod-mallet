@@ -57,6 +57,11 @@ const wandTexts: Record<Lang, WandTexts> = {
   },
 };
 
+/** Every level's text in every language, to keep room for the longest. */
+const LEVEL_TEXTS = (Object.entries(wandTexts) as [Lang, WandTexts][]).flatMap(([lang, texts]) =>
+  texts.levels.map((text, at) => ({ lang, at, text })),
+);
+
 /** The texts of the magic wand in the language shown. */
 export function useWandTexts(): WandTexts {
   const { lang } = useSession();
@@ -87,6 +92,7 @@ export function WandControl({
   onLevel: (level: number) => void;
 }) {
   const w = useWandTexts();
+  const { lang: shown } = useSession();
   return (
     <label className="view-tool wand" title={w.hint} data-on={level > 0 || undefined}>
       <WandIcon />
@@ -100,7 +106,18 @@ export function WandControl({
         aria-valuetext={w.levels[level]}
         onChange={(event) => onLevel(Number(event.target.value))}
       />
-      <span className="view-tool-value">{w.levels[level]}</span>
+      <span className="view-tool-value view-tool-stack">
+        {/* Every level's text in every language, so that the bar does not jump. */}
+        {LEVEL_TEXTS.map(({ lang, at, text }) => (
+          <span
+            key={`${lang}:${at}`}
+            data-shown={(shown === lang && at === level) || undefined}
+            aria-hidden={shown !== lang || at !== level}
+          >
+            {text}
+          </span>
+        ))}
+      </span>
     </label>
   );
 }

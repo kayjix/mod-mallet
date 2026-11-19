@@ -70,8 +70,26 @@
   font-weight: 600;
 }
 
+/* Values that change keep their width, so that nothing in the bar jumps. */
 .view-tool-value {
+  min-width: 4.5ch;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every text a value can show, laid over each other: the longest sets the width. */
+.view-tool-stack {
+  display: inline-grid;
+}
+
+.view-tool-stack > span {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.view-tool-stack > span[data-shown] {
+  visibility: visible;
 }
 
 .wand-icon {
