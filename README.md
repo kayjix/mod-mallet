@@ -25,6 +25,13 @@ not look the way you wanted: a fence runs through a house, a rock floats in
 the air, a road turns into a different style halfway. Somewhere among a few
 hundred mods something does not fit, but which one, and why?
 
+<p align="center">
+  <img src="docs/assets/readme/in-game.jpg" alt="In the game, outside Whiterun: the post of one mod's gate with its banner runs straight through the pavilion of another mod" width="700">
+  <br>
+  <em>Outside Whiterun: one mod's gate runs through another mod's pavilion.
+  Further down you see the same spot in Mod Mallet.</em>
+</p>
+
 Mod Mallet reads your setup, tells you in plain words what is wrong and why
 it matters in the game, and offers fixes that you can undo. It works next to
 the tools you already use, Vortex and LOOT, instead of replacing them.
