@@ -137,21 +137,12 @@ pub fn duels(findings: &[Finding], context: &Context<'_>) -> Vec<ModDuel> {
         if a.key == b.key {
             continue;
         }
-        let count = finding
-            .args
-            .get("count")
-            .and_then(|value| match value {
-                mallet_core::ArgValue::Number(number) => u32::try_from(*number).ok(),
-                mallet_core::ArgValue::Text(_) => None,
-            })
-            .unwrap_or(1)
-            .max(1);
+        let parts = parts_of(finding, topic);
         for found in [&a, &b] {
-            *footprint
-                .entry(found.key.clone())
-                .or_default()
-                .entry(topic)
-                .or_default() += count;
+            let mine = footprint.entry(found.key.clone()).or_default();
+            for (part, count) in &parts {
+                *mine.entry(*part).or_default() += count;
+            }
         }
 
         // Sides in a fixed order, by key, so that the duel's identity does
@@ -173,8 +164,10 @@ pub fn duels(findings: &[Finding], context: &Context<'_>) -> Vec<ModDuel> {
                 }
             }
         }
-        let topic_entry = entry.topics.entry(topic).or_insert((0, winner));
-        topic_entry.0 += count;
+        for (part, count) in &parts {
+            let topic_entry = entry.topics.entry(*part).or_insert((0, winner));
+            topic_entry.0 += count;
+        }
         entry.findings.push(finding.id.clone());
         add_files(&mut entry.files, finding, topic, &objects);
 
@@ -268,6 +261,56 @@ fn objects_by_model<'a>(context: &'a Context<'_>) -> HashMap<&'a str, (String, &
         .collect()
 }
 
+/// How many things of each topic `finding`, about `topic`, is about. A
+/// finding about the files of archives counts its meshes, textures and
+/// other files apart, so that a mesh is never counted as a texture.
+fn parts_of(finding: &Finding, topic: Topic) -> Vec<(Topic, u32)> {
+    let number = |name: &str| {
+        finding.args.get(name).and_then(|value| match value {
+            mallet_core::ArgValue::Number(number) => u32::try_from(*number).ok(),
+            mallet_core::ArgValue::Text(_) => None,
+        })
+    };
+    let count = number("count").unwrap_or(1).max(1);
+    if !finding.kind.as_str().starts_with("assets.") {
+        return vec![(topic, count)];
+    }
+    // Findings kept from before the files were counted by kind.
+    let (Some(meshes), Some(textures)) = (number("meshes"), number("textures")) else {
+        return vec![(topic, count)];
+    };
+    let other = count.saturating_sub(meshes).saturating_sub(textures);
+    let parts: Vec<(Topic, u32)> = [
+        (Topic::Meshes, meshes),
+        (Topic::Textures, textures),
+        (Topic::Files, other),
+    ]
+    .into_iter()
+    .filter(|(_, count)| *count > 0)
+    .collect();
+    if parts.is_empty() {
+        vec![(Topic::Files, count)]
+    } else {
+        parts
+    }
+}
+
+/// The topic of one file of a finding about `topic`: for the files of
+/// archives, by the file's kind.
+fn file_topic(path: &str, topic: Topic) -> Topic {
+    if topic != Topic::Textures {
+        return topic;
+    }
+    let extension = std::path::Path::new(path)
+        .extension()
+        .map(|extension| extension.to_string_lossy().to_ascii_lowercase());
+    match extension.as_deref() {
+        Some("nif") => Topic::Meshes,
+        Some("dds") => Topic::Textures,
+        _ => Topic::Files,
+    }
+}
+
 /// Adds the files `finding` names to `files`, each once.
 fn add_files(
     files: &mut Vec<DuelFile>,
@@ -282,7 +325,7 @@ fn add_files(
         }
         let object = objects.get(path.as_str());
         files.push(DuelFile {
-            topic,
+            topic: file_topic(&path, topic),
             object: object.map(|(name, _)| name.clone()),
             object_kind: object.map(|(_, kind)| (*kind).to_owned()),
             path,
@@ -496,6 +539,40 @@ mod tests {
         let suggestion = found[0].suggestion.as_ref().unwrap();
         assert_eq!(found[0].sides[usize::from(suggestion.side)].name, "patch");
         assert_eq!(suggestion.reason, SuggestionReason::BuiltOn);
+    }
+
+    #[test]
+    fn files_of_archives_are_counted_by_their_kind() {
+        let facts = Facts::default();
+        let context = Context::new(&facts, &ByName);
+        // Two skeletons and a script: meshes and another file, no texture.
+        let finding = Finding::new(
+            &kinds::ASSETS_ARCHIVE_OVER_ARCHIVE,
+            Subject::Override {
+                winner: file("Skeleton.bsa"),
+                loser: file("Patch.bsa"),
+            },
+        )
+        .with_arg("count", 3)
+        .with_arg("meshes", 2)
+        .with_arg("textures", 0)
+        .with_previews(vec![
+            GamePath::new("data/meshes/actors/werewolfbeast/character assets/skeleton.nif"),
+            GamePath::new("data/meshes/actors/vampirelord/character assets/skeleton.nif"),
+        ]);
+        let found = duels(&[finding], &context);
+        let topics: Vec<(Topic, u32)> = found[0]
+            .topics
+            .iter()
+            .map(|topic| (topic.topic, topic.count))
+            .collect();
+        assert_eq!(topics, [(Topic::Meshes, 2), (Topic::Files, 1)]);
+        assert!(
+            found[0]
+                .files
+                .iter()
+                .all(|file| file.topic == Topic::Meshes)
+        );
     }
 
     #[test]

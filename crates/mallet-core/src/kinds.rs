@@ -223,6 +223,8 @@ pub const ASSETS_LOOSE_OVER_ARCHIVE: KindInfo = KindInfo {
     confidence: Confidence::Certain,
     args: &[
         "count",
+        "meshes",
+        "textures",
         "examples",
         "winnerOrigin",
         "winnerMod",
@@ -238,6 +240,8 @@ pub const ASSETS_ARCHIVE_OVER_ARCHIVE: KindInfo = KindInfo {
     confidence: Confidence::Certain,
     args: &[
         "count",
+        "meshes",
+        "textures",
         "examples",
         "winnerArchive",
         "winnerOrigin",

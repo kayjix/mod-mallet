@@ -106,7 +106,7 @@ export function CompareView({ report, start }: { report: RenderedReport; start: 
 // ---- left: the duels ----------------------------------------------------------
 
 /** The groups of the duel list, in this order: what a duel is about first. */
-const GROUPS: Topic[] = ["faces", "textures", "meshes"];
+const GROUPS: Topic[] = ["faces", "textures", "meshes", "files"];
 
 /** The group a duel is listed in: the first of its topics that is about files. */
 function groupOf(rendered: RenderedDuel): Topic {

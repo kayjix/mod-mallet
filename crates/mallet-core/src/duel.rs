@@ -29,6 +29,8 @@ pub enum Topic {
     Objects,
     /// One mod's plugin contained in the other.
     Contained,
+    /// Other files, such as scripts, sounds or animations.
+    Files,
 }
 
 /// One of the two mods of a duel.

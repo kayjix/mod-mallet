@@ -310,7 +310,7 @@ A mesh names the textures it uses by path. A texture mod works by providing new 
 
 - Severity: Note
 - Confidence: certain
-- Message arguments: `count`, `examples`, `winnerOrigin`, `winnerMod`, `archive`, `archiveMod`
+- Message arguments: `count`, `meshes`, `textures`, `examples`, `winnerOrigin`, `winnerMod`, `archive`, `archiveMod`
 
 A mod can ship its files packed into an archive or as loose files. The game always prefers a loose file over the same file in an archive, whatever the order of the mods. Mod managers show conflicts between loose files but not this kind, because one side is hidden inside the archive. Often it is intended, for example a texture pack over an older mod. It becomes a problem when only some of the files that belong together are replaced, such as a mesh without its texture: the result can be purple or misplaced objects.
 
@@ -322,7 +322,7 @@ A mod can ship its files packed into an archive or as loose files. The game alwa
 
 - Severity: Note
 - Confidence: certain
-- Message arguments: `count`, `examples`, `winnerArchive`, `winnerOrigin`, `winnerMod`, `archive`, `archiveMod`
+- Message arguments: `count`, `meshes`, `textures`, `examples`, `winnerArchive`, `winnerOrigin`, `winnerMod`, `archive`, `archiveMod`
 
 Archives are loaded in the order of the plugins they belong to. When two archives contain the same file, the game uses the one loaded later. Mod managers do not show this, because both sides are hidden inside archives. It is harmless when the later mod is meant to build on the earlier one. It is a problem when the later archive carries older copies of files that it shares with the earlier mod.
 

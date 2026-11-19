@@ -505,6 +505,7 @@ impl Messages {
             Topic::Meshes => "meshes",
             Topic::Objects => "objects",
             Topic::Contained => "contained",
+            Topic::Files => "files",
         };
         let topic_labels = duel
             .topics

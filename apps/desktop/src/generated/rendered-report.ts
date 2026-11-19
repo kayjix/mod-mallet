@@ -11,7 +11,7 @@ export type FindingId = string;
 /**
  * What two mods disagree about.
  */
-export type Topic = "faces" | "textures" | "meshes" | "objects" | "contained";
+export type Topic = "faces" | "textures" | "meshes" | "objects" | "contained" | "files";
 /**
  * Something that can be done about a finding.
  */
@@ -221,7 +221,7 @@ export interface DuelFile {
   /**
    * What the disagreement about it is.
    */
-  topic: "faces" | "textures" | "meshes" | "objects" | "contained";
+  topic: "faces" | "textures" | "meshes" | "objects" | "contained" | "files";
 }
 /**
  * What makes one side win one finding of the duel.
@@ -498,7 +498,7 @@ export interface DuelTopic {
   /**
    * What two mods disagree about.
    */
-  topic: "faces" | "textures" | "meshes" | "objects" | "contained";
+  topic: "faces" | "textures" | "meshes" | "objects" | "contained" | "files";
   /**
    * Which side the game takes them from now, 0 or 1; `None` where
    * neither wins, as with objects standing in each other.

@@ -152,11 +152,16 @@ duel-topic-contained = { $count ->
     [one] 1 contained plugin
    *[other] { $count } contained plugins
 }
+duel-topic-files = { $count ->
+    [one] 1 other file
+   *[other] { $count } other files
+}
 duel-subject-faces = faces
 duel-subject-textures = textures
 duel-subject-meshes = meshes
 duel-subject-objects = placed objects
 duel-subject-contained = plugins
+duel-subject-files = other files
 duel-suggest-built-on = { $winner } is built on { $other }: it was made to change it, so it should win.
 duel-suggest-specialist = { $winner } is about { $subject } above all, for { $other } they are a small part. The specialist usually does its own thing better.
 

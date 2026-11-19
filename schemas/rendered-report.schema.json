@@ -2094,6 +2094,11 @@
           "description": "One mod's plugin contained in the other.",
           "type": "string",
           "const": "contained"
+        },
+        {
+          "description": "Other files, such as scripts, sounds or animations.",
+          "type": "string",
+          "const": "files"
         }
       ]
     },

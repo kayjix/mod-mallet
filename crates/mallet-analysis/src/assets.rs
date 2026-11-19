@@ -98,6 +98,20 @@ impl<'a> Tally<'a> {
         self.files.push(file);
     }
 
+    /// How many of the files have the extension `extension`.
+    fn of_kind(&self, extension: &str) -> i64 {
+        let found = self
+            .files
+            .iter()
+            .filter(|file| {
+                std::path::Path::new(file.as_str())
+                    .extension()
+                    .is_some_and(|found| found.eq_ignore_ascii_case(extension))
+            })
+            .count();
+        i64::try_from(found).unwrap_or(i64::MAX)
+    }
+
     /// The textures and meshes among the files, to look at, up to a limit.
     fn textures(&self) -> Vec<GamePath> {
         self.files
@@ -215,6 +229,8 @@ fn loose_over_archive(
         },
     )
     .with_arg("count", tally.count)
+    .with_arg("meshes", tally.of_kind("nif"))
+    .with_arg("textures", tally.of_kind("dds"))
     .with_arg("examples", tally.examples())
     .with_arg("winnerOrigin", origin(provider))
     .with_arg("winnerMod", name(provider))
@@ -242,6 +258,8 @@ fn archive_over_archive(
         },
     )
     .with_arg("count", tally.count)
+    .with_arg("meshes", tally.of_kind("nif"))
+    .with_arg("textures", tally.of_kind("dds"))
     .with_arg("examples", tally.examples())
     .with_arg("winnerArchive", winning.path.file_name())
     .with_arg("winnerOrigin", origin(winner_owner))

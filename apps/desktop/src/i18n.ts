@@ -194,7 +194,7 @@ export interface Texts {
   compareCannotShow: string;
   compareObjects: string;
   compareTechnical: (count: number) => string;
-  topicName: Record<"faces" | "textures" | "meshes" | "objects" | "contained", string>;
+  topicName: Record<"faces" | "textures" | "meshes" | "objects" | "contained" | "files", string>;
   objectKinds: Record<string, string>;
   rankedMark: string;
   rankedFor: (name: string) => string;
@@ -633,6 +633,7 @@ export const texts: Record<Lang, Texts> = {
       meshes: "Meshes",
       objects: "Objects in the world",
       contained: "Files inside each other",
+      files: "Other files",
     },
     objectKinds: {
       static: "Static object",
@@ -1180,6 +1181,7 @@ export const texts: Record<Lang, Texts> = {
       meshes: "Meshes",
       objects: "Objekte in der Welt",
       contained: "Dateien ineinander",
+      files: "Andere Dateien",
     },
     objectKinds: {
       static: "Festes Objekt",
