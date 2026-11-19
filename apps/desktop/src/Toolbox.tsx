@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSession } from "./Actions";
 import type { RenderedTool, RenderedToolbox } from "./generated/rendered-toolbox";
+import { LoadingMallet } from "./LoadingMallet";
 import { toolboxTexts } from "./toolbox-texts";
 import "./toolbox.css";
 
@@ -36,7 +37,12 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   const [placed, setPlaced] = useState(false);
 
   if (toolbox === null) {
-    return <p className="empty">{t.scanning}</p>;
+    return (
+      <section className="loading-screen" role="status">
+        <LoadingMallet size={120} />
+        <span>{t.scanning}</span>
+      </section>
+    );
   }
 
   const attempt = async (work: () => Promise<string | null>) => {

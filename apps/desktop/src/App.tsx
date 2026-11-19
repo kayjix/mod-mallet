@@ -18,6 +18,7 @@ import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import { type Health, healthOf } from "./health";
 import { initialLive, type Lang, rememberLang, rememberLive, type Texts, texts } from "./i18n";
 import { type JourneyTexts, journeyTexts } from "./journey-texts";
+import { LoadingMallet, LoadingScreen } from "./LoadingMallet";
 import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
@@ -546,9 +547,10 @@ export default function App({ api, startLang }: AppProps) {
             </header>
           )}
 
-          {scanning && (
+          {scanning && report !== null && (
             <p className="progress" role="status">
               <span className="bar" aria-hidden="true" />
+              <LoadingMallet size={28} />
               {changed ? t.changedRescanning : t.scanningNote}
             </p>
           )}
@@ -601,9 +603,11 @@ export default function App({ api, startLang }: AppProps) {
               live={liveWanted}
               onLive={changeLive}
             />
+          ) : report === null && scanning ? (
+            // The first scan: nothing to show yet but that Mod Mallet works.
+            <LoadingScreen title={t.scanning} note={t.scanningNote} />
           ) : report === null ? (
-            places !== null &&
-            !scanning && (
+            places !== null && (
               <section className="welcome">
                 <p>{t.noScanYet}</p>
                 <button type="button" className="primary" onClick={scan}>

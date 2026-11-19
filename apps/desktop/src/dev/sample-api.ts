@@ -1170,7 +1170,8 @@ function sampleGames(): GameChoice {
 }
 
 export const sampleApi: Api = {
-  scan: (lang) => later(report(lang)),
+  // A scan takes a while, as a real one does, so that its animation shows.
+  scan: (lang) => new Promise((resolve) => setTimeout(() => resolve(report(lang)), 2500)),
   lastReport: () => later(null),
   runAction: (action, lang) =>
     later(

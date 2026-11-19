@@ -12,6 +12,7 @@ import { storedReview } from "./Review";
 import { useReviewTexts } from "./review-texts";
 import "./journey.css";
 import "./overview.css";
+import { LoadingScreen } from "./LoadingMallet";
 
 /** The pages the overview leads to. */
 export type OverviewTarget = Target | "map" | "assets" | "toolbox" | "review";
@@ -92,7 +93,9 @@ export function Overview({
     return (
       <div className="stack">
         {banner}
-        {!scanning && (
+        {scanning ? (
+          <LoadingScreen title={t.scanning} note={t.scanningNote} />
+        ) : (
           <section className="panel welcome">
             <p>{j.scanFirst}</p>
             <button type="button" className="primary" onClick={onScan}>

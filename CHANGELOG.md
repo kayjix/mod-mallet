@@ -6,6 +6,16 @@ in [Releases](docs/src/contributing/releases.md).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
+### Added
+
+- While Mod Mallet scans, the hammer of the logo drives the teeth of a gear
+  in, one stroke at a time; the gear moves on by one tooth and its teeth
+  grow out again. Large on the first scan, small beside "Scanning…" on
+  every later one, and still for people who asked their system for less
+  motion.
+
 ## [0.1.0] - 2026-11-19
 
 The first counted version: everything built so far. Mod Mallet is in
@@ -58,5 +68,6 @@ Edition with Vortex.
   to do about it. Updating the link shows that it landed and asks for
   Vortex's restart.
 
-[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kayjix/mod-mallet/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kayjix/mod-mallet/releases/tag/v0.1.0

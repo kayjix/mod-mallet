@@ -1,0 +1,38 @@
+/* The hammer and the gear while Mod Mallet works (LoadingMallet.tsx). */
+
+.loading-mallet {
+  display: block;
+  flex: none;
+}
+
+.loading-mallet .loading-shadow {
+  fill: #000;
+  opacity: 0.25;
+}
+
+/* The holes in the hub show the page behind them. */
+.loading-mallet .loading-hole {
+  fill: var(--bg);
+}
+
+/* The first scan, before there is anything to show. */
+.loading-screen {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.loading-screen strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+/* A small one at the start of a line that says Mod Mallet is busy. */
+.progress .loading-mallet {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
