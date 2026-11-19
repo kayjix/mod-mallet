@@ -94,6 +94,12 @@ fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
     }
 }
 
+/// Whether the character `record` of `game` takes its looks from its
+/// template rather than having a face of its own.
+pub(crate) fn inherits_appearance_of(game: Game, record: &Record) -> bool {
+    inherits_appearance(record, face_fields(game))
+}
+
 /// Whether the record has a template and is flagged to take its traits,
 /// which include the face, from it. Fallout 4 names a template for each
 /// flag (`TPTA`, traits first) besides the one for all (`TPLT`).

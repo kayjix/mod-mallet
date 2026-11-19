@@ -17,6 +17,7 @@
 mod actions;
 mod anchors;
 mod area;
+mod catalogue;
 mod installers;
 mod knowledge;
 mod lod;
@@ -49,6 +50,7 @@ pub use actions::{
 };
 pub use anchors::object_anchors;
 pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects, world_land};
+pub use catalogue::catalogue;
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;

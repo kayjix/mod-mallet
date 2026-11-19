@@ -6,8 +6,10 @@ import { type Session, SessionContext, useSession } from "./Actions";
 import { AllGames, useGameArt } from "./AllGames";
 import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, modsByName } from "./arrange";
+import { CatalogueView } from "./Catalogue";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
+import { catalogueTexts } from "./catalogue-texts";
 import { type Games, useGames } from "./games";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
@@ -58,6 +60,7 @@ type ViewName =
   | "patch"
   | "map"
   | "assets"
+  | "catalogue"
   | "mods"
   | "toolbox"
   | "settings"
@@ -614,6 +617,8 @@ export default function App({ api, startLang }: AppProps) {
             <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
             <CompareView report={report} start={compareAt} />
+          ) : current === "catalogue" ? (
+            <CatalogueView scannedAt={report.scannedAt} />
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (
@@ -685,18 +690,22 @@ function Sidebar({
   gameCard,
 }: SidebarProps) {
   const reviewTexts = useReviewTexts();
-  const { decisions } = useSession();
+  const { decisions, lang } = useSession();
+  const c = catalogueTexts[lang];
   const assets = report === null ? null : openFileDuels(report, decisions);
+  // Two kinds of collisions side by side (ADR 0053): placed objects on the
+  // map, and files of mods for the same thing.
   const game: NavEntry[] = [
     { name: "overview", label: j.navOverview, icon: <IconOverview /> },
     { name: "review", label: reviewTexts.nav, icon: <IconReview /> },
     { name: "tasks", label: t.viewTasks, icon: <IconTasks />, badge: counts?.tasks },
     {
       name: "collisions",
-      label: t.viewCollisions,
+      label: c.navMapCollisions,
       icon: <IconCollisions />,
       badge: health?.spots.open,
     },
+    { name: "assets", label: c.navAssetCollisions, icon: <IconAssets />, badge: assets },
     {
       name: "patch",
       label: t.viewPatch,
@@ -705,7 +714,7 @@ function Sidebar({
       badgeLabel: health === null ? undefined : j.spotsWaiting(health.spots.waiting),
     },
     { name: "map", label: t.viewMap, icon: <IconMap /> },
-    { name: "assets", label: j.navAssets, icon: <IconAssets />, badge: assets },
+    { name: "catalogue", label: c.nav, icon: <IconCatalogue /> },
     { name: "mods", label: t.viewMods, icon: <IconMods /> },
   ];
   const beside: NavEntry[] = [
@@ -970,6 +979,15 @@ function IconAssets() {
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <circle cx="9" cy="10" r="2" />
       <path d="M21 16l-5-5-9 9" />
+    </Icon>
+  );
+}
+
+function IconCatalogue() {
+  return (
+    <Icon>
+      <path d="M5 4h4v16H5zM10 4h4v16h-4z" />
+      <path d="M15.5 5l3.8-1 3 15.5-3.8 1z" />
     </Icon>
   );
 }

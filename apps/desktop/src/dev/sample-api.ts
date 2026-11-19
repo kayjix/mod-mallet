@@ -6,6 +6,7 @@
 
 import type { Api } from "../api";
 import type { AreaObject, AreaObjects } from "../generated/area-objects";
+import type { Catalogue, CatalogueItem } from "../generated/catalogue";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { LodMesh } from "../generated/lod-mesh";
 import type { MeshView } from "../generated/mesh-view";
@@ -1233,6 +1234,7 @@ export const sampleApi: Api = {
   // The sample has no pictures; the page shows its placeholder.
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
+  catalogue: () => later(sampleCatalogue()),
   // Up close, made-up bridges at every collision spot; no level of detail.
   areaObjects: (world, x, y, radius) => later(sampleArea(world, x, y, radius)),
   areaLand: () => later(null),
@@ -1625,6 +1627,155 @@ function sampleBox(name: string): LodMesh | null {
         texture: null,
         alphaTest: false,
       },
+    ],
+  };
+}
+
+/** A made-up catalogue: some things of the game, of the Creation Club and of mods. */
+function sampleCatalogue(): Catalogue {
+  const item = (
+    id: string,
+    category: CatalogueItem["category"],
+    name: string,
+    model: string,
+    extra: Partial<CatalogueItem> = {},
+  ): CatalogueItem => ({
+    id,
+    category,
+    name,
+    editorId: name.replace(/[^A-Za-z]/g, ""),
+    plugin: id.split("/")[0] ?? "skyrim.esm",
+    models: [`meshes/${model}.nif`],
+    ...extra,
+  });
+  const items: CatalogueItem[] = [
+    item("skyrim.esm/00013989", "sword", "Steel Sword", "weapons/steel/steelsword", {
+      material: "Steel",
+      changedBy: ["better blades.esp"],
+      variants: 24,
+    }),
+    item("skyrim.esm/00013983", "greatsword", "Steel Greatsword", "weapons/steel/steelgreatsword", {
+      material: "Steel",
+    }),
+    item("skyrim.esm/0001397e", "dagger", "Iron Dagger", "weapons/iron/irondagger", {
+      material: "Iron",
+    }),
+    item("skyrim.esm/0001359d", "bow", "Hunting Bow", "weapons/longbow/longbow", {
+      material: "Wood",
+    }),
+    item("skyrim.esm/00013952", "body", "Steel Armor", "armor/steel/cuirass_go", {
+      material: "Steel",
+      models: ["meshes/armor/steel/cuirass_go.nif", "meshes/armor/steel/m/cuirass_1.nif"],
+      variants: 12,
+    }),
+    item("skyrim.esm/00013954", "head", "Steel Helmet", "armor/steel/helmet_go", {
+      material: "Steel",
+    }),
+    item("skyrim.esm/00013951", "feet", "Steel Boots", "armor/steel/boots_go", {
+      material: "Steel",
+    }),
+    item("skyrim.esm/00013953", "hands", "Steel Gauntlets", "armor/steel/gauntlets_go", {
+      material: "Steel",
+    }),
+    item("skyrim.esm/00013955", "shield", "Steel Shield", "armor/steel/shield", {
+      material: "Steel",
+    }),
+    item(
+      "skyrim.esm/0001b3a1",
+      "body",
+      "Whiterun Guard's Armor",
+      "armor/whiterunguard/cuirass_go",
+      {
+        material: "Imperial",
+      },
+    ),
+    item("skyrim.esm/0001b3a3", "head", "Guard's Helmet", "armor/guard/helmet_go", {
+      material: "Iron",
+      changedBy: ["better blades.esp", "guard variety.esp"],
+    }),
+    item("skyrim.esm/0001b3a4", "feet", "Guard's Boots", "armor/guard/boots_go"),
+    item("skyrim.esm/0001b3a5", "hands", "Guard's Gauntlets", "armor/guard/gauntlets_go"),
+    item("skyrim.esm/0001b3a2", "shield", "Whiterun Guard's Shield", "armor/whiterunguard/shield", {
+      material: "Iron",
+    }),
+    item("skyrim.esm/0001b3a6", "jewellery", "Gold Ring", "clothes/ring/goldring"),
+    item("skyrim.esm/0002c3a1", "potion", "Potion of Healing", "clutter/potions/healthpotion"),
+    item("skyrim.esm/0002c3a2", "book", "The Lusty Argonian Maid", "clutter/books/book01"),
+    item("skyrim.esm/0002c3a3", "misc", "Tankard", "clutter/tankard01"),
+    item("skyrim.esm/0002c3a4", "container", "Chest", "clutter/containers/chest01"),
+    item("skyrim.esm/0002c3a5", "furniture", "Chair", "furniture/chair01"),
+    item(
+      "skyrim.esm/000a2c94",
+      "character",
+      "Lydia",
+      "actors/character/facegendata/facegeom/skyrim.esm/000a2c94",
+      {
+        race: "Nord",
+        outfit: "skyrim.esm/0001b3b0",
+      },
+    ),
+    item(
+      "skyrim.esm/0001414d",
+      "character",
+      "Ulfric Stormcloak",
+      "actors/character/facegendata/facegeom/skyrim.esm/0001414d",
+      {
+        race: "Nord",
+        changedBy: ["face overhaul.esp"],
+      },
+    ),
+    item("ccbgssse001-fish.esm/00000d70", "misc", "Fishing Rod", "clutter/fishing/rod", {
+      plugin: "ccbgssse001-fish.esm",
+    }),
+    item("laser blades.esp/00000801", "sword", "Laser Blade", "laserblades/blade", {
+      material: "Plasma",
+    }),
+    item("laser blades.esp/00000802", "greatsword", "Laser Greatblade", "laserblades/greatblade", {
+      material: "Plasma",
+    }),
+    item("guard variety.esp/00000901", "head", "Whiterun Guard's Hood", "guardvariety/hood", {
+      material: "Leather",
+    }),
+  ];
+  return {
+    items: items.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
+    outfits: [
+      {
+        id: "skyrim.esm/0001b3b0",
+        editorId: "GuardWhiterunOutfit",
+        plugin: "skyrim.esm",
+        worn: [
+          "skyrim.esm/0001b3a1",
+          "skyrim.esm/0001b3a3",
+          "guard variety.esp/00000901",
+          "skyrim.esm/0001b3a4",
+          "skyrim.esm/0001b3a5",
+          "skyrim.esm/0001b3a2",
+        ],
+        weapons: ["skyrim.esm/00013989", "skyrim.esm/0001359d"],
+        characters: 48,
+      },
+      {
+        id: "skyrim.esm/0001b3b1",
+        editorId: "ArmorSteelOutfit",
+        plugin: "skyrim.esm",
+        worn: [
+          "skyrim.esm/00013952",
+          "skyrim.esm/00013954",
+          "skyrim.esm/00013951",
+          "skyrim.esm/00013953",
+        ],
+        weapons: ["skyrim.esm/00013983"],
+        characters: 7,
+      },
+    ],
+    sources: [
+      { plugin: "skyrim.esm", origin: "game", mod: null },
+      { plugin: "ccbgssse001-fish.esm", origin: "creationClub", mod: null },
+      { plugin: "better blades.esp", origin: "mod", mod: "Better Blades" },
+      { plugin: "guard variety.esp", origin: "mod", mod: "Guard Variety" },
+      { plugin: "face overhaul.esp", origin: "mod", mod: "Face Overhaul" },
+      { plugin: "laser blades.esp", origin: "mod", mod: "Laser Blades" },
     ],
   };
 }

@@ -45,7 +45,7 @@ pub fn file_preview(options: &ScanOptions, path: &str) -> Option<FilePreview> {
 }
 
 /// Which mod deployed which file, if Vortex says so; otherwise nothing.
-fn deployment(options: &ScanOptions, game_dir: &Path) -> Box<dyn ModSource> {
+pub(crate) fn deployment(options: &ScanOptions, game_dir: &Path) -> Box<dyn ModSource> {
     let manifest_path = options
         .deployment_manifest
         .clone()

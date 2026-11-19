@@ -30,6 +30,7 @@ mod archive;
 mod archive_meshes;
 pub mod archives;
 pub mod area;
+pub mod catalogue;
 pub mod crash_logs;
 pub mod files;
 pub mod game;

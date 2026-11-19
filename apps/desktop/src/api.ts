@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
+import type { Catalogue } from "./generated/catalogue";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
 import type { HiddenWalkways } from "./generated/hidden-walkways";
@@ -30,6 +31,13 @@ export interface Api {
   scan(lang: Lang): Promise<RenderedReport>;
   /** The result of the last scan, or `null` if there is none yet. */
   lastReport(lang: Lang): Promise<RenderedReport | null>;
+  /**
+   * Every thing of the setup worth looking at (ADR 0053): weapons, armour,
+   * characters and other things, with the outfits they form. The first call
+   * for a setup reads every plugin and takes a few seconds. Null if the setup
+   * cannot be read.
+   */
+  catalogue(lang: Lang): Promise<Catalogue | null>;
   /** Hands an action to the mod manager and says what became of it. */
   runAction(action: Action, lang: Lang): Promise<RenderedOutcome>;
   /** Whether the link to the mod manager is installed and answering. */
@@ -160,6 +168,7 @@ const tauriApi: Api = {
   mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
+  catalogue: (lang) => invoke<Catalogue | null>("catalogue", { lang }),
   areaObjects: (world, x, y, radius) =>
     invoke<AreaObjects | null>("area_objects", { world, x, y, radius }),
   interiorObjects: (cell) => invoke<AreaObjects | null>("interior_objects", { cell }),

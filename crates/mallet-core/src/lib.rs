@@ -18,6 +18,7 @@
 pub mod action;
 pub mod anchors;
 pub mod cache;
+pub mod catalogue;
 pub mod duel;
 pub mod encoding;
 pub mod facts;

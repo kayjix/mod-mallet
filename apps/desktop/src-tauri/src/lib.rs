@@ -407,6 +407,15 @@ fn hidden_walkways(
     ))
 }
 
+/// Every thing of the setup worth looking at, for the assets page. The
+/// first call for a setup reads every plugin and takes a few seconds.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn catalogue(lang: String) -> Result<Option<mallet_core::catalogue::Catalogue>, String> {
+    Ok(mallet_engine::catalogue(&settings()?.scan_options(), &lang)
+        .map(|catalogue| (*catalogue).clone()))
+}
+
 /// A mesh of the setup in its own units, with its textures named by path.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -631,6 +640,7 @@ pub fn run() -> tauri::Result<()> {
             decisions,
             set_decision,
             mesh_view,
+            catalogue,
             lod_tiles,
             lod_mesh,
             lod_texture,

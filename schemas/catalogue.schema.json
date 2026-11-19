@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalogue",
+  "description": "Every thing of the setup worth looking at, with the sets it forms.",
+  "type": "object",
+  "properties": {
+    "items": {
+      "description": "The things, sorted by name.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CatalogueItem"
+      }
+    },
+    "outfits": {
+      "description": "What characters wear, as sets of things.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CatalogueOutfit"
+      }
+    },
+    "sources": {
+      "description": "The plugins things come from, in load order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CatalogueSource"
+      }
+    }
+  },
+  "required": [
+    "items",
+    "outfits",
+    "sources"
+  ],
+  "$defs": {
+    "CatalogueItem": {
+      "description": "One thing: a weapon, a piece of armour, a character, an item.\n\nVariants made from another thing, such as the enchanted swords made\nfrom a plain one, look like it and are counted there, not listed.\nCharacters are listed where there is only one of them and they have a\nface of their own; what the many others wear is listed as outfits.",
+      "type": "object",
+      "properties": {
+        "category": {
+          "description": "What kind of thing it is.",
+          "$ref": "#/$defs/ItemCategory"
+        },
+        "changedBy": {
+          "description": "The plugins that change it, in load order; the last one's version is\nthe one the game uses.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "editorId": {
+          "description": "The internal name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable identity: the plugin that defines the record and its number\nthere, as `skyrim.esm/00012eb7`. It does not depend on the load\norder.",
+          "type": "string"
+        },
+        "material": {
+          "description": "What it is made of, from its keywords, such as `Steel` or `Daedric`.\nMaterials of mods keep the name the mod gives them.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "models": {
+          "description": "Its models below the data directory (`meshes/...`), lower case: the\none lying on the ground first, then the ones worn or held. For a\ncharacter, its face.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The name players see, from the version the game uses.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outfit": {
+          "description": "For a character, what it wears unless told otherwise.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plugin": {
+          "description": "The plugin that defines it, in lower case.",
+          "type": "string"
+        },
+        "race": {
+          "description": "For a character, the name of its race.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variants": {
+          "description": "How many variants are made from it, such as enchanted swords.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "plugin",
+        "models"
+      ]
+    },
+    "CatalogueOutfit": {
+      "description": "What a group of characters wears: a set of things.",
+      "type": "object",
+      "properties": {
+        "characters": {
+          "description": "How many characters wear it unless told otherwise.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "editorId": {
+          "description": "The internal name, such as `GuardWhiterunOutfit`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable identity, as for [`CatalogueItem::id`].",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "The plugin that defines it, in lower case.",
+          "type": "string"
+        },
+        "weapons": {
+          "description": "The weapons the characters who wear it carry, by identity, the most\ncommon first.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "worn": {
+          "description": "The things worn, by identity. Where the game picks one of several,\nall of them are listed.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "plugin",
+        "worn",
+        "weapons",
+        "characters"
+      ]
+    },
+    "CatalogueSource": {
+      "description": "A plugin things come from, and the mod that brings it.",
+      "type": "object",
+      "properties": {
+        "mod": {
+          "description": "The name the mod manager shows for the mod that brings it, if known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "description": "Whether it comes with the game, the Creation Club or a mod.",
+          "$ref": "#/$defs/WorldOrigin"
+        },
+        "plugin": {
+          "description": "The plugin's file name, in lower case.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "origin"
+      ]
+    },
+    "ItemCategory": {
+      "description": "What a thing is, as players would sort it.",
+      "oneOf": [
+        {
+          "description": "A one-handed sword.",
+          "type": "string",
+          "const": "sword"
+        },
+        {
+          "description": "A dagger.",
+          "type": "string",
+          "const": "dagger"
+        },
+        {
+          "description": "A war axe.",
+          "type": "string",
+          "const": "war-axe"
+        },
+        {
+          "description": "A mace.",
+          "type": "string",
+          "const": "mace"
+        },
+        {
+          "description": "A two-handed sword.",
+          "type": "string",
+          "const": "greatsword"
+        },
+        {
+          "description": "A battle axe.",
+          "type": "string",
+          "const": "battleaxe"
+        },
+        {
+          "description": "A warhammer.",
+          "type": "string",
+          "const": "warhammer"
+        },
+        {
+          "description": "A bow.",
+          "type": "string",
+          "const": "bow"
+        },
+        {
+          "description": "A crossbow.",
+          "type": "string",
+          "const": "crossbow"
+        },
+        {
+          "description": "A staff.",
+          "type": "string",
+          "const": "staff"
+        },
+        {
+          "description": "Any other weapon.",
+          "type": "string",
+          "const": "other-weapon"
+        },
+        {
+          "description": "Arrows and bolts.",
+          "type": "string",
+          "const": "ammunition"
+        },
+        {
+          "description": "Something worn on the head: a helmet, a hood, a circlet.",
+          "type": "string",
+          "const": "head"
+        },
+        {
+          "description": "Something worn on the body: a cuirass, robes, clothes.",
+          "type": "string",
+          "const": "body"
+        },
+        {
+          "description": "Something worn on the hands: gauntlets, gloves.",
+          "type": "string",
+          "const": "hands"
+        },
+        {
+          "description": "Something worn on the feet: boots, shoes.",
+          "type": "string",
+          "const": "feet"
+        },
+        {
+          "description": "A shield.",
+          "type": "string",
+          "const": "shield"
+        },
+        {
+          "description": "A ring or a necklace.",
+          "type": "string",
+          "const": "jewellery"
+        },
+        {
+          "description": "Anything else that is worn.",
+          "type": "string",
+          "const": "other-worn"
+        },
+        {
+          "description": "A character.",
+          "type": "string",
+          "const": "character"
+        },
+        {
+          "description": "A book, a note or a scroll.",
+          "type": "string",
+          "const": "book"
+        },
+        {
+          "description": "A potion, a poison or something to eat or drink.",
+          "type": "string",
+          "const": "potion"
+        },
+        {
+          "description": "An ingredient.",
+          "type": "string",
+          "const": "ingredient"
+        },
+        {
+          "description": "A key.",
+          "type": "string",
+          "const": "key"
+        },
+        {
+          "description": "A soul gem.",
+          "type": "string",
+          "const": "soul-gem"
+        },
+        {
+          "description": "Any other thing that can be carried.",
+          "type": "string",
+          "const": "misc"
+        },
+        {
+          "description": "Something to sit or lie on, or to work at.",
+          "type": "string",
+          "const": "furniture"
+        },
+        {
+          "description": "A chest, a barrel, a sack.",
+          "type": "string",
+          "const": "container"
+        },
+        {
+          "description": "A door.",
+          "type": "string",
+          "const": "door"
+        },
+        {
+          "description": "Something to interact with, such as a lever.",
+          "type": "string",
+          "const": "activator"
+        },
+        {
+          "description": "A plant or something else to harvest.",
+          "type": "string",
+          "const": "flora"
+        },
+        {
+          "description": "A light.",
+          "type": "string",
+          "const": "light"
+        }
+      ]
+    },
+    "WorldOrigin": {
+      "description": "Where a worldspace comes from.",
+      "oneOf": [
+        {
+          "description": "The game itself or its DLC.",
+          "type": "string",
+          "const": "game"
+        },
+        {
+          "description": "Creation Club content the game lists as its own.",
+          "type": "string",
+          "const": "creationClub"
+        },
+        {
+          "description": "A mod.",
+          "type": "string",
+          "const": "mod"
+        }
+      ]
+    }
+  }
+}

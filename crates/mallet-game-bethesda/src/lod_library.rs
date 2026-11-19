@@ -173,6 +173,12 @@ impl LodLibrary {
         ))
     }
 
+    /// The path of every file this library has, normalized, in no
+    /// particular order.
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.files.keys().map(String::as_str)
+    }
+
     /// The file at `path` below the data directory, if this library has
     /// it: a file below its folders.
     /// The version the game uses comes first; where it cannot be read, the
