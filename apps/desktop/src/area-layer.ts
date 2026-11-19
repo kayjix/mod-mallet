@@ -521,6 +521,16 @@ const WAND_MOST = 300;
 const CONTENT_MARGIN = 4;
 
 /**
+ * At the levels of a whole structure, how many times longer than the
+ * picked part a link may be: a road or a slab of ground of the same mod
+ * touches half a town, and hiding it tears holes.
+ */
+const WAND_LARGER = 4;
+
+/** A link may always be this long, in game units (about 7 m). */
+const WAND_LARGE = 512;
+
+/**
  * How an object is drawn: plainly, as part of a collision, picked, as part
  * of the collision looked at, as hidden by the patch, not at all, or in
  * the chain of the picked object.
@@ -694,6 +704,7 @@ export class AreaLayer {
           object: other,
           box: placedBox(model.box, instance.matrix),
           kind: kindOf(other.model, sizeOf(model.box, other.scale)),
+          size: sizeOf(model.box, other.scale),
         },
       ];
     });
@@ -711,7 +722,8 @@ export class AreaLayer {
           ? part.object.model.toLowerCase() === first.object.model.toLowerCase()
           : step.alike === "family"
             ? modelFamily(part.object.model) === family
-            : part.kind === first.kind;
+            : part.kind === first.kind &&
+              part.size <= Math.max(first.size * WAND_LARGER, WAND_LARGE);
       const links = parts.flatMap((part, index) =>
         index === start || (ownerOf(part.object) === owner && alike(part)) ? [index] : [],
       );

@@ -45,7 +45,10 @@ the left, and did not show that a spot is about two mods.
      without the variant's number, so `Shelf01` and `Shelf02`), gaps up to
      2 m.
    - 4: the whole structure: every part of the same sort (built, clutter
-     or nature, as in ADR 0050) within 20 cm, link by link.
+     or nature, as in ADR 0050) within 20 cm, link by link, but no part
+     more than four times as long as the picked one (7 m are always
+     allowed): a road or a slab of ground of the same mod touches half a
+     town, and hiding it tears holes.
    - 5: the structure with gaps up to 2 m.
 2. **Only the same mod's parts are links.** A part belongs to the mod that
    placed it. Objects of other mods and of the game are passed over.
@@ -91,6 +94,10 @@ the left, and did not show that a spot is about two mods.
   view opens, parts far from the camera may still be missing.
 - The review's structures and segments (ADR 0050) keep growing by touch;
   only the card of a picked object uses the wand.
+- At Hollyfrost Farm the old chain ran from a small wall end over the
+  road, slabs of ground and the roofs of the farm. Rocks and land are
+  nature and never links from something built; roads and slabs are built,
+  and the rule of size keeps them out.
 
 ## Alternatives considered
 
