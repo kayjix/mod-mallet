@@ -1,66 +1,118 @@
-# Mod Mallet
+<p align="center">
+  <img src="apps/desktop/src-tauri/icons/128x128.png" alt="" width="96">
+</p>
 
-Mod Mallet diagnoses a modded game setup, explains in plain language what is
-wrong, and proposes fixes that can be undone. It works alongside the tools
-modders already use instead of replacing them.
+<h1 align="center">Mod Mallet</h1>
 
-The first supported game is Skyrim Special Edition with the Vortex mod
-manager. Mod Mallet is written in Rust.
+<p align="center">
+  <strong>Find out why your modded Skyrim crashes or looks wrong, and fix it
+  without breaking anything.</strong>
+</p>
 
-> **Status: pre-alpha.** Mod Mallet reports script extender plugins that the
-> game refused to load, characters whose face files do not match the record
-> that wins ("dark faces"), patches a mod's installer would offer now but
-> that were never installed, replacement meshes that a texture mod no
-> longer reaches, and files in a mod's archive that the game takes from
-> somewhere else. See the [roadmap](docs/src/product/roadmap.md)
-> for what comes next.
+<p align="center">
+  <a href="LICENSE">GPL-3.0-or-later</a> · Windows · Skyrim Special Edition
+  with Vortex · pre-release
+</p>
 
-## What it looks like today
+<p align="center">
+  <img src="docs/assets/readme/map.jpg" alt="Mod Mallet's map of Skyrim: the game's own land, its places and those mods add, and the spots where objects of different mods collide" width="900">
+</p>
 
-```text
-$ mallet scan
-Skyrim Special Edition 1.7.104, script extender 2.3.1
-48 script extender plugins checked
-385 plugins and 209 archives read
+---
 
-Error (certain): Script extender plugin does not support this game version
-  Old.dll was switched off because it was not built for game version 1.7.104.
-  File: data/skse/plugins/old.dll
-  Mod: Old Mod
-  What to do: Look on the mod's page for a version built for your game version and install it. If there is none yet, disable the mod until it has been updated.
-  [extender.plugin-incompatible]
+You installed a lot of mods. Now the game crashes now and then, and it does
+not look the way you wanted: a fence runs through a house, a rock floats in
+the air, a road turns into a different style halfway. Somewhere among a few
+hundred mods something does not fit, but which one, and why?
 
-Warning (likely): Characters will probably have dark or mismatched faces
-  College.esp is loaded after Faces.esp and describes different faces for 16 characters than the face files in use, which come from Face Overhaul. For example: Ancano, Brelyna, Colette.
-  What to do: If you want the looks of the face files, load their plugin after the other one, or look for a compatibility patch for the two mods. If you want the other plugin's version of the characters, its mod has to provide matching face files.
-  [npcs.face-mismatch]
+Mod Mallet reads your setup, tells you in plain words what is wrong and why
+it matters in the game, and offers fixes that you can undo. It works next to
+the tools you already use, Vortex and LOOT, instead of replacing them.
 
-1 error, 1 warning, 133 notes
-Notes are not listed. Add --notes to see them.
-More about a finding: mallet explain <kind>
-```
+## Find, understand, fix
 
-A scan only reads. It changes nothing in the game, the mods or the mod
-manager. Where the mod manager can fix a finding, Mod Mallet offers to ask
-it: so far, to run a mod's installer again in Vortex.
+| Find | Understand | Fix |
+|---|---|---|
+| One list of what is wrong, ordered by what matters most, each in a sentence you can read without knowing modding tools. | See the problem where it is: on the map, in 3D up close, or as the same thing side by side in every mod that changes it. | Let Vortex reinstall a mod with the options it missed, or hide colliding objects with a small patch of Mod Mallet's own. Switch it off and everything is as before. |
 
-## Building
+<p align="center">
+  <img src="docs/assets/readme/tasks.jpg" alt="The task list: collisions to decide, pairs of mods to choose between, LOOT's warnings and suggestions, each with the buttons that act on it" width="900">
+</p>
 
-You need [Rust](https://rustup.rs) and, for the desktop app,
-[Node.js](https://nodejs.org) 22 or newer. On Windows you also need the
-Visual Studio Build Tools. Details are in
+## What you see
+
+**The land in 3D.** Every place of the game and of your mods on the game's
+own land and level of detail, with the mountains where they are.
+
+<p align="center">
+  <img src="docs/assets/readme/relief.jpg" alt="The 3D relief of Skyrim from above, with the names of its places" width="900">
+</p>
+
+**Up close.** Come closer and the objects themselves appear, as the game
+places them. A collision opens right where it is: pick what should stay, and
+Mod Mallet builds the patch.
+
+<p align="center">
+  <img src="docs/assets/readme/up-close.jpg" alt="Whiterun up close in 3D, with the houses, walls and trees of the game and of mods" width="900">
+</p>
+
+<!-- Later: a short animation from the whole map into Whiterun, opening a
+     collision and hiding the banner pole that runs through the pavilion. -->
+
+**Side by side.** The same thing as every mod that changes it has it, so you
+can choose the version you like.
+
+**Crashes.** When a crash logger is installed, Mod Mallet reads its recent
+reports and says which mods they point at, and how sure that is.
+
+**And more.** Script extender plugins the game switched off, patches an
+installer would offer now but that were never installed, characters with dark
+faces, meshes made for the 2011 Skyrim, missing textures, characters' paths
+that a later mod undoes, plugins LOOT warns about, and more. Everything Mod
+Mallet can report is in the [finding catalog](docs/src/reference/findings.md).
+
+## What it does not do
+
+- **It changes nothing on its own.** A scan only reads. Every change goes
+  through your mod manager, and only when you ask for it.
+- **It is not a mod manager.** Vortex keeps installing, enabling and sorting
+  your mods.
+- **It never touches your mods.** What Mod Mallet makes lives in a separate
+  mod that you can switch off.
+- **It stays on your computer.** No account, no telemetry.
+
+## Where it stands
+
+Mod Mallet is in development and has no release to download yet.
+
+- **Skyrim Special Edition with Vortex** is what it is built and tested with.
+- **Skyrim (2011), Skyrim VR, Fallout 4, Fallout 4 VR, New Vegas, Fallout 3
+  and Oblivion** are found and get the checks that their shared file formats
+  allow.
+- **Mod Organizer 2** is planned.
+
+The app speaks English and German. See the [roadmap](docs/src/product/roadmap.md)
+for what comes next.
+
+<details>
+<summary><strong>Building it yourself</strong></summary>
+
+You need [Rust](https://rustup.rs) and [Node.js](https://nodejs.org) 22 or
+newer, and on Windows the Visual Studio Build Tools. Details are in
 [Development setup](docs/src/contributing/setup.md).
 
 ```text
 npm install
-cargo run -p mallet-cli -- scan     # the command line
 npm run desktop -- dev              # the desktop app
+cargo run -p mallet-cli -- scan     # the command line
 cargo xtask ci                      # every check CI runs
 ```
 
+</details>
+
 ## Documentation
 
-The documentation is a book in [`docs/`](docs/src/SUMMARY.md). Build and open
+The documentation is a book in [`docs/`](docs/src/SUMMARY.md); build and open
 it with `cargo xtask docs --open`. Good places to start:
 
 - [Vision and non-goals](docs/src/product/vision.md): what Mod Mallet is for
@@ -68,8 +120,6 @@ it with `cargo xtask docs --open`. Good places to start:
 - [Architecture overview](docs/src/architecture/overview.md): how the code is
   organised.
 - [Decisions](docs/src/adr/README.md): why it is organised that way.
-- [Finding catalog](docs/src/reference/findings.md): everything Mod Mallet
-  can report.
 
 ## Contributing
 
@@ -81,4 +131,5 @@ Mod Mallet is free software under the
 [GNU General Public License, version 3 or later](LICENSE).
 
 Mod Mallet is not affiliated with Bethesda Softworks, Nexus Mods, the LOOT
-project or the Rust Foundation.
+project or the Rust Foundation. Pictures in this file show the game's and
+mods' own content as Mod Mallet displays it; they belong to their authors.
