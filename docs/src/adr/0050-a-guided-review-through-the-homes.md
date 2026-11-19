@@ -76,7 +76,7 @@ a colour of its own.
    as for the mod's own parts. The keep effect names what rests on a part
    and goes with it, and what rests on it but stays ("then in the air").
    The part started from always belongs to the structure. The object
-   card's *parts that hang together* follows the same rules.
+   card's magic wand (ADR 0055) takes decor along by the same rule.
 5. **A structure is shown three times, through one camera**: the place as
    it is now (with what the patch hides left out), with only the first
    mod's structure, and with only the second's. The first mod's parts are

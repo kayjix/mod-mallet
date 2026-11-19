@@ -69,7 +69,7 @@
   - [0052 Paths over hidden objects are cut out](adr/0052-paths-over-hidden-objects-are-cut-out.md)
   - [0053 Shareable patches in parts](adr/0053-shareable-patches-in-parts.md)
   - [0054 A catalogue of the game's things](adr/0054-a-catalogue-of-the-games-things.md)
-  - [0055 A chain of parts by their reach](adr/0055-a-chain-of-parts-by-their-reach.md)
+  - [0055 A magic wand for what belongs together, and one column per mod](adr/0055-a-magic-wand-for-what-belongs-together.md)
   - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)
   - [Template](adr/template.md)
 

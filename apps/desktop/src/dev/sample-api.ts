@@ -1519,10 +1519,11 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
       0,
       "Lantern post",
     );
-    // A pavilion of Old Town nearby: a roof on four posts that stop a hand
-    // short of it, a bench a step away, around a signpost of the game, and a
-    // banner pole of Water Mod through its roof. Picking one post chains the
-    // other posts and the roof (ADR 0055), not the pole.
+    // A pavilion of Old Town nearby: a roof on four posts, a bench with a cup
+    // on it a step away, around a signpost of the game, and a banner pole of
+    // Water Mod through its roof. The magic wand at "the whole structure"
+    // takes a post's roof and the other posts along, not the pole; at level
+    // 1 the bench takes its cup (ADR 0055).
     const [px, py] = [cx, cy + 340];
     const corners: [number, number][] = [
       [-90, -90],
@@ -1540,8 +1541,9 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
         "Pavilion post",
       );
     });
-    place("Old Town.esp", 0xb34, "sample\\roof.nif", [px, py, ground + 198], 0, "Pavilion roof");
+    place("Old Town.esp", 0xb34, "sample\\roof.nif", [px, py, ground + 178], 0, "Pavilion roof");
     place("Old Town.esp", 0xb35, "sample\\bench.nif", [px + 200, py, ground + 12], 0, "Bench");
+    place("Old Town.esp", 0xb38, "sample\\cup.nif", [px + 210, py, ground + 30], 0, "Cup");
     place("Skyrim.esm", 0xb36, "sample\\signpost.nif", [px, py, ground + 50], 0, "Signpost");
     place(
       "Water Mod.esp",

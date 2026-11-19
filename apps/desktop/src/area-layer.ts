@@ -121,100 +121,6 @@ void main() {
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
 
-/**
- * The reach of a part in a chain (ADR 0055): its box, turned and placed,
- * grown by the radius on every side, with rounded edges. Drawn from a
- * sphere whose points are pushed out to the box's corners.
- */
-const HULL_VERTEX = `#version 300 es
-in vec3 a_normal;
-in vec3 a_centre;
-in vec3 a_axis0;
-in vec3 a_axis1;
-in vec3 a_axis2;
-in float a_strength;
-uniform mat4 u_matrix;
-uniform float u_exaggeration;
-uniform float u_radius;
-out vec3 v_normal;
-out float v_strength;
-void main() {
-  vec3 side = sign(a_normal);
-  float l0 = max(length(a_axis0), 1e-6);
-  float l1 = max(length(a_axis1), 1e-6);
-  float l2 = max(length(a_axis2), 1e-6);
-  vec3 normal = a_axis0 / l0 * a_normal.x + a_axis1 / l1 * a_normal.y + a_axis2 / l2 * a_normal.z;
-  vec3 world = a_centre + a_axis0 * side.x + a_axis1 * side.y + a_axis2 * side.z + normal * u_radius;
-  v_normal = normal;
-  v_strength = a_strength;
-  gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
-}`;
-
-const HULL_FRAGMENT = `#version 300 es
-precision highp float;
-in vec3 v_normal;
-in float v_strength;
-uniform vec3 u_colour;
-out vec4 colour;
-void main() {
-  vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
-  float lit = 0.75 + 0.35 * abs(dot(normalize(v_normal), light));
-  colour = vec4(u_colour * lit, 0.16 * v_strength);
-}`;
-
-/** Where the attributes of the hulls are. */
-const HULL_LOCATIONS: [string, number][] = [
-  ["a_normal", 0],
-  ["a_centre", 1],
-  ["a_axis0", 2],
-  ["a_axis1", 3],
-  ["a_axis2", 4],
-  ["a_strength", 5],
-];
-
-/** How many floats a hull takes in its buffer: centre, three half axes, strength. */
-const HULL_STRIDE = 13;
-
-/** The colour of the hulls of a chain. */
-const HULL_COLOUR: Vec3 = [0.75, 0.92, 1.0];
-
-/**
- * The points and triangles of a sphere of radius one, none of whose points
- * lies on a plane of the axes: pushed out to a box's corners, the triangles
- * across those planes span the box's flat sides.
- */
-function hullSphere(): { points: Float32Array; triangles: Uint16Array } {
-  const rings = 12;
-  const around = 24;
-  const points: number[] = [0, 0, 1];
-  for (let ring = 0; ring < rings; ring += 1) {
-    const polar = ((ring + 0.5) / rings) * Math.PI;
-    for (let step = 0; step < around; step += 1) {
-      const azimuth = ((step + 0.5) / around) * Math.PI * 2;
-      points.push(
-        Math.sin(polar) * Math.cos(azimuth),
-        Math.sin(polar) * Math.sin(azimuth),
-        Math.cos(polar),
-      );
-    }
-  }
-  points.push(0, 0, -1);
-  const last = 1 + rings * around;
-  const at = (ring: number, step: number) => 1 + ring * around + (step % around);
-  const triangles: number[] = [];
-  for (let step = 0; step < around; step += 1) {
-    triangles.push(0, at(0, step), at(0, step + 1));
-    triangles.push(last, at(rings - 1, step + 1), at(rings - 1, step));
-  }
-  for (let ring = 0; ring + 1 < rings; ring += 1) {
-    for (let step = 0; step < around; step += 1) {
-      triangles.push(at(ring, step), at(ring + 1, step), at(ring + 1, step + 1));
-      triangles.push(at(ring, step), at(ring + 1, step + 1), at(ring, step + 1));
-    }
-  }
-  return { points: new Float32Array(points), triangles: new Uint16Array(triangles) };
-}
-
 /** Where every attribute is, the same in both programs. */
 const LOCATIONS: [string, number][] = [
   ["a_position", 0],
@@ -224,13 +130,8 @@ const LOCATIONS: [string, number][] = [
   ["a_look", 7],
 ];
 
-/** A program with the attributes at `locations`. */
-function linked(
-  gl: WebGL2RenderingContext,
-  vertex: string,
-  fragment: string,
-  locations: [string, number][] = LOCATIONS,
-): WebGLProgram {
+/** A program with the attributes at {@link LOCATIONS}. */
+function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
   const shader = (type: number, source: string) => {
     const made = gl.createShader(type);
     if (made === null) {
@@ -248,7 +149,7 @@ function linked(
   for (const part of parts) {
     gl.attachShader(made, part);
   }
-  for (const [name, location] of locations) {
+  for (const [name, location] of LOCATIONS) {
     gl.bindAttribLocation(made, location, name);
   }
   gl.linkProgram(made);
@@ -443,15 +344,12 @@ function sizeOf(box: [[number, number, number], [number, number, number]], scale
   return Math.max(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * scale;
 }
 
-/** What the card of a picked object can do with the view it was picked in. */
+/** What the card of a picked object knows of the view it was picked in. */
 export interface PartTools {
-  /** Its chain: the parts of the same mod linked to it, each within `radius` game units of the next. */
-  chain: (radius: number) => AreaObject[];
-  /**
-   * Lights `chain` up faintly next to the picked object and, with `hulls`,
-   * draws how far each part reaches; an empty chain clears it.
-   */
-  showChain: (chain: AreaObject[], radius: number, hulls: boolean) => void;
+  /** What the magic wand took along with the object (ADR 0055), the object first. */
+  selection: AreaObject[];
+  /** The magic wand's level the selection was made at, 0 to {@link WAND_TOP}. */
+  level: number;
 }
 
 /** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
@@ -533,14 +431,24 @@ function outerRadius(box: PlacedBox): number {
   return Math.hypot(...box.half);
 }
 
+/** Whether the point `at` lies inside the placed box `box`. */
+function holds(box: PlacedBox, at: readonly number[]): boolean {
+  const between = [0, 1, 2].map((axis) => (at[axis] ?? 0) - (box.centre[axis] ?? 0));
+  return box.axes.every((axis, index) => Math.abs(dot(between, axis)) <= (box.half[index] ?? 0));
+}
+
 /**
- * The smart selection (ADR 0055): the parts reached from the part at
- * `start` link by link, each part reaching `radius` game units beyond its
- * box. Two parts link where one's box comes within the other's reach. The
- * caller passes only parts of one mod; the chain grows through them alone.
- * Returns the indices of the chain's parts, the start first.
+ * The parts reached from the part at `start` link by link, at most `most`:
+ * two parts link where their boxes come within `gap` game units of each
+ * other. The caller passes only the parts that may link. Returns the
+ * indices of the chain's parts, the start first.
  */
-export function chainFrom(boxes: PlacedBox[], start: number, radius: number): number[] {
+export function chainFrom(
+  boxes: PlacedBox[],
+  start: number,
+  gap: number,
+  most = Number.POSITIVE_INFINITY,
+): number[] {
   if (boxes[start] === undefined) {
     return [];
   }
@@ -548,7 +456,7 @@ export function chainFrom(boxes: PlacedBox[], start: number, radius: number): nu
   const found = [start];
   const left = new Set(boxes.map((_, index) => index));
   left.delete(start);
-  for (let at = 0; at < found.length; at += 1) {
+  for (let at = 0; at < found.length && found.length < most; at += 1) {
     const from = found[at] ?? start;
     const box = boxes[from];
     if (box === undefined) {
@@ -556,7 +464,7 @@ export function chainFrom(boxes: PlacedBox[], start: number, radius: number): nu
     }
     for (const other of [...left]) {
       const candidate = boxes[other];
-      if (candidate === undefined) {
+      if (candidate === undefined || found.length >= most) {
         continue;
       }
       // Far apart by their spheres already: no axis needed.
@@ -565,10 +473,10 @@ export function chainFrom(boxes: PlacedBox[], start: number, radius: number): nu
         candidate.centre[1] - box.centre[1],
         candidate.centre[2] - box.centre[2],
       );
-      if (apart > (outer[from] ?? 0) + (outer[other] ?? 0) + radius) {
+      if (apart > (outer[from] ?? 0) + (outer[other] ?? 0) + gap) {
         continue;
       }
-      if (boxesMeet(box, candidate, radius)) {
+      if (boxesMeet(box, candidate, gap)) {
         found.push(other);
         left.delete(other);
       }
@@ -576,6 +484,41 @@ export function chainFrom(boxes: PlacedBox[], start: number, radius: number): nu
   }
   return found;
 }
+
+/**
+ * A model's family: its file name without the number of the variant, so
+ * that `UpperShelf01` and `UpperShelf02`, or every piece of a stone wall,
+ * are alike.
+ */
+export function modelFamily(model: string): string {
+  const name = (model.split(/[\\/]/).pop() ?? model).toLowerCase().replace(/\.nif$/, "");
+  return name.replace(/[\d_ -]+[a-z]?$/, "") || name;
+}
+
+/** The highest level of the magic wand (ADR 0055); level 0 takes the object alone. */
+export const WAND_TOP = 5;
+
+/**
+ * What the magic wand chains at each level from 2 on: which parts are
+ * alike (the same model, the same family of models, or the same kind of
+ * thing: built, clutter or nature), and how far apart two links may be, in
+ * game units. Level 1 takes only what lies on or in the object.
+ */
+const WAND_STEPS: Record<number, { alike: "model" | "family" | "kind"; gap: number }> = {
+  2: { alike: "model", gap: 14 },
+  3: { alike: "family", gap: 140 },
+  4: { alike: "kind", gap: 14 },
+  5: { alike: "kind", gap: 140 },
+};
+
+/** How far from the picked object the magic wand reaches at most, in game units (about 30 m). */
+const WAND_REACH = 2048;
+
+/** How many parts the magic wand chains at most. */
+const WAND_MOST = 300;
+
+/** How close decor must come to a part to lie on it, in game units. */
+const CONTENT_MARGIN = 4;
 
 /**
  * How an object is drawn: plainly, as part of a collision, picked, as part
@@ -623,19 +566,6 @@ export class AreaLayer {
   private selected = new Set<string>();
   /** The chain of the picked object, lit faintly (ADR 0055). */
   private chained = new Set<string>();
-  private readonly hullProgram: WebGLProgram;
-  /** The sphere the hulls are drawn from, with its points and triangles. */
-  private readonly hullShape: {
-    vao: WebGLVertexArrayObject;
-    buffers: WebGLBuffer[];
-    count: number;
-  };
-  /** The hulls of the chain, one per part, and how far they reach. */
-  private hulls: { buffer: WebGLBuffer | null; count: number; radius: number } = {
-    buffer: null,
-    count: 0,
-    radius: 0,
-  };
   /** The objects shown, as last set. */
   area: AreaObjects | null = null;
 
@@ -646,20 +576,6 @@ export class AreaLayer {
   ) {
     this.program = linked(gl, VERTEX, FRAGMENT);
     this.picking = linked(gl, PICK_VERTEX, PICK_FRAGMENT);
-    this.hullProgram = linked(gl, HULL_VERTEX, HULL_FRAGMENT, HULL_LOCATIONS);
-    const sphere = hullSphere();
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    const points = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, points);
-    gl.bufferData(gl.ARRAY_BUFFER, sphere.points, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-    const triangles = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere.triangles, gl.STATIC_DRAW);
-    gl.bindVertexArray(null);
-    this.hullShape = { vao, buffers: [points, triangles], count: sphere.triangles.length };
   }
 
   /** How an object is drawn now: picked, in the chain, or as its look says. */
@@ -731,111 +647,110 @@ export class AreaLayer {
   }
 
   /**
-   * Picks the objects with `keys` (see {@link objectKey}), or none; a chain
-   * shown goes unless the same objects are picked again.
+   * Picks the objects with `keys` (see {@link objectKey}), or none; a
+   * selection of the magic wand goes unless the same objects are picked again.
    */
   select(keys: string[]) {
     const same = keys.length === this.selected.size && keys.every((key) => this.selected.has(key));
     this.selected = new Set(keys);
     if (!same) {
       this.chained = new Set();
-      this.hulls.count = 0;
     }
     this.relookAll();
   }
 
   /**
-   * The chain of `object` (ADR 0055): the parts of its mod linked to it,
-   * each reaching `radius` game units beyond its box, as far as the area
-   * shows them and their models are read. Parts of other mods and of the
-   * game are passed over; they neither join the chain nor break it.
+   * What the magic wand takes along with `object` at `level` (ADR 0055),
+   * the object first: from level 1 what lies on or in it, from level 2 on
+   * the parts of its mod alike enough to it in a chain, with what lies on
+   * or in them. Parts of other mods and of the game are passed over. Only
+   * parts within {@link WAND_REACH} of the object count, and their models
+   * must be read.
    */
-  chain(object: AreaObject, radius: number): AreaObject[] {
+  wand(object: AreaObject, level: number): AreaObject[] {
+    if (level <= 0) {
+      return [object];
+    }
     const owner = ownerOf(object);
     const isStart = (other: AreaObject) =>
       other.id.plugin === object.id.plugin && other.id.localId === object.id.localId;
+    const [x, y, z] = object.position;
     const parts = this.instances.flatMap((instance) => {
       const other = instance.object;
       const ours =
         isStart(other) || ownerOf(other) === owner || other.plugin.toLowerCase() === owner;
       const model = this.models.get(other.model);
-      if (!ours || model === undefined || !Array.isArray(model.surfaces)) {
+      const [ox, oy, oz] = other.position;
+      if (
+        !ours ||
+        model === undefined ||
+        !Array.isArray(model.surfaces) ||
+        Math.hypot(ox - x, oy - y, oz - z) > WAND_REACH
+      ) {
         return [];
       }
-      return [{ object: other, box: placedBox(model.box, instance.matrix) }];
+      return [
+        {
+          object: other,
+          box: placedBox(model.box, instance.matrix),
+          kind: kindOf(other.model, sizeOf(model.box, other.scale)),
+        },
+      ];
     });
     const start = parts.findIndex((part) => isStart(part.object));
-    if (start < 0) {
+    const first = parts[start];
+    if (first === undefined) {
       return [object];
     }
-    return chainFrom(
-      parts.map((part) => part.box),
-      start,
-      radius,
-    ).flatMap((index) => {
+    let chain = [start];
+    const step = WAND_STEPS[level];
+    if (step !== undefined) {
+      const family = modelFamily(first.object.model);
+      const alike = (part: (typeof parts)[number]) =>
+        step.alike === "model"
+          ? part.object.model.toLowerCase() === first.object.model.toLowerCase()
+          : step.alike === "family"
+            ? modelFamily(part.object.model) === family
+            : part.kind === first.kind;
+      const links = parts.flatMap((part, index) =>
+        index === start || (ownerOf(part.object) === owner && alike(part)) ? [index] : [],
+      );
+      chain = chainFrom(
+        links.map((index) => parts[index]?.box ?? first.box),
+        links.indexOf(start),
+        step.gap,
+        WAND_MOST,
+      ).map((at) => links[at] ?? start);
+    }
+    const inChain = new Set(chain);
+    const holders = chain.flatMap((index) => {
       const part = parts[index];
-      return part === undefined ? [] : [part.object];
+      return part === undefined ? [] : [part.box];
     });
+    // What lies on or in the chain: decor touching it, or anything whose
+    // middle is inside one of its parts. The chain does not grow from it.
+    const contents = parts.flatMap((part, index) => {
+      if (inChain.has(index)) {
+        return [];
+      }
+      const decor = isDecor(part.object.model, part.kind);
+      const held = holders.some((box) =>
+        decor ? boxesMeet(box, part.box, CONTENT_MARGIN) : holds(box, part.box.centre),
+      );
+      return held ? [part.object] : [];
+    });
+    return [
+      ...chain.flatMap((index) => {
+        const part = parts[index];
+        return part === undefined ? [] : [part.object];
+      }),
+      ...contents,
+    ];
   }
 
-  /**
-   * Lights `chain` faintly besides what is picked and, with `hulls`, draws
-   * each part's reach of `radius` game units around it: the picked ones'
-   * stronger. An empty chain clears it.
-   */
-  showChain(chain: AreaObject[], radius: number, hulls: boolean) {
-    const { gl } = this;
-    const keys = new Set(chain.map((part) => objectKey(part.id.plugin, part.id.localId)));
-    this.chained = keys;
-    const placed = hulls
-      ? this.instances.flatMap((instance) => {
-          const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-          const model = this.models.get(instance.object.model);
-          if (
-            !(keys.has(key) || this.selected.has(key)) ||
-            model === undefined ||
-            !Array.isArray(model.surfaces)
-          ) {
-            return [];
-          }
-          return [{ box: placedBox(model.box, instance.matrix), main: this.selected.has(key) }];
-        })
-      : [];
-    const data = new Float32Array(placed.length * HULL_STRIDE);
-    placed.forEach(({ box, main }, index) => {
-      const at = index * HULL_STRIDE;
-      data.set(box.centre, at);
-      box.axes.forEach((axis, which) => {
-        const half = box.half[which] ?? 0;
-        data.set(
-          axis.map((value) => value * half),
-          at + 3 + which * 3,
-        );
-      });
-      data[at + 12] = main ? 1 : 0.5;
-    });
-    if (this.hulls.buffer === null) {
-      this.hulls.buffer = gl.createBuffer();
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.hulls.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-    gl.bindVertexArray(this.hullShape.vao);
-    const stride = HULL_STRIDE * 4;
-    for (let location = 1; location <= 5; location += 1) {
-      gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(
-        location,
-        location === 5 ? 1 : 3,
-        gl.FLOAT,
-        false,
-        stride,
-        (location - 1) * 12,
-      );
-      gl.vertexAttribDivisor(location, 1);
-    }
-    gl.bindVertexArray(null);
-    this.hulls.count = placed.length;
-    this.hulls.radius = radius;
+  /** Lights `objects` faintly besides what is picked: what the magic wand took along. */
+  showChain(objects: AreaObject[]) {
+    this.chained = new Set(objects.map((part) => objectKey(part.id.plugin, part.id.localId)));
     this.relookAll();
   }
 
@@ -1224,44 +1139,6 @@ export class AreaLayer {
       }
     }
     gl.bindVertexArray(null);
-    this.drawHulls(matrix, exaggeration);
-  }
-
-  /** Draws the reach of the chain's parts, see-through, over what is drawn. */
-  private drawHulls(matrix: Mat4, exaggeration: number) {
-    if (this.hulls.count === 0) {
-      return;
-    }
-    const { gl } = this;
-    // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
-    gl.useProgram(this.hullProgram);
-    const at = (name: string) => gl.getUniformLocation(this.hullProgram, name);
-    gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
-    gl.uniform1f(at("u_exaggeration"), exaggeration);
-    gl.uniform1f(at("u_radius"), this.hulls.radius);
-    gl.uniform3f(at("u_colour"), ...HULL_COLOUR);
-    const blending = gl.isEnabled(gl.BLEND);
-    const culling = gl.isEnabled(gl.CULL_FACE);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.disable(gl.CULL_FACE);
-    gl.depthMask(false);
-    gl.bindVertexArray(this.hullShape.vao);
-    gl.drawElementsInstanced(
-      gl.TRIANGLES,
-      this.hullShape.count,
-      gl.UNSIGNED_SHORT,
-      0,
-      this.hulls.count,
-    );
-    gl.bindVertexArray(null);
-    gl.depthMask(true);
-    if (!blending) {
-      gl.disable(gl.BLEND);
-    }
-    if (culling) {
-      gl.enable(gl.CULL_FACE);
-    }
   }
 
   /**
@@ -1353,11 +1230,5 @@ export class AreaLayer {
     this.textures.clear();
     gl.deleteProgram(this.program);
     gl.deleteProgram(this.picking);
-    gl.deleteProgram(this.hullProgram);
-    gl.deleteVertexArray(this.hullShape.vao);
-    for (const buffer of this.hullShape.buffers) {
-      gl.deleteBuffer(buffer);
-    }
-    gl.deleteBuffer(this.hulls.buffer);
   }
 }

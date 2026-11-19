@@ -5,7 +5,8 @@
 // out, decides which of them the patch hides (spot by spot, for a passage
 // of spots close together, or for a pair of mods at once) and goes on.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./work-panel.css";
 import { CopyButton, useSession } from "./Actions";
 import { objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
@@ -1152,10 +1153,160 @@ function Spot(props: SpotProps) {
     return { parts, pieces };
   };
 
+  /** One mod's column: hiding its part here, in the passage and around, and what ties it. */
+  const sideColumn = (side: Side, at: number) => {
+    const name = side.parts.map((part) => part.name).join(", ");
+    const left = preview.has(side.plugin) || decided === side.plugin;
+    const plugin = side.plugin.toLowerCase();
+    const objects = around.get(plugin)?.objects ?? [];
+    const careful = around.get(plugin)?.careful ?? 0;
+    return (
+      <div className="work-column" key={side.plugin}>
+        <div className="work-column-head">
+          <strong title={side.plugin}>{shortName(side.plugin)}</strong>
+          {side.suggested && <span className="suggested-mark">{t.patchSuggested}</span>}
+        </div>
+        <div className="work-side" data-left={left || undefined}>
+          <button
+            type="button"
+            className="work-eye"
+            aria-pressed={preview.has(side.plugin)}
+            title={t.workPreviewWithout(name)}
+            aria-label={t.workPreviewWithout(name)}
+            onClick={() => props.onPreview(side.plugin)}
+          >
+            <Eye open={!left} />
+          </button>
+          <button
+            type="button"
+            className="work-choice"
+            aria-pressed={decided === side.plugin}
+            disabled={!side.hideable}
+            title={side.hideable ? undefined : t.workCannotHide}
+            onClick={() => props.onDecide(side.plugin)}
+          >
+            <kbd>{at + 1}</kbd>
+            <span className="work-choice-text">
+              <span className="work-choice-verb">
+                {side.hideable ? t.workHideVerb : t.workNeeded}
+                {side.hideable && walkedOf(side).parts.length > 0 && (
+                  <>
+                    {" "}
+                    <PathIcon />
+                  </>
+                )}
+              </span>
+              <strong className="work-choice-title">{name}</strong>
+              <span className="aside">{side.plugin}</span>
+            </span>
+          </button>
+        </div>
+        {!side.hideable && (
+          <div className="needed-parts">
+            <span className="work-column-label">{t.anchorWhy}</span>
+            {side.parts.map((part) => (
+              <NeededPart
+                key={`${part.object.plugin}:${part.object.localId}`}
+                place={place}
+                object={part.object}
+                name={part.name}
+              />
+            ))}
+          </div>
+        )}
+        {passage.length > 1 && (
+          <button
+            type="button"
+            className="small work-wide"
+            disabled={!side.hideable}
+            onClick={() => props.onDecidePassage(passage, side.plugin, [])}
+          >
+            {own.passageHide(passage.length)}
+          </button>
+        )}
+        {spot.location.type === "exterior" && (
+          <div className="work-around">
+            {area === null ? (
+              <span className="aside">{own.aroundWaiting}</span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="small work-eye-button"
+                  aria-pressed={aroundPreview === plugin}
+                  disabled={objects.length === 0}
+                  title={own.aroundPreview(side.plugin)}
+                  aria-label={own.aroundPreview(side.plugin)}
+                  onClick={() => setAroundPreview(aroundPreview === plugin ? null : plugin)}
+                >
+                  <Eye open={aroundPreview !== plugin} />
+                </button>
+                <button
+                  type="button"
+                  className="small work-wide"
+                  disabled={objects.length === 0}
+                  onClick={() => {
+                    setAroundPreview(null);
+                    props.onDecidePassage([], side.plugin, objects);
+                  }}
+                >
+                  {own.aroundHideHere(objects.length, metres)}
+                </button>
+                {careful > 0 && (
+                  <span className="aside relief-object-warning" title={own.aroundCarefulHint}>
+                    {own.aroundCareful(careful)}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const [leftSide, ...rightSides] = item.sides;
+  // The tools of this page in the bar over the view: how far "around"
+  // reaches, the marks, and what the colours mean.
+  const viewTools = (
+    <>
+      {spot.location.type === "exterior" && (
+        <label className="view-tool" title={own.aroundHint}>
+          <span className="view-tool-name">{own.aroundTool}</span>
+          <input
+            type="range"
+            min={3}
+            max={40}
+            step={1}
+            value={metres}
+            onChange={(event) => setMetres(Number(event.target.value))}
+          />
+          <span className="view-tool-value">{own.metres(metres)}</span>
+        </label>
+      )}
+      <span className="view-tool">
+        <button
+          type="button"
+          className="small work-marks"
+          aria-pressed={marks}
+          title={t.workMarksHint}
+          onClick={() => props.onMarks(!marks)}
+        >
+          <Eye open={marks} /> {t.workMarks}
+        </button>
+        {marks && (
+          <span className="view-legend" aria-hidden="true">
+            <span className="work-legend-focus" /> {t.workThisSpot}
+            <span className="work-legend-ghost" /> {t.workGhost}
+          </span>
+        )}
+      </span>
+    </>
+  );
+
   return (
     <>
       <div className="work-decision">
-        <div className="work-decision-head">
+        <div className="work-nav">
           <span className="work-kind" data-kind={item.kind} title={t.spotKindHints[item.kind]}>
             {t.spotKinds[item.kind]}
           </span>
@@ -1165,86 +1316,83 @@ function Spot(props: SpotProps) {
             <span className="aside">· {t.workDepth(depth / UNITS_PER_METRE)}</span>
           )}
           <span className="spacer" />
-          <span className="aside">
+          <span className="aside" title={t.workKeys}>
             {props.index >= 0 ? t.workSpotOf(props.index + 1, props.total) : ""}
           </span>
-          <button type="button" className="small" onClick={props.onPrevious}>
-            ‹ {t.workPrevious}
-          </button>
-          <button type="button" className="small" onClick={props.onNext}>
-            {t.workNext} ›
-          </button>
-          <button type="button" className="small" onClick={props.onNextOpen}>
-            {t.workNextOpen} »
-          </button>
-        </div>
-        <div className="work-section">
-          <span className="work-section-label">{t.workScopeSpot}</span>
-          <div className="work-choices">
-            {item.sides.map((side, at) => {
-              const name = side.parts.map((part) => part.name).join(", ");
-              const left = preview.has(side.plugin) || decided === side.plugin;
-              return (
-                <div className="work-side" key={side.plugin} data-left={left || undefined}>
-                  <button
-                    type="button"
-                    className="work-eye"
-                    aria-pressed={preview.has(side.plugin)}
-                    title={t.workPreviewWithout(name)}
-                    aria-label={t.workPreviewWithout(name)}
-                    onClick={() => props.onPreview(side.plugin)}
-                  >
-                    <Eye open={!left} />
-                  </button>
-                  <button
-                    type="button"
-                    className="work-choice"
-                    aria-pressed={decided === side.plugin}
-                    disabled={!side.hideable}
-                    title={side.hideable ? undefined : t.workCannotHide}
-                    onClick={() => props.onDecide(side.plugin)}
-                  >
-                    <kbd>{at + 1}</kbd>
-                    <span className="work-choice-text">
-                      <span className="work-choice-verb">
-                        {side.hideable ? t.workHideVerb : t.workNeeded}
-                        {side.hideable && walkedOf(side).parts.length > 0 && (
-                          <>
-                            {" "}
-                            <PathIcon />
-                          </>
-                        )}
-                      </span>
-                      <strong className="work-choice-title">{name}</strong>
-                      <span className="aside">
-                        {side.plugin}
-                        {side.suggested && (
-                          <span className="suggested-mark">{t.patchSuggested}</span>
-                        )}
-                      </span>
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              className="work-choice"
-              aria-pressed={decided === null}
-              onClick={() => props.onDecide(null)}
-            >
-              <kbd>0</kbd>
-              <span className="work-choice-text">
-                <span className="work-choice-verb">{t.workKeepVerb}</span>
-                <strong className="work-choice-title">{t.patchKeepBoth}</strong>
-              </span>
+          <span className="work-nav-group">
+            <button type="button" className="small" onClick={props.onPrevious}>
+              ‹ {t.workPrevious}
             </button>
-            {props.ownChoice && (
-              <button type="button" className="small quiet" onClick={props.onUndecide}>
-                {t.workReset}
+            <button type="button" className="small" onClick={props.onNext}>
+              {t.workNext} ›
+            </button>
+            <button type="button" className="small" onClick={props.onNextOpen}>
+              {t.workNextOpen} »
+            </button>
+          </span>
+          <span className="work-nav-more">
+            <label className="control-check aside">
+              <input
+                type="checkbox"
+                checked={props.advance}
+                onChange={(event) => props.onAdvance(event.target.checked)}
+              />
+              {t.workAfterDecide}
+            </label>
+            <PinButton keys={decided === undefined ? [item.key] : []} />
+            {spot.location.type === "exterior" && (
+              <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
+                {own.showOnMap}
               </button>
             )}
+          </span>
+        </div>
+        <div className="work-columns">
+          {leftSide !== undefined && sideColumn(leftSide, 0)}
+          <div className="work-column work-common">
+            <div className="work-column-head">
+              <strong>{own.common}</strong>
+            </div>
+            <div className="work-common-choices">
+              <button
+                type="button"
+                className="work-choice"
+                aria-pressed={decided === null}
+                onClick={() => props.onDecide(null)}
+              >
+                <kbd>0</kbd>
+                <span className="work-choice-text">
+                  <span className="work-choice-verb">{t.workKeepVerb}</span>
+                  <strong className="work-choice-title">{t.patchKeepBoth}</strong>
+                </span>
+              </button>
+              {props.ownChoice && (
+                <button type="button" className="small quiet" onClick={props.onUndecide}>
+                  {t.workReset}
+                </button>
+              )}
+            </div>
+            {item.sides.every((side) => !side.hideable) && (
+              <p className="work-note">{t.workBothNeeded}</p>
+            )}
+            {first !== undefined && second !== undefined && pairSpots > 1 && (
+              <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
+                <span>
+                  {pairSpots >= MANY
+                    ? t.workPairMany(first.plugin, second.plugin, pairSpots)
+                    : own.pairSpots(shortName(first.plugin), shortName(second.plugin), pairSpots)}
+                </span>
+                <button type="button" className="small" onClick={props.onOpenPair}>
+                  {own.openThePair}
+                </button>
+              </div>
+            )}
           </div>
+          {rightSides.length > 0 && (
+            <div className="work-column-stack">
+              {rightSides.map((side, at) => sideColumn(side, at + 1))}
+            </div>
+          )}
         </div>
         {item.sides
           .filter((side) => side.hideable && walkedOf(side).parts.length > 0)
@@ -1258,152 +1406,8 @@ function Spot(props: SpotProps) {
               </p>
             );
           })}
-        {item.sides.some((side) => !side.hideable) && (
-          <div className="work-section">
-            <span className="work-section-label">{t.anchorWhy}</span>
-            <div className="needed-parts">
-              {item.sides
-                .filter((side) => !side.hideable)
-                .flatMap((side) => side.parts)
-                .map((part) => (
-                  <NeededPart
-                    key={`${part.object.plugin}:${part.object.localId}`}
-                    place={
-                      spot.location.type === "interior" ? spot.location.cell : spot.location.world
-                    }
-                    object={part.object}
-                    name={`${part.name} · ${part.object.plugin}`}
-                  />
-                ))}
-            </div>
-          </div>
-        )}
-        {item.sides.every((side) => !side.hideable) && (
-          <p className="work-note">{t.workBothNeeded}</p>
-        )}
-        {passage.length > 1 && (
-          <div className="work-section">
-            <span className="work-section-label">{t.workScopePassage(passage.length)}</span>
-            <div className="work-line">
-              {item.sides.map((side) => {
-                return (
-                  <span key={side.plugin} className="work-line-group">
-                    <button
-                      type="button"
-                      className="small"
-                      disabled={!side.hideable}
-                      onClick={() => props.onDecidePassage(passage, side.plugin, [])}
-                    >
-                      {t.workPassageHide(side.plugin)}
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {spot.location.type === "exterior" && (
-          <div className="work-section">
-            <label className="work-section-label work-around-label">
-              {own.around(metres)}
-              <input
-                type="range"
-                min={3}
-                max={40}
-                step={1}
-                value={metres}
-                onChange={(event) => setMetres(Number(event.target.value))}
-              />
-            </label>
-            <div className="work-line">
-              {area === null ? (
-                <span className="aside">{own.aroundWaiting}</span>
-              ) : (
-                item.sides.map((side) => {
-                  const plugin = side.plugin.toLowerCase();
-                  const objects = around.get(plugin)?.objects ?? [];
-                  const careful = around.get(plugin)?.careful ?? 0;
-                  return (
-                    <span key={side.plugin} className="work-line-group">
-                      <button
-                        type="button"
-                        className="small work-eye-button"
-                        aria-pressed={aroundPreview === plugin}
-                        disabled={objects.length === 0}
-                        title={own.aroundPreview(side.plugin)}
-                        onClick={() => setAroundPreview(aroundPreview === plugin ? null : plugin)}
-                      >
-                        <Eye open={aroundPreview !== plugin} /> {own.aroundPreviewShort}
-                      </button>
-                      <button
-                        type="button"
-                        className="small"
-                        disabled={objects.length === 0}
-                        onClick={() => {
-                          setAroundPreview(null);
-                          props.onDecidePassage([], side.plugin, objects);
-                        }}
-                      >
-                        {own.aroundHide(side.plugin, objects.length)}
-                      </button>
-                      {careful > 0 && (
-                        <span className="aside relief-object-warning" title={own.aroundCarefulHint}>
-                          {own.aroundCareful(careful)}
-                        </span>
-                      )}
-                    </span>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-        {first !== undefined && second !== undefined && pairSpots > 1 && (
-          <div className="work-section" data-many={pairSpots >= MANY || undefined}>
-            <span className="work-section-label">{t.workScopePair(pairSpots)}</span>
-            <div className="work-line">
-              {pairSpots >= MANY && (
-                <span className="work-many">
-                  {t.workPairMany(first.plugin, second.plugin, pairSpots)}
-                </span>
-              )}
-              <button type="button" className="small" onClick={props.onOpenPair}>
-                {own.openThePair}
-              </button>
-            </div>
-          </div>
-        )}
-        {spot.location.type === "exterior" && (
-          <div className="work-line">
-            <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
-              {own.showOnMap}
-            </button>
-          </div>
-        )}
-        <div className="work-decision-foot">
-          <button
-            type="button"
-            className="small work-marks"
-            aria-pressed={marks}
-            title={t.workMarksHint}
-            onClick={() => props.onMarks(!marks)}
-          >
-            <Eye open={marks} /> {t.workMarks}
-          </button>
-          <PinButton keys={decided === undefined ? [item.key] : []} />
-          <label className="control-check aside">
-            <input
-              type="checkbox"
-              checked={props.advance}
-              onChange={(event) => props.onAdvance(event.target.checked)}
-            />
-            {t.workAfterDecide}
-          </label>
-          <span className="spacer" />
-          <span className="aside work-keys">{t.workKeys}</span>
-        </div>
       </div>
-      <Stage {...props} onArea={setArea} previewObjects={previewObjects} />
+      <Stage {...props} onArea={setArea} previewObjects={previewObjects} tools={viewTools} />
     </>
   );
 }
@@ -1461,10 +1465,13 @@ function Stage({
   onDecide,
   onArea,
   previewObjects,
+  tools,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
   previewObjects: ObjectRef[];
+  /** The page's tools for the bar over the view. */
+  tools: ReactNode;
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -1550,7 +1557,7 @@ function Stage({
           ) : (
             <p className="aside relief-object-action">{t.workCannotHide}</p>
           )}
-          <PartsTogether object={object} tools={tools} />
+          <PartsTogether tools={tools} />
         </>
       );
     }
@@ -1575,14 +1582,8 @@ function Stage({
         objectExtra={extra}
         onObject={openSpotOf}
         onArea={onArea}
-      >
-        {marks && (
-          <p className="work-legend">
-            <span className="work-legend-focus" /> {t.workThisSpot}
-            <span className="work-legend-ghost" /> {t.workGhost}
-          </p>
-        )}
-      </InteriorView>
+        tools={tools}
+      />
     );
   }
   if (world === undefined || !world.terrain) {
@@ -1623,14 +1624,8 @@ function Stage({
       spotDistance={CLOSE}
       plain={!marks}
       onArea={onArea}
-    >
-      {marks && (
-        <p className="work-legend">
-          <span className="work-legend-focus" /> {t.workThisSpot}
-          <span className="work-legend-ghost" /> {t.workGhost}
-        </p>
-      )}
-    </MapView3D>
+      tools={tools}
+    />
   );
 }
 

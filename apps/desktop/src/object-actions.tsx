@@ -1,10 +1,10 @@
 // What can be done with one object picked in a 3D view (ADR 0040, 0046):
 // hide it on its own through the patch, with the reasons the game may rely
-// on it; show it again however it was hidden; take the chain of parts of
-// the same mod linked to it along (ADR 0055); or, where it is part of a
+// on it; show it again however it was hidden; take what the magic wand
+// took along with it (ADR 0055); or, where it is part of a
 // collision, decide that collision on the collisions' page.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
 import type { Api } from "./api";
 import { objectKey, type PartTools } from "./area-layer";
@@ -23,13 +23,11 @@ import {
   spotKey,
 } from "./patch";
 import { PinButton } from "./pins";
+import { useWandTexts } from "./wand";
 
 /** The plugins of the games themselves, whose objects quests may need. */
 const GAME_PLUGIN =
   /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
-
-/** Game units in a centimetre, for how far each part of a chain reaches. */
-const UNITS_PER_CENTIMETRE = 0.7;
 
 /** Whether an object belongs to the game itself rather than to a mod. */
 export const isGameObject = (object: { id: ObjectRef }) => GAME_PLUGIN.test(object.id.plugin);
@@ -113,57 +111,28 @@ function useHidden(): Set<string> {
   return useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
 }
 
-/** How far each part reaches beyond itself in a chain, in centimetres, as last set. */
-let chainReach = 50;
-/** Whether the reach of each part is drawn, as last set. */
-let chainHulls = true;
-
 /**
- * The smart selection (ADR 0055): the chain of parts of the same mod linked
- * to an object, each within the reach of the one before, lit faintly in the
- * view with how far each reaches; hidden or shown again together.
+ * What the magic wand took along with an object (ADR 0055), hidden or shown
+ * again together; with the wand off, where to raise it.
  */
-export function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools }) {
+export function PartsTogether({ tools }: { tools: PartTools }) {
   const { lang, spots, patchChoices, setPatchChoices } = useSession();
   const own = collisionsTexts[lang];
+  const w = useWandTexts();
   const hidden = useHidden();
-  const [reach, setReach] = useState(chainReach);
-  const [hulls, setHulls] = useState(chainHulls);
-  const toolsNow = useRef(tools);
-  toolsNow.current = tools;
-  const key = objectKey(object.id.plugin, object.id.localId);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the chain belongs to the object picked, by its key.
-  const group = useMemo(() => toolsNow.current.chain(reach * UNITS_PER_CENTIMETRE), [key, reach]);
-  useEffect(() => {
-    toolsNow.current.showChain(group, reach * UNITS_PER_CENTIMETRE, hulls);
-  }, [group, reach, hulls]);
-  const controls = (
-    <>
-      <ReachSlider
-        reach={reach}
-        onReach={(next) => {
-          chainReach = next;
-          setReach(next);
-        }}
-      />
-      <label className="parts-hulls">
-        <input
-          type="checkbox"
-          checked={hulls}
-          onChange={(event) => {
-            chainHulls = event.target.checked;
-            setHulls(event.target.checked);
-          }}
-        />
-        {own.partsHulls}
-      </label>
-    </>
-  );
+  const { selection: group, level } = tools;
+  if (level === 0) {
+    return (
+      <div className="parts-together">
+        <p className="aside parts-hint">{w.raise}</p>
+      </div>
+    );
+  }
   if (group.length <= 1) {
     return (
       <div className="parts-together">
-        <p className="aside">{own.partsAlone}</p>
-        {controls}
+        <p className="aside wand-took">{w.took(group.length, level)}</p>
+        <p className="aside">{w.alone}</p>
       </div>
     );
   }
@@ -171,8 +140,7 @@ export function PartsTogether({ object, tools }: { object: AreaObject; tools: Pa
   const hideable = group.filter((part) => !part.anchored);
   return (
     <div className="parts-together">
-      <p className="aside">{own.partsTogether(group.length)}</p>
-      {controls}
+      <p className="aside wand-took">{w.took(group.length, level)}</p>
       <span className="relief-object-buttons">
         {allHidden ? (
           <button
@@ -207,37 +175,18 @@ export function PartsTogether({ object, tools }: { object: AreaObject; tools: Pa
           </button>
         )}
       </span>
-      <p className="aside parts-hint">
-        {hideable.length < group.length ? own.partsSomeTied(group.length - hideable.length) : ""}
-        {own.partsHint}
-      </p>
+      {hideable.length < group.length && (
+        <p className="aside parts-hint">{own.partsSomeTied(group.length - hideable.length)}</p>
+      )}
     </div>
-  );
-}
-
-function ReachSlider({ reach, onReach }: { reach: number; onReach: (reach: number) => void }) {
-  const { lang } = useSession();
-  const own = collisionsTexts[lang];
-  return (
-    <label className="parts-gap">
-      {own.partsReach(reach)}
-      <input
-        type="range"
-        min={0}
-        max={500}
-        step={10}
-        value={reach}
-        onChange={(event) => onReach(Number(event.target.value))}
-      />
-    </label>
   );
 }
 
 /**
  * Hiding an object on its own, or showing it again however it was hidden,
  * after what ties it: nothing for an object the game cannot do without, a
- * warning for one it may miss. With the view's tools, the chain of parts
- * of the same mod linked to it as well (ADR 0055).
+ * warning for one it may miss. With the view's tools, what the magic
+ * wand took along with it as well (ADR 0055).
  */
 export function FreeObjectActions({
   object,
@@ -259,7 +208,7 @@ export function FreeObjectActions({
   const isHidden = hidden.has(matchKey(object.id));
   // A null choice is one shown again on purpose, not one hidden by itself.
   const byItself = (patchChoices[objectChoiceKey(object.id)] ?? null) !== null;
-  const together = tools === undefined ? null : <PartsTogether object={object} tools={tools} />;
+  const together = tools === undefined ? null : <PartsTogether tools={tools} />;
   if (isHidden) {
     return (
       <div className="relief-object-action">

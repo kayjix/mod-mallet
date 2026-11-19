@@ -81,5 +81,5 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0052](0052-paths-over-hidden-objects-are-cut-out.md) | Paths over hidden objects are cut out of the navigation meshes | accepted |
 | [0053](0053-shareable-patches-in-parts.md) | Shareable patches in parts, with an installer | accepted |
 | [0054](0054-a-catalogue-of-the-games-things.md) | A catalogue of the game's things, and asset collisions beside map collisions | accepted |
-| [0055](0055-a-chain-of-parts-by-their-reach.md) | A chain of parts by their reach | accepted |
+| [0055](0055-a-magic-wand-for-what-belongs-together.md) | A magic wand for what belongs together, and one column per mod | accepted |
 | [0056](0056-missing-textures-found-in-switched-off-mods.md) | Missing textures are looked for in switched-off mods | accepted |

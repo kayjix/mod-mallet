@@ -9,6 +9,7 @@ import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
 import { interiorTexts } from "./interior-texts";
 import { CELL } from "./map-places";
+import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 export interface InteriorViewProps {
   /** The interior cell, by its editor ID. */
@@ -32,6 +33,8 @@ export interface InteriorViewProps {
   onArea?: (area: AreaObjects | null) => void;
   /** Shown over the view. */
   children?: ReactNode;
+  /** More tools for the bar along the top of the view, after the magic wand. */
+  tools?: ReactNode;
 }
 
 /**
@@ -71,6 +74,7 @@ export function InteriorView({
   onObject,
   onArea,
   children,
+  tools,
 }: InteriorViewProps) {
   const { t, api, lang } = useSession();
   const own = interiorTexts[lang];
@@ -82,6 +86,15 @@ export function InteriorView({
   const [area, setArea] = useState<AreaObjects | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [picked, setPicked] = useState<AreaObject | null>(null);
+  // What the magic wand takes along with the picked object (ADR 0055).
+  const [level, setLevel] = useWandLevel();
+  const [selection, setSelection] = useState<AreaObject[]>([]);
+  useEffect(() => {
+    const found = picked === null ? [] : (layer.current?.wand(picked, level) ?? [picked]);
+    setSelection(found);
+    layer.current?.showChain(found.slice(1));
+    redrawNow.current();
+  }, [picked, level]);
   const [seeInside, setSeeInside] = useState(true);
   const [failed, setFailed] = useState(false);
   const camera = useRef<Camera>({
@@ -423,90 +436,99 @@ export function InteriorView({
           {failed || state === "missing" ? own.missing(cell) : own.loading(cell)}
         </p>
       )}
-      <div className="map-zoom">
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => zoom(1 / 1.5)}
-          aria-label={t.mapZoomIn}
-          title={t.mapZoomIn}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => zoom(1.5)}
-          aria-label={t.mapZoomOut}
-          title={t.mapZoomOut}
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => {
-            camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
-            redraw();
-          }}
-        >
-          {t.mapTopView}
-        </button>
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => {
-            camera.current = framed(area);
-            redraw();
-          }}
-        >
-          {own.fit}
-        </button>
-      </div>
-      {picked !== null && (
-        <div className="relief-object" role="status">
-          <div className="relief-object-head">
-            <strong>{picked.name ?? picked.model.split("/").pop()}</strong>
-            <button
-              type="button"
-              className="small quiet"
-              aria-label={t.viewerClose}
-              onClick={() => {
-                setPicked(null);
-                layer.current?.select([]);
-                redraw();
-              }}
-            >
-              ✕
-            </button>
+      <div className="view-top">
+        <ViewToolbar
+          tools={
+            <>
+              <WandControl level={level} onLevel={setLevel} />
+              {tools}
+            </>
+          }
+          camera={
+            <>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => zoom(1 / 1.5)}
+                aria-label={t.mapZoomIn}
+                title={t.mapZoomIn}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => zoom(1.5)}
+                aria-label={t.mapZoomOut}
+                title={t.mapZoomOut}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => {
+                  camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
+                  redraw();
+                }}
+              >
+                {t.mapTopView}
+              </button>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => {
+                  camera.current = framed(area);
+                  redraw();
+                }}
+              >
+                {own.fit}
+              </button>
+            </>
+          }
+        />
+        {picked !== null && (
+          <div className="relief-object" role="status">
+            <div className="relief-object-head">
+              <strong>{picked.name ?? picked.model.split("/").pop()}</strong>
+              <button
+                type="button"
+                className="small quiet"
+                aria-label={t.viewerClose}
+                onClick={() => {
+                  setPicked(null);
+                  layer.current?.select([]);
+                  redraw();
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <dl>
+              <dt>{t.mapObjectFrom}</dt>
+              <dd>{picked.plugin}</dd>
+              {picked.id.plugin.toLowerCase() !== picked.plugin.toLowerCase() && (
+                <>
+                  <dt>{t.mapObjectPlacedBy}</dt>
+                  <dd>{picked.id.plugin}</dd>
+                </>
+              )}
+              <dt>{t.mapObjectId}</dt>
+              <dd>
+                <code>{picked.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
+              </dd>
+              <dt>{t.mapObjectModel}</dt>
+              <dd>
+                <code>{picked.model}</code>
+              </dd>
+            </dl>
+            {objectExtra?.(picked, {
+              selection: selection[0] === picked ? selection : [picked],
+              level,
+            })}
           </div>
-          <dl>
-            <dt>{t.mapObjectFrom}</dt>
-            <dd>{picked.plugin}</dd>
-            {picked.id.plugin.toLowerCase() !== picked.plugin.toLowerCase() && (
-              <>
-                <dt>{t.mapObjectPlacedBy}</dt>
-                <dd>{picked.id.plugin}</dd>
-              </>
-            )}
-            <dt>{t.mapObjectId}</dt>
-            <dd>
-              <code>{picked.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
-            </dd>
-            <dt>{t.mapObjectModel}</dt>
-            <dd>
-              <code>{picked.model}</code>
-            </dd>
-          </dl>
-          {objectExtra?.(picked, {
-            chain: (radius) => layer.current?.chain(picked, radius) ?? [picked],
-            showChain: (chain, radius, hulls) => {
-              layer.current?.showChain(chain, radius, hulls);
-              redraw();
-            },
-          })}
-        </div>
-      )}
+        )}
+      </div>
       {children}
       <div className="relief-controls">
         <label className="relief-control" title={own.seeInsideHint}>

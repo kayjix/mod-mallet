@@ -1,0 +1,101 @@
+/* The bar of tools along the top of a 3D view (ADR 0055). */
+
+/* The bar and the card of a picked object below it, over the top of the view. */
+.view-top {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-height: calc(100% - 60px);
+  pointer-events: none;
+}
+
+.view-top > * {
+  pointer-events: auto;
+}
+
+.view-toolbar {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 42px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  font-size: 0.85rem;
+}
+
+.view-toolbar-tools {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.view-toolbar-camera {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  gap: 4px;
+}
+
+.view-toolbar-camera .map-zoom-button {
+  box-shadow: none;
+}
+
+.view-tool {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.view-tool + .view-tool {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.view-tool input[type="range"] {
+  width: 96px;
+}
+
+.view-tool-name {
+  font-weight: 600;
+}
+
+.view-tool-value {
+  color: var(--muted);
+}
+
+.wand-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.wand[data-on] .wand-icon {
+  color: var(--brand);
+}
+
+.view-top .relief-object {
+  position: relative;
+  top: auto;
+  left: auto;
+  min-height: 0;
+  margin: 10px;
+  overflow-y: auto;
+}
+
+.wand-took {
+  font-weight: 600;
+}

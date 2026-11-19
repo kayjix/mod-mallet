@@ -38,6 +38,7 @@ import {
 } from "./map-places";
 import { pinsOf, spotKey } from "./patch";
 import { drawPin, PIN_COLOUR } from "./pins";
+import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 interface MapView3DProps {
   world: MapWorld;
@@ -62,6 +63,8 @@ interface MapView3DProps {
   onObject?: (object: AreaObject | null) => void;
   /** Shown over the relief. */
   children?: ReactNode;
+  /** More tools for the bar along the top of the view, after the magic wand. */
+  tools?: ReactNode;
   /** How far from a picked collision the camera comes, in cells. */
   spotDistance?: number;
   /**
@@ -455,6 +458,7 @@ export function MapView3D({
   objectExtra,
   onObject,
   children,
+  tools,
   spotDistance = NEAR * 0.7,
   plain = false,
   onArea,
@@ -468,8 +472,8 @@ export function MapView3D({
   const overlay = useRef<HTMLCanvasElement>(null);
   const scene = useRef<Scene | null>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
-  // The true height of the land; raised only when the user asks.
-  const [exaggeration, setExaggeration] = useState(1);
+  // The true height of the land: the game's own world is drawn as it is.
+  const [exaggeration] = useState(1);
   // The land on a block with walls, so that it cannot be seen from below.
   const [withBase, setWithBase] = useState(true);
   // The game's own level of detail: its land and towns, finer up close.
@@ -489,6 +493,17 @@ export function MapView3D({
   const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
   const progressKey = useRef("");
   const [pickedObject, setPickedObject] = useState<AreaObject | null>(null);
+  // What the magic wand takes along with the picked object (ADR 0055).
+  const [level, setLevel] = useWandLevel();
+  const [selection, setSelection] = useState<AreaObject[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the layer is read when the pick or the level changes.
+  useEffect(() => {
+    const found =
+      pickedObject === null ? [] : (area.current?.wand(pickedObject, level) ?? [pickedObject]);
+    setSelection(found);
+    area.current?.showChain(found.slice(1));
+    redraw();
+  }, [pickedObject, level]);
   const areaTimer = useRef<number | null>(null);
   const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
   const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
@@ -1540,103 +1555,91 @@ export function MapView3D({
         onPointerLeave={() => onHover(null)}
         onContextMenu={(event) => event.preventDefault()}
       />
-      <div className="map-zoom">
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => zoom(1 / 1.5)}
-          aria-label={t.mapZoomIn}
-          title={t.mapZoomIn}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => zoom(1.5)}
-          aria-label={t.mapZoomOut}
-          title={t.mapZoomOut}
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className="map-zoom-button"
-          onClick={() => fly({ ...camera.current, yaw: 0, pitch: MAX_PITCH })}
-        >
-          {t.mapTopView}
-        </button>
-        <button type="button" className="map-zoom-button" onClick={() => fly(fitted())}>
-          {t.mapFit}
-        </button>
-      </div>
-      {pickedObject !== null && (
-        <div className="relief-object" role="status">
-          <div className="relief-object-head">
-            <strong>{pickedObject.name ?? pickedObject.model.split("/").pop()}</strong>
-            <button
-              type="button"
-              className="small quiet"
-              aria-label={t.viewerClose}
-              onClick={() => {
-                setPickedObject(null);
-                area.current?.select([]);
-                redraw();
-              }}
-            >
-              ✕
-            </button>
+      <div className="view-top">
+        <ViewToolbar
+          tools={
+            <>
+              <WandControl level={level} onLevel={setLevel} />
+              {tools}
+            </>
+          }
+          camera={
+            <>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => zoom(1 / 1.5)}
+                aria-label={t.mapZoomIn}
+                title={t.mapZoomIn}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => zoom(1.5)}
+                aria-label={t.mapZoomOut}
+                title={t.mapZoomOut}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="map-zoom-button"
+                onClick={() => fly({ ...camera.current, yaw: 0, pitch: MAX_PITCH })}
+              >
+                {t.mapTopView}
+              </button>
+              <button type="button" className="map-zoom-button" onClick={() => fly(fitted())}>
+                {t.mapFit}
+              </button>
+            </>
+          }
+        />
+        {pickedObject !== null && (
+          <div className="relief-object" role="status">
+            <div className="relief-object-head">
+              <strong>{pickedObject.name ?? pickedObject.model.split("/").pop()}</strong>
+              <button
+                type="button"
+                className="small quiet"
+                aria-label={t.viewerClose}
+                onClick={() => {
+                  setPickedObject(null);
+                  area.current?.select([]);
+                  redraw();
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <dl>
+              <dt>{t.mapObjectFrom}</dt>
+              <dd>{pickedObject.plugin}</dd>
+              {pickedObject.id.plugin.toLowerCase() !== pickedObject.plugin.toLowerCase() && (
+                <>
+                  <dt>{t.mapObjectPlacedBy}</dt>
+                  <dd>{pickedObject.id.plugin}</dd>
+                </>
+              )}
+              <dt>{t.mapObjectId}</dt>
+              <dd>
+                <code>{pickedObject.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
+              </dd>
+              <dt>{t.mapObjectModel}</dt>
+              <dd>
+                <code>{pickedObject.model}</code>
+              </dd>
+            </dl>
+            {objectExtra?.(pickedObject, {
+              selection: selection[0] === pickedObject ? selection : [pickedObject],
+              level,
+            })}
           </div>
-          <dl>
-            <dt>{t.mapObjectFrom}</dt>
-            <dd>{pickedObject.plugin}</dd>
-            {pickedObject.id.plugin.toLowerCase() !== pickedObject.plugin.toLowerCase() && (
-              <>
-                <dt>{t.mapObjectPlacedBy}</dt>
-                <dd>{pickedObject.id.plugin}</dd>
-              </>
-            )}
-            <dt>{t.mapObjectId}</dt>
-            <dd>
-              <code>{pickedObject.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
-            </dd>
-            <dt>{t.mapObjectModel}</dt>
-            <dd>
-              <code>{pickedObject.model}</code>
-            </dd>
-          </dl>
-          {objectExtra?.(pickedObject, {
-            chain: (radius) => area.current?.chain(pickedObject, radius) ?? [pickedObject],
-            showChain: (chain, radius, hulls) => {
-              area.current?.showChain(chain, radius, hulls);
-              redraw();
-            },
-          })}
-        </div>
-      )}
+        )}
+      </div>
       {children}
       <div className="relief-controls">
-        <label className="relief-control">
-          {t.mapHeight}
-          <input
-            type="range"
-            min={0.5}
-            max={4}
-            step={0.25}
-            value={exaggeration}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              const view = camera.current;
-              // Keep looking at the same spot of the land.
-              camera.current = {
-                ...view,
-                target: [view.target[0], view.target[1], (view.target[2] / exaggeration) * next],
-              };
-              setExaggeration(next);
-            }}
-          />
-          <span className="relief-value">{t.mapHeightValue(exaggeration)}</span>
-        </label>
         <label className="relief-control">
           <input
             type="checkbox"
