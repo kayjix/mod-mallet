@@ -36,7 +36,7 @@ the tools you already use, Vortex and LOOT, instead of replacing them.
 | One list of what is wrong, ordered by what matters most, each in a sentence you can read without knowing modding tools. | See the problem where it is: on the map, in 3D up close, or as the same thing side by side in every mod that changes it. | Let Vortex reinstall a mod with the options it missed, or hide colliding objects with a small patch of Mod Mallet's own. Switch it off and everything is as before. |
 
 <p align="center">
-  <img src="docs/assets/readme/tasks.jpg" alt="The task list: collisions to decide, pairs of mods to choose between, LOOT's warnings and suggestions, each with the buttons that act on it" width="900">
+  <img src="docs/assets/readme/overview.jpg" alt="The overview: a score of 34 of 100, crashes likely, with the four things that lower it most and a tile for each page" width="900">
 </p>
 
 ## What you see
@@ -49,18 +49,38 @@ own land and level of detail, with the mountains where they are.
 </p>
 
 **Up close.** Come closer and the objects themselves appear, as the game
-places them. A collision opens right where it is: pick what should stay, and
-Mod Mallet builds the patch.
+places them.
 
 <p align="center">
   <img src="docs/assets/readme/up-close.jpg" alt="Whiterun up close in 3D, with the houses, walls and trees of the game and of mods" width="900">
 </p>
 
-<!-- Later: a short animation from the whole map into Whiterun, opening a
-     collision and hiding the banner pole that runs through the pavilion. -->
+**Where two mods collide.** A collision opens right where it is. With the
+markings on, you see what each mod brings and, in red, what the patch would
+hide; without them, the place as it looks in the game. Pick what should stay,
+and Mod Mallet builds the patch.
 
-**Side by side.** The same thing as every mod that changes it has it, so you
-can choose the version you like.
+| With markings | As in the game |
+|---|---|
+| <img src="docs/assets/readme/pavilion-marked.jpg" alt="A pavilion at Whiterun's stables: the roof of one mod in blue, the posts of another in orange, a pole in red that the patch would hide"> | <img src="docs/assets/readme/pavilion-plain.jpg" alt="The same pavilion without markings, as it looks in the game"> |
+
+**Place by place.** Go through your setup one place at a time and see it as
+it is now, with only the one mod, and with only the other. Little marks show
+where characters walk, so hiding something never leaves them on thin air.
+
+<p align="center">
+  <img src="docs/assets/readme/review.jpg" alt="One place in three views: now, with only Cutting Room Floor, and with only JK's Skyrim, with marks where characters walk" width="900">
+</p>
+
+<!-- Later: a short animation from the whole map into Whiterun, opening a
+     collision and hiding the pole that runs through the pavilion. -->
+
+**Side by side.** Faces, meshes and textures as each mod that changes them
+has them, turning in the light, so you can choose the version you like.
+
+| Faces | Trees |
+|---|---|
+| <img src="docs/assets/readme/compare-faces.jpg" alt="The same character's face from BruvRamm's Vanilla NPC Overhaul and from Cutting Room Floor"> | <img src="docs/assets/readme/compare-trees.jpg" alt="The same pine tree from Skyrim 202X and from Happy Little Trees"> |
 
 **Crashes.** When a crash logger is installed, Mod Mallet reads its recent
 reports and says which mods they point at, and how sure that is.
