@@ -71,6 +71,7 @@
   - [0054 A catalogue of the game's things](adr/0054-a-catalogue-of-the-games-things.md)
   - [0055 A magic wand for what belongs together, and one column per mod](adr/0055-a-magic-wand-for-what-belongs-together.md)
   - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)
+  - [0057 One version for the app](adr/0057-one-version-for-the-app.md)
   - [Template](adr/template.md)
 
 # Reference
@@ -86,3 +87,4 @@
 - [Development setup](contributing/setup.md)
 - [Conventions](contributing/conventions.md)
 - [Dependencies](contributing/dependencies.md)
+- [Releases](contributing/releases.md)

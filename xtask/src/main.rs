@@ -10,6 +10,7 @@ mod ci;
 mod commit_msg;
 mod generate;
 mod tools;
+mod versions;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

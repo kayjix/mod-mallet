@@ -101,6 +101,8 @@ export interface Texts {
   themeLight: string;
   themeDark: string;
   aboutText: string;
+  /** The app's version, and which build of it this is (ADR 0057). */
+  aboutVersion: (version: string, commit: string | null, date: string | null) => string;
   viewToolbox: string;
   viewSettings: string;
   restartVortex: string;
@@ -519,6 +521,10 @@ export const texts: Record<Lang, Texts> = {
     themeDark: "Dark",
     aboutText:
       "Mod Mallet looks at a modded game, explains what is wrong in plain words and lets the mod manager carry out the fixes. It changes nothing by itself.",
+    aboutVersion: (version, commit, date) =>
+      commit === null
+        ? `Version ${version}, development build`
+        : `Version ${version}, build ${commit}${date === null ? "" : ` of ${date}`}`,
     viewToolbox: "Toolbox",
     viewSettings: "Settings",
     restartVortex: "Restart Vortex",
@@ -1067,6 +1073,10 @@ export const texts: Record<Lang, Texts> = {
     themeDark: "Dunkel",
     aboutText:
       "Mod Mallet schaut sich ein gemoddetes Spiel an, erklärt verständlich, was nicht stimmt, und lässt den Mod-Manager die Korrekturen ausführen. Selbst ändert es nichts.",
+    aboutVersion: (version, commit, date) =>
+      commit === null
+        ? `Version ${version}, Entwicklungsstand`
+        : `Version ${version}, Build ${commit}${date === null ? "" : ` vom ${date}`}`,
     viewToolbox: "Werkzeugkasten",
     viewSettings: "Einstellungen",
     restartVortex: "Vortex neu starten",

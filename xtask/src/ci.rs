@@ -8,7 +8,7 @@ use std::process::Command;
 
 use anyhow::{Result, bail};
 
-use crate::{architecture, generate, tools};
+use crate::{architecture, generate, tools, versions};
 
 const DESKTOP_CRATE: &str = "mallet-desktop";
 
@@ -17,6 +17,9 @@ pub(crate) fn run(root: &Path, skip_desktop: bool, require_tools: bool) -> Resul
 
     step("Architecture rules");
     architecture::check(root)?;
+
+    step("One version");
+    versions::check(root)?;
 
     step("Rust formatting");
     let mut fmt = tools::cargo();

@@ -2285,7 +2285,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-analysis"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mallet-core",
  "proptest",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "schemars 1.2.3",
  "serde",
@@ -2318,7 +2318,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-desktop"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mallet-core",
  "mallet-engine",
@@ -2330,7 +2330,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-engine"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "dirs 7.0.0",
  "flate2",
@@ -2353,7 +2353,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-format-fomod"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mallet-core",
  "proptest",
@@ -2363,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-formats-bethesda"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "flate2",
  "lz4_flex",
@@ -2373,7 +2373,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-game-bethesda"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "dirs 7.0.0",
  "libloadorder",
@@ -2387,7 +2387,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-knowledge"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "dirs 7.0.0",
  "libloot",
@@ -2401,7 +2401,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-messages"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "fluent-bundle",
  "mallet-core",
@@ -2413,7 +2413,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-source-vortex"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mallet-core",
  "proptest",
@@ -2426,7 +2426,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-store"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mallet-core",
  "rusqlite",
@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "mallet-unpack"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "tempfile",
  "thiserror 2.0.21",
@@ -5550,7 +5550,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",

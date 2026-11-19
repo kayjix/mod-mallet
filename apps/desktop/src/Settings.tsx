@@ -157,6 +157,15 @@ export function SettingsView({
               <strong>Mod Mallet</strong>
               <span className="brand-tagline">{t.tagline}</span>
               <p>{t.aboutText}</p>
+              <p className="about-version">
+                {t.aboutVersion(
+                  __MALLET_VERSION__,
+                  __MALLET_COMMIT__,
+                  __MALLET_COMMIT_DATE__ === null
+                    ? null
+                    : new Date(__MALLET_COMMIT_DATE__).toLocaleDateString(lang),
+                )}
+              </p>
             </div>
           </div>
         </section>

@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, ensure};
 
-use crate::tools;
+use crate::{tools, versions};
 
 const DESKTOP_CRATE: &str = "mallet-desktop";
 
@@ -19,12 +19,25 @@ pub(crate) fn run(root: &Path, release: bool, start: bool) -> Result<()> {
         "the frontend's dependencies are missing: run `npm install` first"
     );
 
+    // Which commit the app is built from, shown in its settings and log so
+    // that two builds of the same version can be told apart (ADR 0057).
+    let stamp = versions::build_stamp(root);
+    let stamped = |command: &mut Command| {
+        if let Some((commit, date)) = &stamp {
+            command
+                .env("MALLET_COMMIT", commit)
+                .env("MALLET_COMMIT_DATE", date);
+        }
+    };
+
     let mut frontend = tools::npm(root);
     frontend.args(["run", "build", "--workspace", "apps/desktop"]);
+    stamped(&mut frontend);
     tools::run(frontend, "frontend build")?;
 
     let mut build = tools::cargo();
     build.current_dir(root).args(["build", "-p", DESKTOP_CRATE]);
+    stamped(&mut build);
     if release {
         build.arg("--release");
     }

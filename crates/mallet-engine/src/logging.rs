@@ -48,6 +48,7 @@ pub fn start_logging(dir: &Path) -> std::io::Result<PathBuf> {
         .map_err(|error| std::io::Error::other(error.to_string()))?;
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
+        commit = option_env!("MALLET_COMMIT").unwrap_or("none"),
         log = %path.display(),
         "Mod Mallet started"
     );

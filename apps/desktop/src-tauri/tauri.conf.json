@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Mod Mallet",
-  "version": "0.0.0",
   "identifier": "org.modmallet.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",

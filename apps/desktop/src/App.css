@@ -3371,3 +3371,8 @@ button.quiet {
   border-radius: 10px;
   background: color-mix(in srgb, var(--warning) 10%, var(--surface));
 }
+
+.about-version {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
