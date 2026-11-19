@@ -1,4 +1,4 @@
-// The catalogue of things (ADR 0053): every character, weapon, piece of
+// The catalogue of things (ADR 0054): every character, weapon, piece of
 // armour and other thing of the game and the mods, alone or as the sets
 // characters wear, on the same stage as the comparison of duels.
 

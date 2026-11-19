@@ -55,7 +55,7 @@ export type Action =
 
 /**
  * Every version of a thing the setup has: what the game and each mod
- * make it look like (ADR 0053).
+ * make it look like (ADR 0054).
  */
 export interface AssetVersions {
   /**

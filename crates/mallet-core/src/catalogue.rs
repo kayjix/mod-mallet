@@ -1,4 +1,4 @@
-//! The things of the game one can look at (ADR 0053): weapons, armour,
+//! The things of the game one can look at (ADR 0054): weapons, armour,
 //! characters and other items, with the sets they form, from the game and
 //! from every mod.
 //!
@@ -237,7 +237,7 @@ pub struct CatalogueOutfit {
 }
 
 /// Every version of a thing the setup has: what the game and each mod
-/// make it look like (ADR 0053).
+/// make it look like (ADR 0054).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetVersions {

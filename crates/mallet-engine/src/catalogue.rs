@@ -1,5 +1,5 @@
 //! The things of the setup one can look at, for the *Assets* page
-//! (ADR 0053). Only reads.
+//! (ADR 0054). Only reads.
 
 use std::sync::{Arc, Mutex};
 

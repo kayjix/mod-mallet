@@ -153,7 +153,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 | **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
 | **Map** | Look at the places of any worldspace | flat or relief | decide; a spot links to the worklist |
 | **Asset collisions** | Decide whose textures, meshes and faces the game shows where two mods bring their own | *Duels*: two mods side by side on the comparison stage; *Ranking*: which mods to prefer, which suggests every duel's side | decide placed objects (Map collisions does) |
-| **Assets** | Look at every thing of the game and the mods, and choose the version of one thing (ADR 0053) | the list, by kind, material or as sets; a thing's versions side by side | decide whole pairs of mods (Asset collisions does) |
+| **Assets** | Look at every thing of the game and the mods, and choose the version of one thing (ADR 0054) | the list, by kind, material or as sets; a thing's versions side by side | decide whole pairs of mods (Asset collisions does) |
 | **Mods** | Know the mods, one at a time | the list; a mod's details | decide collisions or duels in place |
 | **Toolbox** | Have the tools the setup needs | the list; the one button a tool offers | – |
 | **Settings** | Where Mod Mallet reads, language, theme | tabs | – |

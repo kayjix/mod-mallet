@@ -10,7 +10,7 @@ export type StageItem =
       path: string;
       /** Counted from the version lowest in precedence; absent for the one in the game. */
       version?: number;
-      /** A version of a catalogue thing (ADR 0053), by its identity; it wins over `version`. */
+      /** A version of a catalogue thing (ADR 0054), by its identity; it wins over `version`. */
       assetVersion?: string;
     }
   | { kind: "texture"; label: string; path: string; image: string | null };

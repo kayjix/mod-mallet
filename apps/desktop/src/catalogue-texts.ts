@@ -1,4 +1,4 @@
-// The texts of the catalogue of things (ADR 0053): characters, weapons,
+// The texts of the catalogue of things (ADR 0054): characters, weapons,
 // armour and other things of the game and the mods, and the sets they form.
 // Kept apart from `i18n.ts`, like the other pages' texts.
 

@@ -4,7 +4,7 @@
 //! the files that win. The listing of a mod's folder says which files the
 //! mod brings, including those Vortex kept back because another mod's file
 //! wins. Here only the folder listings are read, never a file (the catalogue
-//! opens the files of the one thing looked at, ADR 0053), and each mod's
+//! opens the files of the one thing looked at, ADR 0054), and each mod's
 //! listing is kept in the cache until the modification time of its folder
 //! changes, which Vortex causes by installing the mod anew. The folders of
 //! mods that are installed but switched off are listed too, so that files

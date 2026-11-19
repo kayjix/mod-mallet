@@ -1,5 +1,5 @@
 //! Every version of a thing of the catalogue, and what each looks like
-//! (ADR 0053): the copies of its files in the game's archives, in the
+//! (ADR 0054): the copies of its files in the game's archives, in the
 //! mods' archives, in the data directory and in the mod manager's staging
 //! folder, where the copies other mods replaced are kept.
 //!

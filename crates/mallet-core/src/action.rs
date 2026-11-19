@@ -58,7 +58,7 @@ pub enum Action {
         mod_ref: ModRef,
     },
     /// Decide whose copies of some loose files reach the game, through the
-    /// mod manager's file overrides (ADR 0053): the mods in `leave_out` no
+    /// mod manager's file overrides (ADR 0054): the mods in `leave_out` no
     /// longer deploy the files, those in `provide` deploy them again. With
     /// every mod in `leave_out` but one, that one's copies win; with every
     /// mod in `leave_out`, the copies in the archives show. Removing the

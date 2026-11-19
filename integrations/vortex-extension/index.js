@@ -247,7 +247,7 @@ function isDataFile(value) {
 }
 
 /**
- * Which files the mods are to leave out (ADR 0053): `files` (below the data
+ * Which files the mods are to leave out (ADR 0054): `files` (below the data
  * directory) are added to the file overrides of the mods in `leaveOut`, so
  * that Vortex does not deploy their copies, and taken out of those of the
  * mods in `provide`, so that it deploys theirs again. Vortex keeps the

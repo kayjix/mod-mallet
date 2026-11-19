@@ -1,4 +1,4 @@
-//! The versions of a thing of the catalogue (ADR 0053), from a made-up
+//! The versions of a thing of the catalogue (ADR 0054), from a made-up
 //! game folder and Vortex staging folder.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]

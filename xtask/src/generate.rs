@@ -198,7 +198,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
     }
 }
 
-/// The schemas of the catalogue of things and their versions (ADR 0053).
+/// The schemas of the catalogue of things and their versions (ADR 0054).
 fn catalogue_schemas() -> Result<Vec<Generated>> {
     Ok(vec![
         Generated {

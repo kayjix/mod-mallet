@@ -52,7 +52,7 @@ pub struct Settings {
     pub patch_choices: Option<BTreeMap<String, Option<String>>>,
     /// Which version of a thing of the catalogue the user had the mod
     /// manager put into the game, by the thing's identity: the version's
-    /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0053).
+    /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0054).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub asset_choices: BTreeMap<String, String>,
 }

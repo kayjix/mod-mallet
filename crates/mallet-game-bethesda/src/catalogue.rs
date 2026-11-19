@@ -1,5 +1,5 @@
 //! The things of the game one can look at, read from the plugins
-//! (ADR 0053): weapons, armour, characters and other things with a model,
+//! (ADR 0054): weapons, armour, characters and other things with a model,
 //! and the outfits characters wear.
 //!
 //! Only the top-level groups of the record types listed in [`RECORDS`] are

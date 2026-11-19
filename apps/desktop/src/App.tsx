@@ -693,7 +693,7 @@ function Sidebar({
   const { decisions, lang } = useSession();
   const c = catalogueTexts[lang];
   const assets = report === null ? null : openFileDuels(report, decisions);
-  // Two kinds of collisions side by side (ADR 0053): placed objects on the
+  // Two kinds of collisions side by side (ADR 0054): placed objects on the
   // map, and files of mods for the same thing.
   const game: NavEntry[] = [
     { name: "overview", label: j.navOverview, icon: <IconOverview /> },

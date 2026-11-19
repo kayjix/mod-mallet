@@ -179,7 +179,7 @@ each mod in `provide`, with `SET_FILE_OVERRIDE`; a mod's other overrides
 stay. Vortex does not deploy a file that is in a mod's overrides. The
 extension then emits `deploy-mods`, as Vortex's *Deploy* button does. The
 user finds the overrides among the mods' file conflicts in Vortex and can
-change them there (ADR 0053).
+change them there (ADR 0054).
 
 ## A result
 

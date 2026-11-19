@@ -33,7 +33,7 @@ export interface Api {
   /** The result of the last scan, or `null` if there is none yet. */
   lastReport(lang: Lang): Promise<RenderedReport | null>;
   /**
-   * Every thing of the setup worth looking at (ADR 0053): weapons, armour,
+   * Every thing of the setup worth looking at (ADR 0054): weapons, armour,
    * characters and other things, with the outfits they form. The first call
    * for a setup reads every plugin and takes a few seconds. Null if the setup
    * cannot be read.
