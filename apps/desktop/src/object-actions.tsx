@@ -257,7 +257,8 @@ export function FreeObjectActions({
   const locked = anchors === null ? object.anchored : anchors?.verdict === "locked";
   const careful = anchors?.verdict === "careful";
   const isHidden = hidden.has(matchKey(object.id));
-  const byItself = objectChoiceKey(object.id) in patchChoices;
+  // A null choice is one shown again on purpose, not one hidden by itself.
+  const byItself = (patchChoices[objectChoiceKey(object.id)] ?? null) !== null;
   const together = tools === undefined ? null : <PartsTogether object={object} tools={tools} />;
   if (isHidden) {
     return (

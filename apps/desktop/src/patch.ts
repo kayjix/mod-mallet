@@ -69,19 +69,58 @@ export function freeObjects(choices: PatchChoices): ObjectRef[] {
   });
 }
 
-/** The choices with one object hidden on its own, or no longer. */
+/**
+ * The choices with one object hidden on its own, or shown again. Showing
+ * one again is kept as a choice of its own (null), so that the installed
+ * patch, read again at the next start, does not hide it once more.
+ */
 export function chooseObject(
   choices: PatchChoices,
   object: ObjectRef,
   hide: boolean,
 ): PatchChoices {
-  const next = { ...choices };
-  if (hide) {
-    next[objectChoiceKey(object)] = object.plugin;
-  } else {
-    delete next[objectChoiceKey(object)];
+  const next = withoutObjectKeys(choices, new Set([matchKey(object)]));
+  next[objectChoiceKey(object)] = hide ? object.plugin : null;
+  return next;
+}
+
+/** The choices without any key of these objects hidden on their own, in any spelling. */
+function withoutObjectKeys(choices: PatchChoices, wanted: Set<string>): PatchChoices {
+  const next: PatchChoices = {};
+  for (const [key, value] of Object.entries(choices)) {
+    const own = objectOfKey(key);
+    if (own === undefined || !wanted.has(matchKey(own))) {
+      next[key] = value;
+    }
   }
   return next;
+}
+
+/** The object a choice key names when it is one hidden on its own (or shown again). */
+function objectOfKey(key: string): ObjectRef | undefined {
+  if (!key.startsWith(OBJECT)) {
+    return undefined;
+  }
+  const bar = key.lastIndexOf("|");
+  const localId = Number(key.slice(bar + 1));
+  return bar > OBJECT.length && Number.isInteger(localId)
+    ? { plugin: key.slice(OBJECT.length, bar), localId }
+    : undefined;
+}
+
+/**
+ * The installed patch's choices with the user's own kept ones over them.
+ * An object the user hid or showed again replaces the installed choice of
+ * the same object in any spelling of its plugin.
+ */
+export function mergeChoices(installed: PatchChoices, own: PatchChoices): PatchChoices {
+  const mine = new Set(
+    Object.keys(own).flatMap((key) => {
+      const object = objectOfKey(key);
+      return object === undefined ? [] : [matchKey(object)];
+    }),
+  );
+  return { ...withoutObjectKeys(installed, mine), ...own };
 }
 
 /**
@@ -433,12 +472,10 @@ export function revealObjects(
   objects: ObjectRef[],
 ): PatchChoices {
   const wanted = new Set(objects.map(matchKey));
-  const next: PatchChoices = {};
-  for (const [key, value] of Object.entries(choices)) {
-    const own = freeObjects({ [key]: value })[0];
-    if (own === undefined || !wanted.has(matchKey(own))) {
-      next[key] = value;
-    }
+  const next = withoutObjectKeys(choices, wanted);
+  // Shown again on purpose: kept, so the installed patch does not hide them again.
+  for (const object of objects) {
+    next[objectChoiceKey(object)] = null;
   }
   for (const [finding, list] of spots) {
     for (const spot of list) {
