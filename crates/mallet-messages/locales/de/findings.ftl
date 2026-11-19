@@ -253,9 +253,13 @@ meshes-texture-missing = Modelle einer Mod verwenden Texturen, die im Spiel fehl
         } für Farbe oder Oberfläche { $count ->
             [one] eine Textur
            *[other] { $count } Texturen
-        }, die keine Mod und kein Archiv in deinem Spiel mitbringt: { $examples }.
+        }, die keine Mod und kein Archiv in deinem Spiel mitbringt: { $examples }.{ $offCount ->
+        [0] {""}
+        [one] {" "}1 davon liegt in { $offMods }, installiert, aber ausgeschaltet.
+       *[other] {" "}{ $offCount } davon liegen in { $offMods }, installiert, aber ausgeschaltet.
+    }
     .explanation = Ein Modell ist die 3D-Form eines Dings; Farbe und feine Oberfläche bekommt es aus Texturen, eigenen Bilddateien, die das Modell nennt. Fehlt eine genannte Textur, malt das Spiel die Fläche grell lila, oder dunkel und flach, wo die Oberflächendetails fehlen. Meist ist dann ein Teil der Mod nicht installiert, zum Beispiel ihre Texturen in einem eigenen Download, oder die Mod gehört zu einer anderen Mod, die du nicht hast. Modelle, die eine Mod für eine Mod mitinstalliert, die du nicht verwendest, werden nie gezeigt; ihre fehlenden Texturen schaden dann nicht.
-    .remedy = Sieh auf der Seite der Mod nach Dateien, die dazugehören, etwa einem Textur-Download oder einer Mod, die sie braucht, und installiere sie. Gehören die Modelle zu einem Patch für eine Mod, die du nicht hast, kannst du sie lassen.
+    .remedy = Nennt Mod Mallet eine Mod, die sie mitbringt, aber ausgeschaltet ist, schalte sie in Vortex ein. Sonst sieh auf der Seite der Mod nach Dateien, die dazugehören, etwa einem Textur-Download oder einer Mod, die sie braucht, und installiere sie. Gehören die Modelle zu einem Patch für eine Mod, die du nicht hast, kannst du sie lassen.
 
 meshes-retexture-bypassed = Textur-Mod erreicht ersetzte Modelle nicht
     .headline =

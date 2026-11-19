@@ -47,6 +47,10 @@ export type Action =
   | {
       mod: ModRef1;
       type: "disable-mod";
+    }
+  | {
+      mod: ModRef2;
+      type: "enable-mod";
     };
 /**
  * A value substituted into the text of a finding.
@@ -246,6 +250,10 @@ export interface DuelResolution {
     | {
         mod: ModRef1;
         type: "disable-mod";
+      }
+    | {
+        mod: ModRef2;
+        type: "enable-mod";
       };
   /**
    * The identity of a finding across scans.
@@ -345,13 +353,30 @@ export interface ModRef1 {
   source: string;
 }
 /**
+ * The mod to switch on.
+ */
+export interface ModRef2 {
+  /**
+   * The manager's own identifier of the mod.
+   */
+  id: string;
+  /**
+   * The name to show to people.
+   */
+  name: string;
+  /**
+   * The manager that knows this mod, for example `vortex`.
+   */
+  source: string;
+}
+/**
  * One of the two mods of a duel.
  */
 export interface DuelSide {
   /**
    * The mod, if a mod manager knows it.
    */
-  mod?: ModRef2 | null;
+  mod?: ModRef3 | null;
   /**
    * What to call this side: the mod's name, or the file's.
    */
@@ -364,7 +389,7 @@ export interface DuelSide {
 /**
  * A mod as a mod manager knows it.
  */
-export interface ModRef2 {
+export interface ModRef3 {
   /**
    * The manager's own identifier of the mod.
    */
@@ -491,6 +516,10 @@ export interface RenderedAction {
     | {
         mod: ModRef1;
         type: "disable-mod";
+      }
+    | {
+        mod: ModRef2;
+        type: "enable-mod";
       };
   /**
    * What will happen, in a sentence or two.
@@ -591,7 +620,7 @@ export interface Finding {
   /**
    * The mod the subject comes from, if a mod manager knows.
    */
-  provider?: ModRef2 | null;
+  provider?: ModRef3 | null;
   /**
    * How much the finding matters.
    */
@@ -826,7 +855,7 @@ export interface InstalledPatch {
   /**
    * The mod the file belongs to, if the mod manager knows it.
    */
-  provider?: ModRef2 | null;
+  provider?: ModRef3 | null;
 }
 /**
  * A place the scan looked at, with its role and origin in words.
@@ -1244,7 +1273,7 @@ export interface ModInfo {
    * Whether the mod is enabled in the profile in use.
    */
   enabled: boolean;
-  mod: ModRef3;
+  mod: ModRef4;
   /**
    * The newest version the mod manager knows of, if it is another one.
    */
@@ -1261,7 +1290,7 @@ export interface ModInfo {
 /**
  * A mod as a mod manager knows it.
  */
-export interface ModRef3 {
+export interface ModRef4 {
   /**
    * The manager's own identifier of the mod.
    */

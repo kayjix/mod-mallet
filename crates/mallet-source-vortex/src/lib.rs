@@ -125,6 +125,8 @@ pub struct VortexDeployment {
     base: Option<GamePath>,
     /// Every file of each mod's folder, deployed or not, by folder name.
     staged: HashMap<String, Vec<GamePath>>,
+    /// The folders of the switched-off mods that hold each file.
+    switched_off: HashMap<GamePath, Vec<String>>,
 }
 
 impl VortexDeployment {
@@ -205,6 +207,29 @@ impl VortexDeployment {
         self
     }
 
+    /// Adds the files of the folders of mods that are installed but
+    /// switched off: by folder name, the paths below each folder as
+    /// [`list_mod_folder`] lists them.
+    #[must_use]
+    pub fn with_switched_off_files(mut self, folders: HashMap<String, Vec<String>>) -> Self {
+        let base = self.base.clone().unwrap_or_else(|| GamePath::new(""));
+        let mut switched_off: HashMap<GamePath, Vec<String>> = HashMap::new();
+        for (folder, files) in folders {
+            for file in files {
+                switched_off
+                    .entry(base.join(&file))
+                    .or_default()
+                    .push(folder.clone());
+            }
+        }
+        for folders in switched_off.values_mut() {
+            folders.sort_unstable();
+            folders.dedup();
+        }
+        self.switched_off = switched_off;
+        self
+    }
+
     /// The mod that lives in the staging folder `folder`.
     pub fn mod_ref(&self, folder: &str) -> ModRef {
         ModRef {
@@ -246,6 +271,15 @@ impl ModSource for VortexDeployment {
             return None;
         }
         self.staged.get(&mod_ref.id).cloned()
+    }
+
+    fn switched_off_with(&self, path: &GamePath) -> Vec<ModRef> {
+        self.switched_off
+            .get(path)
+            .into_iter()
+            .flatten()
+            .map(|folder| self.mod_ref(folder))
+            .collect()
     }
 }
 
@@ -304,6 +338,35 @@ mod tests {
             .provider_of(&GamePath::new("data/textures/sky.dds"))
             .unwrap();
         assert_eq!(unnamed.name, "Sky Textures 456 2.0");
+    }
+
+    #[test]
+    fn files_of_switched_off_mods_are_found_by_path() {
+        let names = HashMap::from([("Town Textures 7 1.0".to_owned(), "Town Textures".to_owned())]);
+        let folders = HashMap::from([(
+            "Town Textures 7 1.0".to_owned(),
+            vec![r"textures\town\wall.dds".to_owned()],
+        )]);
+        let deployment = VortexDeployment::parse(MANIFEST, GAME_DIR)
+            .unwrap()
+            .with_names(names)
+            .with_switched_off_files(folders);
+
+        let [found] = deployment
+            .switched_off_with(&GamePath::new("Data/Textures/Town/Wall.dds"))
+            .try_into()
+            .unwrap();
+        assert_eq!(found.id, "Town Textures 7 1.0");
+        assert_eq!(found.name, "Town Textures");
+        assert_eq!(
+            deployment.switched_off_with(&GamePath::new("data/textures/sky.dds")),
+            Vec::<ModRef>::new()
+        );
+        // A switched-off mod's file is not in the game.
+        assert_eq!(
+            deployment.provider_of(&GamePath::new("data/textures/town/wall.dds")),
+            None
+        );
     }
 
     #[test]

@@ -9,6 +9,10 @@ export interface TaskRowTexts {
   modPage: (name: string) => string;
   /** The button that shows the map filtered to one mod. */
   modOnMap: (name: string) => string;
+  /** The heading of the list of missing textures. */
+  missingTextures: (count: number) => string;
+  /** The meshes that use a texture. */
+  usedBy: (meshes: string) => string;
   /** The heading of the mods under "more about it". */
   mods: string;
 }
@@ -16,12 +20,18 @@ export interface TaskRowTexts {
 const en: TaskRowTexts = {
   modPage: (name) => `Page of ${name}`,
   modOnMap: (name) => `${name} on the map`,
+  missingTextures: (count) =>
+    count === 1 ? "The missing texture" : `The ${count} missing textures`,
+  usedBy: (meshes) => `for ${meshes}`,
   mods: "Mods",
 };
 
 const de: TaskRowTexts = {
   modPage: (name) => `Seite von ${name}`,
   modOnMap: (name) => `${name} auf der Karte`,
+  missingTextures: (count) =>
+    count === 1 ? "Die fehlende Textur" : `Die ${count} fehlenden Texturen`,
+  usedBy: (meshes) => `für ${meshes}`,
   mods: "Mods",
 };
 

@@ -100,6 +100,9 @@ action-load-after = { $plugin } gewinnen lassen
 action-disable-mod = { $mod } deaktivieren
     .description = Vortex schaltet { $mod } im verwendeten Profil ab und bittet ums Bereitstellen. Gelöscht wird nichts; schalte die Mod in Vortex wieder ein, um es rückgängig zu machen.
 
+action-enable-mod = { $mod } einschalten
+    .description = Vortex schaltet { $mod } im verwendeten Profil ein und bittet ums Bereitstellen. Schalte die Mod in Vortex wieder ab, um es rückgängig zu machen.
+
 ## Duelle: alles, worin zwei Mods sich uneins sind.
 
 duel-topic-faces = { $count ->

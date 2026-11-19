@@ -49,6 +49,13 @@ pub enum Action {
         #[serde(rename = "mod")]
         mod_ref: ModRef,
     },
+    /// Switch a mod on that is installed in the mod manager but switched
+    /// off in the profile in use. Switching it off again there undoes it.
+    EnableMod {
+        /// The mod to switch on.
+        #[serde(rename = "mod")]
+        mod_ref: ModRef,
+    },
 }
 
 /// A placed object, by the plugin that placed it first and its number in

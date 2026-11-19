@@ -100,6 +100,9 @@ action-load-after = Let { $plugin } win
 action-disable-mod = Disable { $mod }
     .description = Vortex switches { $mod } off in the profile you use, and asks to deploy. Nothing is deleted; switch it on again in Vortex to undo it.
 
+action-enable-mod = Switch on { $mod }
+    .description = Vortex switches { $mod } on in the profile you use, and asks to deploy. Switch it off again in Vortex to undo it.
+
 ## Duels: everything two mods disagree about.
 
 duel-topic-faces = { $count ->

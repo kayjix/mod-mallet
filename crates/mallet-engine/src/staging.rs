@@ -5,7 +5,9 @@
 //! mod brings, including those Vortex kept back because another mod's file
 //! wins. Only the folder listings are read, never a file, and each mod's
 //! listing is kept in the cache until the modification time of its folder
-//! changes, which Vortex causes by installing the mod anew.
+//! changes, which Vortex causes by installing the mod anew. The folders of
+//! mods that are installed but switched off are listed too, so that files
+//! the game misses can be found in them (ADR 0052).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -50,12 +52,8 @@ pub(crate) fn read(
     store: Option<&Store>,
     locations: &mut Vec<ScanLocation>,
 ) -> VortexDeployment {
-    let (staging, origin) = match &options.staging_dir {
-        Some(given) => (given.clone(), LocationOrigin::Given),
-        None => match deployment.staging_path() {
-            Some(named) => (PathBuf::from(named), LocationOrigin::Manager),
-            None => return deployment,
-        },
+    let Some((staging, origin)) = staging_dir(options, &deployment) else {
+        return deployment;
     };
     let found = staging.is_dir();
     locations.push(ScanLocation {
@@ -67,12 +65,60 @@ pub(crate) fn read(
     if !found {
         return deployment;
     }
+    let staged = list_folders(&staging, deployment.mod_folders(), store);
+    deployment.with_staged_files(staged)
+}
 
+/// Adds the files of the folders of mods that are installed but switched
+/// off, `folders`, so that what the game misses can be found in them. Reads
+/// from the same staging folder as [`read`], which has already listed it as
+/// a place.
+pub(crate) fn read_switched_off(
+    options: &ScanOptions,
+    deployment: VortexDeployment,
+    folders: &[String],
+    store: Option<&Store>,
+) -> VortexDeployment {
+    if folders.is_empty() {
+        return deployment;
+    }
+    let Some((staging, _)) = staging_dir(options, &deployment) else {
+        return deployment;
+    };
+    if !staging.is_dir() {
+        return deployment;
+    }
+    let listed = list_folders(&staging, folders, store);
+    deployment.with_switched_off_files(listed)
+}
+
+/// The staging folder: the one the user named, else the one the
+/// deployment manifest names.
+fn staging_dir(
+    options: &ScanOptions,
+    deployment: &VortexDeployment,
+) -> Option<(PathBuf, LocationOrigin)> {
+    match &options.staging_dir {
+        Some(given) => Some((given.clone(), LocationOrigin::Given)),
+        None => deployment
+            .staging_path()
+            .map(|named| (PathBuf::from(named), LocationOrigin::Manager)),
+    }
+}
+
+/// The files below each of `folders` in `staging`, from the cache where
+/// the folder has not changed. A folder that is missing or cannot be
+/// listed is left out.
+fn list_folders(
+    staging: &Path,
+    folders: &[String],
+    store: Option<&Store>,
+) -> HashMap<String, Vec<String>> {
     let started = Instant::now();
     let mut from_cache = 0usize;
     let mut staged: HashMap<String, Vec<String>> = HashMap::new();
     let mut list = || {
-        for folder in deployment.mod_folders() {
+        for folder in folders {
             let path = staging.join(folder);
             let Some(fingerprint) = fingerprint(&path) else {
                 continue;
@@ -116,7 +162,7 @@ pub(crate) fn read(
         millis = started.elapsed().as_millis(),
         "listed the mods' folders"
     );
-    deployment.with_staged_files(staged)
+    staged
 }
 
 /// The modification time of a mod's folder, or `None` if it is not a
@@ -223,5 +269,28 @@ mod tests {
             mallet_core::ModSource::staged_files(&deployment, &sky),
             None
         );
+    }
+
+    #[test]
+    fn files_of_switched_off_mods_are_listed_from_the_same_folder() {
+        let directory = tempfile::tempdir().unwrap();
+        let staging = directory.path().join("staging");
+        let game = directory.path().join("game");
+        let textures = staging.join("Town 2").join("textures");
+        std::fs::create_dir_all(&textures).unwrap();
+        std::fs::write(textures.join("wall.dds"), b"").unwrap();
+
+        let deployment = read_switched_off(
+            &ScanOptions::default(),
+            deployment(&staging, &game),
+            &["Town 2".to_owned(), "Gone 3".to_owned()],
+            None,
+        );
+        let found = mallet_core::ModSource::switched_off_with(
+            &deployment,
+            &mallet_core::GamePath::new("data/textures/wall.dds"),
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "Town 2");
     }
 }

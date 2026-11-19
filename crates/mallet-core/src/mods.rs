@@ -36,6 +36,14 @@ pub trait ModSource {
         let _ = mod_ref;
         None
     }
+
+    /// The mods the manager keeps installed but switched off in the profile
+    /// in use that bring a file at `path`, by the path the game would see it
+    /// under. Empty if there are none or the manager does not say.
+    fn switched_off_with(&self, path: &GamePath) -> Vec<ModRef> {
+        let _ = path;
+        Vec::new()
+    }
 }
 
 /// The [`ModSource`] of a setup that no known mod manager looks after.

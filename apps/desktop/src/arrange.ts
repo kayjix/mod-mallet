@@ -223,6 +223,11 @@ export function stepOf(rendered: RenderedFinding, ignored: Set<string>): Step | 
   if (severity === "info") {
     return "notes";
   }
+  // Missing textures are a guess, unless a switched-off mod brings them:
+  // then switching it on is one click away (ADR 0052).
+  if (kind === "meshes.texture-missing" && isDirect(rendered)) {
+    return "one-click";
+  }
   if (confidence === "hint") {
     return "advice";
   }

@@ -199,6 +199,33 @@ const samples: Sample[] = [
       "Texture Pack ersetzt Texturen, die von 12 Modellen aus Mesh Improvements nicht mehr verwendet werden.",
     ),
   },
+  {
+    kind: "meshes.texture-missing",
+    severity: "warning",
+    confidence: "hint",
+    key: "Old Town",
+    mod: "Old Town",
+    title: two(
+      "Meshes of a mod use textures that are not in the game",
+      "Modelle einer Mod verwenden Texturen, die im Spiel fehlen",
+    ),
+    headline: two("3 textures missing for 2 meshes", "3 Texturen fehlen für 2 Modelle"),
+    summary: two(
+      "2 meshes of this mod use 3 textures for their colour or surface that no mod and no archive in your game provides: data/textures/town/gate.dds, data/textures/town/wall.dds, data/textures/town/wall_n.dds. 2 of them are in Mesh Improvements, installed but switched off.",
+      "2 Modelle dieser Mod verwenden für Farbe oder Oberfläche 3 Texturen, die keine Mod und kein Archiv in deinem Spiel mitbringt: data/textures/town/gate.dds, data/textures/town/wall.dds, data/textures/town/wall_n.dds. 2 davon liegen in Mesh Improvements, installiert, aber ausgeschaltet.",
+    ),
+    args: {
+      meshes: 2,
+      count: 3,
+      list: [
+        "data/textures/town/gate.dds\tdata/meshes/town/gate.nif",
+        "data/textures/town/wall.dds\tdata/meshes/town/gate.nif, data/meshes/town/wall.nif",
+        "data/textures/town/wall_n.dds\tdata/meshes/town/wall.nif",
+      ].join("\n"),
+      offCount: 2,
+      offMods: "Mesh Improvements",
+    },
+  },
   covers("Texture Pack", "Old Town", 120),
   covers("Texture Pack", "Castle Mod", 14),
   covers("Mesh Improvements", "Old Town", 31),
@@ -352,32 +379,46 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
               guide: [],
             },
           ]
-        : sample.direct && provider !== undefined
+        : sample.kind === "meshes.texture-missing"
           ? [
               {
-                action: { type: "reinstall-mod", mod: provider },
-                label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+                action: {
+                  type: "enable-mod",
+                  mod: { source: "vortex", id: "Mesh Improvements", name: "Mesh Improvements" },
+                },
+                label: de ? "Mesh Improvements einschalten" : "Switch on Mesh Improvements",
                 description: de
-                  ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
-                  : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
-                guide: [
-                  {
-                    tick: {
-                      page: 5,
-                      pages: 7,
-                      step: "Additional Patches A-M",
-                      group: "Towns",
-                      option: "City Overhaul",
-                      description: de
-                        ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
-                        : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
-                    },
-                    pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
-                  },
-                ],
+                  ? "Vortex schaltet Mesh Improvements im verwendeten Profil ein und bittet ums Bereitstellen."
+                  : "Vortex switches Mesh Improvements on in the profile you use, and asks to deploy.",
+                guide: [],
               },
             ]
-          : [],
+          : sample.direct && provider !== undefined
+            ? [
+                {
+                  action: { type: "reinstall-mod", mod: provider },
+                  label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+                  description: de
+                    ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
+                    : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
+                  guide: [
+                    {
+                      tick: {
+                        page: 5,
+                        pages: 7,
+                        step: "Additional Patches A-M",
+                        group: "Towns",
+                        option: "City Overhaul",
+                        description: de
+                          ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
+                          : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
+                      },
+                      pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
+                    },
+                  ],
+                },
+              ]
+            : [],
   };
 }
 

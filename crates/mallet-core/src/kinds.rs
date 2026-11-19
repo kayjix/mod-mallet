@@ -197,12 +197,15 @@ pub const MESHES_MADE_FOR_OTHER_GAME: KindInfo = KindInfo {
 
 /// Meshes of a mod name textures that nothing in the game provides. A
 /// hint: a mesh that is shown looks wrong, but a mod may bring meshes the
-/// game never shows.
+/// game never shows. `list` holds every missing texture, one per line, with
+/// the meshes that name it after a tab. `offCount` counts the missing
+/// textures that mods installed but switched off bring, `offMods` names
+/// those mods (ADR 0052).
 pub const MESHES_TEXTURE_MISSING: KindInfo = KindInfo {
     id: "meshes.texture-missing",
     severity: Severity::Warning,
     confidence: Confidence::Hint,
-    args: &["meshes", "count", "examples"],
+    args: &["meshes", "count", "examples", "list", "offCount", "offMods"],
 };
 
 /// Replacement meshes no longer use textures that a texture mod replaces.

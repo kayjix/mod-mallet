@@ -209,6 +209,24 @@
             "type",
             "mod"
           ]
+        },
+        {
+          "description": "Switch a mod on that is installed in the mod manager but switched\noff in the profile in use. Switching it off again there undoes it.",
+          "type": "object",
+          "properties": {
+            "mod": {
+              "description": "The mod to switch on.",
+              "$ref": "#/$defs/ModRef"
+            },
+            "type": {
+              "type": "string",
+              "const": "enable-mod"
+            }
+          },
+          "required": [
+            "type",
+            "mod"
+          ]
         }
       ]
     },

@@ -572,6 +572,13 @@ fn load_mod_source(
         "read Vortex deployment"
     );
     let manager = installers::read(options, &deployment, store, locations)?;
+    let switched_off: Vec<String> = manager
+        .mods
+        .iter()
+        .filter(|info| !info.enabled)
+        .map(|info| info.mod_ref.id.clone())
+        .collect();
+    let deployment = staging::read_switched_off(options, deployment, &switched_off, store);
     Ok((
         Box::new(deployment.with_names(manager.names)),
         manager.installers,

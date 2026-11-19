@@ -286,11 +286,11 @@ A mesh is the 3D shape of a thing in the game. Each game, and each edition of a 
 
 - Severity: Warning
 - Confidence: hint
-- Message arguments: `meshes`, `count`, `examples`
+- Message arguments: `meshes`, `count`, `examples`, `list`, `offCount`, `offMods`
 
 A mesh is the 3D shape of a thing; its colour and the fine detail of its surface come from textures, separate image files that the mesh names. If a named texture is not there, the game draws the surface in a glaring purple, or dark and flat where the surface detail is missing. This usually means that a part of the mod was not installed, for example its textures in a separate download, or that the mod was made to go with another mod you do not have. Meshes a mod installs for a mod you do not use are never shown, so their missing textures do no harm.
 
-**What to do:** Look on the mod's page for files that belong with it, such as a texture download or a mod it needs, and install them. If the meshes are part of a patch for a mod you do not have, you can leave them.
+**What to do:** If Mod Mallet names a mod that brings them but is switched off, switch it on in Vortex. Otherwise look on the mod's page for files that belong with it, such as a texture download or a mod it needs, and install them. If the meshes are part of a patch for a mod you do not have, you can leave them.
 
 ## meshes.retexture-bypassed
 

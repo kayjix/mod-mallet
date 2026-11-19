@@ -225,6 +225,7 @@ export function FindingRow({
                 )}
                 <h3>{t.whatItMeans}</h3>
                 <p>{rendered.explanation}</p>
+                <MissingFiles rendered={rendered} />
                 {where.length > 0 && <Spots spots={where} collision={isCollision(rendered)} />}
                 {known.length > 0 && (
                   <>
@@ -251,6 +252,43 @@ export function FindingRow({
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Every texture a mod's meshes miss, with the meshes that use it, to look
+ * for on the mod's page (ADR 0052). The finding's `list` holds one texture
+ * per line, the meshes after a tab.
+ */
+function MissingFiles({ rendered }: { rendered: RenderedFinding }) {
+  const r = useTaskRowTexts();
+  const list = rendered.finding.args.list;
+  if (
+    rendered.finding.kind !== "meshes.texture-missing" ||
+    typeof list !== "string" ||
+    list === ""
+  ) {
+    return null;
+  }
+  const rows = list.split("\n").map((line) => {
+    const [texture = "", meshes = ""] = line.split("\t");
+    return { texture, meshes };
+  });
+  return (
+    <div className="missing-files">
+      <h3>
+        {r.missingTextures(rows.length)}{" "}
+        <CopyButton text={rows.map(({ texture }) => texture).join("\n")} />
+      </h3>
+      <ul>
+        {rows.map(({ texture, meshes }) => (
+          <li key={texture}>
+            <code>{texture}</code>
+            {meshes !== "" && <span className="aside"> {r.usedBy(meshes)}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

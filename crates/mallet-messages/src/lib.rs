@@ -403,6 +403,11 @@ impl Messages {
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 &no_ticks,
             ),
+            Action::EnableMod { mod_ref } => (
+                "action-enable-mod",
+                vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
+                &no_ticks,
+            ),
         };
         let args: Vec<_> = args.iter().map(|(name, value)| (*name, value)).collect();
         RenderedAction {

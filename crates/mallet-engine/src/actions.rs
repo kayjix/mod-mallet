@@ -131,7 +131,15 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
                 link.set_mod_enabled(options.vortex_game(), &mod_ref.id, false, timeout)
             })
         }
-        Action::ReinstallMod { mod_ref, .. } | Action::DisableMod { mod_ref } => ActionOutcome {
+        Action::EnableMod { mod_ref } if mod_ref.source == SOURCE_ID => {
+            in_vortex(options, |link, timeout| {
+                tracing::info!(mod_id = mod_ref.id, "asking Vortex to enable a mod");
+                link.set_mod_enabled(options.vortex_game(), &mod_ref.id, true, timeout)
+            })
+        }
+        Action::ReinstallMod { mod_ref, .. }
+        | Action::DisableMod { mod_ref }
+        | Action::EnableMod { mod_ref } => ActionOutcome {
             status: ActionStatus::Unsupported,
             detail: Some(format!("no link to the mod manager `{}`", mod_ref.source)),
         },
