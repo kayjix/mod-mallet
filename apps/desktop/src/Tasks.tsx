@@ -257,7 +257,7 @@ export function FindingRow({
 
 /**
  * Every texture a mod's meshes miss, with the meshes that use it, to look
- * for on the mod's page (ADR 0052). The finding's `list` holds one texture
+ * for on the mod's page (ADR 0056). The finding's `list` holds one texture
  * per line, the meshes after a tab.
  */
 function MissingFiles({ rendered }: { rendered: RenderedFinding }) {

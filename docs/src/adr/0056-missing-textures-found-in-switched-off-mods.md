@@ -1,4 +1,4 @@
-# 0052 Missing textures found in switched-off mods
+# 0056 Missing textures found in switched-off mods
 
 - Status: accepted
 - Date: 2026-11-19

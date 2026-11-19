@@ -200,7 +200,7 @@ pub const MESHES_MADE_FOR_OTHER_GAME: KindInfo = KindInfo {
 /// game never shows. `list` holds every missing texture, one per line, with
 /// the meshes that name it after a tab. `offCount` counts the missing
 /// textures that mods installed but switched off bring, `offMods` names
-/// those mods (ADR 0052).
+/// those mods (ADR 0056).
 pub const MESHES_TEXTURE_MISSING: KindInfo = KindInfo {
     id: "meshes.texture-missing",
     severity: Severity::Warning,

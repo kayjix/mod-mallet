@@ -67,7 +67,7 @@
   - [0050 A guided review through the homes](adr/0050-a-guided-review-through-the-homes.md)
   - [0051 Paths over hidden objects](adr/0051-paths-over-hidden-objects.md)
   - [0055 A chain of parts by their reach](adr/0055-a-chain-of-parts-by-their-reach.md)
-  - [0052 Missing textures found in switched-off mods](adr/0052-missing-textures-found-in-switched-off-mods.md)
+  - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)
   - [Template](adr/template.md)
 
 # Reference

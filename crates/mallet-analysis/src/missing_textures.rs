@@ -6,7 +6,7 @@
 //! meshes of one mod usually miss textures for the same reason: a part of
 //! the mod that was not installed, or a texture mod it was made to go with.
 //! Where a mod that is installed but switched off brings the textures, the
-//! finding says so and offers to switch it on (ADR 0052).
+//! finding says so and offers to switch it on (ADR 0056).
 
 use std::collections::{BTreeMap, BTreeSet};
 

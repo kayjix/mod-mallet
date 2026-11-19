@@ -7,7 +7,7 @@
 //! listing is kept in the cache until the modification time of its folder
 //! changes, which Vortex causes by installing the mod anew. The folders of
 //! mods that are installed but switched off are listed too, so that files
-//! the game misses can be found in them (ADR 0052).
+//! the game misses can be found in them (ADR 0056).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
