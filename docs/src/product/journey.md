@@ -291,6 +291,13 @@ here (it already does not); the step *choose* no longer holds the duel
 cards but one line, like the collisions' line: how many duels about files
 are still open, and the way to Assets.
 
+An opened task row is compact: what the finding is, then one row of
+buttons right under it (the mod manager's action, the way to where it is
+decided, the mod's page, the map, *leave it as it is*). Everything else,
+the places, the mods' versions, what to do and what it means, is under
+*more about it*. The page explains nothing in hint lines: its step titles
+and buttons say what they are for.
+
 #### Collisions
 
 ```text

@@ -143,7 +143,7 @@ const en: OverviewTexts = {
   tasksHeadlineNone: "Nothing to do apart from the collisions",
   step: {
     "one-click": {
-      title: "Done with one click",
+      title: "Done with one click in your mod manager",
       hint: "Mod Mallet hands these to your mod manager. You confirm there.",
     },
     install: {
@@ -163,7 +163,7 @@ const en: OverviewTexts = {
       hint: "Until this is solved, some checks did not run.",
     },
     check: {
-      title: "Look at it",
+      title: "Look at it and decide yourself",
       hint: "Mod Mallet has no fixed recipe for these.",
     },
     advice: {
@@ -171,11 +171,11 @@ const en: OverviewTexts = {
       hint: "Optional. Suggestions that may make the setup better; nothing breaks if you leave them.",
     },
     notes: {
-      title: "Good to know",
+      title: "Good to know, nothing to do",
       hint: "Nothing to do. This is how the setup works.",
     },
     ignored: {
-      title: "Set aside",
+      title: "Set aside, not counted",
       hint: "You chose to leave these as they are. They do not count.",
     },
   },
@@ -308,7 +308,7 @@ const de: OverviewTexts = {
   tasksHeadlineNone: "Außer den Kollisionen nichts zu tun",
   step: {
     "one-click": {
-      title: "Mit einem Klick erledigt",
+      title: "Mit einem Klick in deiner Mod-Verwaltung",
       hint: "Mod Mallet gibt das an deine Mod-Verwaltung weiter. Bestätigen musst du dort.",
     },
     install: {
@@ -328,7 +328,7 @@ const de: OverviewTexts = {
       hint: "Solange das so ist, liefen manche Prüfungen nicht.",
     },
     check: {
-      title: "Ansehen",
+      title: "Selbst ansehen und entscheiden",
       hint: "Dafür hat Mod Mallet kein festes Rezept.",
     },
     advice: {
@@ -336,11 +336,11 @@ const de: OverviewTexts = {
       hint: "Freiwillig. Vorschläge, die das Setup verbessern können; nichts geht kaputt, wenn du sie lässt.",
     },
     notes: {
-      title: "Gut zu wissen",
+      title: "Gut zu wissen, nichts zu tun",
       hint: "Nichts zu tun. So funktioniert das Setup eben.",
     },
     ignored: {
-      title: "Beiseitegelegt",
+      title: "Beiseitegelegt, zählt nicht mit",
       hint: "Die hast du gelassen, wie sie sind. Sie zählen nicht mit.",
     },
   },

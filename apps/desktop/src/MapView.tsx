@@ -85,7 +85,7 @@ const cellOf = (coordinate: number) => Math.floor(coordinate / CELL);
  * collide. Drawn flat or as a relief in 3D.
  */
 export function MapView({ map, headlines, focus }: MapViewProps) {
-  const { t, lang } = useSession();
+  const { t, lang, mapMod } = useSession();
   const own = worldTexts[lang];
   const focusWorld =
     focus?.location.type === "exterior"
@@ -96,7 +96,8 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   // The world of the spot the map was opened for, else the game's main
   // world, which comes first.
   const [worldIndex, setWorldIndex] = useState(Math.max(focusWorld, 0));
-  const [owner, setOwner] = useState(-1);
+  // The mod the map was opened for, else all of them.
+  const [owner, setOwner] = useState(() => (mapMod === null ? -1 : map.owners.indexOf(mapMod)));
   const [mode, setMode] = useState<"flat" | "relief">("flat");
   // The cells are a grid to pick from, not coloured by how much is in
   // them; only the cells of a mod picked above are marked.

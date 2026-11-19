@@ -1,12 +1,5 @@
 import { type ReactNode, useId, useMemo, useState } from "react";
-import {
-  ActionResult,
-  type ActionState,
-  CopyButton,
-  ModCard,
-  useAction,
-  useSession,
-} from "./Actions";
+import { ActionResult, type ActionState, CopyButton, useAction, useSession } from "./Actions";
 import {
   type Filter,
   type Group,
@@ -21,6 +14,7 @@ import {
 } from "./arrange";
 import type {
   MapSpot,
+  ModInfo,
   RenderedAction,
   RenderedDuel,
   RenderedFinding,
@@ -30,7 +24,9 @@ import { reportSpots, type SpotState, weightOf } from "./health";
 import type { Texts } from "./i18n";
 import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
+import { useTaskRowTexts } from "./task-row-texts";
 import "./overview.css";
+import "./tasks.css";
 
 /** A group with more findings than this starts folded. */
 const OPEN_GROUP_LIMIT = 4;
@@ -140,7 +136,10 @@ function GroupRow({ group }: { group: Group }) {
   );
 }
 
-/** One finding: a line, and behind it what it means and what to do. */
+/**
+ * One finding: a line, and behind it what it is, one row of buttons with
+ * the ways out, and everything else folded under "more about it".
+ */
 export function FindingRow({
   rendered,
   nested = false,
@@ -150,6 +149,7 @@ export function FindingRow({
 }) {
   const { t, mods, spots } = useSession();
   const o = useOverviewTexts();
+  const r = useTaskRowTexts();
   const [open, setOpen] = useState(false);
   const action = useAction();
   const bodyId = useId();
@@ -165,6 +165,7 @@ export function FindingRow({
   const provider = finding.provider?.name;
   const showProvider = provider != null && !rendered.headline.includes(provider);
   const crash = weightOf(rendered).impact === "crash";
+  const ways = useWays(rendered, known);
 
   return (
     <li className="finding" data-severity={finding.severity}>
@@ -185,44 +186,56 @@ export function FindingRow({
           )}
           {showProvider && <span className="line-mod">{provider}</span>}
         </button>
-        {rendered.actions.map((available) => (
-          <button
-            type="button"
-            className="act"
-            key={available.label}
-            title={available.description}
-            disabled={action.busy}
-            onClick={() => action.run(available.action)}
-          >
-            {available.label}
-          </button>
-        ))}
+        {/* Opened, the buttons move under the text, next to what they are about. */}
+        {!open &&
+          rendered.actions.map((available) => (
+            <button
+              type="button"
+              className="act"
+              key={available.label}
+              title={available.description}
+              disabled={action.busy}
+              onClick={() => action.run(available.action)}
+            >
+              {available.label}
+            </button>
+          ))}
       </div>
       {showBody && (
-        <div className={nested ? "body nested" : "body"} id={bodyId}>
+        <div className={nested ? "body task-body nested" : "body task-body"} id={bodyId}>
           <ActionResult state={action} />
           {open && (
             <>
               <p className="summary">{rendered.summary}</p>
-              <Choices rendered={rendered} action={action} />
+              {ways.length === 0 && rendered.actions.length === 0 && (
+                <p className="remedy">{rendered.remedy}</p>
+              )}
+              <Ways rendered={rendered} action={action} ways={ways} />
               {(finding.previews?.length ?? 0) > 0 && <Previews paths={finding.previews ?? []} />}
               {rendered.actions.map((available) => (
                 <Guide key={available.label} action={available} />
               ))}
-              {known.length > 0 && (
-                <div className="mod-cards">
-                  {known.map((info) => (
-                    <ModCard key={info.mod.id} info={info} />
-                  ))}
-                </div>
-              )}
-              {where.length > 0 && <Spots spots={where} collision={isCollision(rendered)} />}
               <details>
                 <summary className="more">{t.moreAbout}</summary>
-                <h3>{t.whatToDo}</h3>
-                <p>{rendered.remedy}</p>
+                {(ways.length > 0 || rendered.actions.length > 0) && (
+                  <>
+                    <h3>{t.whatToDo}</h3>
+                    <p>{rendered.remedy}</p>
+                  </>
+                )}
                 <h3>{t.whatItMeans}</h3>
                 <p>{rendered.explanation}</p>
+                {where.length > 0 && <Spots spots={where} collision={isCollision(rendered)} />}
+                {known.length > 0 && (
+                  <>
+                    <h3>{r.mods}</h3>
+                    <ul className="mod-facts">
+                      {known.map((info) => (
+                        <ModFacts key={info.mod.id} info={info} />
+                      ))}
+                    </ul>
+                  </>
+                )}
                 <p className="meta">
                   {rendered.severityLabel} · {rendered.confidenceLabel}
                   {finding.subject.type === "file" && (
@@ -242,90 +255,168 @@ export function FindingRow({
 }
 
 /**
- * What the user can do about a finding, side by side: what Mod Mallet can
- * hand to the mod manager, what goes into the patch, what is left to do by
- * hand, and leaving it as it is. Each with what it does, and one button.
+ * A mod a finding is about, in one line: its version, author, whether it is
+ * switched off and whether there is a newer one. Its page is a button above.
  */
-function Choices({ rendered, action }: { rendered: RenderedFinding; action: ActionState }) {
-  const { t, ignored, setIgnored, spots, decideSpot, openPair, showToolbox } = useSession();
+function ModFacts({ info }: { info: ModInfo }) {
+  const { t } = useSession();
+  return (
+    <li>
+      <strong>{info.mod.name}</strong>
+      {!info.enabled && <span className="tag">{t.disabled}</span>}
+      {info.version != null && ` · ${t.version} ${info.version}`}
+      {info.author != null && ` · ${t.author}: ${info.author}`}
+      {info.newerVersion != null && (
+        <span className="newer"> · {t.newerVersion(info.newerVersion)}</span>
+      )}
+    </li>
+  );
+}
+
+/** A way out of a finding besides the mod manager's actions and leaving it. */
+interface Way {
+  key: string;
+  label: string;
+  run: () => void;
+  /** The way Mod Mallet suggests, drawn as the main button. */
+  primary: boolean;
+}
+
+/**
+ * The ways out of a finding, the one Mod Mallet suggests first: where a
+ * collision is decided, the tool that repairs it, the mod's page, the
+ * place on the map.
+ */
+function useWays(rendered: RenderedFinding, known: ModInfo[]): Way[] {
+  const { t, api, spots, decideSpot, openPair, showToolbox, showOnMap, showModOnMap } =
+    useSession();
   const o = useOverviewTexts();
+  const r = useTaskRowTexts();
+  const { finding } = rendered;
+  const collision = isCollision(rendered);
+  const where = spots.get(finding.id) ?? [];
+  const ways: Way[] = [];
+
+  if (collision) {
+    // The first spot to open, or the pair of mods where no spot names its objects.
+    const first = where[0];
+    const pair = pairOf(rendered);
+    if (first !== undefined) {
+      ways.push({
+        key: "worklist",
+        label: o.worklistOpen,
+        run: () => decideSpot(first),
+        primary: true,
+      });
+    }
+    if (pair !== null) {
+      ways.push({
+        key: "pair",
+        label: o.pairOpen,
+        run: () => openPair(pair[0], pair[1]),
+        primary: first === undefined,
+      });
+    }
+  }
+  // A suggestion about a whole mod leads to where its collisions are decided.
+  const { mod, other, others, modCount } = finding.args;
+  if (
+    finding.kind === "mods.duplicates-another" &&
+    typeof mod === "string" &&
+    typeof other === "string"
+  ) {
+    ways.push({ key: "pair", label: o.pairOpen, run: () => openPair(mod, other), primary: true });
+  }
+  if (finding.kind === "mods.collides-widely" && typeof mod === "string") {
+    // With one other mod, `others` is its name and its count of spots: "Large Town (25)".
+    const single =
+      modCount === 1 && typeof others === "string" ? others.replace(/ \(\d+\)$/, "") : null;
+    if (single !== null) {
+      ways.push({
+        key: "pair",
+        label: o.pairOpen,
+        run: () => openPair(mod, single),
+        primary: true,
+      });
+    }
+    ways.push({
+      key: "mod-map",
+      label: r.modOnMap(mod),
+      run: () => showModOnMap(mod),
+      primary: single === null,
+    });
+  }
+  if (finding.kind.startsWith("navmeshes.") && showToolbox !== undefined) {
+    // Named by what it is for; the button opens the tool's row in the toolbox.
+    ways.push({ key: "toolbox", label: o.navmeshChoice, run: showToolbox, primary: false });
+  }
+  for (const info of known) {
+    const page = info.page;
+    if (page?.startsWith("https://www.nexusmods.com/")) {
+      ways.push({
+        key: `page:${info.mod.id}`,
+        label: known.length === 1 ? t.openPage : r.modPage(info.mod.name),
+        run: () => api.openPage(page),
+        primary: false,
+      });
+    }
+  }
+  const onMap = collision ? undefined : where.find((spot) => spot.location.type === "exterior");
+  if (onMap !== undefined) {
+    ways.push({ key: "map", label: t.showOnMap, run: () => showOnMap(onMap), primary: false });
+  }
+  // Where Mod Mallet hands nothing to the mod manager, the first way is the main one.
+  const first = ways[0];
+  if (rendered.actions.length === 0 && first !== undefined && !ways.some((way) => way.primary)) {
+    first.primary = true;
+  }
+  return ways;
+}
+
+/**
+ * The buttons under an opened finding, in one row: what Mod Mallet can hand
+ * to the mod manager, then the other ways out, then leaving it as it is.
+ */
+function Ways({
+  rendered,
+  action,
+  ways,
+}: {
+  rendered: RenderedFinding;
+  action: ActionState;
+  ways: Way[];
+}) {
+  const { t, ignored, setIgnored } = useSession();
   const { finding } = rendered;
   const aside = ignored.has(finding.id);
-  const collision = isCollision(rendered);
-  // The first spot to open, or the pair of mods where no spot names its objects.
-  const first = collision ? (spots.get(finding.id) ?? [])[0] : undefined;
-  const pair = collision ? pairOf(rendered) : null;
-  const navmesh = finding.kind.startsWith("navmeshes.") && showToolbox !== undefined;
 
   return (
-    <div className="choices">
-      <h3>{t.choicesTitle}</h3>
-      <div className="choice-list">
-        {rendered.actions.map((available) => (
-          <div className="choice" key={available.label}>
-            <div className="choice-text">
-              <strong>{available.label}</strong>
-              <p className="choice-note">{available.description}</p>
-            </div>
-            <button
-              type="button"
-              className="primary"
-              disabled={action.busy}
-              onClick={() => action.run(available.action)}
-            >
-              {t.choiceRun}
-            </button>
-          </div>
-        ))}
-        {collision && (first !== undefined || pair !== null) && (
-          <div className="choice">
-            <div className="choice-text">
-              <strong>{o.worklistChoice}</strong>
-              <p className="choice-note">{o.worklistChoiceNote}</p>
-            </div>
-            <div className="choice-buttons">
-              {first !== undefined && (
-                <button type="button" className="primary" onClick={() => decideSpot(first)}>
-                  {o.worklistOpen}
-                </button>
-              )}
-              {pair !== null && (
-                <button type="button" onClick={() => openPair(pair[0], pair[1])}>
-                  {o.pairOpen}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        {navmesh && (
-          <div className="choice">
-            <div className="choice-text">
-              <strong>{o.navmeshChoice}</strong>
-              <p className="choice-note">{o.navmeshChoiceNote}</p>
-            </div>
-            <button type="button" onClick={showToolbox}>
-              {o.toToolbox}
-            </button>
-          </div>
-        )}
-        {rendered.actions.length === 0 && !collision && !navmesh && (
-          <div className="choice">
-            <div className="choice-text">
-              <strong>{t.choiceByHand}</strong>
-              <p className="choice-note">{rendered.remedy}</p>
-            </div>
-          </div>
-        )}
-        <div className="choice quiet">
-          <div className="choice-text">
-            <strong>{aside ? t.unignore : t.choiceLeave}</strong>
-            <p className="choice-note">{aside ? t.choiceBringBackNote : t.choiceLeaveNote}</p>
-          </div>
-          <button type="button" onClick={() => setIgnored(finding.id, !aside)}>
-            {aside ? t.unignore : t.ignore}
-          </button>
-        </div>
-      </div>
+    <div className="ways">
+      {rendered.actions.map((available) => (
+        <button
+          type="button"
+          className="primary"
+          key={available.label}
+          title={available.description}
+          disabled={action.busy}
+          onClick={() => action.run(available.action)}
+        >
+          {available.label}
+        </button>
+      ))}
+      {ways.map((way) => (
+        <button
+          type="button"
+          key={way.key}
+          className={way.primary ? "primary" : undefined}
+          onClick={way.run}
+        >
+          {way.label}
+        </button>
+      ))}
+      <button type="button" className="quiet" onClick={() => setIgnored(finding.id, !aside)}>
+        {aside ? t.unignore : t.choiceLeave}
+      </button>
     </div>
   );
 }
@@ -481,7 +572,8 @@ function StepSection({
 }) {
   const o = useOverviewTexts();
   const [open, setOpen] = useState(!folded);
-  const { title, hint } = o.step[step];
+  // The title says what to do; no line under it explains it again.
+  const { title } = o.step[step];
   return (
     <section className="tasks step" data-step={step}>
       <header>
@@ -489,7 +581,6 @@ function StepSection({
           {title} {count > 0 && <span className="count">{count}</span>}
         </h2>
         {step === "advice" && <span className="tag optional-tag">{o.optional}</span>}
-        <span className="tasks-hint">{hint}</span>
         <span className="spacer" />
         {folded && (
           <button

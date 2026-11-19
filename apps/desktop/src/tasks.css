@@ -1,0 +1,60 @@
+/* ---- a task's row, opened ----------------------------------------------- */
+
+/* What a finding is and what to do about it stay together on the left, in a
+   column narrow enough to read, however wide the window is. */
+.task-body > * {
+  max-width: 82ch;
+}
+
+.task-body .summary {
+  font-size: 0.95rem;
+}
+
+.task-body .remedy {
+  color: var(--text);
+}
+
+/* The ways out, in one row right under the text. */
+.ways {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ways > .quiet {
+  margin-left: var(--space-2);
+}
+
+/* The mods a finding is about, one line each, under "more about it". */
+.mod-facts {
+  display: grid;
+  gap: 2px;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mod-facts strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.task-body details > h3 {
+  margin-top: var(--space-3);
+}
+
+.task-body details .spots {
+  margin-top: var(--space-2);
+}
+
+/* The mod a line is about follows its title, not the far edge of the window. */
+.finding > .line-with-action .line-title {
+  flex: 0 1 auto;
+}
+
+.finding > .line-with-action .line {
+  justify-content: flex-start;
+}
