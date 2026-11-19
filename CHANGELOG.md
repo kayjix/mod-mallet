@@ -6,6 +6,11 @@ in [Releases](docs/src/contributing/releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- The bar over a 3D view no longer jumps when the magic wand changes its
+  level: it keeps room for the longest text.
+
 ## [0.2.1] - 2026-11-19
 
 ### Changed
