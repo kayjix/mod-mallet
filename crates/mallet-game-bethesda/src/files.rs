@@ -103,6 +103,12 @@ pub fn mesh_shapes(bytes: &[u8]) -> Vec<mallet_formats_bethesda::nif_geometry::S
     mallet_formats_bethesda::nif_geometry::shapes(bytes).unwrap_or_default()
 }
 
+/// The bones of a mesh, for drawing a skeleton as lines; empty if it has
+/// none or cannot be read.
+pub fn mesh_bones(bytes: &[u8]) -> Vec<mallet_formats_bethesda::nif_geometry::Bone> {
+    mallet_formats_bethesda::nif_geometry::bones(bytes)
+}
+
 /// A texture as a picture no wider or higher than `max_side`, from the
 /// largest mipmap level that fits; `None` if it is not a texture that can
 /// be decoded.

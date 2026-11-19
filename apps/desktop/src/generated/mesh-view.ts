@@ -9,6 +9,13 @@ export interface MeshView {
    */
   archive?: string | null;
   /**
+   * For a mesh with nothing to draw but bones, such as a skeleton, the
+   * bones as lines: six 32-bit floats each (where it starts, where it
+   * ends), little-endian and Base64-encoded as in [`MeshShape`]. Empty
+   * when the mesh has surfaces.
+   */
+  bones?: string;
+  /**
    * The mesh, below the data directory.
    */
   path: string;

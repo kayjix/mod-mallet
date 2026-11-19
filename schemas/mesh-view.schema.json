@@ -11,6 +11,11 @@
         "null"
       ]
     },
+    "bones": {
+      "description": "For a mesh with nothing to draw but bones, such as a skeleton, the\nbones as lines: six 32-bit floats each (where it starts, where it\nends), little-endian and Base64-encoded as in [`MeshShape`]. Empty\nwhen the mesh has surfaces.",
+      "type": "string",
+      "default": ""
+    },
     "path": {
       "description": "The mesh, below the data directory.",
       "type": "string"

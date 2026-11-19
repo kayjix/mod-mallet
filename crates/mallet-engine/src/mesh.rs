@@ -19,8 +19,9 @@ const FACE_TEXTURES: &str = "textures/actors/character/facegendata/facetint/";
 
 /// Version `version` (counted from the lowest in precedence; `None` for the
 /// one the game uses) of the mesh at `path` below the data directory, with
-/// its textures as the setup has them. `None` if there is no such version
-/// or it is not a mesh that can be read. Only reads.
+/// its textures as the setup has them; for a skeleton, its bones. `None` if
+/// there is no such version, or it is not a mesh that can be read, or it has
+/// neither surfaces nor bones. Only reads.
 pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> Option<MeshView> {
     let game = options.game().ok()?;
     let (game_dir, _) = options.located_game_dir()?;
@@ -32,9 +33,19 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
     }
     let chosen = versions.swap_remove(index);
     let shapes = files::mesh_shapes(&chosen.bytes);
-    if shapes.is_empty() {
+    // A skeleton has bones and no surfaces; its bones are drawn instead.
+    let bones = if shapes.is_empty() {
+        files::mesh_bones(&chosen.bytes)
+    } else {
+        Vec::new()
+    };
+    if shapes.is_empty() && bones.is_empty() {
         return None;
     }
+    let bones: Vec<f32> = bones
+        .iter()
+        .flat_map(|bone| bone.from.into_iter().chain(bone.to))
+        .collect();
 
     let mut textures: HashMap<String, Option<String>> = HashMap::new();
     let mut texture = |raw: &str| -> Option<String> {
@@ -104,6 +115,7 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         },
         shapes,
         tint,
+        bones: base64(&floats(&bones)),
     })
 }
 

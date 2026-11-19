@@ -942,7 +942,10 @@ function sampleDuels(lang: Lang): RenderedReport["duels"] {
       duel: {
         id: "duel:mod:vortex:Old Town|mod:vortex:Texture Pack",
         sides: [side("Old Town", ["Old Town.esp"]), side("Texture Pack", ["Texture Pack.esp"])],
-        topics: [{ topic: "objects", count: 3, winning: null }],
+        topics: [
+          { topic: "objects", count: 3, winning: null },
+          { topic: "meshes", count: 1, winning: null },
+        ],
         findings: ["objects.overlapping:Old Town+Texture Pack"],
         files: [
           {
@@ -960,6 +963,12 @@ function sampleDuels(lang: Lang): RenderedReport["duels"] {
           {
             path: "textures/architecture/whiterun/wrwoodplank01.dds",
             topic: "objects",
+            object: null,
+            objectKind: null,
+          },
+          {
+            path: "meshes/actors/character/character assets/skeleton.nif",
+            topic: "meshes",
             object: null,
             objectKind: null,
           },
@@ -983,8 +992,47 @@ function base64Of(numbers: Float32Array | Uint32Array): string {
   return btoa(text);
 }
 
-/** A cube, standing in for a mesh. */
+/** A few bones of a standing figure, standing in for a skeleton: nothing to draw but lines. */
+function sampleSkeleton(path: string): MeshView {
+  const joints: Record<string, [number, number, number]> = {
+    root: [0, 0, 0],
+    pelvis: [0, 0, 60],
+    spine: [0, 0, 90],
+    neck: [0, 0, 115],
+    head: [0, 0, 128],
+    leftHand: [-30, 0, 80],
+    rightHand: [30, 0, 80],
+    leftFoot: [-10, 0, 2],
+    rightFoot: [10, 0, 2],
+  };
+  const bones: [string, string][] = [
+    ["root", "pelvis"],
+    ["pelvis", "spine"],
+    ["spine", "neck"],
+    ["neck", "head"],
+    ["neck", "leftHand"],
+    ["neck", "rightHand"],
+    ["pelvis", "leftFoot"],
+    ["pelvis", "rightFoot"],
+  ];
+  const points = bones.flatMap(([from, to]) => [
+    ...(joints[from] ?? [0, 0, 0]),
+    ...(joints[to] ?? [0, 0, 0]),
+  ]);
+  return {
+    path,
+    archive: null,
+    tint: null,
+    shapes: [],
+    bones: base64Of(new Float32Array(points)),
+  };
+}
+
+/** A cube, standing in for a mesh; a skeleton for a path that names one. */
 function sampleCube(path: string): MeshView {
+  if (path.endsWith("skeleton.nif")) {
+    return sampleSkeleton(path);
+  }
   const corners = [
     [-1, -1, -1],
     [1, -1, -1],

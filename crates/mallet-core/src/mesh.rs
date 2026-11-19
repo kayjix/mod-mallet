@@ -16,6 +16,12 @@ pub struct MeshView {
     /// For a face, the face texture that colours the head, as a PNG
     /// `data:` address.
     pub tint: Option<String>,
+    /// For a mesh with nothing to draw but bones, such as a skeleton, the
+    /// bones as lines: six 32-bit floats each (where it starts, where it
+    /// ends), little-endian and Base64-encoded as in [`MeshShape`]. Empty
+    /// when the mesh has surfaces.
+    #[serde(default)]
+    pub bones: String,
 }
 
 /// One surface of a mesh. Numbers are little-endian and Base64-encoded,

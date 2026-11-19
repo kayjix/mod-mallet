@@ -162,6 +162,7 @@ export interface Texts {
   viewerHint: string;
   viewerClose: string;
   viewerNothing: string;
+  viewerSkeleton: string;
   view3d: string;
   view3dBoth: string;
   duelsTitle: string;
@@ -589,7 +590,8 @@ export const texts: Record<Lang, Texts> = {
     viewer3d: "In 3D",
     viewerHint: "Drag to turn, scroll to zoom.",
     viewerClose: "Close",
-    viewerNothing: "This mesh cannot be shown.",
+    viewerNothing: "This mesh could not be read, or has nothing to draw.",
+    viewerSkeleton: "A skeleton: only bones, drawn as lines.",
     view3d: "View in 3D",
     view3dBoth: "Both in 3D",
     duelsTitle: "Mod against mod",
@@ -1135,7 +1137,8 @@ export const texts: Record<Lang, Texts> = {
     viewer3d: "In 3D",
     viewerHint: "Ziehen zum Drehen, Mausrad zum Zoomen.",
     viewerClose: "Schließen",
-    viewerNothing: "Dieses Mesh lässt sich nicht zeigen.",
+    viewerNothing: "Dieses Mesh ließ sich nicht lesen oder hat nichts zu zeichnen.",
+    viewerSkeleton: "Ein Skelett: nur Knochen, als Linien gezeichnet.",
     view3d: "In 3D ansehen",
     view3dBoth: "Beide in 3D",
     duelsTitle: "Mod gegen Mod",

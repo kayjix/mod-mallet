@@ -20,7 +20,7 @@
 //! Like everything that reads files of mods, nothing here trusts a size or
 //! an index in the file (ADR 0013).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::Bytes;
 use crate::nif::{NifError, blocks};
@@ -851,6 +851,83 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
     Ok(shapes)
 }
 
+/// One bone of a skeleton, for drawing it as a line: from where a node
+/// lies to where one of the nodes below it lies, in the mesh's space.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bone {
+    /// Where the upper node lies.
+    pub from: [f32; 3],
+    /// Where the node below it lies.
+    pub to: [f32; 3],
+}
+
+/// The most bones read from one mesh; skeletons have a few hundred.
+const MOST_BONES: usize = 16_384;
+
+/// The bones of the mesh in `data`: a line from every node to each node
+/// below it, as a skeleton is drawn. A skeleton has nodes and nothing to
+/// draw; its bones show what it is. Empty if the data is not a mesh that
+/// can be read, or has nodes in no more than one place. Meshes of
+/// Oblivion are not read for bones.
+#[must_use]
+pub fn bones(data: &[u8]) -> Vec<Bone> {
+    if crate::nif_oblivion::has_oblivion_version(data) {
+        return Vec::new();
+    }
+    let Ok((bs_version, found, _)) = blocks(data) else {
+        return Vec::new();
+    };
+    let block = |index: usize| -> Option<(&str, &[u8])> {
+        let info = found.get(index)?;
+        Some((
+            info.kind.as_str(),
+            data.get(info.start..info.start + info.size)?,
+        ))
+    };
+
+    let mut seen = HashSet::new();
+    let mut bones = Vec::new();
+    // The node, where its parent lies (transform and point), and how deep.
+    let mut pending: Vec<(usize, Transform, Option<[f32; 3]>, u32)> =
+        vec![(0, Transform::IDENTITY, None, 0)];
+    while let Some((index, parent, parent_point, depth)) = pending.pop() {
+        if depth > 256 || bones.len() >= MOST_BONES || !seen.insert(index) {
+            continue;
+        }
+        let Some((kind, bytes)) = block(index) else {
+            continue;
+        };
+        if !kind.ends_with("Node") {
+            continue;
+        }
+        let Some((local, children)) = node_children(bytes, bs_version) else {
+            continue;
+        };
+        let here = if index == 0 {
+            Transform::IDENTITY
+        } else {
+            local.transform.within(&parent)
+        };
+        let point = here.translation;
+        if !point.iter().all(|value| value.is_finite()) {
+            continue;
+        }
+        // A node where its parent lies makes no line.
+        if let Some(from) = parent_point
+            && from
+                .iter()
+                .zip(point)
+                .any(|(a, b)| (a - b).abs() > f32::EPSILON)
+        {
+            bones.push(Bone { from, to: point });
+        }
+        for child in children {
+            pending.push((child, here, Some(point), depth + 1));
+        }
+    }
+    bones
+}
+
 /// Takes what a shape keeps in its skin partition (points, texture
 /// coordinates, triangles, if the shape has none itself) and moves each
 /// point where the bones it hangs on hold it, by their weights, as the game
@@ -1065,13 +1142,7 @@ mod tests {
     }
 
     fn node(children: &[i32]) -> Vec<u8> {
-        let mut out = av_object([0.0, 0.0, 0.0]);
-        out.extend(u32::try_from(children.len()).unwrap().to_le_bytes());
-        for child in children {
-            out.extend(child.to_le_bytes());
-        }
-        out.extend(0u32.to_le_bytes()); // effects
-        out
+        node_at([0.0, 0.0, 0.0], children)
     }
 
     /// A one-triangle `BSTriShape` of Skyrim Special Edition, moved up by 10.
@@ -1282,6 +1353,82 @@ mod tests {
         assert_eq!(shapes(b"not a mesh"), Err(NifError::NotAMesh));
     }
 
+    /// A node at `translation` with the given children.
+    fn node_at(translation: [f32; 3], children: &[i32]) -> Vec<u8> {
+        let mut out = av_object(translation);
+        out.extend(u32::try_from(children.len()).unwrap().to_le_bytes());
+        for child in children {
+            out.extend(child.to_le_bytes());
+        }
+        out.extend(0u32.to_le_bytes()); // effects
+        out
+    }
+
+    /// A small skeleton: a root, a pelvis 10 up, and below it a spine 5
+    /// further up and a leg 3 to the side; nothing to draw.
+    fn skeleton() -> Vec<u8> {
+        mesh(
+            100,
+            &[
+                ("NiNode", node_at([0.0, 0.0, 0.0], &[1])),
+                ("NiNode", node_at([0.0, 0.0, 10.0], &[2, 3])),
+                ("NiNode", node_at([0.0, 0.0, 5.0], &[])),
+                ("NiNode", node_at([3.0, 0.0, 0.0], &[])),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_skeleton_has_bones_and_no_shapes() {
+        let data = skeleton();
+        assert_eq!(shapes(&data).unwrap(), Vec::new());
+        let mut found = bones(&data);
+        found.sort_by(|a, b| a.to.partial_cmp(&b.to).unwrap());
+        assert_eq!(
+            found,
+            [
+                Bone {
+                    from: [0.0, 0.0, 0.0],
+                    to: [0.0, 0.0, 10.0],
+                },
+                Bone {
+                    from: [0.0, 0.0, 10.0],
+                    to: [0.0, 0.0, 15.0],
+                },
+                Bone {
+                    from: [0.0, 0.0, 10.0],
+                    to: [3.0, 0.0, 10.0],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bones_follow_only_nodes_and_never_loop() {
+        let data = mesh(
+            100,
+            &[
+                ("NiNode", node_at([0.0, 0.0, 0.0], &[1, 2, 7])),
+                // Refers back to the root and to itself.
+                ("NiNode", node_at([1.0, 0.0, 0.0], &[0, 1])),
+                ("BSTriShape", tri_shape()),
+            ],
+        );
+        assert_eq!(
+            bones(&data),
+            [Bone {
+                from: [0.0, 0.0, 0.0],
+                to: [1.0, 0.0, 0.0],
+            }]
+        );
+    }
+
+    #[test]
+    fn other_files_have_no_bones() {
+        assert_eq!(bones(b"not a mesh"), Vec::new());
+        assert_eq!(bones(&mesh(155, &[("NiNode", node(&[]))])), Vec::new());
+    }
+
     #[test]
     fn half_floats_are_read() {
         assert!((half(0x3C00) - 1.0).abs() < f32::EPSILON);
@@ -1293,6 +1440,23 @@ mod tests {
         #[test]
         fn never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..512)) {
             let _ = shapes(&data);
+        }
+
+        #[test]
+        fn bones_never_panic_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..512)) {
+            let _ = bones(&data);
+        }
+
+        #[test]
+        fn bones_never_panic_on_a_damaged_skeleton(
+            position in 0usize..400, value in any::<u8>(), cut in 0usize..400,
+        ) {
+            let mut data = skeleton();
+            if let Some(byte) = data.get_mut(position) {
+                *byte = value;
+            }
+            data.truncate(data.len().saturating_sub(cut));
+            let _ = bones(&data);
         }
 
         #[test]

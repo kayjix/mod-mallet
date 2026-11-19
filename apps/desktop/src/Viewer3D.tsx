@@ -236,6 +236,9 @@ function StagePane({
       )}
       <figcaption>
         <strong>{item.label}</strong>
+        {mesh != null && mesh.shapes.length === 0 && (mesh.bones ?? "") !== "" && (
+          <span className="aside stage-note">{t.viewerSkeleton}</span>
+        )}
       </figcaption>
     </figure>
   );
@@ -286,7 +289,7 @@ function ball(path: string, image: string): MeshView {
     tinted: false,
     alphaTest: false,
   };
-  return { path, archive: null, tint: null, shapes: [shape] };
+  return { path, archive: null, tint: null, shapes: [shape], bones: "" };
 }
 
 // ---- drawing ----------------------------------------------------------------
@@ -445,6 +448,27 @@ void main() {
   result = vec4(clamp(base * light * brightness, 0.0, 1.0), 1.0);
 }`;
 
+/** Bones of a skeleton: plain lines and dots at the joints, unlit. */
+const BONE_VERTEX = `#version 300 es
+in vec3 position;
+uniform mat4 matrix;
+uniform float pointSize;
+void main() {
+  gl_PointSize = pointSize;
+  gl_Position = matrix * vec4(position, 1.0);
+}`;
+
+const BONE_FRAGMENT = `#version 300 es
+precision mediump float;
+uniform vec3 colour;
+out vec4 result;
+void main() {
+  result = vec4(colour, 1.0);
+}`;
+
+/** The colour of bones: warm, to stand out on dark and on light scenes alike. */
+const BONE_COLOUR: [number, number, number] = [0.96, 0.62, 0.22];
+
 interface Drawn {
   vao: WebGLVertexArrayObject;
   count: number;
@@ -481,15 +505,22 @@ function MeshCanvas({
       gl.compileShader(shader);
       return shader;
     };
-    const program = gl.createProgram();
-    const vertex = compile(gl.VERTEX_SHADER, VERTEX);
-    const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT);
-    if (program === null || vertex === null || fragment === null) {
+    const link = (vertexSource: string, fragmentSource: string) => {
+      const linked = gl.createProgram();
+      const vertex = compile(gl.VERTEX_SHADER, vertexSource);
+      const fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
+      if (linked === null || vertex === null || fragment === null) {
+        return null;
+      }
+      gl.attachShader(linked, vertex);
+      gl.attachShader(linked, fragment);
+      gl.linkProgram(linked);
+      return linked;
+    };
+    const program = link(VERTEX, FRAGMENT);
+    if (program === null) {
       return;
     }
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.linkProgram(program);
     // WebGL's "useProgram" is no React hook; the linter only sees the name.
     const activate = gl.useProgram.bind(gl);
     activate(program);
@@ -570,6 +601,35 @@ function MeshCanvas({
         });
       }
     }
+
+    // A skeleton's bones, two points each, as lines with dots at the joints.
+    const bonePoints =
+      (mesh.bones ?? "") === "" ? new Float32Array(0) : new Float32Array(bytesOf(mesh.bones ?? ""));
+    const boneCount = Math.floor(bonePoints.length / 6) * 2;
+    const boneProgram = boneCount > 0 ? link(BONE_VERTEX, BONE_FRAGMENT) : null;
+    let boneVao: WebGLVertexArrayObject | null = null;
+    if (boneProgram !== null) {
+      for (let index = 0; index < boneCount * 3; index++) {
+        const axis = index % 3;
+        low[axis] = Math.min(low[axis] ?? 0, bonePoints[index] ?? 0);
+        high[axis] = Math.max(high[axis] ?? 0, bonePoints[index] ?? 0);
+      }
+      boneVao = gl.createVertexArray();
+      gl.bindVertexArray(boneVao);
+      const location = gl.getAttribLocation(boneProgram, "position");
+      if (location >= 0) {
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, bonePoints.subarray(0, boneCount * 3), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, 3, gl.FLOAT, false, 0, 0);
+      }
+    }
+    const boneMatrixAt = boneProgram === null ? null : gl.getUniformLocation(boneProgram, "matrix");
+    const boneColourAt = boneProgram === null ? null : gl.getUniformLocation(boneProgram, "colour");
+    const pointSizeAt =
+      boneProgram === null ? null : gl.getUniformLocation(boneProgram, "pointSize");
+
     const centre = [0, 1, 2].map((axis) => ((low[axis] ?? 0) + (high[axis] ?? 0)) / 2);
     const radius = Math.max(
       1,
@@ -644,6 +704,16 @@ function MeshCanvas({
         gl.uniform1i(alphaTestAt, shape.alphaTest ? 1 : 0);
         gl.bindVertexArray(shape.vao);
         gl.drawElements(gl.TRIANGLES, shape.count, gl.UNSIGNED_INT, 0);
+      }
+      if (boneProgram !== null && boneVao !== null) {
+        activate(boneProgram);
+        gl.uniformMatrix4fv(boneMatrixAt, false, matrix);
+        gl.uniform3f(boneColourAt, ...BONE_COLOUR);
+        gl.uniform1f(pointSizeAt, 5 * ratio);
+        gl.bindVertexArray(boneVao);
+        gl.drawArrays(gl.LINES, 0, boneCount);
+        gl.drawArrays(gl.POINTS, 0, boneCount);
+        activate(program);
       }
       frame = requestAnimationFrame(draw);
     };

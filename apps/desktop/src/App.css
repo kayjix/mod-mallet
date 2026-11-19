@@ -1378,6 +1378,10 @@ button.quiet {
   overflow-wrap: anywhere;
 }
 
+.stage-pane .stage-note {
+  display: block;
+}
+
 .stage-pane .viewer-message {
   color: #d9e2e6;
 }
