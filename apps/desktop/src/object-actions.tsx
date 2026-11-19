@@ -1,13 +1,13 @@
 // What can be done with one object picked in a 3D view (ADR 0040, 0046):
 // hide it on its own through the patch, with the reasons the game may rely
-// on it; show it again however it was hidden; take the parts of the same
-// mod that hang together with it along; or, where it is part of a
+// on it; show it again however it was hidden; take the chain of parts of
+// the same mod linked to it along (ADR 0055); or, where it is part of a
 // collision, decide that collision on the collisions' page.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
 import type { Api } from "./api";
-import { objectKey, type PartTools, TOUCHING } from "./area-layer";
+import { objectKey, type PartTools } from "./area-layer";
 import { collisionsTexts } from "./collisions-texts";
 import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
@@ -28,7 +28,7 @@ import { PinButton } from "./pins";
 const GAME_PLUGIN =
   /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
 
-/** Game units in a centimetre, for how close parts must come to hang together. */
+/** Game units in a centimetre, for how far each part of a chain reaches. */
 const UNITS_PER_CENTIMETRE = 0.7;
 
 /** Whether an object belongs to the game itself rather than to a mod. */
@@ -113,25 +113,57 @@ function useHidden(): Set<string> {
   return useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
 }
 
+/** How far each part reaches beyond itself in a chain, in centimetres, as last set. */
+let chainReach = 50;
+/** Whether the reach of each part is drawn, as last set. */
+let chainHulls = true;
+
 /**
- * The parts of the same mod that hang together with an object, as far as
- * the view shows them: how close they must come, marked in the view, and
- * hidden or shown again together.
+ * The smart selection (ADR 0055): the chain of parts of the same mod linked
+ * to an object, each within the reach of the one before, lit faintly in the
+ * view with how far each reaches; hidden or shown again together.
  */
-function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools }) {
+export function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools }) {
   const { lang, spots, patchChoices, setPatchChoices } = useSession();
   const own = collisionsTexts[lang];
   const hidden = useHidden();
-  // How close parts must come, in centimetres.
-  const [gap, setGap] = useState(Math.round(TOUCHING / UNITS_PER_CENTIMETRE));
-  const { connected, mark } = tools;
-  const group = useMemo(() => connected(gap * UNITS_PER_CENTIMETRE), [connected, gap]);
-  const others = group.filter((part) => part !== object);
-  if (others.length === 0 && gap <= 20) {
+  const [reach, setReach] = useState(chainReach);
+  const [hulls, setHulls] = useState(chainHulls);
+  const toolsNow = useRef(tools);
+  toolsNow.current = tools;
+  const key = objectKey(object.id.plugin, object.id.localId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the chain belongs to the object picked, by its key.
+  const group = useMemo(() => toolsNow.current.chain(reach * UNITS_PER_CENTIMETRE), [key, reach]);
+  useEffect(() => {
+    toolsNow.current.showChain(group, reach * UNITS_PER_CENTIMETRE, hulls);
+  }, [group, reach, hulls]);
+  const controls = (
+    <>
+      <ReachSlider
+        reach={reach}
+        onReach={(next) => {
+          chainReach = next;
+          setReach(next);
+        }}
+      />
+      <label className="parts-hulls">
+        <input
+          type="checkbox"
+          checked={hulls}
+          onChange={(event) => {
+            chainHulls = event.target.checked;
+            setHulls(event.target.checked);
+          }}
+        />
+        {own.partsHulls}
+      </label>
+    </>
+  );
+  if (group.length <= 1) {
     return (
       <div className="parts-together">
         <p className="aside">{own.partsAlone}</p>
-        <GapSlider gap={gap} onGap={setGap} />
+        {controls}
       </div>
     );
   }
@@ -140,11 +172,8 @@ function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools
   return (
     <div className="parts-together">
       <p className="aside">{own.partsTogether(group.length)}</p>
-      <GapSlider gap={gap} onGap={setGap} />
+      {controls}
       <span className="relief-object-buttons">
-        <button type="button" className="small" onClick={() => mark(group)}>
-          {own.partsMark}
-        </button>
         {allHidden ? (
           <button
             type="button"
@@ -186,19 +215,19 @@ function PartsTogether({ object, tools }: { object: AreaObject; tools: PartTools
   );
 }
 
-function GapSlider({ gap, onGap }: { gap: number; onGap: (gap: number) => void }) {
+function ReachSlider({ reach, onReach }: { reach: number; onReach: (reach: number) => void }) {
   const { lang } = useSession();
   const own = collisionsTexts[lang];
   return (
     <label className="parts-gap">
-      {own.partsGap(gap)}
+      {own.partsReach(reach)}
       <input
         type="range"
         min={0}
-        max={100}
-        step={5}
-        value={gap}
-        onChange={(event) => onGap(Number(event.target.value))}
+        max={500}
+        step={10}
+        value={reach}
+        onChange={(event) => onReach(Number(event.target.value))}
       />
     </label>
   );
@@ -207,8 +236,8 @@ function GapSlider({ gap, onGap }: { gap: number; onGap: (gap: number) => void }
 /**
  * Hiding an object on its own, or showing it again however it was hidden,
  * after what ties it: nothing for an object the game cannot do without, a
- * warning for one it may miss. With the view's tools, the parts that hang
- * together with it as well.
+ * warning for one it may miss. With the view's tools, the chain of parts
+ * of the same mod linked to it as well (ADR 0055).
  */
 export function FreeObjectActions({
   object,

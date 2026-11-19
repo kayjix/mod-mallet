@@ -1606,11 +1606,9 @@ export function MapView3D({
             </dd>
           </dl>
           {objectExtra?.(pickedObject, {
-            connected: (margin) => area.current?.connected(pickedObject, margin) ?? [pickedObject],
-            mark: (objects) => {
-              area.current?.select(
-                objects.map((part) => objectKey(part.id.plugin, part.id.localId)),
-              );
+            chain: (radius) => area.current?.chain(pickedObject, radius) ?? [pickedObject],
+            showChain: (chain, radius, hulls) => {
+              area.current?.showChain(chain, radius, hulls);
               redraw();
             },
           })}

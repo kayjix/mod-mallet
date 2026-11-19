@@ -1239,6 +1239,11 @@ const SAMPLE_MODELS: Record<string, [number, number, number]> = {
   "sample\\cup.nif": [5, 5, 6],
   "sample\\shelf.nif": [40, 12, 30],
   "sample\\book.nif": [4, 6, 8],
+  "sample\\post.nif": [5, 5, 85],
+  "sample\\roof.nif": [115, 115, 8],
+  "sample\\bench.nif": [40, 12, 12],
+  "sample\\signpost.nif": [4, 4, 50],
+  "sample\\pole.nif": [3, 3, 110],
 };
 
 /**
@@ -1382,6 +1387,38 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
       [cx + 30, cy + 10, ground + 40],
       0,
       "Lantern post",
+    );
+    // A pavilion of Old Town nearby: a roof on four posts that stop a hand
+    // short of it, a bench a step away, around a signpost of the game, and a
+    // banner pole of Water Mod through its roof. Picking one post chains the
+    // other posts and the roof (ADR 0055), not the pole.
+    const [px, py] = [cx, cy + 340];
+    const corners: [number, number][] = [
+      [-90, -90],
+      [90, -90],
+      [90, 90],
+      [-90, 90],
+    ];
+    corners.forEach(([dx, dy], index) => {
+      place(
+        "Old Town.esp",
+        0xb30 + index,
+        "sample\\post.nif",
+        [px + dx, py + dy, ground + 85],
+        0,
+        "Pavilion post",
+      );
+    });
+    place("Old Town.esp", 0xb34, "sample\\roof.nif", [px, py, ground + 198], 0, "Pavilion roof");
+    place("Old Town.esp", 0xb35, "sample\\bench.nif", [px + 200, py, ground + 12], 0, "Bench");
+    place("Skyrim.esm", 0xb36, "sample\\signpost.nif", [px, py, ground + 50], 0, "Signpost");
+    place(
+      "Water Mod.esp",
+      0xb37,
+      "sample\\pole.nif",
+      [px + 60, py + 40, ground + 110],
+      0,
+      "Banner pole",
     );
   } else {
     bridge("Texture Pack.esp", 0x900 + cellX * 16 + cellY, 0x6000, 0.55, 3);

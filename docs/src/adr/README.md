@@ -78,3 +78,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0049](0049-the-files-every-mod-brings.md) | The files every mod brings, from the mod manager's staging folder | accepted |
 | [0050](0050-a-guided-review-through-the-homes.md) | A guided review through the homes, collisions structure by structure | accepted |
 | [0051](0051-paths-over-hidden-objects.md) | Paths over hidden objects are found before and after hiding | accepted |
+| [0055](0055-a-chain-of-parts-by-their-reach.md) | A chain of parts by their reach | accepted |

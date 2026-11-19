@@ -3,6 +3,14 @@
 
 import type { Lang } from "./i18n";
 
+/** A length given in centimetres, in metres from one metre on, with `point` as decimal mark. */
+function length(centimetres: number, point: string): string {
+  if (centimetres < 100) {
+    return `${centimetres} cm`;
+  }
+  return `${(centimetres / 100).toFixed(1).replace(".", point)} m`;
+}
+
 export interface CollisionsTexts {
   also: string;
   alsoNote: string;
@@ -22,8 +30,8 @@ export interface CollisionsTexts {
   hideHint: string;
   partsAlone: string;
   partsTogether: (count: number) => string;
-  partsGap: (centimetres: number) => string;
-  partsMark: string;
+  partsReach: (centimetres: number) => string;
+  partsHulls: string;
   partsShow: (count: number) => string;
   partsHide: (count: number) => string;
   partsSomeTied: (count: number) => string;
@@ -48,15 +56,16 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
     hiddenByDecision:
       "Hidden by the patch, through a decision of a collision. Showing it again keeps both objects at that spot.",
     hideHint: "Only this object goes; the patch hides it while the game runs and changes no file.",
-    partsAlone: "No other part of this mod touches it.",
-    partsTogether: (count) => `Hangs together with other parts of the same mod: ${count} in all`,
-    partsGap: (centimetres) => `Count parts within ${centimetres} cm`,
-    partsMark: "Mark them",
+    partsAlone: "No other part of this mod lies within its reach.",
+    partsTogether: (count) =>
+      `Linked by their reach with other parts of the same mod: ${count} in all`,
+    partsReach: (centimetres) => `Each part reaches ${length(centimetres, ".")} beyond itself`,
+    partsHulls: "Show how far each part reaches",
     partsShow: (count) => `Show all ${count} again`,
     partsHide: (count) => `Hide all ${count}`,
     partsSomeTied: (count) => `${count} of them the game relies on and stay. `,
     partsHint:
-      "Fewer centimetres: only parts that really touch. More: parts with a little gap, such as the planks of a bridge.",
+      "The chain goes from part to part of this mod while each lies within the reach of one before; parts of other mods are passed over. More reach: also parts a little apart, such as the posts under a roof.",
     aroundCareful: (count) => `${count} of them with care`,
     aroundCarefulHint:
       "The game may miss these: they are drawn from afar, or something refers to them. Pick one in 3D to see why.",
@@ -80,15 +89,16 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
       "Vom Patch ausgeblendet, über die Entscheidung einer Kollision. Wieder zeigen behält an dieser Stelle beide Objekte.",
     hideHint:
       "Nur dieses Objekt verschwindet; der Patch blendet es aus, während das Spiel läuft, und ändert keine Datei.",
-    partsAlone: "Kein anderes Teil dieser Mod berührt es.",
-    partsTogether: (count) => `Hängt mit anderen Teilen derselben Mod zusammen: ${count} insgesamt`,
-    partsGap: (centimetres) => `Teile bis ${centimetres} cm Abstand mitzählen`,
-    partsMark: "Markieren",
+    partsAlone: "In seiner Reichweite liegt kein anderes Teil dieser Mod.",
+    partsTogether: (count) =>
+      `Über die Reichweite mit anderen Teilen derselben Mod verbunden: ${count} insgesamt`,
+    partsReach: (centimetres) => `Jedes Teil reicht ${length(centimetres, ",")} über sich hinaus`,
+    partsHulls: "Reichweite jedes Teils zeigen",
     partsShow: (count) => `Alle ${count} wieder zeigen`,
     partsHide: (count) => `Alle ${count} ausblenden`,
     partsSomeTied: (count) => `${count} davon braucht das Spiel; die bleiben. `,
     partsHint:
-      "Weniger Zentimeter: nur Teile, die sich wirklich berühren. Mehr: auch Teile mit kleiner Lücke, wie die Bretter einer Brücke.",
+      "Die Kette geht von Teil zu Teil dieser Mod, solange jedes in der Reichweite eines vorigen liegt; Teile anderer Mods zählen nicht mit. Mehr Reichweite: auch Teile mit etwas Abstand, etwa die Stützen unter einem Dach.",
     aroundCareful: (count) => `davon ${count} mit Vorsicht`,
     aroundCarefulHint:
       "Das Spiel könnte sie vermissen: Sie werden aus der Ferne gezeigt, oder etwas verweist auf sie. Klick eines in 3D an, um zu sehen, warum.",

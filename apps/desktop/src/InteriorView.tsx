@@ -499,11 +499,9 @@ export function InteriorView({
             </dd>
           </dl>
           {objectExtra?.(picked, {
-            connected: (margin) => layer.current?.connected(picked, margin) ?? [picked],
-            mark: (objects) => {
-              layer.current?.select(
-                objects.map((part) => objectKey(part.id.plugin, part.id.localId)),
-              );
+            chain: (radius) => layer.current?.chain(picked, radius) ?? [picked],
+            showChain: (chain, radius, hulls) => {
+              layer.current?.showChain(chain, radius, hulls);
               redraw();
             },
           })}

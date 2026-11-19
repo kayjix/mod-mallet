@@ -55,7 +55,10 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
-  if (v_look > 4.5) {
+  if (v_look > 5.5) {
+    // In the chain of the picked object: lit up, half as much.
+    shaded = mix(shaded, vec3(1.0), 0.22);
+  } else if (v_look > 4.5) {
     // Hidden, and shown as the game would show it: not at all.
     discard;
   }
@@ -114,9 +117,103 @@ void main() {
   vec4 world = a_model * vec4(a_position, 1.0);
   v_uv = a_uv;
   v_id = u_base + float(gl_InstanceID) + 1.0;
-  v_gone = a_look > 4.5 ? 1.0 : 0.0;
+  v_gone = a_look > 4.5 && a_look < 5.5 ? 1.0 : 0.0;
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
+
+/**
+ * The reach of a part in a chain (ADR 0055): its box, turned and placed,
+ * grown by the radius on every side, with rounded edges. Drawn from a
+ * sphere whose points are pushed out to the box's corners.
+ */
+const HULL_VERTEX = `#version 300 es
+in vec3 a_normal;
+in vec3 a_centre;
+in vec3 a_axis0;
+in vec3 a_axis1;
+in vec3 a_axis2;
+in float a_strength;
+uniform mat4 u_matrix;
+uniform float u_exaggeration;
+uniform float u_radius;
+out vec3 v_normal;
+out float v_strength;
+void main() {
+  vec3 side = sign(a_normal);
+  float l0 = max(length(a_axis0), 1e-6);
+  float l1 = max(length(a_axis1), 1e-6);
+  float l2 = max(length(a_axis2), 1e-6);
+  vec3 normal = a_axis0 / l0 * a_normal.x + a_axis1 / l1 * a_normal.y + a_axis2 / l2 * a_normal.z;
+  vec3 world = a_centre + a_axis0 * side.x + a_axis1 * side.y + a_axis2 * side.z + normal * u_radius;
+  v_normal = normal;
+  v_strength = a_strength;
+  gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
+}`;
+
+const HULL_FRAGMENT = `#version 300 es
+precision highp float;
+in vec3 v_normal;
+in float v_strength;
+uniform vec3 u_colour;
+out vec4 colour;
+void main() {
+  vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
+  float lit = 0.75 + 0.35 * abs(dot(normalize(v_normal), light));
+  colour = vec4(u_colour * lit, 0.16 * v_strength);
+}`;
+
+/** Where the attributes of the hulls are. */
+const HULL_LOCATIONS: [string, number][] = [
+  ["a_normal", 0],
+  ["a_centre", 1],
+  ["a_axis0", 2],
+  ["a_axis1", 3],
+  ["a_axis2", 4],
+  ["a_strength", 5],
+];
+
+/** How many floats a hull takes in its buffer: centre, three half axes, strength. */
+const HULL_STRIDE = 13;
+
+/** The colour of the hulls of a chain. */
+const HULL_COLOUR: Vec3 = [0.75, 0.92, 1.0];
+
+/**
+ * The points and triangles of a sphere of radius one, none of whose points
+ * lies on a plane of the axes: pushed out to a box's corners, the triangles
+ * across those planes span the box's flat sides.
+ */
+function hullSphere(): { points: Float32Array; triangles: Uint16Array } {
+  const rings = 12;
+  const around = 24;
+  const points: number[] = [0, 0, 1];
+  for (let ring = 0; ring < rings; ring += 1) {
+    const polar = ((ring + 0.5) / rings) * Math.PI;
+    for (let step = 0; step < around; step += 1) {
+      const azimuth = ((step + 0.5) / around) * Math.PI * 2;
+      points.push(
+        Math.sin(polar) * Math.cos(azimuth),
+        Math.sin(polar) * Math.sin(azimuth),
+        Math.cos(polar),
+      );
+    }
+  }
+  points.push(0, 0, -1);
+  const last = 1 + rings * around;
+  const at = (ring: number, step: number) => 1 + ring * around + (step % around);
+  const triangles: number[] = [];
+  for (let step = 0; step < around; step += 1) {
+    triangles.push(0, at(0, step), at(0, step + 1));
+    triangles.push(last, at(rings - 1, step + 1), at(rings - 1, step));
+  }
+  for (let ring = 0; ring + 1 < rings; ring += 1) {
+    for (let step = 0; step < around; step += 1) {
+      triangles.push(at(ring, step), at(ring + 1, step), at(ring + 1, step + 1));
+      triangles.push(at(ring, step), at(ring + 1, step + 1), at(ring, step + 1));
+    }
+  }
+  return { points: new Float32Array(points), triangles: new Uint16Array(triangles) };
+}
 
 /** Where every attribute is, the same in both programs. */
 const LOCATIONS: [string, number][] = [
@@ -127,8 +224,13 @@ const LOCATIONS: [string, number][] = [
   ["a_look", 7],
 ];
 
-/** A program with the attributes at {@link LOCATIONS}. */
-function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
+/** A program with the attributes at `locations`. */
+function linked(
+  gl: WebGL2RenderingContext,
+  vertex: string,
+  fragment: string,
+  locations: [string, number][] = LOCATIONS,
+): WebGLProgram {
   const shader = (type: number, source: string) => {
     const made = gl.createShader(type);
     if (made === null) {
@@ -146,7 +248,7 @@ function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): W
   for (const part of parts) {
     gl.attachShader(made, part);
   }
-  for (const [name, location] of LOCATIONS) {
+  for (const [name, location] of locations) {
     gl.bindAttribLocation(made, location, name);
   }
   gl.linkProgram(made);
@@ -343,14 +445,17 @@ function sizeOf(box: [[number, number, number], [number, number, number]], scale
 
 /** What the card of a picked object can do with the view it was picked in. */
 export interface PartTools {
-  /** The parts of the same plugin that hang together with it, boxes within `margin` game units. */
-  connected: (margin: number) => AreaObject[];
-  /** Lights these objects up in the view. */
-  mark: (objects: AreaObject[]) => void;
+  /** Its chain: the parts of the same mod linked to it, each within `radius` game units of the next. */
+  chain: (radius: number) => AreaObject[];
+  /**
+   * Lights `chain` up faintly next to the picked object and, with `hulls`,
+   * draws how far each part reaches; an empty chain clears it.
+   */
+  showChain: (chain: AreaObject[], radius: number, hulls: boolean) => void;
 }
 
 /** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
-interface PlacedBox {
+export interface PlacedBox {
   centre: [number, number, number];
   axes: [[number, number, number], [number, number, number], [number, number, number]];
   half: [number, number, number];
@@ -423,11 +528,69 @@ export function boxesMeet(a: PlacedBox, b: PlacedBox, margin: number): boolean {
   );
 }
 
+/** Half the diagonal of a placed box: no point of it is farther from its middle. */
+function outerRadius(box: PlacedBox): number {
+  return Math.hypot(...box.half);
+}
+
+/**
+ * The smart selection (ADR 0055): the parts reached from the part at
+ * `start` link by link, each part reaching `radius` game units beyond its
+ * box. Two parts link where one's box comes within the other's reach. The
+ * caller passes only parts of one mod; the chain grows through them alone.
+ * Returns the indices of the chain's parts, the start first.
+ */
+export function chainFrom(boxes: PlacedBox[], start: number, radius: number): number[] {
+  if (boxes[start] === undefined) {
+    return [];
+  }
+  const outer = boxes.map(outerRadius);
+  const found = [start];
+  const left = new Set(boxes.map((_, index) => index));
+  left.delete(start);
+  for (let at = 0; at < found.length; at += 1) {
+    const from = found[at] ?? start;
+    const box = boxes[from];
+    if (box === undefined) {
+      continue;
+    }
+    for (const other of [...left]) {
+      const candidate = boxes[other];
+      if (candidate === undefined) {
+        continue;
+      }
+      // Far apart by their spheres already: no axis needed.
+      const apart = Math.hypot(
+        candidate.centre[0] - box.centre[0],
+        candidate.centre[1] - box.centre[1],
+        candidate.centre[2] - box.centre[2],
+      );
+      if (apart > (outer[from] ?? 0) + (outer[other] ?? 0) + radius) {
+        continue;
+      }
+      if (boxesMeet(box, candidate, radius)) {
+        found.push(other);
+        left.delete(other);
+      }
+    }
+  }
+  return found;
+}
+
 /**
  * How an object is drawn: plainly, as part of a collision, picked, as part
- * of the collision looked at, as hidden by the patch, or not at all.
+ * of the collision looked at, as hidden by the patch, not at all, or in
+ * the chain of the picked object.
  */
-export const LOOK = { plain: 0, marked: 1, selected: 2, focus: 3, ghost: 4, gone: 5 } as const;
+export const LOOK = {
+  plain: 0,
+  marked: 1,
+  selected: 2,
+  focus: 3,
+  ghost: 4,
+  gone: 5,
+  chained: 6,
+} as const;
 export type Look = (typeof LOOK)[keyof typeof LOOK];
 
 /** What is known of a model: being fetched, its surfaces, or nothing to draw. */
@@ -458,6 +621,21 @@ export class AreaLayer {
   private disposed = false;
   private instances: Instance[] = [];
   private selected = new Set<string>();
+  /** The chain of the picked object, lit faintly (ADR 0055). */
+  private chained = new Set<string>();
+  private readonly hullProgram: WebGLProgram;
+  /** The sphere the hulls are drawn from, with its points and triangles. */
+  private readonly hullShape: {
+    vao: WebGLVertexArrayObject;
+    buffers: WebGLBuffer[];
+    count: number;
+  };
+  /** The hulls of the chain, one per part, and how far they reach. */
+  private hulls: { buffer: WebGLBuffer | null; count: number; radius: number } = {
+    buffer: null,
+    count: 0,
+    radius: 0,
+  };
   /** The objects shown, as last set. */
   area: AreaObjects | null = null;
 
@@ -468,6 +646,31 @@ export class AreaLayer {
   ) {
     this.program = linked(gl, VERTEX, FRAGMENT);
     this.picking = linked(gl, PICK_VERTEX, PICK_FRAGMENT);
+    this.hullProgram = linked(gl, HULL_VERTEX, HULL_FRAGMENT, HULL_LOCATIONS);
+    const sphere = hullSphere();
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const points = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, points);
+    gl.bufferData(gl.ARRAY_BUFFER, sphere.points, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    const triangles = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere.triangles, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    this.hullShape = { vao, buffers: [points, triangles], count: sphere.triangles.length };
+  }
+
+  /** How an object is drawn now: picked, in the chain, or as its look says. */
+  private lookOf(key: string, look: Look): Look {
+    if (this.selected.has(key)) {
+      return LOOK.selected;
+    }
+    if (this.chained.has(key) && look !== LOOK.ghost && look !== LOOK.gone) {
+      return LOOK.chained;
+    }
+    return look;
   }
 
   /** Shows `area`, each object drawn as `look` says by its key (see {@link objectKey}). */
@@ -520,16 +723,119 @@ export class AreaLayer {
       }
       model.own.forEach((instance, index) => {
         const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-        data[index * 17 + 16] = this.selected.has(key) ? LOOK.selected : instance.look;
+        data[index * 17 + 16] = this.lookOf(key, instance.look);
       });
       gl.bindBuffer(gl.ARRAY_BUFFER, instances);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     }
   }
 
-  /** Picks the objects with `keys` (see {@link objectKey}), or none. */
+  /**
+   * Picks the objects with `keys` (see {@link objectKey}), or none; a chain
+   * shown goes unless the same objects are picked again.
+   */
   select(keys: string[]) {
+    const same = keys.length === this.selected.size && keys.every((key) => this.selected.has(key));
     this.selected = new Set(keys);
+    if (!same) {
+      this.chained = new Set();
+      this.hulls.count = 0;
+    }
+    this.relookAll();
+  }
+
+  /**
+   * The chain of `object` (ADR 0055): the parts of its mod linked to it,
+   * each reaching `radius` game units beyond its box, as far as the area
+   * shows them and their models are read. Parts of other mods and of the
+   * game are passed over; they neither join the chain nor break it.
+   */
+  chain(object: AreaObject, radius: number): AreaObject[] {
+    const owner = ownerOf(object);
+    const isStart = (other: AreaObject) =>
+      other.id.plugin === object.id.plugin && other.id.localId === object.id.localId;
+    const parts = this.instances.flatMap((instance) => {
+      const other = instance.object;
+      const ours =
+        isStart(other) || ownerOf(other) === owner || other.plugin.toLowerCase() === owner;
+      const model = this.models.get(other.model);
+      if (!ours || model === undefined || !Array.isArray(model.surfaces)) {
+        return [];
+      }
+      return [{ object: other, box: placedBox(model.box, instance.matrix) }];
+    });
+    const start = parts.findIndex((part) => isStart(part.object));
+    if (start < 0) {
+      return [object];
+    }
+    return chainFrom(
+      parts.map((part) => part.box),
+      start,
+      radius,
+    ).flatMap((index) => {
+      const part = parts[index];
+      return part === undefined ? [] : [part.object];
+    });
+  }
+
+  /**
+   * Lights `chain` faintly besides what is picked and, with `hulls`, draws
+   * each part's reach of `radius` game units around it: the picked ones'
+   * stronger. An empty chain clears it.
+   */
+  showChain(chain: AreaObject[], radius: number, hulls: boolean) {
+    const { gl } = this;
+    const keys = new Set(chain.map((part) => objectKey(part.id.plugin, part.id.localId)));
+    this.chained = keys;
+    const placed = hulls
+      ? this.instances.flatMap((instance) => {
+          const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
+          const model = this.models.get(instance.object.model);
+          if (
+            !(keys.has(key) || this.selected.has(key)) ||
+            model === undefined ||
+            !Array.isArray(model.surfaces)
+          ) {
+            return [];
+          }
+          return [{ box: placedBox(model.box, instance.matrix), main: this.selected.has(key) }];
+        })
+      : [];
+    const data = new Float32Array(placed.length * HULL_STRIDE);
+    placed.forEach(({ box, main }, index) => {
+      const at = index * HULL_STRIDE;
+      data.set(box.centre, at);
+      box.axes.forEach((axis, which) => {
+        const half = box.half[which] ?? 0;
+        data.set(
+          axis.map((value) => value * half),
+          at + 3 + which * 3,
+        );
+      });
+      data[at + 12] = main ? 1 : 0.5;
+    });
+    if (this.hulls.buffer === null) {
+      this.hulls.buffer = gl.createBuffer();
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.hulls.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(this.hullShape.vao);
+    const stride = HULL_STRIDE * 4;
+    for (let location = 1; location <= 5; location += 1) {
+      gl.enableVertexAttribArray(location);
+      gl.vertexAttribPointer(
+        location,
+        location === 5 ? 1 : 3,
+        gl.FLOAT,
+        false,
+        stride,
+        (location - 1) * 12,
+      );
+      gl.vertexAttribDivisor(location, 1);
+    }
+    gl.bindVertexArray(null);
+    this.hulls.count = placed.length;
+    this.hulls.radius = radius;
     this.relookAll();
   }
 
@@ -735,7 +1041,7 @@ export class AreaLayer {
     own.forEach((instance, index) => {
       data.set(instance.matrix, index * 17);
       const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-      data[index * 17 + 16] = this.selected.has(key) ? LOOK.selected : instance.look;
+      data[index * 17 + 16] = this.lookOf(key, instance.look);
     });
     if (model.instances === null) {
       model.instances = gl.createBuffer();
@@ -918,6 +1224,44 @@ export class AreaLayer {
       }
     }
     gl.bindVertexArray(null);
+    this.drawHulls(matrix, exaggeration);
+  }
+
+  /** Draws the reach of the chain's parts, see-through, over what is drawn. */
+  private drawHulls(matrix: Mat4, exaggeration: number) {
+    if (this.hulls.count === 0) {
+      return;
+    }
+    const { gl } = this;
+    // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
+    gl.useProgram(this.hullProgram);
+    const at = (name: string) => gl.getUniformLocation(this.hullProgram, name);
+    gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
+    gl.uniform1f(at("u_exaggeration"), exaggeration);
+    gl.uniform1f(at("u_radius"), this.hulls.radius);
+    gl.uniform3f(at("u_colour"), ...HULL_COLOUR);
+    const blending = gl.isEnabled(gl.BLEND);
+    const culling = gl.isEnabled(gl.CULL_FACE);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.CULL_FACE);
+    gl.depthMask(false);
+    gl.bindVertexArray(this.hullShape.vao);
+    gl.drawElementsInstanced(
+      gl.TRIANGLES,
+      this.hullShape.count,
+      gl.UNSIGNED_SHORT,
+      0,
+      this.hulls.count,
+    );
+    gl.bindVertexArray(null);
+    gl.depthMask(true);
+    if (!blending) {
+      gl.disable(gl.BLEND);
+    }
+    if (culling) {
+      gl.enable(gl.CULL_FACE);
+    }
   }
 
   /**
@@ -1009,5 +1353,11 @@ export class AreaLayer {
     this.textures.clear();
     gl.deleteProgram(this.program);
     gl.deleteProgram(this.picking);
+    gl.deleteProgram(this.hullProgram);
+    gl.deleteVertexArray(this.hullShape.vao);
+    for (const buffer of this.hullShape.buffers) {
+      gl.deleteBuffer(buffer);
+    }
+    gl.deleteBuffer(this.hulls.buffer);
   }
 }

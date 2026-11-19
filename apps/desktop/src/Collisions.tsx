@@ -22,7 +22,7 @@ import { InteriorView } from "./InteriorView";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
-import { FreeObjectActions, NeededPart, spotOf } from "./object-actions";
+import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
 import {
   chooseFinding,
   chooseObject,
@@ -1537,16 +1537,21 @@ function Stage({
       (candidate) => objectKey(candidate.object.plugin, candidate.object.localId) === key,
     );
     if (part !== undefined) {
-      return part.hideable ? (
-        <button
-          type="button"
-          className="small primary relief-object-action"
-          onClick={() => onDecide(part.object.plugin)}
-        >
-          {t.workHideObject}
-        </button>
-      ) : (
-        <p className="aside relief-object-action">{t.workCannotHide}</p>
+      return (
+        <>
+          {part.hideable ? (
+            <button
+              type="button"
+              className="small primary relief-object-action"
+              onClick={() => onDecide(part.object.plugin)}
+            >
+              {t.workHideObject}
+            </button>
+          ) : (
+            <p className="aside relief-object-action">{t.workCannotHide}</p>
+          )}
+          <PartsTogether object={object} tools={tools} />
+        </>
       );
     }
     return (
