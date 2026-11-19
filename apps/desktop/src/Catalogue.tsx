@@ -19,6 +19,7 @@ import type {
   CatalogueSource,
 } from "./generated/catalogue";
 import type { Action, ModRef } from "./generated/rendered-report";
+import { LoadingLine, LoadingScreen } from "./LoadingMallet";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
 
@@ -196,7 +197,7 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
   );
 
   if (catalogue === "loading") {
-    return <p className="aside catalogue-message">{c.loading}</p>;
+    return <LoadingScreen title={c.loading} />;
   }
   if (index === null) {
     return <p className="aside catalogue-message">{c.unreadable}</p>;
@@ -678,7 +679,7 @@ function ItemPage({
           )}
         </div>
         {versions === undefined ? (
-          <p className="aside catalogue-message">{c.versionsLoading}</p>
+          <LoadingLine className="catalogue-message" text={c.versionsLoading} />
         ) : (
           <Stage key={`${item.id}/${path}`} items={stage} />
         )}

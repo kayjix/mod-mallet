@@ -550,7 +550,7 @@ export default function App({ api, startLang }: AppProps) {
           {scanning && report !== null && (
             <p className="progress" role="status">
               <span className="bar" aria-hidden="true" />
-              <LoadingMallet size={28} />
+              <LoadingMallet size={34} />
               {changed ? t.changedRescanning : t.scanningNote}
             </p>
           )}
@@ -837,6 +837,7 @@ function ScanBox({ scannedAt, live, scanning, onScan, lang, t }: ScanBoxProps) {
   return (
     <div className="scan-box">
       <button type="button" className="primary scan-button" onClick={onScan} disabled={scanning}>
+        {scanning && <LoadingMallet size={26} className="loading-inline" />}
         {scanning ? t.scanning : t.scan}
       </button>
       {scannedAt !== null && (

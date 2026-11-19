@@ -6,6 +6,15 @@ in [Releases](docs/src/contributing/releases.md).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-19
+
+### Changed
+
+- The hammer and gear also show wherever Mod Mallet waits for something:
+  in the scan button in the sidebar, while the catalogue of things reads
+  the plugins, while versions, pictures, interiors and objects up close
+  load.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added
@@ -68,6 +77,7 @@ Edition with Vortex.
   to do about it. Updating the link shows that it landed and asks for
   Vortex's restart.
 
-[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kayjix/mod-mallet/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/kayjix/mod-mallet/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kayjix/mod-mallet/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kayjix/mod-mallet/releases/tag/v0.1.0

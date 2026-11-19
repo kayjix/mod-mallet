@@ -320,3 +320,16 @@ export function LoadingScreen({ title, note }: { title: string; note?: string })
     </section>
   );
 }
+
+/** One line that says what Mod Mallet is busy with, the hammer at work in front. */
+export function LoadingLine({ text, className }: { text: string; className?: string }) {
+  return (
+    <p
+      className={className === undefined ? "loading-line" : `loading-line ${className}`}
+      role="status"
+    >
+      <LoadingMallet size={32} />
+      <span>{text}</span>
+    </p>
+  );
+}

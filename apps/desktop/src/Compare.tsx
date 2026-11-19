@@ -11,6 +11,8 @@ import {
   useFindings,
   usePick,
 } from "./Duels";
+import { LoadingLine } from "./LoadingMallet";
+
 import "./assets.css";
 import type { FilePreview, PreviewVersion } from "./generated/file-preview";
 import type {
@@ -479,7 +481,7 @@ function DuelWorkspace({
         ) : path === null ? (
           <p className="aside compare-stage-empty">{t.duelNoPictures}</p>
         ) : found === undefined ? (
-          <p className="aside compare-stage-empty">{t.previewLoading}</p>
+          <LoadingLine className="compare-stage-empty" text={t.previewLoading} />
         ) : items.length === 0 ? (
           <p className="aside compare-stage-empty">{t.compareCannotShow}</p>
         ) : (

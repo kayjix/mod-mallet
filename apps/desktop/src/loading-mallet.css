@@ -36,3 +36,24 @@
   vertical-align: middle;
   margin-right: 8px;
 }
+
+/* A line saying what is being loaded, with a small hammer in front. */
+.loading-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+/* In a button or beside a short value: as tall as the text. */
+.loading-inline {
+  display: inline-block;
+  vertical-align: -0.3em;
+  margin-right: 6px;
+}
+
+/* Above a line of text, centred. */
+.loading-centred {
+  margin: 0 auto 8px;
+}

@@ -1,6 +1,7 @@
 import { type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
 import type { MeshShape, MeshView } from "./generated/mesh-view";
+import { LoadingLine } from "./LoadingMallet";
 
 /** One thing to show: a mesh of the setup, or a texture on a ball. */
 export type StageItem =
@@ -232,7 +233,7 @@ function StagePane({
   return (
     <figure className="stage-pane">
       {mesh === undefined ? (
-        <p className="aside viewer-message">{t.previewLoading}</p>
+        <LoadingLine className="viewer-message" text={t.previewLoading} />
       ) : mesh === null ? (
         <p className="aside viewer-message">{t.viewerNothing}</p>
       ) : (

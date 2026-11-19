@@ -8,6 +8,7 @@ import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-la
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
 import { interiorTexts } from "./interior-texts";
+import { LoadingMallet } from "./LoadingMallet";
 import { CELL } from "./map-places";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
@@ -433,7 +434,14 @@ export function InteriorView({
             textAlign: "center",
           }}
         >
-          {failed || state === "missing" ? own.missing(cell) : own.loading(cell)}
+          {failed || state === "missing" ? (
+            own.missing(cell)
+          ) : (
+            <>
+              <LoadingMallet size={96} className="loading-centred" />
+              {own.loading(cell)}
+            </>
+          )}
         </p>
       )}
       <div className="view-top">

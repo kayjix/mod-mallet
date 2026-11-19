@@ -5,6 +5,7 @@ import { type Games, isPlayable } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
 import type { Health } from "./health";
 import { useJourneyTexts } from "./journey-texts";
+import { LoadingMallet } from "./LoadingMallet";
 import { openFileDuels, ScoreRing } from "./Overview";
 import { useOverviewTexts } from "./overview-texts";
 import { storedReview } from "./Review";
@@ -127,6 +128,7 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
           <div className="home-hero-actions">
             {report === null ? (
               <button type="button" className="primary" disabled={scanning} onClick={onScan}>
+                {scanning && <LoadingMallet size={26} className="loading-inline" />}
                 {scanning ? t.scanning : t.scan}
               </button>
             ) : (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./Actions";
 import type { FilePreview } from "./generated/file-preview";
+import { LoadingLine } from "./LoadingMallet";
 import { type MeshItem, Viewer3D } from "./Viewer3D";
 
 /**
@@ -31,7 +32,7 @@ export function Previews({ paths }: { paths: string[] }) {
   }, [api, paths]);
 
   if (previews === null) {
-    return <p className="aside">{t.previewLoading}</p>;
+    return <LoadingLine text={t.previewLoading} />;
   }
   const shown = previews.filter((preview) => preview.versions.length > 0);
   if (shown.length === 0) {

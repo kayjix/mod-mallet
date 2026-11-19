@@ -21,6 +21,7 @@ import {
   project,
   type Vec3,
 } from "./gl";
+import { LoadingMallet } from "./LoadingMallet";
 import { LandLayer } from "./land-layer";
 import { LodLayer } from "./lod-layer";
 import {
@@ -1664,6 +1665,11 @@ export function MapView3D({
           />
           {t.mapNear}
           <span className="relief-value">
+            {withObjects &&
+              (areaState === "loading" ||
+                (areaProgress !== null && areaProgress.done < areaProgress.total)) && (
+                <LoadingMallet size={18} className="loading-inline" />
+              )}
             {!withObjects
               ? ""
               : areaState === "far"
