@@ -27,9 +27,11 @@ use crate::contact::Point;
 use crate::walkways::Carried;
 
 /// The smallest part, in square game units, that counts as cut off when
-/// it has no door: about two by two metres. A sliver of path beside the
+/// it has no door: about 20 square metres, a room of four and a half by
+/// four and a half metres. On a real setup, the smaller parts were pieces
+/// of one to seven triangles next to the hidden objects. A sliver beside the
 /// hidden object that nobody stands on is left alone.
-pub const MIN_AREA: f64 = 20_000.0;
+pub const MIN_AREA: f64 = 100_000.0;
 
 /// What taking the triangles over hidden objects out of the paths leaves.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -435,7 +437,7 @@ mod tests {
     }
 
     /// The side of a square of the grids, in game units.
-    const SIDE: i32 = 200;
+    const SIDE: i32 = 300;
 
     /// A navigation mesh over the squares `cells` (column, row) of a grid
     /// whose squares are `side` units wide, two triangles each, in the
@@ -580,10 +582,10 @@ mod tests {
         let jetty = repair.cut_off.first().unwrap();
         assert_eq!(jetty.triangles, 4);
         assert_eq!(jetty.navmeshes, BTreeSet::from([0]));
-        assert!((jetty.area - 80_000.0).abs() < 1e-6);
+        assert!((jetty.area - 180_000.0).abs() < 1e-6);
         // The middle of squares (2, 0) and (3, 0).
-        assert!((jetty.centre[0] - 600.0).abs() < 1e-6);
-        assert!((jetty.centre[1] - 100.0).abs() < 1e-6);
+        assert!((jetty.centre[0] - 900.0).abs() < 1e-6);
+        assert!((jetty.centre[1] - 150.0).abs() < 1e-6);
         assert!(!repair.is_safe());
     }
 
@@ -658,7 +660,7 @@ mod tests {
         assert_eq!(repair.cut_off.len(), 1);
         let gallery = repair.cut_off.first().unwrap();
         assert_eq!(gallery.doors, []);
-        assert!((gallery.centre[0] - 600.0).abs() < 1e-6);
+        assert!((gallery.centre[0] - 900.0).abs() < 1e-6);
     }
 
     #[test]

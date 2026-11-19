@@ -63,8 +63,8 @@ What the game reads, and what the tools do with it:
    out into the rest of the world. Of what hung together before the cut,
    a part that no longer leads out is cut off; where nothing led out, as
    in an interior cell, the part with the most doors is where characters
-   come from and the others are cut off. Parts smaller than about two by
-   two metres without a door are slivers beside the object and do not
+   come from and the others are cut off. Parts smaller than about 20
+   square metres without a door are pieces beside the object and do not
    count. A door whose triangle is cut out can no longer be used.
 4. **A repair that cuts something off warns first.** The window shows
    what would be cut off, where, how large and with which doors, and the
@@ -92,6 +92,15 @@ What the game reads, and what the tools do with it:
 
 - Hiding the second bridge no longer has to leave characters walking on
   air; the repair is undone like the rest of the patch.
+- On the user's setup, the installed patch hides 913 objects; 905
+  triangles of 36 meshes the game uses lie on them. Cut out by the plugin
+  whose objects are hidden, those of Lux Via (28 triangles), JK's Skyrim,
+  JK's Sky Haven Temple and JK's outskirts of Markarth and Whiterun leave
+  every remaining path reachable. Those of Open Cities would lose 7 doors,
+  and in all six parts of 24 to 91 square metres would be cut off, among
+  them part of a Legacy of the Dragonborn interior with a door. Below 20
+  square metres there were 15 more parts of one to seven triangles next to
+  hidden objects, which the threshold leaves alone.
 - Mod Mallet writes a plugin for the first time. Copying cells and
   worldspaces is what ADR 0025 avoided; it is limited to the records that
   hold a changed mesh, and the copies are the winning versions.
