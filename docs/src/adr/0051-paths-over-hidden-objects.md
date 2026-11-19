@@ -1,6 +1,6 @@
 # 0051 Paths over hidden objects are found before and after hiding
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0052](0052-paths-over-hidden-objects-are-cut-out.md): the paths over hidden objects are cut out
 - Date: 2026-11-19
 - Changes: ADR 0025 (patches hide objects through Base Object Swapper: what
   hiding leaves behind is now checked)

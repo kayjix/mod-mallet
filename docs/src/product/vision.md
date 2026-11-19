@@ -54,7 +54,9 @@ that will be declined.
   nothing that stands on the land. For looking at a place there is the
   game, reached by a console command or, later, an in-game bridge.
 - **Not an automatic navmesh generator.** Navmesh conflicts are detected and
-  explained. Repairing them stays manual work in the Creation Kit for now.
+  explained. Paths over objects Mod Mallet hides are cut out of the meshes
+  (ADR 0052), never laid anew: laying new paths stays manual work in the
+  Creation Kit.
 - **Not a universal modding platform.** The design targets the Bethesda
   family of games. Other games are not excluded, but nothing is built for
   them on speculation.

@@ -35,6 +35,7 @@ pub mod meshes;
 pub mod missing_textures;
 pub mod navmeshes;
 pub mod objects;
+pub mod path_repair;
 mod places;
 pub mod recommendations;
 pub mod setup;

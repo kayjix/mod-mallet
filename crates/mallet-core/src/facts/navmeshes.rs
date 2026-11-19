@@ -79,6 +79,27 @@ pub struct NavmeshShape {
     pub vertices: Vec<[i32; 3]>,
     /// The triangles characters walk on, three corner numbers each.
     pub triangles: Vec<[u32; 3]>,
+    /// For each triangle, what lies beyond its three edges: where
+    /// characters can step on from it (ADR 0052).
+    pub edges: Vec<[Beyond; 3]>,
+    /// The triangles where characters step through a door, with the door.
+    pub doors: Vec<(u32, RecordId)>,
+}
+
+/// What lies beyond one edge of a triangle of a navigation mesh.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Beyond {
+    /// Nothing characters can step onto: a wall or a drop.
+    Nothing,
+    /// Another triangle of the same mesh, by its number.
+    Triangle(u32),
+    /// A triangle of a neighbouring mesh.
+    Link {
+        /// The neighbouring mesh, by the plugin that first defined it.
+        navmesh: RecordId,
+        /// The triangle, by its number there.
+        triangle: u32,
+    },
 }
 
 /// The ground of one outside cell, in the version the game uses.

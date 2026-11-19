@@ -15,6 +15,10 @@
       "description": "The worldspace or interior cell asked about, as in\n[`AreaObjects::world`].",
       "type": "string"
     },
+    "repair": {
+      "description": "What taking the paths over them out of the versions the game uses\nwould leave (ADR 0052).",
+      "$ref": "#/$defs/PathRepair"
+    },
     "walkways": {
       "description": "Each version of a navigation mesh that runs over one of them.",
       "type": "array",
@@ -26,9 +30,51 @@
   "required": [
     "place",
     "found",
-    "walkways"
+    "walkways",
+    "repair"
   ],
   "$defs": {
+    "CutOffPath": {
+      "description": "A part of the paths that nobody could reach any more once the paths\nover hidden objects are taken out, such as a jetty beyond a bridge.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "Where it lies, for people, as [`Walkway::cell`].",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "centre": {
+          "description": "Its middle, in whole game units, in the coordinates of the\nworldspace or the cell.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "doors": {
+          "description": "The doors in it, which characters could no longer reach, as in\n[`PathRepair::lost_doors`].",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "squareMetres": {
+          "description": "How large it is, in square metres.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "centre",
+        "squareMetres",
+        "doors"
+      ]
+    },
     "ObjectRef": {
       "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
       "type": "object",
@@ -47,6 +93,42 @@
       "required": [
         "plugin",
         "localId"
+      ]
+    },
+    "PathRepair": {
+      "description": "What taking the paths over hidden objects out of the navigation meshes\nwould leave: whether the game's characters still find a way to every\npart of the paths that is left (ADR 0052).",
+      "type": "object",
+      "properties": {
+        "cutOff": {
+          "description": "The parts of the paths nobody could reach any more, the largest\nfirst.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CutOffPath"
+          }
+        },
+        "lostDoors": {
+          "description": "The doors characters could no longer step through, because their\npaths lie on what is hidden: by plugin and number, as\n[`Walkway::navmesh`].",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "safe": {
+          "description": "Whether every part of the paths that is left stays reachable, and\nno door loses its way through: then the repair is safe.",
+          "type": "boolean"
+        },
+        "triangles": {
+          "description": "How many triangles would be taken out, of every version the game\nuses.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "triangles",
+        "safe",
+        "cutOff",
+        "lostDoors"
       ]
     },
     "Walkway": {

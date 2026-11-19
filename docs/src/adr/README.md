@@ -78,6 +78,7 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0049](0049-the-files-every-mod-brings.md) | The files every mod brings, from the mod manager's staging folder | accepted |
 | [0050](0050-a-guided-review-through-the-homes.md) | A guided review through the homes, collisions structure by structure | accepted |
 | [0051](0051-paths-over-hidden-objects.md) | Paths over hidden objects are found before and after hiding | accepted |
+| [0052](0052-paths-over-hidden-objects-are-cut-out.md) | Paths over hidden objects are cut out of the navigation meshes | accepted |
 | [0053](0053-shareable-patches-in-parts.md) | Shareable patches in parts, with an installer | accepted |
 | [0055](0055-a-chain-of-parts-by-their-reach.md) | A chain of parts by their reach | accepted |
 | [0056](0056-missing-textures-found-in-switched-off-mods.md) | Missing textures are looked for in switched-off mods | accepted |

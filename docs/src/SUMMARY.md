@@ -66,6 +66,7 @@
   - [0049 The files every mod brings](adr/0049-the-files-every-mod-brings.md)
   - [0050 A guided review through the homes](adr/0050-a-guided-review-through-the-homes.md)
   - [0051 Paths over hidden objects](adr/0051-paths-over-hidden-objects.md)
+  - [0052 Paths over hidden objects are cut out](adr/0052-paths-over-hidden-objects-are-cut-out.md)
   - [0053 Shareable patches in parts](adr/0053-shareable-patches-in-parts.md)
   - [0055 A chain of parts by their reach](adr/0055-a-chain-of-parts-by-their-reach.md)
   - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)

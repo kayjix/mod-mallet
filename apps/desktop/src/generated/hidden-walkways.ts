@@ -15,6 +15,7 @@ export interface HiddenWalkways {
    * [`AreaObjects::world`].
    */
   place: string;
+  repair: PathRepair;
   /**
    * Each version of a navigation mesh that runs over one of them.
    */
@@ -34,6 +35,60 @@ export interface ObjectRef {
    * The plugin's file name.
    */
   plugin: string;
+}
+/**
+ * What taking the paths over them out of the versions the game uses
+ * would leave (ADR 0052).
+ */
+export interface PathRepair {
+  /**
+   * The parts of the paths nobody could reach any more, the largest
+   * first.
+   */
+  cutOff: CutOffPath[];
+  /**
+   * The doors characters could no longer step through, because their
+   * paths lie on what is hidden: by plugin and number, as
+   * [`Walkway::navmesh`].
+   */
+  lostDoors: string[];
+  /**
+   * Whether every part of the paths that is left stays reachable, and
+   * no door loses its way through: then the repair is safe.
+   */
+  safe: boolean;
+  /**
+   * How many triangles would be taken out, of every version the game
+   * uses.
+   */
+  triangles: number;
+}
+/**
+ * A part of the paths that nobody could reach any more once the paths
+ * over hidden objects are taken out, such as a jetty beyond a bridge.
+ */
+export interface CutOffPath {
+  /**
+   * Where it lies, for people, as [`Walkway::cell`].
+   */
+  cell?: string | null;
+  /**
+   * Its middle, in whole game units, in the coordinates of the
+   * worldspace or the cell.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  centre: [number, number, number];
+  /**
+   * The doors in it, which characters could no longer reach, as in
+   * [`PathRepair::lost_doors`].
+   */
+  doors: string[];
+  /**
+   * How large it is, in square metres.
+   */
+  squareMetres: number;
 }
 /**
  * One plugin's version of a navigation mesh that runs over a hidden

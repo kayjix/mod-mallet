@@ -1,16 +1,18 @@
 //! The paths characters walk on that run over hidden objects (ADR 0051):
 //! for the scan, those of the patch in the game; for the window, those of
-//! objects the user is about to hide. Only reads.
+//! objects the user is about to hide, and what taking those paths out
+//! would leave (ADR 0052). Only reads.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
-use mallet_analysis::walkways::{self, Hidden};
+use mallet_analysis::path_repair;
+use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::NearHidden;
 use mallet_core::facts::objects::{Place, PlacedObject};
-use mallet_core::mesh::{HiddenWalkways, Walkway};
+use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
 use mallet_core::{Facts, InstalledPatch, ObjectRef};
 use mallet_game_bethesda::Game;
 use mallet_game_bethesda::area::AreaObject;
@@ -150,7 +152,9 @@ pub fn hidden_walkways(
         reader.navmeshes(&around)
     };
 
-    let walkways: Vec<Walkway> = walkways::carried(&hidden, &near)
+    let carried = walkways::carried(&hidden, &near);
+    let repair = path_repair(&near, &carried);
+    let walkways: Vec<Walkway> = carried
         .into_iter()
         .filter_map(|carried| {
             let object = hidden.get(carried.hidden)?.object;
@@ -163,7 +167,7 @@ pub fn hidden_walkways(
                 plugin: shape.plugin.clone(),
                 used: shape.used,
                 cell: shape.place_name.clone(),
-                triangles: u32::try_from(carried.triangles).unwrap_or(u32::MAX),
+                triangles: u32::try_from(carried.triangles.len()).unwrap_or(u32::MAX),
             })
         })
         .collect();
@@ -172,6 +176,7 @@ pub fn hidden_walkways(
         objects = objects.len(),
         found = hidden.len(),
         walkways = walkways.len(),
+        repair_safe = repair.safe,
         elapsed_ms = started.elapsed().as_millis(),
         "looked for paths over objects to hide"
     );
@@ -183,7 +188,52 @@ pub fn hidden_walkways(
             .cloned()
             .collect(),
         walkways,
+        repair,
     })
+}
+
+/// Square game units per square metre: a metre is about 70 units.
+const UNITS_PER_SQUARE_METRE: f64 = 70.0 * 70.0;
+
+/// What taking the triangles in `carried` out of the paths in `near`
+/// would leave, for the window.
+fn path_repair(near: &NearHidden, carried: &[Carried]) -> PathRepair {
+    let repair = path_repair::repair(near, carried);
+    let triangles: usize = repair.cuts.values().map(BTreeSet::len).sum();
+    PathRepair {
+        triangles: u32::try_from(triangles).unwrap_or(u32::MAX),
+        safe: repair.is_safe(),
+        cut_off: repair
+            .cut_off
+            .iter()
+            .map(|part| CutOffPath {
+                cell: part
+                    .navmeshes
+                    .iter()
+                    .find_map(|index| near.navmeshes.get(*index)?.place_name.clone()),
+                centre: part.centre.map(whole_f64),
+                square_metres: square_metres(part.area),
+                doors: part.doors.iter().map(ToString::to_string).collect(),
+            })
+            .collect(),
+        lost_doors: repair.lost_doors.iter().map(ToString::to_string).collect(),
+    }
+}
+
+/// An area in square game units, in whole square metres.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn square_metres(area: f64) -> u32 {
+    // Clamped before converting.
+    (area / UNITS_PER_SQUARE_METRE)
+        .round()
+        .clamp(0.0, f64::from(u32::MAX)) as u32
+}
+
+/// A number rounded to whole units.
+#[allow(clippy::cast_possible_truncation)]
+fn whole_f64(value: f64) -> i32 {
+    // Bounded before converting; positions of the games are far inside.
+    value.round().clamp(-1.0e9, 1.0e9) as i32
 }
 
 /// An object as the window names it, by the identity the plugins use.

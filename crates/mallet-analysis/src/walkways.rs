@@ -71,18 +71,18 @@ pub struct Hidden<'a> {
 }
 
 /// A version of a navigation mesh that runs over a hidden object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Carried {
     /// The object, by its place in the list of hidden objects.
     pub hidden: usize,
     /// The navigation mesh, by its place in [`NearHidden::navmeshes`].
     pub navmesh: usize,
-    /// How many of its triangles lie on the object.
-    pub triangles: usize,
+    /// The triangles that lie on the object, by their numbers.
+    pub triangles: Vec<u32>,
 }
 
 /// Every version of a navigation mesh in `near` that runs over one of the
-/// `hidden` objects, with how many of its triangles do. Versions the game
+/// `hidden` objects, with the triangles that do. Versions the game
 /// does not use are included; [`NavmeshShape::used`] tells them apart.
 pub fn carried(hidden: &[Hidden<'_>], near: &NearHidden) -> Vec<Carried> {
     let ground = Ground::new(near);
@@ -106,7 +106,7 @@ pub fn carried(hidden: &[Hidden<'_>], near: &NearHidden) -> Vec<Carried> {
             let triangles = surface.carried(shape, |x, y| {
                 world.and_then(|world| ground.height(world, x, y))
             });
-            if triangles > 0 {
+            if !triangles.is_empty() {
                 found.push(Carried {
                     hidden: index,
                     navmesh,
@@ -198,7 +198,7 @@ impl Analysis for HiddenWalkways {
                 .extend(base.and_then(|base| base.editor_id.as_deref().or(base.name.as_deref())));
             walked.places.extend(shape.place_name.as_deref());
             walked.navmesh_plugins.insert(shape.plugin.as_str());
-            walked.triangles += carried.triangles;
+            walked.triangles += carried.triangles.len();
         }
         by_plugin
             .into_iter()
@@ -387,30 +387,30 @@ impl Surface {
         (index(x, self.min[0]), index(y, self.min[1]))
     }
 
-    /// How many triangles of `shape` lie on this surface. `ground` gives
-    /// the height of the land at a point outside, if known.
-    fn carried(&self, shape: &NavmeshShape, ground: impl Fn(f64, f64) -> Option<f64>) -> usize {
+    /// The triangles of `shape` that lie on this surface, by their
+    /// numbers. `ground` gives the height of the land at a point outside,
+    /// if known.
+    fn carried(&self, shape: &NavmeshShape, ground: impl Fn(f64, f64) -> Option<f64>) -> Vec<u32> {
         let vertex = |index: u32| -> Option<Point> {
             let [x, y, z] = *shape.vertices.get(usize::try_from(index).ok()?)?;
             Some([f64::from(x), f64::from(y), f64::from(z)])
         };
-        shape
-            .triangles
-            .iter()
-            .filter_map(|triangle| {
+        (0u32..)
+            .zip(&shape.triangles)
+            .filter_map(|(number, triangle)| {
                 let [a, b, c] = [
                     vertex(triangle[0])?,
                     vertex(triangle[1])?,
                     vertex(triangle[2])?,
                 ];
-                Some([
+                let middle = [
                     (a[0] + b[0] + c[0]) / 3.0,
                     (a[1] + b[1] + c[1]) / 3.0,
                     (a[2] + b[2] + c[2]) / 3.0,
-                ])
+                ];
+                self.carries(middle, &ground).then_some(number)
             })
-            .filter(|middle| self.carries(*middle, &ground))
-            .count()
+            .collect()
     }
 
     /// Whether this surface carries a point of a navigation mesh.
@@ -549,7 +549,7 @@ const BOX_TRIANGLES: [[u32; 3]; 12] = [
 #[cfg(test)]
 mod tests {
     use mallet_core::facts::PluginFacts;
-    use mallet_core::facts::navmeshes::GroundCell;
+    use mallet_core::facts::navmeshes::{Beyond, GroundCell};
     use mallet_core::facts::objects::{BaseKind, ObjectFacts};
     use mallet_core::{ArgValue, NoModSource, Severity};
 
@@ -618,6 +618,11 @@ mod tests {
                 [x - 50, y + 50, z],
             ],
             triangles: vec![[0, 1, 2], [0, 2, 3]],
+            edges: vec![
+                [Beyond::Nothing, Beyond::Nothing, Beyond::Triangle(1)],
+                [Beyond::Triangle(0), Beyond::Nothing, Beyond::Nothing],
+            ],
+            doors: Vec::new(),
         }
     }
 
@@ -638,7 +643,7 @@ mod tests {
         }];
         carried(&hidden, near)
             .iter()
-            .map(|carried| (carried.navmesh, carried.triangles))
+            .map(|carried| (carried.navmesh, carried.triangles.len()))
             .collect()
     }
 

@@ -207,6 +207,47 @@ pub struct HiddenWalkways {
     pub found: Vec<crate::ObjectRef>,
     /// Each version of a navigation mesh that runs over one of them.
     pub walkways: Vec<Walkway>,
+    /// What taking the paths over them out of the versions the game uses
+    /// would leave (ADR 0052).
+    pub repair: PathRepair,
+}
+
+/// What taking the paths over hidden objects out of the navigation meshes
+/// would leave: whether the game's characters still find a way to every
+/// part of the paths that is left (ADR 0052).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PathRepair {
+    /// How many triangles would be taken out, of every version the game
+    /// uses.
+    pub triangles: u32,
+    /// Whether every part of the paths that is left stays reachable, and
+    /// no door loses its way through: then the repair is safe.
+    pub safe: bool,
+    /// The parts of the paths nobody could reach any more, the largest
+    /// first.
+    pub cut_off: Vec<CutOffPath>,
+    /// The doors characters could no longer step through, because their
+    /// paths lie on what is hidden: by plugin and number, as
+    /// [`Walkway::navmesh`].
+    pub lost_doors: Vec<String>,
+}
+
+/// A part of the paths that nobody could reach any more once the paths
+/// over hidden objects are taken out, such as a jetty beyond a bridge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CutOffPath {
+    /// Where it lies, for people, as [`Walkway::cell`].
+    pub cell: Option<String>,
+    /// Its middle, in whole game units, in the coordinates of the
+    /// worldspace or the cell.
+    pub centre: [i32; 3],
+    /// How large it is, in square metres.
+    pub square_metres: u32,
+    /// The doors in it, which characters could no longer reach, as in
+    /// [`PathRepair::lost_doors`].
+    pub doors: Vec<String>,
 }
 
 /// One plugin's version of a navigation mesh that runs over a hidden

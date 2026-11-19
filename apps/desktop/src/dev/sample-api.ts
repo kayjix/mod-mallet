@@ -1196,27 +1196,47 @@ export const sampleApi: Api = {
   // In the sample, a path of the game runs over the first object to hide.
   // Characters walk on the planks of Water Mod's dock at the docks (made
   // up): hiding them would leave them on thin air.
-  hiddenWalkways: (worldOrCell, _x, _y, objects) =>
-    later({
+  // Cutting those paths out would leave the dock's far end cut off.
+  hiddenWalkways: (worldOrCell, _x, _y, objects) => {
+    const walkways = objects
+      .filter(
+        (object) =>
+          object.plugin === "Water Mod.esp" &&
+          (object.localId === 0xa11 ||
+            object.localId === 0xa21 ||
+            (object.localId >= 0x6000 && object.localId <= 0x6008)),
+      )
+      .map((object) => ({
+        object,
+        navmesh: "skyrim.esm:00A1B2",
+        plugin: "Skyrim.esm",
+        used: true,
+        cell: `${worldOrCell} 6,1`,
+        triangles: 6,
+      }));
+    const cutOff =
+      walkways.length > 0
+        ? [
+            {
+              cell: `${worldOrCell} 6,1`,
+              centre: [25_100, 5_300, -120] as [number, number, number],
+              squareMetres: 18,
+              doors: [],
+            },
+          ]
+        : [];
+    return later({
       place: worldOrCell,
       found: objects,
-      walkways: objects
-        .filter(
-          (object) =>
-            object.plugin === "Water Mod.esp" &&
-            (object.localId === 0xa11 ||
-              object.localId === 0xa21 ||
-              (object.localId >= 0x6000 && object.localId <= 0x6008)),
-        )
-        .map((object) => ({
-          object,
-          navmesh: "skyrim.esm:00A1B2",
-          plugin: "Skyrim.esm",
-          used: true,
-          cell: `${worldOrCell} 6,1`,
-          triangles: 6,
-        })),
-    }),
+      walkways,
+      repair: {
+        triangles: walkways.length * 6,
+        safe: cutOff.length === 0,
+        cutOff,
+        lostDoors: [],
+      },
+    });
+  },
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),

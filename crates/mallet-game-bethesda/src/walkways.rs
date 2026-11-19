@@ -12,7 +12,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use mallet_core::facts::RecordId;
-use mallet_core::facts::navmeshes::{GroundCell, NavmeshShape, NearHidden};
+use mallet_core::facts::navmeshes::{Beyond, GroundCell, NavmeshShape, NearHidden};
 use mallet_core::facts::objects::Place;
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, group_type};
@@ -314,6 +314,27 @@ fn version(
                 .triangles
                 .iter()
                 .map(|triangle| triangle.map(u32::from))
+                .collect(),
+            edges: geometry
+                .edges
+                .iter()
+                .map(|edges| {
+                    edges.map(|beyond| match beyond {
+                        navmesh::Beyond::Nothing => Beyond::Nothing,
+                        navmesh::Beyond::Triangle(triangle) => Beyond::Triangle(triangle.into()),
+                        navmesh::Beyond::Link { navmesh, triangle } => Beyond::Link {
+                            navmesh: record_id(navmesh, masters, plugin_name),
+                            triangle: triangle.into(),
+                        },
+                    })
+                })
+                .collect(),
+            doors: geometry
+                .doors
+                .iter()
+                .map(|(triangle, door)| {
+                    (u32::from(*triangle), record_id(*door, masters, plugin_name))
+                })
                 .collect(),
         });
     (id, shape)
