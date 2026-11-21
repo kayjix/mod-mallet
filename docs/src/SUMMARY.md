@@ -72,6 +72,7 @@
   - [0055 A magic wand for what belongs together, and one column per mod](adr/0055-a-magic-wand-for-what-belongs-together.md)
   - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)
   - [0057 One version for the app](adr/0057-one-version-for-the-app.md)
+  - [0058 Paths repaired on the ground below](adr/0058-paths-repaired-on-the-ground-below.md)
   - [0059 Where characters still go](adr/0059-where-characters-still-go.md)
   - [0060 Objects moved a little through a plugin](adr/0060-objects-moved-a-little-through-a-plugin.md)
   - [0061 Switched-off mods, and mods worth removing](adr/0061-switched-off-mods-and-mods-to-remove.md)

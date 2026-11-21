@@ -78,12 +78,13 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0049](0049-the-files-every-mod-brings.md) | The files every mod brings, from the mod manager's staging folder | accepted |
 | [0050](0050-a-guided-review-through-the-homes.md) | A guided review through the homes, collisions structure by structure | accepted |
 | [0051](0051-paths-over-hidden-objects.md) | Paths over hidden objects are found before and after hiding | accepted |
-| [0052](0052-paths-over-hidden-objects-are-cut-out.md) | Paths over hidden objects are cut out of the navigation meshes | accepted |
+| [0052](0052-paths-over-hidden-objects-are-cut-out.md) | Paths over hidden objects are cut out of the navigation meshes | accepted; changed by 0058 |
 | [0053](0053-shareable-patches-in-parts.md) | Shareable patches in parts, with an installer | accepted |
 | [0054](0054-a-catalogue-of-the-games-things.md) | A catalogue of the game's things, and asset collisions beside map collisions | accepted |
 | [0055](0055-a-magic-wand-for-what-belongs-together.md) | A magic wand for what belongs together, and one column per mod | accepted |
 | [0056](0056-missing-textures-found-in-switched-off-mods.md) | Missing textures are looked for in switched-off mods | accepted |
 | [0057](0057-one-version-for-the-app.md) | One version for the app, shown with its build | accepted |
+| [0058](0058-paths-repaired-on-the-ground-below.md) | Paths over hidden objects are repaired on the ground below | accepted |
 | [0059](0059-where-characters-still-go.md) | Where characters still go once objects are hidden | accepted |
 | [0060](0060-objects-moved-a-little-through-a-plugin.md) | Objects are moved a little, through a plugin Mod Mallet writes | accepted |
 | [0061](0061-switched-off-mods-and-mods-to-remove.md) | Switched-off mods, and mods worth removing | accepted |

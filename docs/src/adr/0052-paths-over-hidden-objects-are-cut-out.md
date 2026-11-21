@@ -1,6 +1,6 @@
 # 0052 Paths over hidden objects are cut out of the navigation meshes
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0058](0058-paths-repaired-on-the-ground-below.md): new paths are laid on the ground below
 - Date: 2026-11-19
 - Changes: the vision's non-goal "not an automatic navmesh generator"
   (repairing is no longer only manual work); ADR 0051 (its repair, "a
