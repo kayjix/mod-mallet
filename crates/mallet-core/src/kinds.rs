@@ -347,6 +347,7 @@ pub const ALL: &[KindInfo] = &[
     MODS_MOSTLY_OVERRIDDEN,
     MODS_DUPLICATES_ANOTHER,
     PATCH_HIDES_WALKWAY,
+    PLUGINS_SWITCHED_OFF_LOADED,
 ];
 
 /// A mod whose placed objects collide with many spots of other mods: a
@@ -359,6 +360,7 @@ pub const MODS_COLLIDES_WIDELY: KindInfo = KindInfo {
     args: &[
         "mod",
         "count",
+        "clearCount",
         "modCount",
         "others",
         "objects",
@@ -367,6 +369,11 @@ pub const MODS_COLLIDES_WIDELY: KindInfo = KindInfo {
         "interiorObjects",
         "lootCount",
         "loot",
+        "dependentCount",
+        "dependentModCount",
+        "dependents",
+        "assetCount",
+        "assetUsers",
     ],
 };
 
@@ -417,6 +424,24 @@ pub const PATCH_HIDES_WALKWAY: KindInfo = KindInfo {
         "unreachable",
         "unreachableNames",
         "longer",
+    ],
+};
+
+/// The plugin of a mod the mod manager keeps switched off is loaded all the
+/// same: the manager has not deployed since, or a copy it did not put
+/// there is still in the data directory (ADR 0061).
+pub const PLUGINS_SWITCHED_OFF_LOADED: KindInfo = KindInfo {
+    id: "plugins.switched-off-but-loaded",
+    severity: Severity::Warning,
+    confidence: Confidence::Certain,
+    args: &[
+        "plugin",
+        "mod",
+        "deployed",
+        "fileCount",
+        "files",
+        "dependentCount",
+        "dependents",
     ],
 };
 

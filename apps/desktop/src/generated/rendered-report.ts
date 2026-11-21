@@ -149,6 +149,11 @@ export interface RenderedReport {
    */
   scannedAt: number;
   /**
+   * The plugins of mods the mod manager keeps switched off, whose
+   * collisions and decisions wait until the mod is on again (ADR 0061).
+   */
+  switchedOffPlugins?: SwitchedOffPlugin[];
+  /**
    * The mods for the game's Unreal Engine side (ADR 0065).
    */
   unrealPaks?: UnrealPak[];
@@ -1421,6 +1426,42 @@ export interface ModInfo {
  * A mod as a mod manager knows it.
  */
 export interface ModRef4 {
+  /**
+   * The manager's own identifier of the mod.
+   */
+  id: string;
+  /**
+   * The name to show to people.
+   */
+  name: string;
+  /**
+   * The manager that knows this mod, for example `vortex`.
+   */
+  source: string;
+}
+/**
+ * A plugin of a mod the mod manager keeps switched off (ADR 0061).
+ *
+ * Usually the game no longer loads it, and the decisions about its
+ * collisions wait until the mod is on again. The game still loads it while
+ * the manager has not deployed since the mod went off, or when a copy the
+ * manager did not put there is still in the data directory and active.
+ */
+export interface SwitchedOffPlugin {
+  /**
+   * Whether the game loads the plugin all the same.
+   */
+  loaded: boolean;
+  mod: ModRef5;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A mod as a mod manager knows it.
+ */
+export interface ModRef5 {
   /**
    * The manager's own identifier of the mod.
    */

@@ -40,6 +40,7 @@ mod places;
 pub mod reachability;
 pub mod recommendations;
 pub mod setup;
+pub mod switched_off;
 pub mod walkways;
 
 use std::cell::OnceCell;
@@ -110,6 +111,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(recommendations::MostlyOverridden),
         Box::new(recommendations::DuplicateMods),
         Box::new(walkways::HiddenWalkways),
+        Box::new(switched_off::SwitchedOffButLoaded),
     ]
 }
 

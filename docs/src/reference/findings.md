@@ -39,6 +39,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `mods.mostly-overridden` | Note | hint | Suggestion: hardly anything of a mod reaches the game |
 | `mods.duplicates-another` | Note | hint | Suggestion: a mod places largely the same objects as another |
 | `patch.hides-walkway` | Warning | likely | Mod Mallet's patch hides something characters walk on |
+| `plugins.switched-off-but-loaded` | Warning | certain | A mod you switched off is still in the game |
 
 ## extender.plugin-incompatible
 
@@ -394,7 +395,7 @@ Mod Mallet needs to know which plugins are active and in which order the game lo
 
 - Severity: Note
 - Confidence: hint
-- Message arguments: `mod`, `count`, `modCount`, `others`, `objects`, `total`, `interiors`, `interiorObjects`, `lootCount`, `loot`
+- Message arguments: `mod`, `count`, `clearCount`, `modCount`, `others`, `objects`, `total`, `interiors`, `interiorObjects`, `lootCount`, `loot`, `dependentCount`, `dependentModCount`, `dependents`, `assetCount`, `assetUsers`
 
 This is only a suggestion; nothing is broken. Two mods that change the same part of the world put their buildings, trees and fences where the other already has something, even mods by the same author when one was not made to fit the other there. A few such places are normal and are listed one by one under collisions. When one mod collides this often, the two do not fit together in these places as they are, or a patch that makes them fit is missing.
 
@@ -435,3 +436,15 @@ This is only a suggestion; nothing is broken. Collections ("all in one") often c
 Characters in the game find their way on an invisible net laid over everything they can walk on: the ground, but also bridges, piers, decks and stairs. Mod Mallet's patch hides an object by making it invisible and letting everyone pass through it, but the net stays as it was made. Where the net runs over a hidden deck, pier or bridge, townspeople, guards, followers and animals walk on thin air or get stuck at its edge, and a quest that sends someone across can stop. You yourself fall through where the object was.
 
 **What to do:** Decide what matters more to you here. Keep the object: on the collisions page, let the other mod's object give way instead, or keep both. Or accept it knowingly if nobody needs to walk there, such as on a ship that nobody boards. Mod Mallet cannot yet repair the paths so that they fit without the object.
+
+## plugins.switched-off-but-loaded
+
+**A mod you switched off is still in the game**
+
+- Severity: Warning
+- Confidence: certain
+- Message arguments: `plugin`, `mod`, `deployed`, `fileCount`, `files`, `dependentCount`, `dependents`
+
+When a mod manager installs a mod, it puts the mod's files into the game's Data folder; when you switch the mod off, it takes them out again the next time it deploys. Until it deploys, the game still loads them. And if a file of the same name was already in the folder before, from an installation by hand or by another tool, the mod manager sets it aside and puts it back when the mod goes. The game then keeps finding the plugin, and the mod manager keeps it in the list of active plugins. Either way, the mod is off in the mod manager but still in the game.
+
+**What to do:** If your mod manager has not deployed yet, deploy. If the files stay, they were not the mod manager's: open its list of plugins and switch the plugin off, or delete the files named here from the game's Data folder. If plugins of other mods build on it, switch those off too. Then scan again. If you want the mod after all, switch it on again in your mod manager instead.

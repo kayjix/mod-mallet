@@ -29,6 +29,18 @@ in [Releases](docs/src/contributing/releases.md).
   they would only get by a long way round. The collisions page draws the
   way before in grey, the way round in green, and marks in red where no
   way is left.
+- A mod you switched off in Vortex that the game still loads is named in
+  the tasks, with the files that keep it there and what to do; its
+  collisions say so in the worklist.
+- What you decided about a mod is kept when you switch it off. While the
+  game no longer loads it, those decisions wait: they do not count and do
+  not go into the patch, and the patch page says how many wait. They are
+  back when you switch the mod on again.
+- A mod that collides with very many others is shown where you work: first
+  among the recommendations, on the mods page and on the collisions page.
+  It says what relies on the mod before it suggests removing it, points to
+  the clear suggestions where most of its places are clear, and switches it
+  off in Vortex on a click.
 
 ## [0.2.2] - 2026-11-19
 

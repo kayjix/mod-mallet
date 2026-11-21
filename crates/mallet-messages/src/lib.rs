@@ -262,6 +262,10 @@ pub struct RenderedReport {
     pub unreal_paks: Vec<mallet_core::UnrealPak>,
     /// What two mods disagree about, pair by pair.
     pub duels: Vec<RenderedDuel>,
+    /// The plugins of mods the mod manager keeps switched off, whose
+    /// collisions and decisions wait until the mod is on again (ADR 0061).
+    #[serde(default)]
+    pub switched_off_plugins: Vec<mallet_core::SwitchedOffPlugin>,
     /// The findings with their texts, most severe first.
     pub findings: Vec<RenderedFinding>,
 }
@@ -678,6 +682,7 @@ impl Messages {
             object_swapper: report.object_swapper,
             installed_patch: report.installed_patch.clone(),
             unreal_paks: report.unreal_paks.clone(),
+            switched_off_plugins: report.switched_off_plugins.clone(),
             duels: {
                 // The mod manager knows the proper names; deployments only
                 // know folders.

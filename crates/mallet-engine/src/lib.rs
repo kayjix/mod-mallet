@@ -30,6 +30,7 @@ mod preview;
 mod reach;
 mod settings;
 mod staging;
+mod switched_off;
 mod toolbox;
 mod unreal;
 mod versions;
@@ -267,6 +268,8 @@ fn scan_with(
     progress.step(ScanStep::Mods);
     let (mods, installers, mod_infos) = load_mod_source(options, &game_dir, store, &mut locations)?;
     facts.installers = installers;
+    facts.switched_off_plugins =
+        switched_off::plugins(game, &game_dir, &facts.plugins, mods.as_ref());
     tracing::info!(
         plugins = facts.plugins.len(),
         archives = facts.archives.len(),
@@ -353,6 +356,7 @@ fn scan_with(
         installed_patch,
         duels,
         unreal_paks,
+        switched_off_plugins: facts.switched_off_plugins.clone(),
     })
 }
 

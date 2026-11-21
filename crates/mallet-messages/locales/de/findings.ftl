@@ -394,6 +394,13 @@ mods-collides-widely = Vorschlag: Eine Mod kollidiert an vielen Orten mit andere
         } { $lootCount ->
             [0] {""}
            *[other] LOOT sagt dazu: { $loot }
+        } { $dependentModCount ->
+            [0] Kein Plugin einer anderen Mod baut auf { $mod } auf.
+            [one] 1 andere Mod braucht { $mod }: { $dependents }. Entfernst du { $mod }, geht sie kaputt, außer du entfernst sie mit.
+           *[other] { $dependentModCount } andere Mods brauchen { $mod }: { $dependents }. Entfernst du { $mod }, gehen sie kaputt, außer du entfernst sie mit.
+        } { $assetCount ->
+            [0] {""}
+           *[other] Objekte anderer Mods zeigen Modelle, die nur { $mod } mitbringt ({ $assetUsers }); ohne sie würden sie fehlen.
         }
     .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Zwei Mods, die denselben Teil der Welt verändern, stellen ihre Gebäude, Bäume und Zäune dorthin, wo die andere schon etwas hat, auch Mods desselben Autors, wenn die eine dort nicht auf die andere abgestimmt ist. Ein paar solcher Orte sind normal und stehen einzeln unter den Kollisionen. Kollidiert eine Mod so oft, passen die beiden an diesen Orten so nicht zusammen, oder es fehlt ein Patch, der sie aufeinander abstimmt.
     .remedy = Entscheide, welche Fassung dieser Orte dir lieber ist. Nennt LOOT einen Patch, installiere ihn zuerst und scanne erneut. Ist dir die Fassung der anderen Mods lieber, behalte die Mod und lass sie in der Liste der Kollisionen an allen Orten auf einmal gegen die anderen Mods verlieren; schalte sie nur aus, wenn sie sonst nichts mitbringt, was du willst, etwa eigene Räume. Gefällt dir die Mod, behalte sie und suche auf ihrer Seite nach einem Patch, der sie mit den anderen Mods verträglich macht.
@@ -421,6 +428,29 @@ mods-duplicates-another = Vorschlag: Eine Mod stellt größtenteils dieselben Ob
         }
     .explanation = Das ist nur ein Vorschlag; kaputt ist nichts. Sammlungen („all in one“) enthalten oft Mods, die es auch einzeln gibt, und zwei Mods können denselben Ort auf dieselbe Weise umbauen. Sind beide installiert, stehen dieselben Gebäude doppelt am selben Ort, und ihre Oberflächen flackern. Ein Plugin, das für eine der beiden gemacht ist, etwa ein Kompatibilitäts-Patch, funktioniert nur mit dieser, und das ist ein guter Grund, sie zu behalten.
     .remedy = Behalte die, die dir lieber ist, und schalte die andere in deinem Mod-Manager aus; nimm lieber die, für die die Patches gemacht sind, die du benutzt. Bevor du eine ausschaltest, sieh nach, ob sie etwas mitbringt, das der anderen fehlt, etwa einen Innenraum: Dann behalte beide und lass in der Liste der Kollisionen eine von ihnen an allen Orten auf einmal verlieren.
+
+plugins-switched-off-but-loaded = Eine Mod, die du ausgeschaltet hast, ist noch im Spiel
+    .headline = { $mod } ist ausgeschaltet, aber das Spiel lädt { $plugin } trotzdem
+    .summary =
+        { $mod } ist in deinem Mod-Manager ausgeschaltet, aber das Spiel lädt { $plugin } trotzdem. { $deployed ->
+            [1] Dein Mod-Manager hat seit dem Ausschalten nicht bereitgestellt (Deploy), darum liegen ihre Dateien noch im Data-Ordner des Spiels: { $files }. Stelle in deinem Mod-Manager bereit, dann nimmt er sie heraus.
+           *[other] { $fileCount ->
+                [one] Eine Kopie ihres Plugins liegt
+               *[other] Kopien ihrer Dateien liegen
+            } noch im Data-Ordner des Spiels: { $files }. Dein Mod-Manager hat sie nicht dorthin gelegt: { $fileCount ->
+                [one] Sie lag
+               *[other] Sie lagen
+            } schon vor der Installation der Mod im Ordner, und beim Ausschalten und Bereitstellen { $fileCount ->
+                [one] ist sie
+               *[other] sind sie
+            } liegen geblieben.
+        } Solange { $plugin } im Spiel ist, sind ihre Kollisionen echt und bleiben in der Liste; was du über sie entscheidest, bleibt für den Fall erhalten, dass du die Mod wieder einschaltest. { $dependentCount ->
+            [0] {""}
+            [one] Ein Plugin baut darauf auf: { $dependents }. Nimm es auch heraus, sonst startet das Spiel nicht mehr, sobald { $plugin } weg ist.
+           *[other] { $dependentCount } Plugins bauen darauf auf: { $dependents }. Nimm sie auch heraus, sonst startet das Spiel nicht mehr, sobald { $plugin } weg ist.
+        }
+    .explanation = Wenn ein Mod-Manager eine Mod installiert, legt er ihre Dateien in den Data-Ordner des Spiels; schaltest du die Mod aus, nimmt er sie beim nächsten Bereitstellen wieder heraus. Bis dahin lädt das Spiel sie weiter. Und lag dort schon vorher eine Datei gleichen Namens, von einer Installation von Hand oder durch ein anderes Werkzeug, legt der Mod-Manager sie beiseite und legt sie zurück, wenn die Mod geht. Das Spiel findet das Plugin dann weiterhin, und der Mod-Manager lässt es in der Liste der aktiven Plugins. So oder so ist die Mod im Mod-Manager aus, im Spiel aber noch da.
+    .remedy = Hat dein Mod-Manager noch nicht bereitgestellt, stelle bereit. Bleiben die Dateien, gehörten sie nicht dem Mod-Manager: Öffne seine Liste der Plugins und schalte das Plugin aus, oder lösche die hier genannten Dateien aus dem Data-Ordner des Spiels. Bauen Plugins anderer Mods darauf auf, schalte die auch aus. Scanne danach erneut. Willst du die Mod doch, schalte sie in deinem Mod-Manager stattdessen wieder ein.
 
 patch-hides-walkway = Der Patch von Mod Mallet versteckt etwas, worauf Figuren laufen
     .headline =

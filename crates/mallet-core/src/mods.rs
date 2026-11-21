@@ -44,6 +44,33 @@ pub trait ModSource {
         let _ = path;
         Vec::new()
     }
+
+    /// Every file the mods that are installed but switched off in the
+    /// profile in use bring, by the path the game would see it under, with
+    /// the mod. Empty if there are none or the manager does not say.
+    fn switched_off_files(&self) -> Vec<(GamePath, ModRef)> {
+        Vec::new()
+    }
+}
+
+/// A plugin of a mod the mod manager keeps switched off (ADR 0061).
+///
+/// Usually the game no longer loads it, and the decisions about its
+/// collisions wait until the mod is on again. The game still loads it while
+/// the manager has not deployed since the mod went off, or when a copy the
+/// manager did not put there is still in the data directory and active.
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchedOffPlugin {
+    /// The plugin's file name.
+    pub plugin: String,
+    /// The switched-off mod that brings it.
+    #[serde(rename = "mod")]
+    pub mod_ref: ModRef,
+    /// Whether the game loads the plugin all the same.
+    pub loaded: bool,
 }
 
 /// The [`ModSource`] of a setup that no known mod manager looks after.

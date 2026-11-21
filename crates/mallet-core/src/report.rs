@@ -195,6 +195,10 @@ pub struct ScanReport {
     /// it (ADR 0065).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unreal_paks: Vec<crate::UnrealPak>,
+    /// The plugins of mods the mod manager keeps switched off, whose
+    /// collisions and decisions wait until the mod is on again (ADR 0061).
+    #[serde(default)]
+    pub switched_off_plugins: Vec<crate::SwitchedOffPlugin>,
 }
 
 /// Every version of one file that the setup has, as pictures for the

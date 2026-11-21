@@ -71,6 +71,10 @@ pub struct Facts {
     pub crashes: CrashFacts,
     /// The shapes of the models of objects that may collide.
     pub models: ModelFacts,
+    /// The plugins of mods the mod manager keeps switched off, other than
+    /// the game's own, and whether the game loads them all the same
+    /// (ADR 0061).
+    pub switched_off_plugins: Vec<crate::SwitchedOffPlugin>,
 }
 
 /// The surface textures a mesh names.

@@ -111,6 +111,14 @@
       "format": "uint32",
       "minimum": 0
     },
+    "switchedOffPlugins": {
+      "description": "The plugins of mods the mod manager keeps switched off, whose\ncollisions and decisions wait until the mod is on again (ADR 0061).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SwitchedOffPlugin"
+      }
+    },
     "unrealPaks": {
       "description": "The mods for the game's Unreal Engine side, for a game drawn with\nit (ADR 0065).",
       "type": "array",
@@ -1927,6 +1935,29 @@
           "type": "string",
           "const": "specialist"
         }
+      ]
+    },
+    "SwitchedOffPlugin": {
+      "description": "A plugin of a mod the mod manager keeps switched off (ADR 0061).\n\nUsually the game no longer loads it, and the decisions about its\ncollisions wait until the mod is on again. The game still loads it while\nthe manager has not deployed since the mod went off, or when a copy the\nmanager did not put there is still in the data directory and active.",
+      "type": "object",
+      "properties": {
+        "loaded": {
+          "description": "Whether the game loads the plugin all the same.",
+          "type": "boolean"
+        },
+        "mod": {
+          "description": "The switched-off mod that brings it.",
+          "$ref": "#/$defs/ModRef"
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "mod",
+        "loaded"
       ]
     },
     "Topic": {

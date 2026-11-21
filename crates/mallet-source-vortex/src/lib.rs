@@ -336,6 +336,20 @@ impl ModSource for VortexDeployment {
             .map(|folder| self.mod_ref(folder))
             .collect()
     }
+
+    fn switched_off_files(&self) -> Vec<(GamePath, ModRef)> {
+        let mut files: Vec<(GamePath, ModRef)> = self
+            .switched_off
+            .iter()
+            .flat_map(|(path, folders)| {
+                folders
+                    .iter()
+                    .map(|folder| (path.clone(), self.mod_ref(folder)))
+            })
+            .collect();
+        files.sort();
+        files
+    }
 }
 
 #[cfg(test)]
@@ -468,6 +482,10 @@ mod tests {
             deployment.provider_of(&GamePath::new("data/textures/town/wall.dds")),
             None
         );
+        // Every file of the switched-off mods can be listed with its mod.
+        let [(path, owner)] = deployment.switched_off_files().try_into().unwrap();
+        assert_eq!(path, GamePath::new("data/textures/town/wall.dds"));
+        assert_eq!(owner.name, "Town Textures");
     }
 
     #[test]

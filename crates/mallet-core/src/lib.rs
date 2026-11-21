@@ -39,7 +39,7 @@ pub use cache::{NoCache, TextCache};
 pub use facts::Facts;
 pub use finding::{ArgValue, Confidence, Finding, FindingId, Party, Severity, Subject};
 pub use kinds::KindInfo;
-pub use mods::{ModRef, ModSource, NoModSource};
+pub use mods::{ModRef, ModSource, NoModSource, SwitchedOffPlugin};
 pub use patch::{DEFAULT_PATCH_NAME, Patch, PatchInGame, PatchPart};
 pub use path::GamePath;
 pub use progress::{Progress, ScanProgress, ScanStep};

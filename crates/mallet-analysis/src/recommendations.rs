@@ -30,6 +30,12 @@ const EXAMPLE_LIMIT: usize = 5;
 /// worth, more than a patch would usually leave.
 const MIN_SPOTS: usize = 20;
 
+/// Of two objects that collide, one that takes up at least this many times
+/// the room of the other makes the decision clear: keep the big one. As
+/// for the clear suggestions of the guided review (ADR 0050), measured here
+/// by the objects' boxes.
+const CLEAR_RATIO: f64 = 20.0;
+
 /// A mod is mostly overridden only if Mod Mallet compared at least this
 /// many of its parts: below that, a few overrides say little.
 const MIN_PARTS: usize = 20;
@@ -57,6 +63,7 @@ impl Analysis for WideCollisions {
             *placed.entry(mods.owner(object.owner())).or_default() += 1;
         }
         let placed_by = |owner: &Owner| placed.get(owner).copied().unwrap_or_default();
+        let room = rooms_of(context);
 
         // Two mods one of which duplicates the other are suggested as such.
         let duplicates: HashSet<(Owner, Owner)> = twin_pairs(context, &mods)
@@ -90,6 +97,9 @@ impl Analysis for WideCollisions {
                 }
                 let tally = tallies.entry(own_mod.clone()).or_default();
                 tally.spots += 1;
+                if is_clear(&room, &first.object, &second.object) {
+                    tally.clear += 1;
+                }
                 tally.objects.insert(own.object.clone());
                 *tally.others.entry(other_owner.name()).or_default() += 1;
                 if !tally.partners.contains(other_owner) {
@@ -106,10 +116,14 @@ impl Analysis for WideCollisions {
                 let total = placed_by(&Owner::Mod(owner.clone()));
                 let (interiors, interior_objects) = rooms.only(&owner, &tally.partners);
                 let loot = loot_about(context, &mods, &owner, &tally.partners);
-                let needed = mods.needed_by_others(&owner);
+                // What relies on it, said before any advice to remove it.
+                let dependents = mods.dependents_of(&owner);
+                let dependent_plugins: usize = dependents.values().map(Vec::len).sum();
+                let assets = asset_users(context, &mods, &owner);
                 let finding = Finding::new(&kinds::MODS_COLLIDES_WIDELY, mod_subject(&owner))
                     .with_arg("mod", owner.name.clone())
                     .with_arg("count", number(tally.spots))
+                    .with_arg("clearCount", number(tally.clear))
                     .with_arg("modCount", number(tally.others.len()))
                     .with_arg("others", ranked(&tally.others))
                     .with_arg("objects", number(tally.objects.len()))
@@ -124,17 +138,66 @@ impl Analysis for WideCollisions {
 ",
                         ),
                     )
+                    .with_arg("dependentCount", number(dependent_plugins))
+                    .with_arg("dependentModCount", number(dependents.len()))
+                    .with_arg("dependents", listed(&dependents))
+                    .with_arg("assetCount", number(assets.values().sum()))
+                    .with_arg("assetUsers", ranked(&assets))
                     .with_provider(Some(owner));
-                // Switching off a mod other mods build on would stop the
-                // game from starting, and one that furnishes rooms of its
-                // own would take them away.
-                if needed || interiors > 0 {
-                    finding
-                } else {
-                    offer_disabling(finding)
-                }
+                // Switching it off stays the user's call, on a click: the
+                // texts say first what relies on it and what it would take
+                // away (ADR 0061).
+                offer_disabling(finding)
             })
             .collect()
+    }
+}
+
+/// The room each placed object takes up, by its box, in cubic game units,
+/// as collision spots name them: by the plugin the object counts as, in
+/// lower case, and its number.
+fn rooms_of(context: &Context<'_>) -> HashMap<(String, u32), f64> {
+    let bases: HashMap<&RecordId, &mallet_core::facts::objects::BaseObject> = context
+        .facts
+        .objects
+        .bases
+        .iter()
+        .map(|base| (&base.id, base))
+        .collect();
+    context
+        .facts
+        .objects
+        .placed
+        .iter()
+        .filter_map(|object| {
+            let base = bases.get(&object.base)?;
+            let scale = f64::from(object.scale) / 1000.0;
+            let [x, y, z] = [0, 1, 2].map(|axis| {
+                let min = base.bounds.min.get(axis).copied().unwrap_or_default();
+                let max = base.bounds.max.get(axis).copied().unwrap_or_default();
+                f64::from(max.saturating_sub(min).max(0)) * scale
+            });
+            Some((
+                (object.owner().to_lowercase(), object.id.local_id),
+                x * y * z,
+            ))
+        })
+        .collect()
+}
+
+/// Whether one of two colliding objects is so much larger than the other
+/// that keeping it is the clear decision.
+fn is_clear(room: &HashMap<(String, u32), f64>, a: &ObjectRef, b: &ObjectRef) -> bool {
+    let of = |object: &ObjectRef| {
+        room.get(&(object.plugin.to_lowercase(), object.local_id))
+            .copied()
+    };
+    match (of(a), of(b)) {
+        (Some(a), Some(b)) => {
+            let (small, large) = if a <= b { (a, b) } else { (b, a) };
+            large >= CLEAR_RATIO * small
+        }
+        _ => false,
     }
 }
 
@@ -471,6 +534,9 @@ fn plugin_stem(plugin: &str) -> &str {
 struct Tally {
     /// The collision spots the mod is part of.
     spots: usize,
+    /// Those of them where one object is far larger than the other, so
+    /// that the decision is clear (see [`CLEAR_RATIO`]).
+    clear: usize,
     /// The mod's own objects among them.
     objects: BTreeSet<ObjectRef>,
     /// How many spots it shares with each other mod, by name.
@@ -729,6 +795,32 @@ impl PluginMods {
         patches
     }
 
+    /// The plugins of other mods that build on a plugin of `owner`, by the
+    /// name of their mod (or their file name, where no mod claims them).
+    fn dependents_of(&self, owner: &ModRef) -> BTreeMap<String, Vec<String>> {
+        let own: HashSet<&String> = self
+            .plugins
+            .iter()
+            .filter(|(_, (_, plugin_mod, _))| plugin_mod.as_ref() == Some(owner))
+            .map(|(name, _)| name)
+            .collect();
+        let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (file, plugin_mod, masters) in self.plugins.values() {
+            if plugin_mod.as_ref() != Some(owner)
+                && masters.iter().any(|master| own.contains(master))
+            {
+                let name = plugin_mod
+                    .as_ref()
+                    .map_or_else(|| file.clone(), |plugin_mod| plugin_mod.name.clone());
+                found.entry(name).or_default().push(file.clone());
+            }
+        }
+        for files in found.values_mut() {
+            files.sort_unstable();
+        }
+        found
+    }
+
     /// Whether a plugin of another mod builds on a plugin of `owner`.
     fn needed_by_others(&self, owner: &ModRef) -> bool {
         let own: HashSet<&String> = self
@@ -773,6 +865,87 @@ fn ranked(counts: &BTreeMap<String, usize>) -> String {
         .join(", ")
 }
 
+/// How many plugins of one mod are named before the rest are counted.
+const PLUGINS_PER_MOD: usize = 2;
+
+/// Mods with their plugins, such as `Patch Hub (A.esp, B.esp, +3), C.esp`:
+/// a plugin no mod claims stands for itself.
+fn listed(dependents: &BTreeMap<String, Vec<String>>) -> String {
+    dependents
+        .iter()
+        .take(EXAMPLE_LIMIT)
+        .map(|(name, files)| match files.as_slice() {
+            [file] if file == name => name.clone(),
+            _ => {
+                let mut shown: Vec<String> = files.iter().take(PLUGINS_PER_MOD).cloned().collect();
+                if files.len() > PLUGINS_PER_MOD {
+                    shown.push(format!("+{}", files.len() - PLUGINS_PER_MOD));
+                }
+                format!("{name} ({})", shown.join(", "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The other mods whose objects show models that only `owner` brings,
+/// with how many of their base objects do: without the mod they would
+/// show nothing. A model another archive or loose file has as well is left
+/// out, since the game would take that one instead.
+fn asset_users(
+    context: &Context<'_>,
+    mods: &PluginMods,
+    owner: &ModRef,
+) -> BTreeMap<String, usize> {
+    let own = Owner::Mod(owner.clone());
+    let data = mallet_core::GamePath::new("data");
+    let candidates: Vec<(mallet_core::GamePath, Owner)> = context
+        .facts
+        .objects
+        .bases
+        .iter()
+        .filter_map(|base| {
+            let model = base.model.as_deref()?;
+            let user = mods.owner(&base.id.plugin);
+            (user != own).then(|| (data.join(model), user))
+        })
+        .collect();
+    if candidates.is_empty() {
+        return BTreeMap::new();
+    }
+    let wanted: HashSet<&mallet_core::GamePath> = candidates.iter().map(|(path, _)| path).collect();
+    // Every source of each wanted model: the mod that deployed it, if any.
+    let mut sources: HashMap<&mallet_core::GamePath, Vec<Option<ModRef>>> = HashMap::new();
+    for archive in &context.facts.archives {
+        let provider = context.mods.provider_of(&archive.path);
+        for file in &archive.files {
+            if let Some(path) = wanted.get(file) {
+                sources.entry(path).or_default().push(provider.clone());
+            }
+        }
+    }
+    for path in &wanted {
+        if context.assets.is_loose(path) {
+            sources
+                .entry(path)
+                .or_default()
+                .push(context.mods.provider_of(path));
+        }
+    }
+    let only_owner = |path: &mallet_core::GamePath| {
+        sources.get(path).is_some_and(|found| {
+            !found.is_empty() && found.iter().all(|source| source.as_ref() == Some(owner))
+        })
+    };
+    let mut users: BTreeMap<String, usize> = BTreeMap::new();
+    for (path, user) in &candidates {
+        if only_owner(path) {
+            *users.entry(user.name()).or_default() += 1;
+        }
+    }
+    users
+}
+
 fn number(value: usize) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
@@ -784,7 +957,7 @@ mod tests {
         BaseKind, BaseObject, Bounds, ObjectFacts, Place, PlacedObject,
     };
     use mallet_core::facts::{ArchiveFacts, NpcFacts, PluginFacts};
-    use mallet_core::{Action, ArgValue, Facts, GamePath};
+    use mallet_core::{Action, ArgValue, Facts, GamePath, NoModSource};
 
     use super::*;
     use crate::assets::testing::Mods;
@@ -889,6 +1062,8 @@ mod tests {
         assert_eq!(finding.kind, "mods.collides-widely");
         assert_eq!(finding.args["mod"], ArgValue::from("Small Village"));
         assert_eq!(finding.args["count"], ArgValue::Number(25));
+        // Two houses of a size: none of the places is a clear decision.
+        assert_eq!(finding.args["clearCount"], ArgValue::Number(0));
         assert_eq!(finding.args["modCount"], ArgValue::Number(1));
         assert_eq!(finding.args["others"], ArgValue::from("Large Town (25)"));
         assert_eq!(finding.args["objects"], ArgValue::Number(25));
@@ -896,6 +1071,27 @@ mod tests {
         assert!(matches!(
             finding.actions.as_slice(),
             [Action::DisableMod { .. }]
+        ));
+    }
+
+    #[test]
+    fn a_lantern_against_a_house_is_a_clear_decision_two_houses_are_not() {
+        let mut facts = colliding(1, 100, Vec::new());
+        // The small mod's house is shrunk to a lantern's size.
+        if let Some(lantern) = facts.objects.placed.first_mut() {
+            lantern.scale = 300;
+        }
+        let room = rooms_of(&Context::new(&facts, &NoModSource));
+        let object = |plugin: &str| ObjectRef {
+            plugin: plugin.to_owned(),
+            local_id: 0x800,
+        };
+        assert!(is_clear(&room, &object("Small.esp"), &object("Large.esp")));
+        assert!(!is_clear(&room, &object("Large.esp"), &object("Large.esp")));
+        assert!(!is_clear(
+            &room,
+            &object("Small.esp"),
+            &object("Unknown.esp")
         ));
     }
 
@@ -934,8 +1130,12 @@ mod tests {
             finding.args["loot"],
             ArgValue::from("Use the Village Patch Collection.")
         );
-        // Switching it off would take the room away.
-        assert_eq!(finding.actions, []);
+        // Switching it off would take the room away, which the texts say;
+        // whether to is the user's call, on a click (ADR 0061).
+        assert!(matches!(
+            finding.actions.as_slice(),
+            [Action::DisableMod { .. }]
+        ));
     }
 
     #[test]
@@ -946,14 +1146,49 @@ mod tests {
     }
 
     #[test]
-    fn a_mod_others_build_on_is_not_offered_to_be_switched_off() {
-        let facts = colliding(25, 100, vec![plugin("Patch.esp", &["Small.esp"])]);
-        let mods = mods();
+    fn what_relies_on_a_mod_is_named_before_switching_it_off() {
+        let mut facts = colliding(25, 100, vec![plugin("Patch.esp", &["Small.esp"])]);
+        // The large mod shows a model only the small mod's archive has.
+        facts.objects.bases.push(BaseObject {
+            id: id("Large.esp", 0x700),
+            editor_id: Some("Lantern".to_owned()),
+            name: None,
+            model: Some("meshes/village/lantern.nif".to_owned()),
+            kind: BaseKind::Static,
+            solid: false,
+            natural: false,
+            bounds: Bounds {
+                min: [0, 0, 0],
+                max: [10, 10, 10],
+            },
+        });
+        facts.archives.push(ArchiveFacts {
+            path: GamePath::new("data/small.bsa"),
+            files: vec![GamePath::new("data/meshes/village/lantern.nif")],
+        });
+        let mods = Mods(vec![
+            ("data/small.esp", "Small Village"),
+            ("data/small.bsa", "Small Village"),
+            ("data/large.esp", "Large Town"),
+            ("data/patch.esp", "Patch"),
+        ]);
         let findings = WideCollisions.run(&Context::new(&facts, &mods));
         let [finding] = findings.as_slice() else {
             panic!("expected one suggestion, got {findings:?}");
         };
-        assert_eq!(finding.actions, []);
+        assert_eq!(finding.args["dependentCount"], ArgValue::Number(1));
+        assert_eq!(finding.args["dependentModCount"], ArgValue::Number(1));
+        assert_eq!(
+            finding.args["dependents"],
+            ArgValue::from("Patch (Patch.esp)")
+        );
+        assert_eq!(finding.args["assetCount"], ArgValue::Number(1));
+        assert_eq!(finding.args["assetUsers"], ArgValue::from("Large Town (1)"));
+        // Offered, on a click, with the dependents named in the texts.
+        assert!(matches!(
+            finding.actions.as_slice(),
+            [Action::DisableMod { .. }]
+        ));
     }
 
     #[test]

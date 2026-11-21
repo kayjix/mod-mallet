@@ -400,6 +400,13 @@ mods-collides-widely = Suggestion: a mod collides with many places of other mods
         } { $lootCount ->
             [0] {""}
            *[other] LOOT says: { $loot }
+        } { $dependentModCount ->
+            [0] No other mod's plugin builds on { $mod }.
+            [one] 1 other mod needs { $mod }: { $dependents }. Removing { $mod } breaks it unless you remove it too.
+           *[other] { $dependentModCount } other mods need { $mod }: { $dependents }. Removing { $mod } breaks them unless you remove them too.
+        } { $assetCount ->
+            [0] {""}
+           *[other] Objects of other mods show models that only { $mod } brings ({ $assetUsers }); without it they would be missing.
         }
     .explanation = This is only a suggestion; nothing is broken. Two mods that change the same part of the world put their buildings, trees and fences where the other already has something, even mods by the same author when one was not made to fit the other there. A few such places are normal and are listed one by one under collisions. When one mod collides this often, the two do not fit together in these places as they are, or a patch that makes them fit is missing.
     .remedy = Decide which version of these places you prefer. If LOOT names a patch, install it first and scan again. If you prefer the other mods' version, keep the mod and, in the list of collisions, let it lose against the other mods in every place at once; switch it off only if it brings nothing else you want, such as rooms of its own. If you like the mod, keep it, and look on its page for a patch that makes it work with the other mods.
@@ -427,6 +434,32 @@ mods-duplicates-another = Suggestion: a mod places largely the same objects as a
         }
     .explanation = This is only a suggestion; nothing is broken. Collections ("all in one") often contain mods that are also offered on their own, and two mods can rebuild the same place in the same way. With both installed, the same buildings stand twice in the same spot and their surfaces flicker. A plugin made for one of the two, such as a compatibility patch, only works with that one, which is a good reason to keep it.
     .remedy = Keep the one you prefer and switch the other off in your mod manager; prefer the one the patches you use are made for. Before you switch one off, check whether it brings something the other lacks, such as an interior: then keep both, and in the list of collisions let one of them lose in every place at once.
+
+plugins-switched-off-but-loaded = A mod you switched off is still in the game
+    .headline = { $mod } is switched off, but the game still loads { $plugin }
+    .summary =
+        { $mod } is switched off in your mod manager, but the game still loads { $plugin }. { $deployed ->
+            [1] Your mod manager has not deployed since you switched it off, so its files are still in the game's Data folder: { $files }. Deploy in your mod manager to take them out.
+           *[other] { $fileCount ->
+                [one] A copy of its plugin is
+               *[other] Copies of its files are
+            } still in the game's Data folder: { $files }. Your mod manager did not put { $fileCount ->
+                [one] it
+               *[other] them
+            } there: { $fileCount ->
+                [one] it was
+               *[other] they were
+            } in the folder before the mod was installed, so switching the mod off, and deploying, left { $fileCount ->
+                [one] it
+               *[other] them
+            } behind.
+        } Until { $plugin } is out of the game, its collisions are real and stay in the list; what you decide about them is kept for when the mod is on again. { $dependentCount ->
+            [0] {""}
+            [one] One plugin builds on it: { $dependents }. Take that one out as well, or the game will not start once { $plugin } is gone.
+           *[other] { $dependentCount } plugins build on it: { $dependents }. Take these out as well, or the game will not start once { $plugin } is gone.
+        }
+    .explanation = When a mod manager installs a mod, it puts the mod's files into the game's Data folder; when you switch the mod off, it takes them out again the next time it deploys. Until it deploys, the game still loads them. And if a file of the same name was already in the folder before, from an installation by hand or by another tool, the mod manager sets it aside and puts it back when the mod goes. The game then keeps finding the plugin, and the mod manager keeps it in the list of active plugins. Either way, the mod is off in the mod manager but still in the game.
+    .remedy = If your mod manager has not deployed yet, deploy. If the files stay, they were not the mod manager's: open its list of plugins and switch the plugin off, or delete the files named here from the game's Data folder. If plugins of other mods build on it, switch those off too. Then scan again. If you want the mod after all, switch it on again in your mod manager instead.
 
 patch-hides-walkway = Mod Mallet's patch hides something characters walk on
     .headline =
