@@ -11,6 +11,7 @@
 import { useState } from "react";
 import "./wide-advice.css";
 import { ActionResult, useAction, useSession } from "./Actions";
+import { DependentLinks } from "./dependent-links";
 import type { Action, RenderedFinding } from "./generated/rendered-report";
 import { wideTexts } from "./switched-off-texts";
 
@@ -93,6 +94,7 @@ export function SwitchOffButton({ rendered }: { rendered: RenderedFinding }) {
       {asking ? (
         <div className="wide-confirm" role="alertdialog">
           <p>{w.confirm(mod, dependents)}</p>
+          <DependentLinks rendered={rendered} />
           <span className="wide-buttons">
             <button
               type="button"

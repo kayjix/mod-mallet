@@ -336,8 +336,11 @@ const samples: Sample[] = [
       interiors: 0,
       modCount: 1,
       dependentCount: 2,
-      dependentModCount: 1,
-      dependents: "Patch Hub (Water Mod - Old Town Patch.esp, Water Mod - Weather Patch.esp)",
+      dependentModCount: 2,
+      dependents:
+        "Cut Content Patches (Cut Content - Water Patch.esp), Patch Hub (Water Mod - Old Town Patch.esp)",
+      dependentPlugins: "Water Mod - Old Town Patch.esp\nCut Content - Water Patch.esp",
+      dependentModIds: "Patch Hub\nCut Content Patches",
       assetCount: 3,
       assetUsers: "Old Town (3)",
     },

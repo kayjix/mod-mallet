@@ -220,3 +220,9 @@ export function search(graph: DependencyGraph, needle: string): PluginNode[] {
       (node.modName ?? "").toLowerCase().includes(wanted),
   );
 }
+
+/** Where the Mods page is to open: a mod's page, by its identity, or a plugin in the diagram, by file name. */
+export interface DependencyTarget {
+  mod?: string;
+  plugin?: string;
+}

@@ -12,6 +12,8 @@ export interface DependencyPage {
   graph: DependencyGraph | null;
   /** Shows a mod's page in the list of mods. */
   openMod: (modId: string) => void;
+  /** A plugin the diagram is to pick, asked for from another page. */
+  pickAt?: { plugin: string } | null;
 }
 
 /** The Mods page's load order and the way to open a mod from a dependency. */

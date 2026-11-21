@@ -10,6 +10,7 @@ import { CatalogueView } from "./Catalogue";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { catalogueTexts } from "./catalogue-texts";
+import type { DependencyTarget } from "./dependencies";
 import { type Games, useGames } from "./games";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
@@ -213,6 +214,7 @@ export default function App({ api, startLang }: AppProps) {
   // Where the collisions and the map are to open, when another page led there.
   const [pairAt, setPairAt] = useState<[string, string] | null>(null);
   const [mapMod, setMapMod] = useState<string | null>(null);
+  const [modsAt, setModsAt] = useState<DependencyTarget | null>(null);
   useEffect(() => {
     if (patchChoices !== null || storedChoices === undefined || report === null) {
       return;
@@ -377,6 +379,7 @@ export default function App({ api, startLang }: AppProps) {
     setWorkSpot(null);
     setPairAt(null);
     setMapMod(null);
+    setModsAt(null);
     setCompareAt(null);
     setPinnedAsked(false);
     setView(next);
@@ -406,6 +409,14 @@ export default function App({ api, startLang }: AppProps) {
   );
 
   const showToolbox = useCallback(() => go("toolbox"), [go]);
+
+  const showDependency = useCallback(
+    (target: DependencyTarget) => {
+      go("mods");
+      setModsAt({ ...target });
+    },
+    [go],
+  );
 
   const showModOnMap = useCallback(
     (mod: string) => {
@@ -482,6 +493,7 @@ export default function App({ api, startLang }: AppProps) {
       pairAt,
       showModOnMap,
       mapMod,
+      showDependency,
       showToolbox,
       toolbox,
       showPinned,
@@ -512,6 +524,7 @@ export default function App({ api, startLang }: AppProps) {
       pairAt,
       showModOnMap,
       mapMod,
+      showDependency,
       showToolbox,
       toolbox,
       showPinned,
@@ -666,7 +679,12 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "mods" ? (
             <>
               <UnrealPaks paks={report.unrealPaks ?? []} />
-              <ModsView mods={report.mods} findings={report.findings} loadOrder={report.loadOrder} />
+              <ModsView
+                mods={report.mods}
+                findings={report.findings}
+                loadOrder={report.loadOrder}
+                at={modsAt}
+              />
             </>
           ) : (
             <TasksPage report={report} />

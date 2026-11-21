@@ -372,6 +372,8 @@ pub const MODS_COLLIDES_WIDELY: KindInfo = KindInfo {
         "dependentCount",
         "dependentModCount",
         "dependents",
+        "dependentPlugins",
+        "dependentModIds",
         "assetCount",
         "assetUsers",
     ],

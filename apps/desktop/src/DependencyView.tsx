@@ -2,7 +2,7 @@
 // Mods page (ADR 0068): find a plugin, pick it, and see what it needs and
 // what needs it.
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { DependencyArcs } from "./DependencyArcs";
 import { mostNeeded, neighbours, search } from "./dependencies";
 import { useDependencyTexts } from "./dependency-texts";
@@ -17,9 +17,16 @@ const MOST_NEEDED = 8;
 
 /** The diagram of every active plugin and the plugins it needs. */
 export function DependencyView() {
-  const { graph, openMod } = use(DependencyContext);
+  const { graph, openMod, pickAt } = use(DependencyContext);
   const d = useDependencyTexts();
   const [picked, setPicked] = useState<number | null>(null);
+  // A plugin another page asked for.
+  useEffect(() => {
+    const place = pickAt == null ? undefined : graph?.byName.get(pickAt.plugin.toLowerCase());
+    if (place !== undefined) {
+      setPicked(place);
+    }
+  }, [graph, pickAt]);
   const [needle, setNeedle] = useState("");
   const found = useMemo(() => (graph === null ? [] : search(graph, needle)), [graph, needle]);
   const marked = useMemo(() => new Set(found.map((node) => node.index)), [found]);

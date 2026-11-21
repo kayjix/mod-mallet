@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import type { Api } from "./api";
+import type { DependencyTarget } from "./dependencies";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
@@ -73,6 +74,11 @@ export interface Session {
    * window has no toolbox to go to.
    */
   showToolbox?: () => void;
+  /**
+   * Switches to the Mods page, at a mod's page or at a plugin in the
+   * dependency diagram (ADR 0068). Absent where the window has no Mods page.
+   */
+  showDependency?: (target: DependencyTarget) => void;
 }
 
 export const SessionContext = createContext<Session | null>(null);

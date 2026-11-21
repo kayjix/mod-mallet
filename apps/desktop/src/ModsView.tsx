@@ -3,7 +3,7 @@ import { useSession } from "./Actions";
 import { stepOf } from "./arrange";
 import { DependencyView } from "./DependencyView";
 import { duelNames } from "./Duels";
-import { buildGraph } from "./dependencies";
+import { buildGraph, type DependencyTarget } from "./dependencies";
 import type {
   LoadedPlugin,
   ModInfo,
@@ -113,6 +113,7 @@ export function ModsView({
   findings,
   duels = [],
   loadOrder = [],
+  at = null,
 }: {
   mods: ModInfo[];
   findings: RenderedFinding[];
@@ -120,9 +121,12 @@ export function ModsView({
   duels?: RenderedDuel[];
   /** The active plugins in load order, for which plugin needs which (ADR 0068). */
   loadOrder?: LoadedPlugin[];
+  /** Where another page asked the Mods page to open. */
+  at?: DependencyTarget | null;
 }) {
   const [tab, setTab] = useState<"list" | "dependencies">("list");
   const [show, setShow] = useState<{ id: string } | null>(null);
+  const [pickAt, setPickAt] = useState<{ plugin: string } | null>(null);
   const dependencies = useMemo(
     () => ({
       graph: loadOrder.length === 0 ? null : buildGraph(loadOrder, mods),
@@ -130,9 +134,19 @@ export function ModsView({
         setTab("list");
         setShow({ id });
       },
+      pickAt,
     }),
-    [loadOrder, mods],
+    [loadOrder, mods, pickAt],
   );
+  useEffect(() => {
+    if (at?.plugin !== undefined) {
+      setTab("dependencies");
+      setPickAt({ plugin: at.plugin });
+    } else if (at?.mod !== undefined) {
+      setTab("list");
+      setShow({ id: at.mod });
+    }
+  }, [at]);
   return (
     <DependencyContext value={dependencies}>
       {dependencies.graph !== null && (

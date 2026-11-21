@@ -20,6 +20,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::objects::Place;
 use mallet_core::{Finding, ModRef, ObjectRef, Subject, kinds};
 
+use crate::dependencies::Stranded;
 use crate::{Analysis, AssetSource, Context, offer_disabling};
 
 /// How many other mods a finding names.
@@ -116,8 +117,10 @@ impl Analysis for WideCollisions {
                 let total = placed_by(&Owner::Mod(owner.clone()));
                 let (interiors, interior_objects) = rooms.only(&owner, &tally.partners);
                 let loot = loot_about(context, &mods, &owner, &tally.partners);
-                // What relies on it, said before any advice to remove it.
-                let dependents = mods.dependents_of(&owner);
+                // What relies on it, said before any advice to remove it:
+                // everything that would lose a master, transitively.
+                let stranded = crate::dependencies::stranded_by(context, &owner);
+                let dependents = dependents_of(&stranded);
                 let dependent_plugins: usize = dependents.values().map(Vec::len).sum();
                 let assets = asset_users(context, &mods, &owner);
                 let finding = Finding::new(&kinds::MODS_COLLIDES_WIDELY, mod_subject(&owner))
@@ -141,6 +144,18 @@ impl Analysis for WideCollisions {
                     .with_arg("dependentCount", number(dependent_plugins))
                     .with_arg("dependentModCount", number(dependents.len()))
                     .with_arg("dependents", listed(&dependents))
+                    // Every one of them, in load order, with its mod, for
+                    // the question before switching it off to link to.
+                    .with_arg(
+                        "dependentPlugins",
+                        lines(stranded.iter().map(|plugin| plugin.plugin.as_str())),
+                    )
+                    .with_arg(
+                        "dependentModIds",
+                        lines(stranded.iter().map(|plugin| {
+                            plugin.provider.as_ref().map_or("", |known| known.id.as_str())
+                        })),
+                    )
                     .with_arg("assetCount", number(assets.values().sum()))
                     .with_arg("assetUsers", ranked(&assets))
                     .with_provider(Some(owner));
@@ -795,32 +810,6 @@ impl PluginMods {
         patches
     }
 
-    /// The plugins of other mods that build on a plugin of `owner`, by the
-    /// name of their mod (or their file name, where no mod claims them).
-    fn dependents_of(&self, owner: &ModRef) -> BTreeMap<String, Vec<String>> {
-        let own: HashSet<&String> = self
-            .plugins
-            .iter()
-            .filter(|(_, (_, plugin_mod, _))| plugin_mod.as_ref() == Some(owner))
-            .map(|(name, _)| name)
-            .collect();
-        let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        for (file, plugin_mod, masters) in self.plugins.values() {
-            if plugin_mod.as_ref() != Some(owner)
-                && masters.iter().any(|master| own.contains(master))
-            {
-                let name = plugin_mod
-                    .as_ref()
-                    .map_or_else(|| file.clone(), |plugin_mod| plugin_mod.name.clone());
-                found.entry(name).or_default().push(file.clone());
-            }
-        }
-        for files in found.values_mut() {
-            files.sort_unstable();
-        }
-        found
-    }
-
     /// Whether a plugin of another mod builds on a plugin of `owner`.
     fn needed_by_others(&self, owner: &ModRef) -> bool {
         let own: HashSet<&String> = self
@@ -842,6 +831,31 @@ impl PluginMods {
             .get(plugin)
             .is_some_and(|(_, _, masters)| masters.contains(master))
     }
+}
+
+/// The plugins of other mods that would lose a master if a mod went,
+/// directly or because a plugin they need would have to go too (ADR 0068),
+/// as `stranded_by` names them, by the name of their mod (or their file
+/// name, where no mod claims them).
+fn dependents_of(stranded: &[Stranded]) -> BTreeMap<String, Vec<String>> {
+    let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for plugin in stranded {
+        let name = plugin.provider.as_ref().map_or_else(
+            || plugin.plugin.clone(),
+            |plugin_mod| plugin_mod.name.clone(),
+        );
+        found.entry(name).or_default().push(plugin.plugin.clone());
+    }
+    for files in found.values_mut() {
+        files.sort_unstable();
+    }
+    found
+}
+
+/// Values one per line, as a finding carries a list for the window to take
+/// apart.
+fn lines<'a>(values: impl Iterator<Item = &'a str>) -> String {
+    values.collect::<Vec<_>>().join("\n")
 }
 
 /// The subject of a finding about a whole mod.
@@ -1189,6 +1203,45 @@ mod tests {
             finding.actions.as_slice(),
             [Action::DisableMod { .. }]
         ));
+    }
+
+    #[test]
+    fn what_needs_a_dependent_is_named_too() {
+        // A fix for the patch needs the patch, which needs the small mod:
+        // removing the small mod takes both (ADR 0068).
+        let facts = colliding(
+            25,
+            100,
+            vec![
+                plugin("Patch.esp", &["Small.esp"]),
+                plugin("Patch Fix.esp", &["Patch.esp"]),
+            ],
+        );
+        let mods = mods();
+        let findings = WideCollisions.run(&Context::new(&facts, &mods));
+        let [finding] = findings.as_slice() else {
+            panic!("expected one suggestion, got {findings:?}");
+        };
+        assert_eq!(finding.args["dependentCount"], ArgValue::Number(2));
+        assert_eq!(finding.args["dependentModCount"], ArgValue::Number(2));
+        assert_eq!(
+            finding.args["dependents"],
+            ArgValue::from("Patch (Patch.esp), Patch Fix.esp")
+        );
+        assert_eq!(
+            finding.args["dependentPlugins"],
+            ArgValue::from(
+                "Patch.esp
+Patch Fix.esp"
+            )
+        );
+        assert_eq!(
+            finding.args["dependentModIds"],
+            ArgValue::from(
+                "Patch
+"
+            )
+        );
     }
 
     #[test]

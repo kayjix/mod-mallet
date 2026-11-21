@@ -65,6 +65,12 @@ export interface DependencyTexts {
   noLoadOrder: string;
   /** How many plugins a search found. */
   found: (count: number) => string;
+  /** The heading of the plugins that would lose a master if a mod went. */
+  wouldLose: (count: number) => string;
+  /** The button that shows a plugin in the dependency diagram. */
+  inDiagram: (plugin: string) => string;
+  /** The button that opens a mod's page. */
+  modPage: (name: string) => string;
 }
 
 const listEn = (names: string[], more: number) =>
@@ -107,6 +113,12 @@ const en: DependencyTexts = {
     `Diagram of ${plugins} plugins in load order and the ${links} plugins they need`,
   noLoadOrder: "The last scan did not record the load order. Scan again to see it.",
   found: (count) => (count === 1 ? "1 plugin found" : `${count} plugins found`),
+  wouldLose: (count) =>
+    count === 1
+      ? "This plugin would lose a plugin it needs:"
+      : `These ${count} plugins would lose a plugin they need:`,
+  inDiagram: (plugin) => `Show ${plugin} in the dependency diagram`,
+  modPage: (name) => `Open the page of ${name}`,
 };
 
 const de: DependencyTexts = {
@@ -146,6 +158,12 @@ const de: DependencyTexts = {
   noLoadOrder:
     "Der letzte Scan hat die Ladereihenfolge nicht festgehalten. Scanne erneut, um sie zu sehen.",
   found: (count) => (count === 1 ? "1 Plugin gefunden" : `${count} Plugins gefunden`),
+  wouldLose: (count) =>
+    count === 1
+      ? "Diesem Plugin würde ein Plugin fehlen, das es braucht:"
+      : `Diesen ${count} Plugins würde ein Plugin fehlen, das sie brauchen:`,
+  inDiagram: (plugin) => `${plugin} im Abhängigkeitsdiagramm zeigen`,
+  modPage: (name) => `Seite von ${name} öffnen`,
 };
 
 const dependencyTexts: Record<Lang, DependencyTexts> = { en, de };

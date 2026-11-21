@@ -395,7 +395,7 @@ Mod Mallet needs to know which plugins are active and in which order the game lo
 
 - Severity: Note
 - Confidence: hint
-- Message arguments: `mod`, `count`, `clearCount`, `modCount`, `others`, `objects`, `total`, `interiors`, `interiorObjects`, `lootCount`, `loot`, `dependentCount`, `dependentModCount`, `dependents`, `assetCount`, `assetUsers`
+- Message arguments: `mod`, `count`, `clearCount`, `modCount`, `others`, `objects`, `total`, `interiors`, `interiorObjects`, `lootCount`, `loot`, `dependentCount`, `dependentModCount`, `dependents`, `dependentPlugins`, `dependentModIds`, `assetCount`, `assetUsers`
 
 This is only a suggestion; nothing is broken. Two mods that change the same part of the world put their buildings, trees and fences where the other already has something, even mods by the same author when one was not made to fit the other there. A few such places are normal and are listed one by one under collisions. When one mod collides this often, the two do not fit together in these places as they are, or a patch that makes them fit is missing.
 
