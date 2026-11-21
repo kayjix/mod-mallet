@@ -88,5 +88,6 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0060](0060-objects-moved-a-little-through-a-plugin.md) | Objects are moved a little, through a plugin Mod Mallet writes | accepted |
 | [0061](0061-switched-off-mods-and-mods-to-remove.md) | Switched-off mods, and mods worth removing | accepted |
 | [0063](0063-the-tools-vortex-knows.md) | The tools Vortex knows, and Mod Mallet as one of them | accepted |
+| [0064](0064-mod-organizer-2-as-the-second-manager.md) | Mod Organizer 2 as the second mod manager | accepted |
 | [0065](0065-oblivion-remastered.md) | Oblivion Remastered: the old game's data below the installation, Unreal mods beside it | accepted |
 | [0066](0066-other-files-compared-side-by-side.md) | Other files are compared side by side | accepted |

@@ -76,6 +76,7 @@
   - [0060 Objects moved a little through a plugin](adr/0060-objects-moved-a-little-through-a-plugin.md)
   - [0061 Switched-off mods, and mods worth removing](adr/0061-switched-off-mods-and-mods-to-remove.md)
   - [0063 The tools Vortex knows](adr/0063-the-tools-vortex-knows.md)
+  - [0064 Mod Organizer 2 as the second mod manager](adr/0064-mod-organizer-2-as-the-second-manager.md)
   - [0065 Oblivion Remastered](adr/0065-oblivion-remastered.md)
   - [0066 Other files are compared side by side](adr/0066-other-files-compared-side-by-side.md)
   - [Template](adr/template.md)

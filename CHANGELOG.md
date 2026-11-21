@@ -47,6 +47,13 @@ in [Releases](docs/src/contributing/releases.md).
   overlap measured again as you go. Mod Mallet writes the moves into a
   small plugin, Mod Mallet - Moves, which Vortex installs on your click;
   remove it there to put everything back.
+- Mod Organizer 2 as a second mod manager. Choose it on the first-run
+  page or in Settings → Places; Mod Mallet finds global instances by
+  itself and takes the folder of a portable one. It reads the profile in
+  use, the mods' folders and the overwrite folder the way the game sees
+  them, and never writes into Mod Organizer's files: where it would fix
+  something in Vortex, it tells you what to click in Mod Organizer
+  instead. On the command line: `--manager mo2`.
 
 ## [0.2.2] - 2026-11-19
 

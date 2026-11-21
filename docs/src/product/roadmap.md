@@ -24,7 +24,18 @@ desktop app grows only once the findings are right.
 ## Adapters planned along the way
 
 - **Mod Organizer 2** as the second mod manager, to prove that the
-  [`ModSource`](../adr/0009-mod-managers.md) seam holds. Not begun. A shared patch already installs there by hand, since its archive carries a FOMOD installer ([ADR 0053](../adr/0053-shareable-patches-in-parts.md)).
+  [`ModSource`](../adr/0009-mod-managers.md) seam holds (begun: portable
+  and global instances, profiles, separators, switched-off mods and the
+  overwrite folder are read, the scan sees the data directory as the game
+  does, the manager is chosen per game on the first-run page and in
+  Settings, and actions become instructions; see
+  [ADR 0064](../adr/0064-mod-organizer-2-as-the-second-manager.md)). Still
+  open: the views outside the scan (3D, map, catalogue, versions of a file)
+  and the toolbox under Mod Organizer, the installer re-check, the load
+  order of the games ordered by file dates, the game directory of
+  Wabbajack lists from `gamePath`, and trying it on a real Mod Organizer.
+  A shared patch installs there by hand, since its archive carries a FOMOD
+  installer ([ADR 0053](../adr/0053-shareable-patches-in-parts.md)).
 - **The other Bethesda games** (begun: Skyrim VR, Skyrim, Fallout 4, Fallout 4 VR, New Vegas, Fallout 3 and Oblivion are found and read with the checks that need only the shared formats; see [ADR 0036](../adr/0036-one-adapter-for-the-bethesda-family.md)). Done since: their place names in English and the kinds of their places; Fallout 4's meshes in the 3D view and in the texture checks. Done since as well: Fallout 4's material files (`.bgsm`, `.bgem`), from which the 3D view takes the textures. Done since as well: Oblivion's meshes, which do not say where their blocks lie and are read block by block. Done since as well: Oblivion's animated meshes (doors, gates) and their Havok collision data; blocks of types the reader does not know, such as particle systems, are measured by where the next known block starts. Done since as well: the creatures' heads with their expressions, and the meshes in the older versions 10.2.0.0 and 10.1.0.106 that Oblivion still loads (among them buildings of the Imperial City, rocks and wayshrines), so that 9,422 of the game's 9,612 meshes are now read to their last byte. Creatures and clothes are shown in the pose they were made in. Done since as well: Fallout 4's characters are read where Fallout 4 keeps their faces (face sliders, face regions, tint layers) and their templates; on the game's own characters, every face mesh now belongs to a character with a face of its own. Begun as well: Oblivion Remastered, its plugins and load order through the Oblivion reader and its Unreal mods listed with their mod ([ADR 0065](../adr/0065-oblivion-remastered.md)). Still open: Oblivion's meshes older than 10.1.0.106 (about 70); OBSE64's log and Oblivion Remastered on Game Pass.
 - **Generators** such as DynDOLOD, Nemesis or Seamless Studio: their output
   is derived from the load order and goes stale when the load order changes.
