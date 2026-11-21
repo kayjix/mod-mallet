@@ -167,34 +167,18 @@ pub fn read_setup_in(
         loose_files: loose.iter().map(|(path, _)| path.clone()).collect(),
         ..SetupFacts::default()
     };
-    let mut loaded_archives = Vec::new();
-
-    let archives_on_disk = virtual_data.archives(game, &data_dir)?;
-    let archive_names = archives::load_order(game, &archives_on_disk, &active_plugins);
-    progress.step(ScanStep::Archives);
-    for (index, name) in archive_names.iter().enumerate() {
-        progress.count(ScanStep::Archives, index + 1, archive_names.len());
-        let path = data_path.join(name);
-        let file = virtual_data.resolve(&data_dir, name);
-        match archive::read_directory(&file) {
-            Ok(directory) => {
-                facts.archives.push(ArchiveFacts {
-                    path: path.clone(),
-                    files: directory
-                        .paths()
-                        .into_iter()
-                        .map(|entry| data_path.join(entry))
-                        .collect(),
-                });
-                loaded_archives.push(LoadedArchive {
-                    file,
-                    path,
-                    directory,
-                });
-            }
-            Err(reason) => facts.unreadable.push(UnreadableFile { path, reason }),
-        }
-    }
+    let archive_names = archives::load_order(
+        game,
+        &virtual_data.archives(game, &data_dir)?,
+        &active_plugins,
+    );
+    let loaded_archives = read_archives(
+        &archive_names,
+        &mut facts,
+        virtual_data,
+        &data_dir,
+        progress,
+    );
     progress.step(ScanStep::Meshes);
     // The meshes in the data folder are what the game draws, except in a
     // game drawn by Unreal Engine from assets of its own (ADR 0065).
@@ -454,6 +438,45 @@ fn loose_files(directory: &Path, base: &GamePath) -> io::Result<Vec<(GamePath, P
         }
     }
     Ok(files)
+}
+
+/// Reads the file lists of the archives `names`, in load order, as the
+/// game sees them in `data_dir` and the folders of `virtual_data`, into
+/// `facts`, and returns those that could be read.
+fn read_archives(
+    names: &[String],
+    facts: &mut SetupFacts,
+    virtual_data: &VirtualData,
+    data_dir: &Path,
+    progress: &Progress<'_>,
+) -> Vec<LoadedArchive> {
+    let data_path = GamePath::new(DATA_DIR);
+    let mut loaded = Vec::new();
+    progress.step(ScanStep::Archives);
+    for (index, name) in names.iter().enumerate() {
+        progress.count(ScanStep::Archives, index + 1, names.len());
+        let path = data_path.join(name);
+        let file = virtual_data.resolve(data_dir, name);
+        match archive::read_directory(&file) {
+            Ok(directory) => {
+                facts.archives.push(ArchiveFacts {
+                    path: path.clone(),
+                    files: directory
+                        .paths()
+                        .into_iter()
+                        .map(|entry| data_path.join(entry))
+                        .collect(),
+                });
+                loaded.push(LoadedArchive {
+                    file,
+                    path,
+                    directory,
+                });
+            }
+            Err(reason) => facts.unreadable.push(UnreadableFile { path, reason }),
+        }
+    }
+    loaded
 }
 
 /// The loose files of the data directory, `in_data`, with the files of
