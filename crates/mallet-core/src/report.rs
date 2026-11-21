@@ -213,6 +213,28 @@ pub struct ScanReport {
     /// (`vortex`, `mo2`). Actions are worded for it. `None` in older reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manager: Option<String>,
+    /// The active plugins in the order the game loads them, each with the
+    /// plugins it needs (ADR 0068).
+    #[serde(default)]
+    pub load_order: Vec<LoadedPlugin>,
+}
+
+/// An active plugin, at its place in the load order, and the plugins it
+/// needs to be loaded before it, its masters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoadedPlugin {
+    /// The plugin's file name in the spelling of the load order.
+    pub name: String,
+    /// Whether it comes with the game, with the Creation Club content the
+    /// game loads on its own, or with a mod.
+    pub origin: WorldOrigin,
+    /// File names of the plugins it needs, as it names them. One that is
+    /// not in the load order is not loaded.
+    pub masters: Vec<String>,
+    /// The mod it comes from, if the mod manager knows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<ModRef>,
 }
 
 /// Every version of one file that the setup has, as pictures for the

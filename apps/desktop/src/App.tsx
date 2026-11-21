@@ -666,7 +666,7 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "mods" ? (
             <>
               <UnrealPaks paks={report.unrealPaks ?? []} />
-              <ModsView mods={report.mods} findings={report.findings} />
+              <ModsView mods={report.mods} findings={report.findings} loadOrder={report.loadOrder} />
             </>
           ) : (
             <TasksPage report={report} />

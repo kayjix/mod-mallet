@@ -236,6 +236,7 @@ mod tests {
             unreal_paks: Vec::new(),
             switched_off_plugins: Vec::new(),
             manager: None,
+            load_order: Vec::new(),
             findings: file_names
                 .iter()
                 .map(|file_name| {

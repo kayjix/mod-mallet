@@ -1,0 +1,384 @@
+/* The plugin dependencies (ADR 0068): the arc diagram, its tab on the
+   Mods page and the section on a mod's page. What a plugin needs is coral,
+   solid, above the line and marked with triangles; what needs it is teal,
+   dashed, below the line and marked with dots. */
+
+:root {
+  --dep-needs: #e0603c;
+  --dep-needed-by: #0b7f8f;
+  --dep-arc: rgb(82 102 108 / 26%);
+  --dep-focus: #12262c;
+  --dep-mark: #7048e8;
+  --dep-missing: #b3261e;
+  --dep-band-game: #3e5257;
+  --dep-band-cc: #8fa3a8;
+  --dep-band-mod: #c9d4d7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --dep-needs: #ff8a72;
+    --dep-needed-by: #3bc9db;
+    --dep-arc: rgb(157 179 185 / 20%);
+    --dep-focus: #f8f9fa;
+    --dep-mark: #b197fc;
+    --dep-missing: #ff8a80;
+    --dep-band-game: #c3d3d7;
+    --dep-band-cc: #6f8a90;
+    --dep-band-mod: #2f4a51;
+  }
+}
+
+:root[data-theme="dark"] {
+  --dep-needs: #ff8a72;
+  --dep-needed-by: #3bc9db;
+  --dep-arc: rgb(157 179 185 / 20%);
+  --dep-focus: #f8f9fa;
+  --dep-mark: #b197fc;
+  --dep-missing: #ff8a80;
+  --dep-band-game: #c3d3d7;
+  --dep-band-cc: #6f8a90;
+  --dep-band-mod: #2f4a51;
+}
+
+/* ---- the diagram ------------------------------------------------------- */
+
+.dep-arcs {
+  position: relative;
+  min-width: 0;
+}
+
+.dep-arcs canvas {
+  display: block;
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.dep-arcs canvas[data-pickable="true"] {
+  cursor: pointer;
+}
+
+.dep-arcs canvas:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.dep-arcs[data-compact="true"] canvas {
+  border: 1px solid var(--border);
+}
+
+.dep-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 2;
+  display: grid;
+  max-width: 320px;
+  padding: 4px 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.dep-tip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep-tip span {
+  color: var(--muted);
+}
+
+.dep-bands {
+  position: relative;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.dep-bands span {
+  position: absolute;
+  top: 0;
+  padding-left: 6px;
+  border-left: 3px solid var(--dep-band-mod);
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.dep-bands span[data-origin="game"] {
+  border-left-color: var(--dep-band-game);
+}
+
+.dep-bands span[data-origin="creationClub"] {
+  border-left-color: var(--dep-band-cc);
+}
+
+/* The small pictures of the two kinds of arc. */
+.dep-key {
+  flex: none;
+  width: 28px;
+  height: 12px;
+  vertical-align: -1px;
+  stroke-width: 1.8;
+}
+
+.dep-key[data-kind="needs"] {
+  stroke: var(--dep-needs);
+  fill: var(--dep-needs);
+}
+
+.dep-key[data-kind="needed-by"] {
+  stroke: var(--dep-needed-by);
+  fill: var(--dep-needed-by);
+}
+
+.dep-key path {
+  fill: none;
+}
+
+/* ---- the Dependencies tab ---------------------------------------------- */
+
+.dep-page {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dep-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.dep-search {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.dep-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dep-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dep-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dep-results button[aria-pressed="true"] {
+  border-color: var(--brand);
+  font-weight: 600;
+}
+
+.dep-canvas-panel {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.dep-detail {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.dep-detail h4 {
+  margin: var(--space-2) 0 0;
+  font-size: 0.9rem;
+}
+
+.dep-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.dep-detail-head h3 {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.dep-detail-head .small {
+  margin-left: auto;
+}
+
+.dep-top {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dep-top li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  align-items: baseline;
+}
+
+.dep-top .aside {
+  font-size: 0.8rem;
+}
+
+.dep-section {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* ---- the lists of what is needed and what needs it --------------------- */
+
+.dep-summary {
+  margin-bottom: var(--space-2);
+}
+
+.dep-own {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: 0.82rem;
+}
+
+.dep-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.dep-list {
+  min-width: 0;
+}
+
+.dep-list h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: 0.88rem;
+}
+
+.dep-list h4 .aside {
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+.dep-count {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dep-list[data-kind="needs"] .dep-count {
+  box-shadow: inset 0 0 0 1px var(--dep-needs);
+}
+
+.dep-list[data-kind="needed-by"] .dep-count {
+  box-shadow: inset 0 0 0 1px var(--dep-needed-by);
+}
+
+.dep-list ul {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.dep-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  padding: 4px 0 4px 10px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--dep-needs);
+}
+
+.dep-list[data-kind="needed-by"] li {
+  border-left-style: dashed;
+  border-left-color: var(--dep-needed-by);
+}
+
+.dep-name {
+  font-weight: 600;
+}
+
+.dep-name.link-button {
+  font-size: inherit;
+}
+
+.dep-plugins {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dep-plugin {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.dep-plugin:hover {
+  color: var(--text);
+}
+
+.dep-list li.dep-missing {
+  border-left-color: var(--dep-missing);
+  border-left-style: double;
+}
+
+.dep-missing .tag {
+  margin-left: 0;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--dep-missing);
+  color: var(--dep-missing);
+}
+
+.dep-list li.dep-missing .aside {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+}
+
+.dep-plugins[data-solo="true"] {
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 600;
+}

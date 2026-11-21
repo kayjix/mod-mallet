@@ -535,7 +535,7 @@ fn read_land(
 
 /// Whether `plugin` comes with `game`, with the Creation Club content the
 /// game lists as its own (`shipped`), or with a mod.
-pub(crate) fn origin(game: Game, shipped: &[String], plugin: &str) -> WorldOrigin {
+pub fn origin(game: Game, shipped: &[String], plugin: &str) -> WorldOrigin {
     if game.is_official(plugin) {
         WorldOrigin::Game
     } else if shipped

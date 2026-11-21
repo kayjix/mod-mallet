@@ -123,6 +123,10 @@ export interface RenderedReport {
    */
   installersChecked: number;
   /**
+   * The active plugins in load order, each with the plugins it needs.
+   */
+  loadOrder?: LoadedPlugin[];
+  /**
    * The language of the texts.
    */
   locale: "en" | "de";
@@ -1058,6 +1062,30 @@ export interface Patch1 {
    * Its version, as its maker numbers it.
    */
   version?: string | null;
+}
+/**
+ * An active plugin, at its place in the load order, and the plugins it
+ * needs to be loaded before it, its masters.
+ */
+export interface LoadedPlugin {
+  /**
+   * File names of the plugins it needs, as it names them. One that is
+   * not in the load order is not loaded.
+   */
+  masters: string[];
+  /**
+   * The plugin's file name in the spelling of the load order.
+   */
+  name: string;
+  /**
+   * Whether it comes with the game, with the Creation Club content the
+   * game loads on its own, or with a mod.
+   */
+  origin: "game" | "creationClub" | "mod";
+  /**
+   * The mod it comes from, if the mod manager knows.
+   */
+  provider?: ModRef3 | null;
 }
 /**
  * A place the scan looked at, with its role and origin in words.

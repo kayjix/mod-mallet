@@ -13,8 +13,8 @@ use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
 use mallet_core::duel::{ModDuel, SuggestionReason, Topic};
 use mallet_core::{
     Action, ActionOutcome, ActionStatus, ArgValue, Confidence, Finding, GameInfo, InstalledPatch,
-    KindInfo, LocationOrigin, LocationRole, ManagerChoice, ModInfo, OptionToTick, ScanLocation,
-    ScanReport, Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
+    KindInfo, LoadedPlugin, LocationOrigin, LocationRole, ManagerChoice, ModInfo, OptionToTick,
+    ScanLocation, ScanReport, Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
 };
 
 /// The mod manager that knows the mod an action is about, if the action is
@@ -288,6 +288,9 @@ pub struct RenderedReport {
     /// collisions and decisions wait until the mod is on again (ADR 0061).
     #[serde(default)]
     pub switched_off_plugins: Vec<mallet_core::SwitchedOffPlugin>,
+    /// The active plugins in load order, each with the plugins it needs.
+    #[serde(default)]
+    pub load_order: Vec<LoadedPlugin>,
     /// The findings with their texts, most severe first.
     pub findings: Vec<RenderedFinding>,
 }
@@ -767,6 +770,7 @@ impl Messages {
                     })
                     .collect()
             },
+            load_order: report.load_order.clone(),
         }
     }
 

@@ -79,6 +79,7 @@
   - [0064 Mod Organizer 2 as the second mod manager](adr/0064-mod-organizer-2-as-the-second-manager.md)
   - [0065 Oblivion Remastered](adr/0065-oblivion-remastered.md)
   - [0066 Other files are compared side by side](adr/0066-other-files-compared-side-by-side.md)
+  - [0068 Which plugin needs which](adr/0068-which-plugin-needs-which.md)
   - [Template](adr/template.md)
 
 # Reference

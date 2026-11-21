@@ -54,6 +54,10 @@ in [Releases](docs/src/contributing/releases.md).
   them, and never writes into Mod Organizer's files: where it would fix
   something in Vortex, it tells you what to click in Mod Organizer
   instead. On the command line: `--manager mo2`.
+- Which plugin needs which: each mod's page shows what its plugins need
+  and which plugins of which mods need them, on a strip of the whole load
+  order. The tab "Dependencies" on the Mods page draws every active plugin
+  and its links, with a search; pick a plugin to see both sides.
 
 ## [0.2.2] - 2026-11-19
 

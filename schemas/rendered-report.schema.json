@@ -51,6 +51,14 @@
       "format": "uint32",
       "minimum": 0
     },
+    "loadOrder": {
+      "description": "The active plugins in load order, each with the plugins it needs.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/LoadedPlugin"
+      }
+    },
     "locale": {
       "description": "The language of the texts.",
       "$ref": "#/$defs/Locale"
@@ -616,6 +624,43 @@
       },
       "required": [
         "objects"
+      ]
+    },
+    "LoadedPlugin": {
+      "description": "An active plugin, at its place in the load order, and the plugins it\nneeds to be loaded before it, its masters.",
+      "type": "object",
+      "properties": {
+        "masters": {
+          "description": "File names of the plugins it needs, as it names them. One that is\nnot in the load order is not loaded.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The plugin's file name in the spelling of the load order.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "Whether it comes with the game, with the Creation Club content the\ngame loads on its own, or with a mod.",
+          "$ref": "#/$defs/WorldOrigin"
+        },
+        "provider": {
+          "description": "The mod it comes from, if the mod manager knows.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "origin",
+        "masters"
       ]
     },
     "Locale": {

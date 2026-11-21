@@ -15,6 +15,7 @@ import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
   Finding,
+  LoadedPlugin,
   MapCell,
   MapMarker,
   MapSpot,
@@ -554,6 +555,7 @@ function report(lang: Lang): RenderedReport {
     objectSwapper: true,
     // Two of the three suggested objects, and one whose collision is gone.
     duels: sampleDuels(lang),
+    loadOrder: sampleLoadOrder(),
     installedPatch: {
       objects: [
         { plugin: "Gone Mod.esp", localId: 0x10 },
@@ -2195,4 +2197,77 @@ function sampleVersions(models: string[]): AssetVersions {
     };
   }
   return { files, versions: [game(files)] };
+}
+
+/** A made-up load order: the game, its Creation Club content, then mods and their patches. */
+function sampleLoadOrder(): LoadedPlugin[] {
+  const game = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
+  const order: LoadedPlugin[] = game.map((name, index) => ({
+    name,
+    origin: "game",
+    masters: index === 0 ? [] : ["Skyrim.esm"],
+  }));
+  for (const name of [
+    "ccBGSSSE001-Fish.esm",
+    "ccQDRSSE001-SurvivalMode.esl",
+    "ccBGSSSE037-Curios.esl",
+    "ccBGSSSE025-AdvDSGS.esm",
+    "_ResourcePack.esl",
+  ]) {
+    order.push({
+      name,
+      origin: "creationClub",
+      masters: name.startsWith("_") ? [] : ["Skyrim.esm", "Update.esm"],
+    });
+  }
+  const vanilla = [
+    "Skyrim.esm",
+    "Update.esm",
+    "Dawnguard.esm",
+    "HearthFires.esm",
+    "Dragonborn.esm",
+  ];
+  const add = (name: string, mod: string, masters: string[]) =>
+    order.push({
+      name,
+      origin: "mod",
+      masters,
+      provider: { source: "vortex", id: mod, name: mod },
+    });
+  add("Unofficial Patch.esp", "Unofficial Patch", [...vanilla, "ccBGSSSE001-Fish.esm"]);
+  add("Lighting Base.esm", "Lighting", ["Skyrim.esm", "Update.esm"]);
+  add("Lighting - Resources.esm", "Lighting Resources", ["Skyrim.esm", "Lighting Base.esm"]);
+  add("Old Mod.esp", "Old Mod", ["Skyrim.esm", "Update.esm"]);
+  add("Old Town.esp", "Old Town", ["Skyrim.esm", "Update.esm", "Dawnguard.esm"]);
+  add("Water Mod.esp", "Water Mod", [
+    "Skyrim.esm",
+    "Update.esm",
+    "Dawnguard.esm",
+    "Dragonborn.esm",
+  ]);
+  add("Water Mod - Rivers.esp", "Water Mod", ["Skyrim.esm", "Water Mod.esp"]);
+  add("Cut Content.esp", "Cut Content", ["Skyrim.esm", "Update.esm", "Unofficial Patch.esp"]);
+  add("Texture Pack.esp", "Texture Pack", ["Skyrim.esm"]);
+  for (const place of ["Riverwood", "Whiterun", "Solitude", "Markarth", "Riften", "Windhelm"]) {
+    add(`Lighting - ${place}.esp`, "Lighting", [
+      "Skyrim.esm",
+      "Lighting Base.esm",
+      "Lighting - Resources.esm",
+    ]);
+  }
+  add("Cut Content - Old Town Patch.esp", "Patch Hub", [
+    "Skyrim.esm",
+    "Cut Content.esp",
+    "Old Town.esp",
+  ]);
+  add("Cut Content - Lighting Patch.esp", "Patch Hub", ["Cut Content.esp", "Lighting Base.esm"]);
+  add("Old Town - Lighting Patch.esp", "Patch Hub", ["Old Town.esp", "Lighting - Whiterun.esp"]);
+  add("Water Mod - Old Town Patch.esp", "Patch Hub", ["Water Mod.esp", "Old Town.esp"]);
+  add("City - Dungeons Patch.esp", "Patch Hub", ["Skyrim.esm", "Old Town.esp", "Dungeons.esp"]);
+  add("Cut Content - Water Patch.esp", "Cut Content Patches", [
+    "Cut Content.esp",
+    "Water Mod - Rivers.esp",
+  ]);
+  add("Face Overhaul.esp", "Face Overhaul", ["Skyrim.esm", "Update.esm", "Cut Content.esp"]);
+  return order;
 }

@@ -1,9 +1,17 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useSession } from "./Actions";
 import { stepOf } from "./arrange";
+import { DependencyView } from "./DependencyView";
 import { duelNames } from "./Duels";
-import type { ModInfo, RenderedDuel, RenderedFinding } from "./generated/rendered-report";
+import { buildGraph } from "./dependencies";
+import type {
+  LoadedPlugin,
+  ModInfo,
+  RenderedDuel,
+  RenderedFinding,
+} from "./generated/rendered-report";
 import { type CollisionSpot, collisionSpots, weightOf } from "./health";
+import { DependencyContext, ModDependencies, ModsTabs } from "./ModDependencies";
 import type { WorkKind } from "./map-places";
 import { type ModFilter, type ModSort, useOverviewTexts } from "./overview-texts";
 import { FindingRow } from "./Tasks";
@@ -104,11 +112,59 @@ export function ModsView({
   mods,
   findings,
   duels = [],
+  loadOrder = [],
 }: {
   mods: ModInfo[];
   findings: RenderedFinding[];
   /** The duels between two mods, for what of a mod wins or loses. */
   duels?: RenderedDuel[];
+  /** The active plugins in load order, for which plugin needs which (ADR 0068). */
+  loadOrder?: LoadedPlugin[];
+}) {
+  const [tab, setTab] = useState<"list" | "dependencies">("list");
+  const [show, setShow] = useState<{ id: string } | null>(null);
+  const dependencies = useMemo(
+    () => ({
+      graph: loadOrder.length === 0 ? null : buildGraph(loadOrder, mods),
+      openMod: (id: string) => {
+        setTab("list");
+        setShow({ id });
+      },
+    }),
+    [loadOrder, mods],
+  );
+  return (
+    <DependencyContext value={dependencies}>
+      {dependencies.graph !== null && (
+        <ModsTabs
+          tab={tab}
+          onTab={(next) => {
+            setTab(next);
+            setShow(null);
+          }}
+        />
+      )}
+      {tab === "dependencies" ? (
+        <DependencyView />
+      ) : (
+        <ModList mods={mods} findings={findings} duels={duels} show={show} />
+      )}
+    </DependencyContext>
+  );
+}
+
+/** The list of mods, with a mod's page opened in place. */
+function ModList({
+  mods,
+  findings,
+  duels,
+  show,
+}: {
+  mods: ModInfo[];
+  findings: RenderedFinding[];
+  duels: RenderedDuel[];
+  /** A mod whose page to show, asked for from a dependency. */
+  show: { id: string } | null;
 }) {
   const session = useSession();
   const { ignored, patchChoices, spots } = session;
@@ -117,6 +173,20 @@ export function ModsView({
   const [sort, setSort] = useState<ModSort>("problems");
   const [filter, setFilter] = useState<ModFilter>("all");
   const [opened, setOpened] = useState<string | null>(null);
+  // A mod's page asked for from a dependency: shown even if filtered out.
+  useEffect(() => {
+    if (show === null) {
+      return;
+    }
+    setFilter("all");
+    setSearch("");
+    setOpened(show.id);
+    requestAnimationFrame(() =>
+      document
+        .querySelector(`[data-mod="${CSS.escape(show.id)}"]`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" }),
+    );
+  }, [show]);
 
   const states = useMemo(() => {
     const byName = new Map(mods.map((info) => [info.mod.name.toLowerCase(), info]));
@@ -329,7 +399,7 @@ function ModRow({
   const wide = wideOf(state);
 
   return (
-    <li className="mod-entry" data-open={open} data-enabled={info.enabled}>
+    <li className="mod-entry" data-mod={info.mod.id} data-open={open} data-enabled={info.enabled}>
       <div className="mod-row">
         <button
           type="button"
@@ -406,7 +476,12 @@ function ModDetails({ state }: { state: ModState }) {
     state.duels.length === 0 &&
     state.advice.length === 0;
   if (nothing) {
-    return <p className="aside">{o.nothingAbout}</p>;
+    return (
+      <>
+        <p className="aside">{o.nothingAbout}</p>
+        <ModDependencies modId={state.info.mod.id} />
+      </>
+    );
   }
   return (
     <>
@@ -500,6 +575,7 @@ function ModDetails({ state }: { state: ModState }) {
           </ul>
         </div>
       )}
+      <ModDependencies modId={state.info.mod.id} />
     </>
   );
 }

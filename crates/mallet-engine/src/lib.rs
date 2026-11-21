@@ -351,6 +351,10 @@ fn scan_with(
     let findings = mallet_analysis::run_all(&context);
     let map = mallet_analysis::map::world_map(&context);
     let duels = mallet_analysis::duels::duels(&findings, &context);
+    let shipped = mallet_game_bethesda::locate::shipped_plugins(game, &game_dir);
+    let load_order = mallet_analysis::dependencies::load_order(&context, &|plugin| {
+        mallet_game_bethesda::ingest::origin(game, &shipped, plugin)
+    });
     tracing::info!(
         findings = findings.len(),
         elapsed_ms = started.elapsed().as_millis(),
@@ -384,6 +388,7 @@ fn scan_with(
         unreal_paks,
         switched_off_plugins: facts.switched_off_plugins.clone(),
         manager: Some(options.manager.id().to_owned()),
+        load_order,
     })
 }
 
