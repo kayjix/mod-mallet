@@ -1,6 +1,6 @@
 # 0025 Patches hide objects through Base Object Swapper
 
-- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): a spot can have a choice of its own; [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects the game relies on; [ADR 0051](0051-paths-over-hidden-objects.md): the paths that run over hidden objects; [ADR 0052](0052-paths-over-hidden-objects-are-cut-out.md): a plugin that cuts paths over hidden objects out of the navigation meshes; [ADR 0053](0053-shareable-patches-in-parts.md): a patch has a name and parts, with an installer
+- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): a spot can have a choice of its own; [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects the game relies on; [ADR 0051](0051-paths-over-hidden-objects.md): the paths that run over hidden objects; [ADR 0052](0052-paths-over-hidden-objects-are-cut-out.md): a plugin that cuts paths over hidden objects out of the navigation meshes; [ADR 0053](0053-shareable-patches-in-parts.md): a patch has a name and parts, with an installer; [ADR 0060](0060-objects-moved-a-little-through-a-plugin.md): objects moved a little through a plugin of overrides
 - Date: 2026-11-15
 
 ## Context

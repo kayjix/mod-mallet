@@ -41,6 +41,12 @@ in [Releases](docs/src/contributing/releases.md).
   It says what relies on the mod before it suggests removing it, points to
   the clear suggestions where most of its places are clear, and switches it
   off in Vortex on a click.
+- Objects can be moved a little to one side instead of hidden, so both
+  mods' buildings stay: arrows, up and down and turning in the object card
+  of the 3D views, alone or with the parts the magic wand took, with the
+  overlap measured again as you go. Mod Mallet writes the moves into a
+  small plugin, Mod Mallet - Moves, which Vortex installs on your click;
+  remove it there to put everything back.
 
 ## [0.2.2] - 2026-11-19
 
