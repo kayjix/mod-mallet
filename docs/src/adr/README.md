@@ -89,3 +89,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0061](0061-switched-off-mods-and-mods-to-remove.md) | Switched-off mods, and mods worth removing | accepted |
 | [0063](0063-the-tools-vortex-knows.md) | The tools Vortex knows, and Mod Mallet as one of them | accepted |
 | [0065](0065-oblivion-remastered.md) | Oblivion Remastered: the old game's data below the installation, Unreal mods beside it | accepted |
+| [0066](0066-other-files-compared-side-by-side.md) | Other files are compared side by side | accepted |

@@ -82,8 +82,12 @@ impl<'a> AssetIndex<'a> {
 /// replacing the game's own files is what mods are for.
 pub struct ArchiveOverrides;
 
-/// How many textures of a finding are offered for looking at.
+/// How many textures and meshes of a finding are offered for looking at.
 const PREVIEW_LIMIT: usize = 40;
+
+/// How many other files of a finding are offered for comparing (ADR 0066):
+/// enough for every script of a script collection.
+const OTHER_PREVIEW_LIMIT: usize = 400;
 
 /// How many files of one archive one other source replaces.
 #[derive(Default)]
@@ -112,21 +116,23 @@ impl<'a> Tally<'a> {
         i64::try_from(found).unwrap_or(i64::MAX)
     }
 
-    /// The textures and meshes among the files, to look at, up to a limit.
-    fn textures(&self) -> Vec<GamePath> {
-        self.files
+    /// The files to look at or compare: the textures and meshes, then the
+    /// other files, each up to a limit.
+    fn previews(&self) -> Vec<GamePath> {
+        let is_picture = |file: &&&GamePath| {
+            std::path::Path::new(file.as_str())
+                .extension()
+                .is_some_and(|extension| {
+                    extension.eq_ignore_ascii_case("dds") || extension.eq_ignore_ascii_case("nif")
+                })
+        };
+        let pictures = self.files.iter().filter(is_picture).take(PREVIEW_LIMIT);
+        let others = self
+            .files
             .iter()
-            .filter(|file| {
-                std::path::Path::new(file.as_str())
-                    .extension()
-                    .is_some_and(|extension| {
-                        extension.eq_ignore_ascii_case("dds")
-                            || extension.eq_ignore_ascii_case("nif")
-                    })
-            })
-            .take(PREVIEW_LIMIT)
-            .map(|file| (*file).clone())
-            .collect()
+            .filter(|file| !is_picture(file))
+            .take(OTHER_PREVIEW_LIMIT);
+        pictures.chain(others).map(|file| (*file).clone()).collect()
     }
 
     /// A few of the files, as paths inside the data directory.
@@ -236,7 +242,7 @@ fn loose_over_archive(
     .with_arg("winnerMod", name(provider))
     .with_arg("archive", archive.path.file_name())
     .with_arg("archiveMod", owner.name.as_str())
-    .with_previews(tally.textures())
+    .with_previews(tally.previews())
 }
 
 fn archive_over_archive(
@@ -266,7 +272,7 @@ fn archive_over_archive(
     .with_arg("winnerMod", name(winner_owner))
     .with_arg("archive", archive.path.file_name())
     .with_arg("archiveMod", owner.name.as_str())
-    .with_previews(tally.textures())
+    .with_previews(tally.previews())
 }
 
 #[cfg(test)]
@@ -458,6 +464,48 @@ mod tests {
         assert_eq!(finding.args["winnerMod"], ArgValue::from("Older Mod"));
         assert_eq!(finding.args["archive"], ArgValue::from("province.bsa"));
         assert_eq!(finding.args["archiveMod"], ArgValue::from("Province"));
+    }
+
+    #[test]
+    fn scripts_and_menus_are_offered_for_comparing_after_the_pictures() {
+        let facts = Facts {
+            archives: vec![
+                archive(
+                    "data/menus.bsa",
+                    &[
+                        "data/interface/map.swf",
+                        "data/scripts/menu.pex",
+                        "data/textures/menu.dds",
+                    ],
+                ),
+                archive(
+                    "data/later.bsa",
+                    &[
+                        "data/interface/map.swf",
+                        "data/scripts/menu.pex",
+                        "data/textures/menu.dds",
+                    ],
+                ),
+            ],
+            ..Facts::default()
+        };
+        let mods = Mods(vec![
+            ("data/menus.bsa", "Menus"),
+            ("data/later.bsa", "Later"),
+        ]);
+        let findings = run_all(&Context::new(&facts, &mods));
+
+        let [finding] = findings.as_slice() else {
+            panic!("expected one finding, got {findings:?}");
+        };
+        assert_eq!(
+            finding.previews,
+            paths(&[
+                "data/textures/menu.dds",
+                "data/interface/map.swf",
+                "data/scripts/menu.pex",
+            ])
+        );
     }
 
     #[test]

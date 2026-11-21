@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./Actions";
+import { isPictured } from "./compare-files";
 import type { FilePreview } from "./generated/file-preview";
 import { LoadingLine } from "./LoadingMallet";
 import { type MeshItem, Viewer3D } from "./Viewer3D";
@@ -19,7 +20,10 @@ export function Previews({ paths }: { paths: string[] }) {
 
   useEffect(() => {
     let outdated = false;
-    Promise.all(paths.map((path) => api.filePreview(path).catch(() => null)))
+    // Scripts, menus and other files are compared on the assets page; only
+    // textures and meshes have pictures.
+    const pictured = paths.filter(isPictured);
+    Promise.all(pictured.map((path) => api.filePreview(path).catch(() => null)))
       .then((found) => {
         if (!outdated) {
           setPreviews(found.filter((preview): preview is FilePreview => preview !== null));

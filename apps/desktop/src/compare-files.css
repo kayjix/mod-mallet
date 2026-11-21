@@ -1,0 +1,170 @@
+/* The comparison of files that are neither textures nor meshes (ADR 0066). */
+
+.compare-other {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: auto;
+}
+
+.compare-other-about p {
+  margin: 0 0 var(--space-1);
+}
+
+.compare-other-about .tag {
+  margin-right: var(--space-1);
+}
+
+.compare-other-verdict {
+  margin: 0;
+  padding: 6px var(--space-2);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+}
+
+.compare-other-verdict[data-same="true"],
+.compare-sameness[data-same="true"] {
+  border-left-color: var(--ok);
+}
+
+.compare-other-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.compare-other-side {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+}
+
+.compare-other-side strong,
+.compare-other-side .aside {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-other-side .aside {
+  font-size: 0.8rem;
+}
+
+/* Two texts side by side. */
+.text-diff {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+}
+
+.text-diff table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.76rem;
+}
+
+.text-diff col.text-diff-number {
+  width: 3.4em;
+}
+
+.text-diff th {
+  padding: 4px var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-family: inherit;
+  text-align: left;
+}
+
+.text-diff td {
+  padding: 0 6px;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  white-space: pre-wrap;
+}
+
+.text-diff td.text-diff-number {
+  padding-right: 4px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.text-diff tr[data-changed="true"] td[data-side="a"] {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+}
+
+.text-diff tr[data-changed="true"] td[data-side="b"] {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+
+.text-diff tr[data-changed="true"] td[data-empty="true"] {
+  background: var(--sunken);
+}
+
+.text-diff-skipped td {
+  padding: 2px var(--space-2);
+  background: var(--sunken);
+  color: var(--muted);
+  text-align: center;
+}
+
+.script-diff h4 {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: 0.88rem;
+}
+
+.script-diff ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.script-diff li code {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+  font-size: 0.78rem;
+}
+
+.compare-sameness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.compare-sameness[data-same="true"] {
+  padding: 6px var(--space-2);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+}
+
+.compare-sameness p {
+  margin: 0;
+}
+
+.compare-file-mark {
+  margin-left: var(--space-1);
+  font-size: 0.72rem;
+}
+
+.compare-file-mark[data-same="true"] {
+  color: var(--ok);
+}
+
+.compare-file-mark[data-same="false"] {
+  color: var(--warning);
+}

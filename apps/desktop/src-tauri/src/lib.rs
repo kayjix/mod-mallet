@@ -589,6 +589,23 @@ fn file_preview(path: String) -> Result<Option<mallet_core::FilePreview>, String
     ))
 }
 
+/// Every version of files other than textures and meshes, compared: text,
+/// size, date, whether the bytes are the same, a script's functions.
+/// `mods` names the mod manager's folders of the mods concerned. Only
+/// reads.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn compare_files(
+    paths: Vec<String>,
+    mods: Vec<String>,
+) -> Result<Option<Vec<mallet_core::compare::FileComparison>>, String> {
+    Ok(mallet_engine::compare_files(
+        &settings()?.scan_options(),
+        &paths,
+        &mods,
+    ))
+}
+
 /// A version of a mesh of the setup, ready to draw: the one the game uses
 /// unless `version` names another.
 #[tauri::command(async)]
@@ -746,6 +763,7 @@ pub fn run() -> tauri::Result<()> {
             game_art,
             map_image,
             file_preview,
+            compare_files,
             decisions,
             set_decision,
             mesh_view,

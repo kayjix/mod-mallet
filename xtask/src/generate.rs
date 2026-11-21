@@ -48,6 +48,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "apps/desktop/src/generated/file-preview.ts",
     ),
     (
+        "schemas/file-comparison.schema.json",
+        "apps/desktop/src/generated/file-comparison.ts",
+    ),
+    (
         "schemas/mesh-view.schema.json",
         "apps/desktop/src/generated/mesh-view.ts",
     ),
@@ -147,6 +151,9 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         },
     ];
     files.extend(catalogue_schemas()?);
+    files.push(schema_of::<mallet_core::compare::FileComparison>(
+        "schemas/file-comparison.schema.json",
+    )?);
 
     // The TypeScript types are derived from a schema, which therefore has to
     // be on disk before the converter runs.

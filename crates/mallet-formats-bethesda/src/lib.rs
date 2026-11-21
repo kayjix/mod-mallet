@@ -30,6 +30,7 @@ pub mod navmesh;
 pub mod nif;
 pub mod nif_geometry;
 mod nif_oblivion;
+pub mod pex;
 pub mod plugin;
 pub mod plugin_write;
 pub mod strings;

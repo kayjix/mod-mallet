@@ -11,6 +11,7 @@ import type { AreaObjects } from "./generated/area-objects";
 import type { AssetVersions } from "./generated/asset-versions";
 import type { Catalogue } from "./generated/catalogue";
 import type { CreatedMoves } from "./generated/created-moves";
+import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
 import type { HiddenWalkways } from "./generated/hidden-walkways";
@@ -96,6 +97,12 @@ export interface Api {
   mapImage(world: string): Promise<MapImage | null>;
   /** Every version of a file of the setup, as pictures where it is a texture. */
   filePreview(path: string): Promise<FilePreview | null>;
+  /**
+   * Every version of files other than textures and meshes, compared, in the
+   * order of `paths`; `mods` names the mod manager's folders of the mods
+   * concerned, whose loose copies kept back are read too.
+   */
+  compareFiles(paths: string[], mods: string[]): Promise<FileComparison[] | null>;
   /** A version of a mesh, ready to draw; the one in the game unless `version` names another. */
   meshView(path: string, version: number | null): Promise<MeshView | null>;
   /** Everything placed within `radius` game units of a point. */
@@ -208,6 +215,7 @@ const tauriApi: Api = {
   gameArt: (game) => invoke<string | null>("game_art", { game }),
   mapImage: (world) => invoke<MapImage | null>("map_image", { world }),
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
+  compareFiles: (paths, mods) => invoke<FileComparison[] | null>("compare_files", { paths, mods }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
   catalogue: (lang) => invoke<Catalogue | null>("catalogue", { lang }),
   assetVersions: (models) => invoke<AssetVersions | null>("asset_versions", { models }),

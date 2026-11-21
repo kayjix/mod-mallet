@@ -948,7 +948,7 @@ function toolbox(lang: Lang): RenderedToolbox {
   };
 }
 
-/** Two made-up duels: faces, and objects. */
+/** Made-up duels: faces, objects, and other files. */
 function sampleDuels(lang: Lang): RenderedReport["duels"] {
   const de = lang === "de";
   const side = (name: string, plugins: string[]) => ({
@@ -1033,6 +1033,51 @@ function sampleDuels(lang: Lang): RenderedReport["duels"] {
         resolutions: [],
       },
       topicLabels: [de ? "3 Objekte" : "3 objects"],
+      suggestion: null,
+    },
+    // Other files: a script, a menu and settings that differ, and two
+    // files two house mods share byte for byte.
+    {
+      duel: {
+        id: "duel:mod:vortex:Better Menus|mod:vortex:Quest Fixes",
+        sides: [side("Better Menus", []), side("Quest Fixes", [])],
+        topics: [{ topic: "files", count: 3, winning: 1 }],
+        findings: ["assets.archive-over-archive:Better Menus+Quest Fixes"],
+        files: [
+          { path: "scripts/samplequestscript.pex", topic: "files", object: null, objectKind: null },
+          { path: "interface/quest_journal.swf", topic: "files", object: null, objectKind: null },
+          {
+            path: "skse/plugins/samplemenus.json",
+            topic: "files",
+            object: null,
+            objectKind: null,
+          },
+        ],
+        suggestion: null,
+        resolutions: [],
+      },
+      topicLabels: [de ? "3 andere Dateien" : "3 other files"],
+      suggestion: null,
+    },
+    {
+      duel: {
+        id: "duel:mod:vortex:Hall House|mod:vortex:Inn House",
+        sides: [side("Hall House", []), side("Inn House", [])],
+        topics: [{ topic: "files", count: 2, winning: 0 }],
+        findings: ["assets.archive-over-archive:Hall House+Inn House"],
+        files: [
+          { path: "scripts/sharedtoggle.pex", topic: "files", object: null, objectKind: null },
+          {
+            path: "scripts/source/sharedmarker.txt",
+            topic: "files",
+            object: null,
+            objectKind: null,
+          },
+        ],
+        suggestion: null,
+        resolutions: [],
+      },
+      topicLabels: [de ? "2 andere Dateien" : "2 other files"],
       suggestion: null,
     },
   ];
@@ -1496,6 +1541,74 @@ export const sampleApi: Api = {
         },
       ],
     }),
+  // Every other file in the game's archive and in both mods' archives: the
+  // two mods' copies the same for files named `shared`, different else.
+  compareFiles: (paths, mods) =>
+    later(
+      paths.map((path) => {
+        const [first = "First Mod", second = "Second Mod"] = mods;
+        const shared = path.includes("shared");
+        const text = (who: string) =>
+          path.endsWith(".json")
+            ? `{\n  "enabled": true,\n  "radius": ${who === first ? 4096 : 8192},\n  "fadeIn": 1.5\n}\n`
+            : null;
+        const script = (who: string) =>
+          path.endsWith(".pex")
+            ? {
+                name: "SampleScript",
+                hasDebugInfo: true,
+                functions: [
+                  { state: "", name: "OnInit", kind: "plain" as const, fingerprint: "3:a" },
+                  {
+                    state: "",
+                    name: "OnActivate",
+                    kind: "plain" as const,
+                    fingerprint: who === first || shared ? "5:b" : "7:c",
+                  },
+                  ...(who === second && !shared
+                    ? [
+                        {
+                          state: "Busy",
+                          name: "OnUpdate",
+                          kind: "plain" as const,
+                          fingerprint: "2:d",
+                        },
+                      ]
+                    : []),
+                ],
+              }
+            : null;
+        const version = (who: string, archive: string, sameAs: number | null) => ({
+          archive,
+          staged: false,
+          provider: { source: "vortex", id: who, name: who },
+          size: who === first || shared ? 1246 : 1530,
+          modified: 1_700_000_000,
+          sameAs,
+          text: text(shared ? first : who),
+          image: null,
+          script: script(who),
+        });
+        return {
+          path,
+          versions: [
+            {
+              archive: "Skyrim - Misc.bsa",
+              staged: false,
+              provider: null,
+              size: 1100,
+              modified: 1_225_494_000,
+              sameAs: null,
+              text: null,
+              image: null,
+              script: null,
+            },
+            version(first, `${first}.bsa`, null),
+            version(second, `${second}.bsa`, shared ? 1 : null),
+          ],
+        };
+      }),
+    ),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
 };
 

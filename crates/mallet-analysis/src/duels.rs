@@ -559,6 +559,7 @@ mod tests {
         .with_previews(vec![
             GamePath::new("data/meshes/actors/werewolfbeast/character assets/skeleton.nif"),
             GamePath::new("data/meshes/actors/vampirelord/character assets/skeleton.nif"),
+            GamePath::new("data/scripts/werewolf.pex"),
         ]);
         let found = duels(&[finding], &context);
         let topics: Vec<(Topic, u32)> = found[0]
@@ -567,11 +568,24 @@ mod tests {
             .map(|topic| (topic.topic, topic.count))
             .collect();
         assert_eq!(topics, [(Topic::Meshes, 2), (Topic::Files, 1)]);
-        assert!(
-            found[0]
-                .files
-                .iter()
-                .all(|file| file.topic == Topic::Meshes)
+        let files: Vec<(&str, Topic)> = found[0]
+            .files
+            .iter()
+            .map(|file| (file.path.as_str(), file.topic))
+            .collect();
+        assert_eq!(
+            files,
+            [
+                (
+                    "meshes/actors/werewolfbeast/character assets/skeleton.nif",
+                    Topic::Meshes
+                ),
+                (
+                    "meshes/actors/vampirelord/character assets/skeleton.nif",
+                    Topic::Meshes
+                ),
+                ("scripts/werewolf.pex", Topic::Files),
+            ]
         );
     }
 

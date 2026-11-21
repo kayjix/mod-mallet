@@ -77,6 +77,7 @@
   - [0061 Switched-off mods, and mods worth removing](adr/0061-switched-off-mods-and-mods-to-remove.md)
   - [0063 The tools Vortex knows](adr/0063-the-tools-vortex-knows.md)
   - [0065 Oblivion Remastered](adr/0065-oblivion-remastered.md)
+  - [0066 Other files are compared side by side](adr/0066-other-files-compared-side-by-side.md)
   - [Template](adr/template.md)
 
 # Reference

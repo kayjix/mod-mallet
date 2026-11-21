@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./Actions";
 import { useAssetsTexts } from "./assets-texts";
+import { DuelSameness, OtherFileStage } from "./CompareOtherFile";
+import { isPictured, kindOf, sameOnBothSides } from "./compare-files";
+import { useCompareFilesTexts } from "./compare-files-texts";
 import {
   duelNames,
   OTHERS,
@@ -14,6 +17,7 @@ import {
 import { LoadingLine } from "./LoadingMallet";
 
 import "./assets.css";
+import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview, PreviewVersion } from "./generated/file-preview";
 import type {
   DuelFile,
@@ -30,6 +34,9 @@ type Topic = DuelFile["topic"];
 
 /** Previews already asked for, by file; one scan's worth. */
 type PreviewCache = Map<string, Promise<FilePreview | null>>;
+
+/** Comparisons of other files already asked for, by duel; one scan's worth. */
+type ComparisonCache = Map<string, Promise<FileComparison[] | null>>;
 
 /**
  * The assets page (ADR 0048): where two mods bring their own textures,
@@ -56,12 +63,13 @@ export function CompareView({ report, start }: { report: RenderedReport; start: 
     }
   }, [start]);
   const [tab, setTab] = useState<"duels" | "ranking">("duels");
-  const cache = useRef<{ at: number; previews: PreviewCache }>({
+  const cache = useRef<{ at: number; previews: PreviewCache; comparisons: ComparisonCache }>({
     at: report.scannedAt,
     previews: new Map(),
+    comparisons: new Map(),
   });
   if (cache.current.at !== report.scannedAt) {
-    cache.current = { at: report.scannedAt, previews: new Map() };
+    cache.current = { at: report.scannedAt, previews: new Map(), comparisons: new Map() };
   }
   // A duel opened from elsewhere is shown even if it is about placed
   // objects, until the collisions take those over completely.
@@ -102,6 +110,7 @@ export function CompareView({ report, start }: { report: RenderedReport; start: 
           rendered={rendered}
           byId={byId}
           previews={cache.current.previews}
+          comparisons={cache.current.comparisons}
         />
       )}
     </div>
@@ -312,9 +321,36 @@ function ObjectsElsewhere({ report }: { report: RenderedReport }) {
 
 // ---- middle and right: one duel -----------------------------------------------
 
+/** How many other files a duel is about, and how many of them its report lists. */
+function otherFilesOf(rendered: RenderedDuel) {
+  const count = rendered.duel.topics.find(({ topic }) => topic === "files")?.count ?? 0;
+  const shown = (rendered.duel.files ?? []).filter((file) => !isPictured(file.path)).length;
+  return { count, shown };
+}
+
+/**
+ * The other files a duel's findings quote as examples, for reports from
+ * before every file was listed.
+ */
+function examplesOf(rendered: RenderedDuel, byId: Map<string, RenderedFinding>): DuelFile[] {
+  const paths = new Set(
+    rendered.duel.findings.flatMap((id) => {
+      const examples = byId.get(id)?.finding.args.examples;
+      return typeof examples === "string" && examples !== "" ? examples.split(", ") : [];
+    }),
+  );
+  return [...paths]
+    .filter((path) => !isPictured(path))
+    .map((path) => ({ path, topic: "files", object: null, objectKind: null }));
+}
+
 /** The files of a duel; for older reports, the files its findings name. */
 function filesOf(rendered: RenderedDuel, byId: Map<string, RenderedFinding>): DuelFile[] {
   const own = rendered.duel.files ?? [];
+  const { count, shown } = otherFilesOf(rendered);
+  if (count > 0 && shown === 0) {
+    return [...own, ...examplesOf(rendered, byId)];
+  }
   if (own.length > 0) {
     return own;
   }
@@ -361,12 +397,15 @@ function DuelWorkspace({
   rendered,
   byId,
   previews,
+  comparisons,
 }: {
   rendered: RenderedDuel;
   byId: Map<string, RenderedFinding>;
   previews: PreviewCache;
+  comparisons: ComparisonCache;
 }) {
   const { t, api, mods, spots, decideSpot } = useSession();
+  const c = useCompareFilesTexts();
   const { duel } = rendered;
   const names = duelNames(duel, mods);
   // Where the two mods' objects collide: shown in 3D on the collisions' page.
@@ -382,8 +421,40 @@ function DuelWorkspace({
     files.find((file) => isMesh(file.path))?.path ?? files[0]?.path ?? every[0]?.path ?? null,
   );
   const [found, setFound] = useState<FilePreview | null | undefined>(undefined);
+  // The files that are not pictures, read and compared at once for the
+  // whole duel: whether they are the same decides whether there is
+  // anything to decide.
+  const others = useMemo(() => every.filter((file) => !isPictured(file.path)), [every]);
+  const [compared, setCompared] = useState<FileComparison[] | null | undefined>(undefined);
   useEffect(() => {
-    if (path === null) {
+    if (others.length === 0) {
+      return;
+    }
+    let outdated = false;
+    let asked = comparisons.get(duel.id);
+    if (asked === undefined) {
+      const folders = duel.sides.flatMap((side) => (side.mod == null ? [] : [side.mod.id]));
+      asked = api
+        .compareFiles(
+          others.map((file) => file.path),
+          folders,
+        )
+        .catch(() => null);
+      comparisons.set(duel.id, asked);
+    }
+    asked.then((result) => {
+      if (!outdated) {
+        setCompared(result);
+      }
+    });
+    return () => {
+      outdated = true;
+    };
+  }, [api, comparisons, duel, others]);
+  const comparisonOf = (file: string): FileComparison | null | undefined =>
+    compared == null ? compared : (compared.find((comparison) => comparison.path === file) ?? null);
+  useEffect(() => {
+    if (path === null || !isPictured(path)) {
       return;
     }
     let outdated = false;
@@ -446,6 +517,7 @@ function DuelWorkspace({
     });
   }, [path, found, duel, nameA, nameB, original]);
   const selected = every.find((file) => file.path === path);
+  const { count: otherCount, shown: otherShown } = otherFilesOf(rendered);
 
   return (
     <>
@@ -467,10 +539,14 @@ function DuelWorkspace({
             {selected.objectKind != null && (
               <span className="tag">{kindName(t, selected.objectKind)}</span>
             )}
-            <span className="tag">{t.topicName[selected.topic]}</span>
+            {isPictured(selected.path) && (
+              <span className="tag">{t.topicName[selected.topic]}</span>
+            )}
           </p>
         )}
-        {path === null && placed[0] !== undefined ? (
+        {path !== null && !isPictured(path) ? (
+          <OtherFileStage duel={duel} names={names} path={path} comparison={comparisonOf(path)} />
+        ) : path === null && placed[0] !== undefined ? (
           <div className="compare-stage-empty compare-spots">
             <p>{t.compareSpots(placed.length)}</p>
             <button
@@ -502,6 +578,9 @@ function DuelWorkspace({
             )}
           </div>
         )}
+        {compared != null && others.length === every.length && (
+          <DuelSameness duel={duel} comparisons={compared} />
+        )}
         <DuelDecision rendered={rendered} byId={byId} />
       </section>
       <aside className="compare-right">
@@ -520,16 +599,25 @@ function DuelWorkspace({
           </label>
         )}
         <ul className="compare-files">
-          {files.map((file) => (
-            <FileRow
-              key={file.path}
-              file={file}
-              selected={file.path === path}
-              previews={previews}
-              onSelect={() => setPath(file.path)}
-            />
-          ))}
+          {files.map((file) => {
+            const comparison = isPictured(file.path) ? null : comparisonOf(file.path);
+            return (
+              <FileRow
+                key={file.path}
+                file={file}
+                selected={file.path === path}
+                previews={previews}
+                same={comparison == null ? null : sameOnBothSides(duel, comparison)}
+                onSelect={() => setPath(file.path)}
+              />
+            );
+          })}
         </ul>
+        {otherShown === 0 && otherCount > 0 ? (
+          <p className="aside">{c.rescanForFiles}</p>
+        ) : (
+          otherShown < otherCount && <p className="aside">{c.moreFiles(otherCount - otherShown)}</p>
+        )}
       </aside>
     </>
   );
@@ -548,14 +636,19 @@ function FileRow({
   file,
   selected,
   previews,
+  same,
   onSelect,
 }: {
   file: DuelFile;
   selected: boolean;
   previews: PreviewCache;
+  /** For files that are not pictures: whether both mods bring the same bytes, if known. */
+  same: boolean | null;
   onSelect: () => void;
 }) {
   const { t, api } = useSession();
+  const c = useCompareFilesTexts();
+  const other = isPictured(file.path) ? null : c.kinds[kindOf(file.path)];
   const row = useRef<HTMLLIElement>(null);
   const [image, setImage] = useState<string | null>(null);
   useEffect(() => {
@@ -590,9 +683,14 @@ function FileRow({
         aria-current={selected ? "true" : undefined}
         onClick={onSelect}
       >
-        <span className="compare-thumb" data-kind={isMesh(file.path) ? "mesh" : "texture"}>
+        <span
+          className="compare-thumb"
+          data-kind={other !== null ? "other" : isMesh(file.path) ? "mesh" : "texture"}
+        >
           {image !== null ? (
             <img className="compare-thumb-image" src={image} alt="" />
+          ) : other !== null ? (
+            other.short
           ) : isMesh(file.path) ? (
             "3D"
           ) : (
@@ -604,10 +702,15 @@ function FileRow({
           <span className="aside">
             {[
               file.objectKind == null ? null : kindName(t, file.objectKind),
-              t.topicName[file.topic],
+              other === null ? t.topicName[file.topic] : other.name,
             ]
               .filter((part) => part !== null)
               .join(" · ")}
+            {same !== null && (
+              <span className="compare-file-mark" data-same={same}>
+                {same ? c.sameShort : c.differsShort}
+              </span>
+            )}
           </span>
           <code>{file.path}</code>
         </span>

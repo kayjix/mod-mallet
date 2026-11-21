@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FileComparison",
+  "description": "Every version of one file the setup has, compared.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "description": "The file, below the data directory.",
+      "type": "string"
+    },
+    "versions": {
+      "description": "Its versions: the copies in archives in the order the game loads\nthem, then the loose file the game uses, then the loose copies a\nmod manager keeps back.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ComparedVersion"
+      }
+    }
+  },
+  "required": [
+    "path",
+    "versions"
+  ],
+  "$defs": {
+    "ComparedVersion": {
+      "description": "One version of a file.",
+      "type": "object",
+      "properties": {
+        "archive": {
+          "description": "The archive it is in, or `None` for a loose file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "description": "The picture, a PNG or JPEG as a `data:` address, for pictures other\nthan textures.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modified": {
+          "description": "When the file, or the archive it is in, was last written, in\nseconds since 1970; `None` where it cannot be told.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "provider": {
+          "description": "The mod it comes from, if the mod manager knows.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sameAs": {
+          "description": "The position of the first earlier version with exactly the same\nbytes, if there is one.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "script": {
+          "description": "What a compiled script says about itself.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScriptSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Its size in bytes.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "staged": {
+          "description": "Whether it is a loose copy that lies only in the mod manager's own\nfolder, because another mod's copy is in the game instead.",
+          "type": "boolean"
+        },
+        "text": {
+          "description": "The content, for files that are text, up to a limit.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "textCut": {
+          "description": "Whether the text was cut at that limit.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "staged",
+        "size"
+      ]
+    },
+    "ModRef": {
+      "description": "A mod as a mod manager knows it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The manager's own identifier of the mod.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name to show to people.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The manager that knows this mod, for example `vortex`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "name"
+      ]
+    },
+    "ScriptFunction": {
+      "description": "One function of a compiled script.",
+      "type": "object",
+      "properties": {
+        "fingerprint": {
+          "description": "Stands for the shape of its compiled code: two versions whose\nfingerprints differ do something different.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "What kind of function it is.",
+          "$ref": "#/$defs/ScriptFunctionKind"
+        },
+        "name": {
+          "description": "Its name; for a property's getter or setter, the property's.",
+          "type": "string"
+        },
+        "state": {
+          "description": "The state it belongs to; empty for the default state.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "name",
+        "kind",
+        "fingerprint"
+      ]
+    },
+    "ScriptFunctionKind": {
+      "description": "What kind of function a script function is.",
+      "oneOf": [
+        {
+          "description": "An ordinary function or event.",
+          "type": "string",
+          "const": "plain"
+        },
+        {
+          "description": "What reads a property.",
+          "type": "string",
+          "const": "getter"
+        },
+        {
+          "description": "What sets a property.",
+          "type": "string",
+          "const": "setter"
+        }
+      ]
+    },
+    "ScriptSummary": {
+      "description": "The name and functions of a compiled script.",
+      "type": "object",
+      "properties": {
+        "functions": {
+          "description": "Its functions.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScriptFunction"
+          }
+        },
+        "hasDebugInfo": {
+          "description": "Whether the script carries the names of its functions; without\nthem, `functions` is empty.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The script's name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "hasDebugInfo",
+        "functions"
+      ]
+    }
+  }
+}

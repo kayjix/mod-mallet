@@ -7,6 +7,7 @@ use std::fs::File;
 use std::path::Path;
 
 use mallet_formats_bethesda::dds;
+pub use mallet_formats_bethesda::pex::{FunctionKind, PexScript};
 
 use crate::game::Game;
 use crate::{archive, archives, ingest};
@@ -50,12 +51,32 @@ pub fn versions(
     local_dir: Option<&Path>,
     path: &str,
 ) -> Vec<FileVersion> {
-    let wanted = normalize(path);
-    if wanted.is_empty() || wanted.split('/').any(|part| part == "..") {
-        return Vec::new();
+    versions_of_each(game, game_dir, local_dir, &[path])
+        .into_iter()
+        .next()
+        .unwrap_or_default()
+}
+
+/// Every version of each of `paths`, as [`versions`] finds them, in the
+/// same order as `paths`. Each archive is read once for all of them.
+pub fn versions_of_each(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    paths: &[&str],
+) -> Vec<Vec<FileVersion>> {
+    let wanted: Vec<Option<String>> = paths
+        .iter()
+        .map(|path| {
+            let wanted = normalize(path);
+            (!wanted.is_empty() && !wanted.split('/').any(|part| part == "..")).then_some(wanted)
+        })
+        .collect();
+    let mut found: Vec<Vec<FileVersion>> = paths.iter().map(|_| Vec::new()).collect();
+    if wanted.iter().all(Option::is_none) {
+        return found;
     }
     let data_dir = game_dir.join("Data");
-    let mut found = Vec::new();
 
     let active = ingest::active_plugin_names(game, game_dir, local_dir).unwrap_or_default();
     let extension = format!(".{}", game.archive_extension());
@@ -70,24 +91,37 @@ pub fn versions(
         },
     );
     for name in archives::load_order(game, &on_disk, &active) {
-        if let Some(bytes) = from_archive(&data_dir.join(&name), &wanted) {
-            found.push(FileVersion {
-                origin: Origin::Archive(name),
+        for (slot, bytes) in from_archive(&data_dir.join(&name), &wanted) {
+            if let Some(versions) = found.get_mut(slot) {
+                versions.push(FileVersion {
+                    origin: Origin::Archive(name.clone()),
+                    bytes,
+                });
+            }
+        }
+    }
+
+    for (versions, wanted) in found.iter_mut().zip(&wanted) {
+        let Some(wanted) = wanted else {
+            continue;
+        };
+        let loose = data_dir.join(wanted);
+        let small =
+            std::fs::metadata(&loose).is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_BYTES);
+        if small && let Ok(bytes) = std::fs::read(&loose) {
+            versions.push(FileVersion {
+                origin: Origin::Loose,
                 bytes,
             });
         }
     }
-
-    let loose = data_dir.join(&wanted);
-    let small =
-        std::fs::metadata(&loose).is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_BYTES);
-    if small && let Ok(bytes) = std::fs::read(&loose) {
-        found.push(FileVersion {
-            origin: Origin::Loose,
-            bytes,
-        });
-    }
     found
+}
+
+/// The name and functions of the compiled script in `bytes`; `None` if
+/// it is not one that can be read.
+pub fn script(bytes: &[u8]) -> Option<PexScript> {
+    mallet_formats_bethesda::pex::read_script(bytes).ok()
 }
 
 /// The colour texture the material file in `bytes` (`.bgsm`, `.bgem`)
@@ -130,16 +164,39 @@ pub fn thumbnail(bytes: &[u8], max_side: u32) -> Option<dds::Rgb> {
     dds::decode_level(bytes, level).ok()
 }
 
-/// The file `wanted` (normalized) from the archive at `archive`, if it has it.
-fn from_archive(archive: &Path, wanted: &str) -> Option<Vec<u8>> {
-    let directory = archive::read_directory(archive).ok()?;
-    let index = directory
-        .paths()
-        .into_iter()
-        .position(|path| normalize(path) == wanted)?;
-    let mut file = File::open(archive).ok()?;
-    let bytes = directory.read(&mut file, index)?;
-    (bytes.len() as u64 <= MAX_BYTES).then_some(bytes)
+/// The files of `wanted` (normalized) that the archive at `archive` has,
+/// each with its position in `wanted`.
+fn from_archive(archive: &Path, wanted: &[Option<String>]) -> Vec<(usize, Vec<u8>)> {
+    let Ok(directory) = archive::read_directory(archive) else {
+        return Vec::new();
+    };
+    let mut slots: std::collections::HashMap<&str, Vec<usize>> = std::collections::HashMap::new();
+    for (slot, path) in wanted.iter().enumerate() {
+        if let Some(path) = path {
+            slots.entry(path.as_str()).or_default().push(slot);
+        }
+    }
+    let mut found = Vec::new();
+    let mut file = None;
+    for (index, path) in directory.paths().into_iter().enumerate() {
+        let Some(mine) = slots.get(normalize(path).as_str()) else {
+            continue;
+        };
+        if file.is_none() {
+            file = File::open(archive).ok();
+        }
+        let Some(open) = file.as_mut() else {
+            break;
+        };
+        if let Some(bytes) = directory.read(open, index)
+            && bytes.len() as u64 <= MAX_BYTES
+        {
+            for slot in mine {
+                found.push((*slot, bytes.clone()));
+            }
+        }
+    }
+    found
 }
 
 #[cfg(test)]
