@@ -43,6 +43,7 @@ impl Vortex {
             vortex_data_dir: Some(self.data_dir()),
             link_dir: Some(self.link_dir()),
             timeout: Some(Duration::from_secs(5)),
+            setup: None,
         }
     }
 
@@ -314,4 +315,119 @@ fn a_mod_of_another_manager_cannot_be_reinstalled_through_vortex() {
     let vortex = Vortex::new();
     let outcome = run_action(&reinstall("mo2"), &vortex.options());
     assert_eq!(outcome.status, ActionStatus::Unsupported);
+}
+
+/// A made-up game whose master places one object outside, at 100, 200.
+fn game_with_one_object(root: &Path) -> mallet_engine::ScanOptions {
+    use mallet_formats_bethesda::fixture::{self, RecordSpec};
+    let game_dir = root.join("Game");
+    let local_dir = root.join("Local");
+    fs::create_dir_all(game_dir.join("Data")).unwrap();
+    fs::create_dir_all(&local_dir).unwrap();
+    let mut grid = 0i32.to_le_bytes().to_vec();
+    grid.extend(0i32.to_le_bytes());
+    grid.extend(0u32.to_le_bytes());
+    let world = RecordSpec::new(*b"WRLD", 0x3C).with(*b"EDID", fixture::zstring("Tamriel"));
+    let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", grid);
+    let object = fixture::reference(0x812, 0x10, [100.0, 200.0, 0.0], [0.0; 3], None);
+    fs::write(
+        game_dir.join("Data").join("Skyrim.esm"),
+        fixture::plugin_with_raw_groups(
+            &[],
+            1,
+            &[fixture::worldspace(&world, &[(cell, vec![object])])],
+        ),
+    )
+    .unwrap();
+    fs::write(local_dir.join("plugins.txt"), "").unwrap();
+    mallet_engine::ScanOptions {
+        game_dir: Some(game_dir),
+        local_dir: Some(local_dir),
+        ..mallet_engine::ScanOptions::default()
+    }
+}
+
+fn lifted(local_id: u32) -> mallet_core::moves::Moves {
+    mallet_core::moves::Moves {
+        moves: vec![mallet_core::moves::ObjectMove {
+            object: mallet_core::ObjectRef {
+                plugin: "Skyrim.esm".to_owned(),
+                local_id,
+            },
+            cell: None,
+            from: [100, 200, 0],
+            offset: [0, 0, 10],
+            turn: 0,
+        }],
+    }
+}
+
+#[test]
+fn moving_objects_writes_a_plugin_and_hands_it_to_vortex() {
+    let vortex = Vortex::new();
+    install_manager_link(&vortex.options()).unwrap();
+    vortex.start_extension();
+    let options = ManagerOptions {
+        setup: Some(game_with_one_object(vortex.root.path())),
+        ..vortex.options()
+    };
+
+    let extension = vortex.answer_next_request(r#"{"ok":true,"code":"installing"}"#);
+    let outcome = run_action(
+        &Action::MoveObjects {
+            moves: lifted(0x812),
+        },
+        &options,
+    );
+
+    assert_eq!(outcome.status, ActionStatus::Installing);
+    let archive = PathBuf::from(extension.join().unwrap());
+    assert_eq!(
+        archive.parent(),
+        Some(vortex.root.path().join("patches").as_path())
+    );
+    assert_eq!(
+        archive.file_name().and_then(|name| name.to_str()),
+        Some("Mod Mallet - Moves.zip")
+    );
+    let bytes = fs::read(&archive).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("Mod Mallet - Moves.esp"));
+    assert!(text.contains("TES4"));
+    // Nothing was written into the game.
+    let data: Vec<_> = fs::read_dir(vortex.root.path().join("Game").join("Data"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name())
+        .collect();
+    assert_eq!(data, ["Skyrim.esm"]);
+}
+
+#[test]
+fn moves_that_find_nothing_or_lack_the_setup_ask_nothing_of_vortex() {
+    let vortex = Vortex::new();
+    install_manager_link(&vortex.options()).unwrap();
+    vortex.start_extension();
+    let lift = |local_id| Action::MoveObjects {
+        moves: lifted(local_id),
+    };
+    let outcome = run_action(&lift(0x812), &vortex.options());
+    assert_eq!(outcome.status, ActionStatus::Failed);
+
+    let options = ManagerOptions {
+        setup: Some(game_with_one_object(vortex.root.path())),
+        ..vortex.options()
+    };
+    let created =
+        mallet_engine::create_moves(options.setup.as_ref().unwrap(), &lifted(0x999), &options)
+            .unwrap();
+    assert_eq!(created.moved, 0);
+    assert_eq!(created.path, "");
+    assert_eq!(
+        created.refused[0].reason,
+        mallet_core::moves::MoveRefusal::NotFound
+    );
+    let outcome = run_action(&lift(0x999), &options);
+    assert_eq!(outcome.status, ActionStatus::Failed);
+    assert_eq!(first_json(&vortex.link_dir().join("requests")), None);
 }

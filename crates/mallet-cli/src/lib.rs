@@ -287,6 +287,7 @@ fn vortex(
         vortex_data_dir: args.vortex_data_dir,
         link_dir: args.link_dir,
         timeout: None,
+        setup: None,
     };
     match args.command {
         VortexCommand::Status => {

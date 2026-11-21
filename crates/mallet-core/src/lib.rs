@@ -26,6 +26,7 @@ pub mod finding;
 pub mod kinds;
 pub mod mesh;
 pub mod mods;
+pub mod moves;
 pub mod patch;
 pub mod path;
 pub mod progress;

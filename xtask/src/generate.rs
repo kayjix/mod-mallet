@@ -18,7 +18,7 @@ use crate::tools;
 
 /// The contracts of the desktop app: for each, the schema and the file its
 /// TypeScript types are written to.
-const DESKTOP_CONTRACTS: [(&str, &str); 19] = [
+const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
     (
         "schemas/rendered-report.schema.json",
         "apps/desktop/src/generated/rendered-report.ts",
@@ -95,6 +95,10 @@ const DESKTOP_CONTRACTS: [(&str, &str); 19] = [
         "schemas/walkway-reach.schema.json",
         "apps/desktop/src/generated/walkway-reach.ts",
     ),
+    (
+        "schemas/created-moves.schema.json",
+        "apps/desktop/src/generated/created-moves.ts",
+    ),
 ];
 
 /// A file and the content it should have.
@@ -132,6 +136,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::mesh::HiddenWalkways>("schemas/hidden-walkways.schema.json")?,
         schema_of::<mallet_core::ScanProgress>("schemas/scan-progress.schema.json")?,
         schema_of::<mallet_core::reach::WalkwayReach>("schemas/walkway-reach.schema.json")?,
+        schema_of::<mallet_core::moves::CreatedMoves>("schemas/created-moves.schema.json")?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),

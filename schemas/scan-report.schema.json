@@ -182,6 +182,24 @@
           ]
         },
         {
+          "description": "Move placed objects a little, through a plugin of overrides that\nthe mod manager installs (ADR 0060). Removing it puts them back.",
+          "type": "object",
+          "properties": {
+            "moves": {
+              "description": "The moves.",
+              "$ref": "#/$defs/Moves"
+            },
+            "type": {
+              "type": "string",
+              "const": "move-objects"
+            }
+          },
+          "required": [
+            "type",
+            "moves"
+          ]
+        },
+        {
           "description": "Load a plugin after another one, through a rule in the mod\nmanager's plugin list, so that its version of what both change wins.\nThe rule can be removed there again.",
           "type": "object",
           "properties": {
@@ -1186,6 +1204,70 @@
         "source",
         "id",
         "name"
+      ]
+    },
+    "Moves": {
+      "description": "The moves to carry into the game, as one plugin.",
+      "type": "object",
+      "properties": {
+        "moves": {
+          "description": "The moves, one per object.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectMove"
+          }
+        }
+      },
+      "required": [
+        "moves"
+      ]
+    },
+    "ObjectMove": {
+      "description": "One placed object moved: by how much, and where it was found.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "The interior cell it stands in, by its editor ID; `None` outside.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "description": "Where it stood when it was moved, in whole game units. Only a hint\nfor finding it: the plugin starts from where the game has it.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "object": {
+          "description": "The object.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "offset": {
+          "description": "How far it goes east, north and up, in game units (about 1.4 cm\neach).",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "turn": {
+          "description": "How far it turns about the upright axis through its own origin, in\ndegrees, the way the game counts (clockwise seen from above).",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "object",
+        "from",
+        "offset",
+        "turn"
       ]
     },
     "ObjectRef": {

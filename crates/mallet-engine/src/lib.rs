@@ -24,6 +24,7 @@ mod knowledge;
 mod lod;
 mod logging;
 mod mesh;
+mod moves;
 mod patch;
 mod png;
 mod preview;
@@ -60,6 +61,7 @@ pub use dashboard::announce_app;
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
+pub use moves::{create_moves, moves_file};
 pub use preview::file_preview;
 pub use reach::{walkway_reach, walkway_reach_after};
 pub use settings::{
@@ -210,6 +212,15 @@ pub enum EngineError {
     /// A patch was asked for that would hide nothing.
     #[error("no objects were chosen to hide")]
     NothingToHide,
+    /// Moves were asked for that would move nothing.
+    #[error("none of the objects chosen could be moved")]
+    NothingToMove,
+    /// The plugin that moves objects could not be made.
+    #[error("the plugin that moves the objects could not be made: {0}")]
+    MovesNotWritten(String),
+    /// An action needs to read the setup, but where it is was not given.
+    #[error("the game's setup is not known here")]
+    SetupUnknown,
     /// The mod manager's records could not be used.
     #[error(transparent)]
     Vortex(#[from] VortexError),

@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreatedMoves",
+  "description": "The plugin of moves as written into Mod Mallet's own folder.",
+  "type": "object",
+  "properties": {
+    "light": {
+      "description": "Whether it is flagged as light.",
+      "type": "boolean"
+    },
+    "masters": {
+      "description": "The plugins it names as masters: those whose versions it copies\nand those they refer to. It loads after them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "moved": {
+      "description": "How many objects it moves.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "path": {
+      "description": "The archive that holds it, ready for the mod manager.",
+      "type": "string"
+    },
+    "refused": {
+      "description": "The objects it could not move, and why.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RefusedMove"
+      }
+    }
+  },
+  "required": [
+    "path",
+    "moved",
+    "masters",
+    "light",
+    "refused"
+  ],
+  "$defs": {
+    "MoveRefusal": {
+      "description": "Why an object could not be moved by the plugin.",
+      "oneOf": [
+        {
+          "description": "No active plugin places it where it was said to be.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "not-found"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "The version the game uses deletes it or switches it off.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "gone"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "The object, its cell or its worldspace has a field Mod Mallet does\nnot know how to copy; copying it blindly could break what it\nrefers to.",
+          "type": "object",
+          "properties": {
+            "field": {
+              "description": "The record type and the field, such as `REFR XCVL`.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unknown-field"
+            }
+          },
+          "required": [
+            "type",
+            "field"
+          ]
+        },
+        {
+          "description": "A name the game keeps in a string table could not be found there.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "name-not-found"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "The game is not one whose plugins Mod Mallet can write.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "unsupported-game"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "RefusedMove": {
+      "description": "An object that was not moved, and why.",
+      "type": "object",
+      "properties": {
+        "object": {
+          "description": "The object.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "reason": {
+          "description": "Why.",
+          "$ref": "#/$defs/MoveRefusal"
+        }
+      },
+      "required": [
+        "object",
+        "reason"
+      ]
+    }
+  }
+}

@@ -397,6 +397,14 @@ impl Messages {
                 )],
                 &no_ticks,
             ),
+            Action::MoveObjects { moves } => (
+                "action-move-objects",
+                vec![(
+                    "count",
+                    ArgValue::Number(i64::try_from(moves.moves.len()).unwrap_or(i64::MAX)),
+                )],
+                &no_ticks,
+            ),
             Action::LoadAfter { plugin, after } => (
                 "action-load-after",
                 vec![

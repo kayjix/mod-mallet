@@ -94,6 +94,12 @@ action-hide-objects = Install the patch in Vortex
        *[other] { $count } objects
     } while the game runs, and Vortex installs it. It needs Base Object Swapper. Remove the mod in Vortex to bring the objects back.
 
+action-move-objects = Install the moves in Vortex
+    .description = Mod Mallet writes a small plugin that puts { $count ->
+        [one] 1 object
+       *[other] { $count } objects
+    } a little to one side, and Vortex installs it. Remove the mod in Vortex to put them back where they were.
+
 action-load-after = Let { $plugin } win
     .description = Vortex gets a rule to load { $plugin } after { $after } and sorts your plugins again. What both change then comes from { $plugin }; whatever only { $after } changes stays. You find the rule, and can remove it, in Vortex's plugin list.
 

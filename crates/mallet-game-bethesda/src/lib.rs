@@ -44,6 +44,7 @@ pub mod loose_meshes;
 pub mod markers;
 pub mod meshes;
 pub mod models;
+pub mod moves;
 pub mod navmeshes;
 pub mod npc;
 pub mod objects;

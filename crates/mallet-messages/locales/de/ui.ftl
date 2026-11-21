@@ -94,6 +94,12 @@ action-hide-objects = Patch in Vortex installieren
        *[other] { $count } Objekte
     } durch einen unsichtbaren Marker ersetzt, und Vortex installiert sie. Dafür braucht es Base Object Swapper. Entfernst du die Mod in Vortex, sind die Objekte wieder da.
 
+action-move-objects = Verschiebungen in Vortex installieren
+    .description = Mod Mallet schreibt ein kleines Plugin, das { $count ->
+        [one] 1 Objekt
+       *[other] { $count } Objekte
+    } ein Stück zur Seite rückt, und Vortex installiert es. Entfernst du die Mod in Vortex, stehen sie wieder, wo sie waren.
+
 action-load-after = { $plugin } gewinnen lassen
     .description = Vortex bekommt eine Regel, { $plugin } nach { $after } zu laden, und sortiert deine Plugins neu. Was beide ändern, kommt dann aus { $plugin }; was nur { $after } ändert, bleibt. Die Regel findest du in Vortex' Plugin-Liste und kannst sie dort wieder entfernen.
 

@@ -34,6 +34,12 @@ pub enum Action {
         /// The patch, with the objects to hide in its parts.
         patch: crate::Patch,
     },
+    /// Move placed objects a little, through a plugin of overrides that
+    /// the mod manager installs (ADR 0060). Removing it puts them back.
+    MoveObjects {
+        /// The moves.
+        moves: crate::moves::Moves,
+    },
     /// Load a plugin after another one, through a rule in the mod
     /// manager's plugin list, so that its version of what both change wins.
     /// The rule can be removed there again.

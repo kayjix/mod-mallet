@@ -31,6 +31,10 @@ export type Action =
       type: "hide-objects";
     }
   | {
+      moves: Moves;
+      type: "move-objects";
+    }
+  | {
       /**
        * The plugin it is to load after.
        */
@@ -255,6 +259,10 @@ export interface DuelResolution {
         type: "hide-objects";
       }
     | {
+        moves: Moves;
+        type: "move-objects";
+      }
+    | {
         /**
          * The plugin it is to load after.
          */
@@ -402,6 +410,61 @@ export interface PatchPart {
  * depend on the load order.
  */
 export interface ObjectRef {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * The moves.
+ */
+export interface Moves {
+  /**
+   * The moves, one per object.
+   */
+  moves: ObjectMove[];
+}
+/**
+ * One placed object moved: by how much, and where it was found.
+ */
+export interface ObjectMove {
+  /**
+   * The interior cell it stands in, by its editor ID; `None` outside.
+   */
+  cell?: string | null;
+  /**
+   * Where it stood when it was moved, in whole game units. Only a hint
+   * for finding it: the plugin starts from where the game has it.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  from: [number, number, number];
+  object: ObjectRef1;
+  /**
+   * How far it goes east, north and up, in game units (about 1.4 cm
+   * each).
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  offset: [number, number, number];
+  /**
+   * How far it turns about the upright axis through its own origin, in
+   * degrees, the way the game counts (clockwise seen from above).
+   */
+  turn: number;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef1 {
   /**
    * The object's number in that plugin.
    */
@@ -574,6 +637,10 @@ export interface RenderedAction {
     | {
         patch: Patch;
         type: "hide-objects";
+      }
+    | {
+        moves: Moves;
+        type: "move-objects";
       }
     | {
         /**
@@ -1137,7 +1204,7 @@ export interface SpotPart {
    * The internal name of what it is.
    */
   name: string;
-  object: ObjectRef1;
+  object: ObjectRef2;
   /**
    * Whether hiding this one rather than the other is suggested: of two
    * copies, the one from the plugin that places fewer objects.
@@ -1149,7 +1216,7 @@ export interface SpotPart {
  * that plugin. Unlike a form ID as the game shows it, this does not
  * depend on the load order.
  */
-export interface ObjectRef1 {
+export interface ObjectRef2 {
   /**
    * The object's number in that plugin.
    */

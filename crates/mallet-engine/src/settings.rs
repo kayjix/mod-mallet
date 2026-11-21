@@ -62,6 +62,7 @@ impl Settings {
     pub fn manager_options(&self) -> crate::ManagerOptions {
         crate::ManagerOptions {
             game: (!self.game.is_empty()).then(|| self.game.clone()),
+            setup: Some(self.scan_options()),
             ..crate::ManagerOptions::default()
         }
     }

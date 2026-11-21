@@ -646,7 +646,11 @@ pub fn read_catalogue(
 
 /// The names of the string table of `plugin_name`, in `language` if the
 /// setup has it, else in English, else in any language there is.
-fn string_table(tables: &LodLibrary, plugin_name: &str, language: &str) -> HashMap<u32, String> {
+pub fn string_table(
+    tables: &LodLibrary,
+    plugin_name: &str,
+    language: &str,
+) -> HashMap<u32, String> {
     let stem = plugin_name
         .rsplit_once('.')
         .map_or(plugin_name, |(stem, _)| stem)

@@ -32,6 +32,9 @@ pub struct ManagerOptions {
     pub link_dir: Option<PathBuf>,
     /// How long to wait for the mod manager's answer.
     pub timeout: Option<Duration>,
+    /// Where the game's setup is, for actions that read it before they
+    /// hand something to the mod manager, such as moving objects.
+    pub setup: Option<crate::ScanOptions>,
 }
 
 impl ManagerOptions {
@@ -121,6 +124,7 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
             reinstall_in_vortex(&mod_ref.id, tick, options)
         }
         Action::HideObjects { patch } => hide_objects(patch, options),
+        Action::MoveObjects { moves } => move_objects(moves, options),
         Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
             tracing::info!(plugin, after, "asking Vortex for a plugin rule");
             link.load_after(options.vortex_game(), plugin, after, timeout)
@@ -333,6 +337,39 @@ fn hide_objects(patch: &Patch, options: &ManagerOptions) -> ActionOutcome {
     let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
     tracing::info!(archive = %created.path.display(), "asking Vortex to install the patch");
     outcome_of(Link::new(link_dir).install_archive(options.vortex_game(), &created.path, timeout))
+}
+
+/// Writes the plugin that moves objects (ADR 0060) and asks Vortex to
+/// install it.
+fn move_objects(moves: &mallet_core::moves::Moves, options: &ManagerOptions) -> ActionOutcome {
+    let failed = |error: EngineError| ActionOutcome {
+        status: ActionStatus::Failed,
+        detail: Some(error.to_string()),
+    };
+    let Some(scan) = options.setup.as_ref() else {
+        return failed(EngineError::SetupUnknown);
+    };
+    if !manager_link(options).installed {
+        return ActionOutcome::new(ActionStatus::LinkMissing);
+    }
+    let Some(link_dir) = options.link_dir() else {
+        return ActionOutcome::new(ActionStatus::ManagerNotRunning);
+    };
+    let created = match crate::moves::create_moves(scan, moves, options) {
+        Ok(created) if created.moved > 0 => created,
+        Ok(_) => return failed(EngineError::NothingToMove),
+        Err(error) => {
+            tracing::warn!(%error, "moves not written");
+            return failed(error);
+        }
+    };
+    let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+    tracing::info!(archive = created.path, "asking Vortex to install the moves");
+    outcome_of(Link::new(link_dir).install_archive(
+        options.vortex_game(),
+        std::path::Path::new(&created.path),
+        timeout,
+    ))
 }
 
 fn reinstall_in_vortex(

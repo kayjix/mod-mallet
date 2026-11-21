@@ -304,6 +304,22 @@ fn create_patch(patch: mallet_core::Patch) -> Result<String, String> {
         })
 }
 
+/// Writes the plugin that moves objects (ADR 0060) into Mod Mallet's own
+/// folder and says what it moves and what it could not. Nothing is
+/// installed. Only ever called because the user pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn create_moves(
+    moves: mallet_core::moves::Moves,
+) -> Result<mallet_core::moves::CreatedMoves, String> {
+    mallet_engine::create_moves(&settings()?.scan_options(), &moves, &manager_options()).map_err(
+        |error| {
+            tracing::warn!(%error, "moves not written");
+            error.to_string()
+        },
+    )
+}
+
 /// Shows one of Mod Mallet's own folders in the file explorer: `patches`
 /// or `logs`. Nothing else can be opened this way.
 #[tauri::command]
@@ -721,6 +737,7 @@ pub fn run() -> tauri::Result<()> {
             setup_fingerprint,
             open_page,
             create_patch,
+            create_moves,
             save_patch_report,
             open_folder,
             log_file,
