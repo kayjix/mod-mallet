@@ -11,6 +11,7 @@ import { InfoTip } from "./info-tip";
 import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
 import { CELL } from "./map-places";
+import { moveKeysOf } from "./moves";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 export interface InteriorViewProps {
@@ -78,7 +79,10 @@ export function InteriorView({
   children,
   tools,
 }: InteriorViewProps) {
-  const { t, api, lang } = useSession();
+  const { t, api, lang, patchChoices } = useSession();
+  // The choices, for a layer of objects made later (moves, ADR 0060).
+  const choicesNow = useRef(patchChoices);
+  choicesNow.current = patchChoices;
   const own = interiorTexts[lang];
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -233,6 +237,7 @@ export function InteriorView({
     }
     try {
       layer.current = new AreaLayer(gl, api, () => redrawNow.current());
+      layer.current.setMoves(moveKeysOf(choicesNow.current));
     } catch {
       setFailed(true);
     }
@@ -297,6 +302,12 @@ export function InteriorView({
   useEffect(() => {
     redraw();
   }, [height, seeInside, redraw]);
+
+  // Moved objects stand where their moves put them (ADR 0060).
+  useEffect(() => {
+    layer.current?.setMoves(moveKeysOf(patchChoices));
+    redraw();
+  }, [patchChoices, redraw]);
 
   /** The object drawn at a point of the screen, if any. */
   const objectAt = (clientX: number, clientY: number): AreaObject | null => {
@@ -534,6 +545,7 @@ export function InteriorView({
             {objectExtra?.(picked, {
               selection: selection[0] === picked ? selection : [picked],
               level,
+              layer: layer.current ?? undefined,
             })}
           </div>
         )}

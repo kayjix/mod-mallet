@@ -1,0 +1,124 @@
+/* Moving objects a little instead of hiding them (ADR 0060). */
+
+.move-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.move-controls[data-open] {
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+}
+
+.move-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.move-together {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+}
+
+.move-pad {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Four arrows as a compass: north on top, south below. */
+.move-arrows {
+  display: grid;
+  grid-template-columns: repeat(3, 2rem);
+  grid-template-rows: repeat(3, 2rem);
+}
+
+.move-arrow[data-direction="↑"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.move-arrow[data-direction="←"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.move-arrow[data-direction="→"] {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.move-arrow[data-direction="↓"] {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.move-arrows,
+.move-column {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.move-arrows button,
+.move-column button {
+  min-width: 2rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1.8rem;
+}
+
+.move-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.move-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 0.85rem;
+}
+
+.move-state {
+  margin: 0;
+}
+
+.move-collision {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.9rem;
+}
+
+.move-collision[data-clear] {
+  color: var(--ok);
+}
+
+.move-spot {
+  margin: var(--space-1) 0 0;
+}
+
+.moves-panel {
+  margin: var(--space-4) 0;
+}
+
+.moves-list {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-4);
+  font-size: 0.9rem;
+}
+
+.moves-refused {
+  color: var(--warning);
+  font-size: 0.9rem;
+}

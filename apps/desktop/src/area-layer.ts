@@ -10,6 +10,7 @@ import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { Mat4, Vec3 } from "./gl";
 import { CELL } from "./map-places";
+import { type Move, movedMatrix } from "./moves";
 
 /** How many meshes are fetched at once. */
 const PARALLEL = 6;
@@ -345,6 +346,8 @@ export interface PartTools {
   selection: AreaObject[];
   /** The magic wand's level the selection was made at, 0 to {@link WAND_TOP}. */
   level: number;
+  /** The view's objects, to see where moved objects would stand (ADR 0060). */
+  layer?: AreaLayer;
 }
 
 /** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
@@ -418,6 +421,33 @@ export function boxesMeet(a: PlacedBox, b: PlacedBox, margin: number): boolean {
   }
   return axes.every(
     (axis) => Math.abs(dot(between, axis)) <= reach(a, axis) + reach(b, axis) + margin,
+  );
+}
+
+/**
+ * How far two placed boxes reach into each other, in game units: the
+ * least overlap along any separating axis. Zero or less where they do not
+ * meet; then minus the gap between them.
+ */
+export function overlapDepth(a: PlacedBox, b: PlacedBox): number {
+  const between = [0, 1, 2].map((axis) => (b.centre[axis] ?? 0) - (a.centre[axis] ?? 0));
+  const reach = (box: PlacedBox, axis: readonly number[]) =>
+    box.axes.reduce(
+      (sum, own, index) => sum + Math.abs(dot(own, axis)) * (box.half[index] ?? 0),
+      0,
+    );
+  const axes: [number, number, number][] = [...a.axes, ...b.axes];
+  for (const own of a.axes) {
+    for (const other of b.axes) {
+      const axis = cross(own, other);
+      const length = Math.hypot(...axis);
+      if (length > 1e-6) {
+        axes.push(axis.map((value) => value / length) as [number, number, number]);
+      }
+    }
+  }
+  return Math.min(
+    ...axes.map((axis) => reach(a, axis) + reach(b, axis) - Math.abs(dot(between, axis))),
   );
 }
 
@@ -571,6 +601,8 @@ export class AreaLayer {
   private selected = new Set<string>();
   /** The chain of the picked object, lit faintly (ADR 0055). */
   private chained = new Set<string>();
+  /** Where moved objects stand now, by key (ADR 0060). */
+  private moves = new Map<string, Move>();
   /** The objects shown, as last set. */
   area: AreaObjects | null = null;
 
@@ -598,8 +630,10 @@ export class AreaLayer {
   show(area: AreaObjects, look: (key: string) => Look) {
     this.area = area;
     this.instances = area.objects.map((object) => {
-      const shown = look(objectKey(object.id.plugin, object.id.localId));
-      return { object, matrix: placement(object), marked: shown !== LOOK.plain, look: shown };
+      const key = objectKey(object.id.plugin, object.id.localId);
+      const shown = look(key);
+      const matrix = movedMatrix(placement(object), this.moves.get(key) ?? null);
+      return { object, matrix, marked: shown !== LOOK.plain, look: shown };
     });
     for (const model of new Set(area.objects.map((object) => object.model))) {
       if (!this.models.has(model) && !this.queue.includes(model)) {
@@ -618,6 +652,60 @@ export class AreaLayer {
       this.place(model);
     }
     this.pump();
+  }
+
+  /**
+   * Draws each object where its move puts it, by key (see
+   * {@link objectKey}); objects without one where they stand (ADR 0060).
+   */
+  setMoves(moves: Map<string, Move>) {
+    const changed = new Set<string>();
+    for (const key of new Set([...this.moves.keys(), ...moves.keys()])) {
+      if (JSON.stringify(this.moves.get(key)) !== JSON.stringify(moves.get(key))) {
+        changed.add(key);
+      }
+    }
+    this.moves = new Map(moves);
+    if (changed.size === 0) {
+      return;
+    }
+    const models = new Set<string>();
+    for (const instance of this.instances) {
+      const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
+      if (changed.has(key)) {
+        instance.matrix = movedMatrix(placement(instance.object), this.moves.get(key) ?? null);
+        models.add(instance.object.model);
+      }
+    }
+    for (const model of models) {
+      this.place(model);
+    }
+  }
+
+  /**
+   * The box of an object's model where `move` would put it (where it
+   * stands with no move); null until its model is read.
+   */
+  boxOf(object: AreaObject, move: Move | null): PlacedBox | null {
+    const model = this.models.get(object.model);
+    if (model === undefined || !Array.isArray(model.surfaces)) {
+      return null;
+    }
+    return placedBox(model.box, movedMatrix(placement(object), move));
+  }
+
+  /** The objects shown within `radius` game units of `point`, as their positions say. */
+  objectsNear(point: readonly number[], radius: number): AreaObject[] {
+    return this.instances
+      .map((instance) => instance.object)
+      .filter(
+        (object) =>
+          Math.hypot(
+            object.position[0] - (point[0] ?? 0),
+            object.position[1] - (point[1] ?? 0),
+            object.position[2] - (point[2] ?? 0),
+          ) <= radius,
+      );
   }
 
   /** Draws the objects anew as `look` says. */

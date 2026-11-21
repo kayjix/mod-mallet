@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
 import type { MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
 import { InfoTip } from "./info-tip";
+import { MovesPanel } from "./move-controls";
+import { movesOnly } from "./moves";
 import { PairReport } from "./PairReport";
 import {
   choicesOf,
@@ -103,12 +105,15 @@ export function PatchView({ report }: { report: RenderedReport }) {
 
   if (!report.objectSwapper) {
     return (
-      <section className="patch-missing">
-        <p>{p.needsSwapper}</p>
-        <button type="button" onClick={() => api.openPage(SWAPPER_PAGE)}>
-          {t.openPage}
-        </button>
-      </section>
+      <>
+        <section className="patch-missing">
+          <p>{p.needsSwapper}</p>
+          <button type="button" onClick={() => api.openPage(SWAPPER_PAGE)}>
+            {t.openPage}
+          </button>
+        </section>
+        <MovesPanel />
+      </>
     );
   }
   const pausedNote = (paused.decisions > 0 ||
@@ -137,15 +142,13 @@ export function PatchView({ report }: { report: RenderedReport }) {
     </div>
   );
   if (pairs.length === 0 && own.length === 0) {
-    if (pausedNote) {
-      return (
-        <section className="patch-view">
-          {pausedNote}
-          <p className="empty">{t.nothingHere}</p>
-        </section>
-      );
-    }
-    return <p className="empty">{t.nothingHere}</p>;
+    return (
+      <section className="patch-view">
+        {pausedNote}
+        <p className="empty">{t.nothingHere}</p>
+        <MovesPanel />
+      </section>
+    );
   }
   return (
     <section className="patch-view">
@@ -188,10 +191,12 @@ export function PatchView({ report }: { report: RenderedReport }) {
               className="primary"
               onClick={() => {
                 setBefore(choices);
-                // Pins are no decisions; they stay (ADR 0050).
+                // Pins are no decisions; they stay (ADR 0050). Moves have
+                // their own plugin and stay too (ADR 0060).
                 setChoices({
                   ...(asking === "clear" ? {} : fromInstalled),
                   ...pinsOnly(choices),
+                  ...movesOnly(choices),
                 });
                 setAsking(null);
               }}
@@ -299,6 +304,8 @@ export function PatchView({ report }: { report: RenderedReport }) {
           onShow={(object) => setChoices(chooseObject(choices, object, false))}
         />
       )}
+
+      <MovesPanel />
 
       <PairReport report={report} game={session.game} />
     </section>

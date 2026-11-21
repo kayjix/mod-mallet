@@ -13,6 +13,7 @@ import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { MoveControls } from "./move-controls";
 import {
   chooseObject,
   decisionAt,
@@ -192,11 +193,14 @@ export function FreeObjectActions({
   object,
   place,
   tools,
+  interior = false,
 }: {
   object: AreaObject;
   /** The worldspace or interior cell it is in. */
   place: string | null;
   tools?: PartTools;
+  /** Whether `place` is an interior cell. */
+  interior?: boolean;
 }) {
   const { t, lang, spots, patchChoices, setPatchChoices } = useSession();
   const own = collisionsTexts[lang];
@@ -209,6 +213,8 @@ export function FreeObjectActions({
   // A null choice is one shown again on purpose, not one hidden by itself.
   const byItself = (patchChoices[objectChoiceKey(object.id)] ?? null) !== null;
   const together = tools === undefined ? null : <PartsTogether tools={tools} />;
+  // Or a little to one side instead (ADR 0060).
+  const move = <MoveControls object={object} tools={tools} place={place} interior={interior} />;
   if (isHidden) {
     return (
       <div className="relief-object-action">
@@ -229,6 +235,7 @@ export function FreeObjectActions({
       <div className="relief-object-action">
         <p className="aside">{t.anchorAsking}</p>
         {together}
+        {move}
       </div>
     );
   }
@@ -238,6 +245,7 @@ export function FreeObjectActions({
         <p className="aside">{t.anchorLocked}</p>
         {anchors !== null && <AnchorReasons anchors={anchors} />}
         {together}
+        {move}
       </div>
     );
   }
@@ -259,6 +267,7 @@ export function FreeObjectActions({
       </button>
       <p className="aside parts-hint">{own.hideHint}</p>
       {together}
+      {move}
     </div>
   );
 }

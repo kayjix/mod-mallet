@@ -31,6 +31,7 @@ import { InteriorView } from "./InteriorView";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
+import { MoveControls, SpotMoves } from "./move-controls";
 import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
 import {
   chooseFinding,
@@ -1264,6 +1265,7 @@ function Spot(props: SpotProps) {
             </span>
           </button>
         </div>
+        <SpotMoves parts={side.parts} />
         {!side.hideable && (
           <div className="needed-parts">
             <span className="work-column-label">{t.anchorWhy}</span>
@@ -1646,6 +1648,19 @@ function Stage({
             <p className="aside relief-object-action">{t.workCannotHide}</p>
           )}
           <PartsTogether tools={tools} />
+          <MoveControls
+            object={object}
+            tools={tools}
+            place={location.type === "interior" ? location.cell : location.world}
+            interior={location.type === "interior"}
+            against={parts
+              .filter((other) => other.object.plugin !== part.object.plugin)
+              .map((other) => other.object)}
+            spotKey={(() => {
+              const key = spotKey(item.spot);
+              return key === null ? null : { finding: item.spot.finding, key, parts };
+            })()}
+          />
         </>
       );
     }
@@ -1654,6 +1669,7 @@ function Stage({
         object={object}
         tools={tools}
         place={location.type === "interior" ? location.cell : location.world}
+        interior={location.type === "interior"}
       />
     );
   };

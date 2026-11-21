@@ -38,6 +38,7 @@ import {
   shapeOf,
   spotPosition,
 } from "./map-places";
+import { moveKeysOf } from "./moves";
 import { pinsOf, spotKey } from "./patch";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
@@ -479,6 +480,9 @@ export function MapView3D({
   // The spots pinned to solve later, read while drawing.
   const pinsNow = useRef<Set<string>>(new Set());
   pinsNow.current = pinsOf(patchChoices);
+  // The choices, for a layer of objects made later (moves, ADR 0060).
+  const choicesNow = useRef(patchChoices);
+  choicesNow.current = patchChoices;
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -975,9 +979,10 @@ export function MapView3D({
     });
   }, [draw]);
 
-  // A pin set or cleared shows at once.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the pins are read from the choices.
+  // A pin set or cleared shows at once; moved objects stand where their
+  // moves put them (ADR 0060).
   useEffect(() => {
+    area.current?.setMoves(moveKeysOf(patchChoices));
     redraw();
   }, [patchChoices, redraw]);
 
@@ -1111,6 +1116,7 @@ export function MapView3D({
     redraw();
     try {
       area.current = new AreaLayer(gl, api, redraw);
+      area.current.setMoves(moveKeysOf(choicesNow.current));
     } catch {
       area.current = null;
     }
@@ -1664,6 +1670,7 @@ export function MapView3D({
             {objectExtra?.(pickedObject, {
               selection: selection[0] === pickedObject ? selection : [pickedObject],
               level,
+              layer: area.current ?? undefined,
             })}
           </div>
         )}

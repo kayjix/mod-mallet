@@ -1304,6 +1304,15 @@ export const sampleApi: Api = {
   openPage: async () => {},
   createPatch: () =>
     later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch.zip"),
+  // Every move is written, after the masters the sample's objects come from.
+  createMoves: (moves) =>
+    later({
+      path: "C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet - Moves.zip",
+      moved: moves.moves.length,
+      masters: [...new Set(["Skyrim.esm", ...moves.moves.map((each) => each.object.plugin)])],
+      light: true,
+      refused: [],
+    }),
   savePatchReport: () =>
     later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch - report.txt"),
   openFolder: async () => {},
