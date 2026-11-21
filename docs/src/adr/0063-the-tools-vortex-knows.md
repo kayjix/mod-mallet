@@ -69,26 +69,39 @@ for the same people, but the way to it led through a shortcut of its own.
    folder than the user thinks. Starting is one click on Vortex's
    dashboard, which the line points to. This can change if Vortex gets a
    call to start a tool; see Alternatives.
-5. **Mod Mallet is added to Vortex's tools by the extension (0.8.0).**
-   When Mod Mallet starts and the folder shared with the extension exists,
-   it leaves `app.json` (its program, version) and `app-icon.png` there.
-   The extension reads them, and for the game in use, if it is one Mod
-   Mallet understands and Vortex has found it, dispatches
-   `ADD_DISCOVERED_TOOL` with the program, `detach`, and `onStart:
-   ignore`, and copies the icon to where Vortex looks. It adds the tool
-   once per game (remembered in `dashboard-tool.json`): a tool the user
-   removes stays removed. If Mod Mallet moves, the path is updated. The
-   extension refuses a note that names anything but an absolute `.exe`
-   that exists. The extension update stays the user's click in the
-   toolbox; nothing is installed or started by Mod Mallet.
-6. The note and icon are written only into Mod Mallet's own folder, and
-   only if it exists, so a machine without the link is left alone.
+5. **Mod Mallet is added to Vortex's tools only on the user's request
+   (extension 0.8.0), as an action** (ADR 0020). The toolbox shows Mod
+   Mallet among "Tools in Vortex" with a button, "Add Mod Mallet to
+   Vortex's tools" or, when it is there, "Remove Mod Mallet from Vortex's
+   tools". The button sends the request `add-to-tools` or
+   `remove-from-tools` through the link, like every other action. Only
+   then does the extension, for the game in use (one Mod Mallet
+   understands and Vortex has found), dispatch `ADD_DISCOVERED_TOOL` with
+   the program, `detach` and `onStart: ignore`, copy the icon to where
+   Vortex looks, and note the game in `dashboard-tool.json`; or dispatch
+   `SET_TOOL_VISIBLE` (which removes a tool added by hand entirely) and
+   forget the note. The button is offered when the link is current and
+   running, or when the tool is there already.
+6. **Nothing is added by itself.** The extension does not register
+   anything when it starts. The one thing it does on its own is keeping the
+   program current: if the user added the tool before (the note names the
+   game), the tool is still in Vortex's state and Mod Mallet's note now
+   names another program (Mod Mallet moved), the extension updates the
+   path. It never adds a tool that is not there, so a tool the user removed
+   in Vortex stays removed.
+7. **Mod Mallet's note and icon.** When Mod Mallet starts and the folder
+   shared with the extension exists, it leaves `app.json` (its program,
+   version) and `app-icon.png` there. That is Mod Mallet's own folder, only
+   written if it exists, so a machine without the link is left alone. The
+   extension trusts the note only if it names an absolute `.exe` that
+   exists. The extension update stays the user's click in the toolbox.
 
 ## Consequences
 
-- Without the new extension the dashboard entry does not appear; the tools
-  are read from the backup instead (possibly stale, but they change
-  rarely).
+- An extension older than 0.8.0 answers the request `unsupported`; the
+  button is only offered with a current link.
+- Without the new extension the tools Vortex lists are read from the
+  backup instead (possibly stale, but they change rarely).
 - Mod Mallet runs inside a packaged app's private `AppData` in the one case
   already described in the Vortex link reference; there, the note lands
   where the extension does not look. Start it as described in the logs page.
@@ -110,5 +123,8 @@ for the same people, but the way to it led through a shortcut of its own.
   knows.
 - **Finding Mod Mallet's program from the extension** (registry, usual
   folders). Mod Mallet can run from any folder; only it knows.
+- **The extension adds Mod Mallet to the tools by itself on start.**
+  Rejected: it changes Vortex's data without the user asking, against
+  ADR 0020.
 - **Showing tools Vortex could discover but has not as "missing".**
   Needs a copy of other extensions' knowledge; see Consequences.

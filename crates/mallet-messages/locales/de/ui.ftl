@@ -227,6 +227,8 @@ tool-fnis-name = Fores New Idles in Skyrim (FNIS)
 tool-fnis-purpose = Macht dem Spiel die neuen Animationen bekannt, die Mods mitbringen, etwa neue Geh- oder Kampfstile. Es muss nach dem Hinzufügen oder Entfernen solcher Mods erneut laufen, sonst stehen die Figuren steif da.
 tool-bodyslide-name = BodySlide
 tool-bodyslide-purpose = Baut die Körper und Kleidung von Mods, die in mehreren Formen kommen, nach deinem Geschmack. Das Ergebnis entsteht bei jeder Änderung neu.
+tool-mod-mallet-tool-name = Mod Mallet
+tool-mod-mallet-tool-purpose = Lässt dich Mod Mallet über Vortex' Übersicht starten, neben deinen anderen Werkzeugen. Vortex ändert seine Liste nur, wenn du hier den Knopf drückst.
 tool-vortex-tool-purpose = Ein Programm, das Vortex unter deinen Werkzeugen aufführt. Mod Mallet weiß nicht, wofür es gut ist; starte es über Vortex' Übersicht.
 
 tool-state-ready = Bereit

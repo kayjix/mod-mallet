@@ -83,6 +83,16 @@ fn install_manager_link(lang: String) -> Result<String, String> {
     Ok(messages(&lang).text("link-installed", &[("path", path)]))
 }
 
+/// Asks Vortex, through the link, to list Mod Mallet among its tools (or
+/// to take it off the list) and says what became of it. Only ever called
+/// because the user pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn set_vortex_tool(add: bool, lang: String) -> RenderedOutcome {
+    let outcome = mallet_engine::set_mallet_tool(&manager_options(), add);
+    messages(&lang).render_outcome(&outcome)
+}
+
 /// The places a scan would read and how each was found, in the language
 /// `lang`, and whether the user has agreed to them. Nothing is read to
 /// find this out.
@@ -682,6 +692,7 @@ pub fn run() -> tauri::Result<()> {
             run_action,
             manager_link,
             install_manager_link,
+            set_vortex_tool,
             places,
             confirm_places,
             ignored,

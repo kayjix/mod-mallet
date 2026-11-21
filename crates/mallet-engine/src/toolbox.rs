@@ -19,6 +19,10 @@ const VORTEX_PAGE: &str = "https://www.nexusmods.com/about/vortex/";
 /// 7-Zip's page.
 const SEVEN_ZIP_PAGE: &str = "https://www.7-zip.org/";
 
+/// The identifier under which the Vortex link lists Mod Mallet among
+/// Vortex's tools.
+const MALLET_TOOL_ID: &str = "mod-mallet";
+
 /// How long Vortex is given to close before a restart gives up.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -46,9 +50,30 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
             *loot = built_in;
         }
     }
-    let listed = listed_tools(&crate::installers::manager_tools(scan), &found, |path| {
-        Path::new(path).is_file()
-    });
+    let entries = crate::installers::manager_tools(scan);
+    let listed = listed_tools(&entries, &found, |path| Path::new(path).is_file());
+    // Whether Mod Mallet is among Vortex's tools, which the user can change
+    // here; shown once the link can carry the request out or when it is
+    // already there.
+    let link_ready = found
+        .iter()
+        .any(|tool| tool.id == "mallet-link" && tool.state == ToolState::Ready);
+    let own = entries.iter().find(|entry| entry.id == MALLET_TOOL_ID);
+    if own.is_some() || link_ready {
+        found.push(
+            Tool::new(
+                "mod-mallet-tool",
+                ToolNeed::Optional,
+                if own.is_some() {
+                    ToolState::Ready
+                } else {
+                    ToolState::Missing
+                },
+            )
+            .in_group(ToolGroup::ModTool)
+            .with_path(own.map(|entry| entry.path.clone())),
+        );
+    }
     found.extend(listed);
     let unpacker = scan
         .unpacker
@@ -84,7 +109,7 @@ fn listed_tools(listed: &[VortexTool], have: &[Tool], exists: impl Fn(&str) -> b
     // tell the user about.
     for entry in listed
         .iter()
-        .filter(|entry| !entry.hidden && entry.id != "mod-mallet")
+        .filter(|entry| !entry.hidden && entry.id != MALLET_TOOL_ID)
     {
         let file_name = entry.path.rsplit(['\\', '/']).next().unwrap_or_default();
         let id = match tools::classify_listed_tool(file_name) {

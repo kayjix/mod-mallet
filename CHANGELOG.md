@@ -12,9 +12,10 @@ in [Releases](docs/src/contributing/releases.md).
   its variants, FNIS, Wrye Bash, BodySlide) with what each is for and whether
   it is still where Vortex expects it. Findings about plugins that need
   cleaning say which of them to use.
-- Vortex link 0.8.0: Mod Mallet appears among the tools on Vortex's
-  dashboard, so you can start it from there. Update the link in the toolbox
-  to get it.
+- Vortex link 0.8.0: a button in the toolbox adds Mod Mallet to the tools on
+  Vortex's dashboard (and takes it off again), so you can start it from
+  there. Nothing is added unless you press it. Update the link in the
+  toolbox to get it.
 
 ## [0.2.2] - 2026-11-19
 

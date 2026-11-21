@@ -242,6 +242,22 @@ impl Link {
         self.ask("set-mod-enabled", game, &subject, timeout)
     }
 
+    /// Asks Vortex to list Mod Mallet among the tools of `game` on its
+    /// dashboard (`add`), or to take it off the list again (ADR 0063).
+    pub fn mallet_tool(
+        &self,
+        game: &str,
+        add: bool,
+        timeout: Duration,
+    ) -> Result<Reply, LinkError> {
+        let action = if add {
+            "add-to-tools"
+        } else {
+            "remove-from-tools"
+        };
+        self.ask(action, game, &Subject::default(), timeout)
+    }
+
     /// Asks Vortex to leave `files` (below the data directory) out of the
     /// mods `leave_out` and to deploy them again from the mods `provide`,
     /// through its file overrides, and then to deploy. Mods are named by

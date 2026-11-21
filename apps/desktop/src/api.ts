@@ -60,6 +60,8 @@ export interface Api {
   managerLink(lang: Lang): Promise<RenderedLink>;
   /** Installs the link into the mod manager; resolves to a sentence about it. */
   installManagerLink(lang: Lang): Promise<string>;
+  /** Asks Vortex to list Mod Mallet among its tools, or to take it off the list. */
+  setVortexTool(add: boolean, lang: Lang): Promise<RenderedOutcome>;
   /** The places a scan would read, and whether the user has agreed to them. */
   places(lang: Lang): Promise<RenderedPlaces>;
   /** Remembers the places the user named and that they agreed to the rest. */
@@ -174,6 +176,7 @@ const tauriApi: Api = {
   runAction: (action, lang) => invoke<RenderedOutcome>("run_action", { action, lang }),
   managerLink: (lang) => invoke<RenderedLink>("manager_link", { lang }),
   installManagerLink: (lang) => invoke<string>("install_manager_link", { lang }),
+  setVortexTool: (add, lang) => invoke<RenderedOutcome>("set_vortex_tool", { add, lang }),
   places: (lang) => invoke<RenderedPlaces>("places", { lang }),
   confirmPlaces: (named, lang) => invoke<RenderedPlaces>("confirm_places", { named, lang }),
   ignored: () => invoke<string[]>("ignored"),

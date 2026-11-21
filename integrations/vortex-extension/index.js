@@ -60,6 +60,8 @@ const ACTIONS = [
   "load-after",
   "set-mod-enabled",
   "file-overrides",
+  "add-to-tools",
+  "remove-from-tools",
 ];
 
 /** How many files one request for file overrides may name. */
@@ -109,6 +111,9 @@ function plan(state, request, now, env = process.env) {
   const game = activeGame(state);
   if (game !== request.game) {
     return { code: "wrong-game", detail: game ?? "no game" };
+  }
+  if (request.action === "add-to-tools" || request.action === "remove-from-tools") {
+    return planMalletTool(state, request, env);
   }
   if (request.action === "install-archive") {
     return planArchive(request.path, env);
@@ -421,6 +426,22 @@ function handle(
       }
     });
   }
+  if (planned.tool !== undefined) {
+    // Only on the user's request: Mod Mallet's place among Vortex's tools.
+    try {
+      applyMalletTool(api, bridgeDir(process.env), planned.tool);
+    } catch (error) {
+      log("warn", "changing Mod Mallet's place among the tools failed", {
+        error: String(error?.message ?? error),
+      });
+      return {
+        id: request?.id,
+        ok: false,
+        code: "failed",
+        detail: String(error?.message ?? error),
+      };
+    }
+  }
   if (planned.enable !== undefined) {
     const { profileId, modId, game, enabled } = planned.enable;
     // What Vortex's own switch in the mod list does.
@@ -613,14 +634,15 @@ function writeStateIfChanged(dir, state, previous, now) {
 }
 
 /**
- * Mod Mallet on Vortex's dashboard (ADR 0063).
+ * Mod Mallet among Vortex's tools (ADR 0063).
  *
  * Vortex has no call for an extension to register a tool. Its own "add
  * tool" dialog and the tools a collection brings store a tool in the
  * state, under settings.gameMode.discovered.<game>.tools, with the action
- * ADD_DISCOVERED_TOOL; so does this. Mod Mallet leaves a note (app.json)
- * and its icon (app-icon.png) in the shared folder when it starts; the
- * extension reads them from there.
+ * ADD_DISCOVERED_TOOL; so does this. It happens only when the user asks
+ * for it in Mod Mallet (the requests add-to-tools and remove-from-tools).
+ * Mod Mallet leaves a note (app.json) and its icon (app-icon.png) in the
+ * shared folder when it starts; the request reads them from there.
  */
 const DASHBOARD_TOOL_ID = "mod-mallet";
 /** The games Mod Mallet understands, by Vortex's identifier. */
@@ -634,7 +656,7 @@ const MALLET_GAMES = new Set([
   "fallout4vr",
   "oblivion",
 ]);
-/** Games the tool was added to, remembered so that a removal sticks. */
+/** The games the user added the tool to, with the program it was given. */
 const DASHBOARD_MARKER = "dashboard-tool.json";
 
 /**
@@ -658,51 +680,57 @@ function readAppNote(dir, exists = fs.existsSync) {
   }
 }
 
+/** The tool as Vortex stores it. */
+function toolEntry(note) {
+  return {
+    id: DASHBOARD_TOOL_ID,
+    name: "Mod Mallet",
+    shortName: "Mod Mallet",
+    path: note.exe,
+    requiredFiles: [],
+    executable: null,
+    parameters: [],
+    environment: {},
+    workingDirectory: path.win32.dirname(note.exe),
+    shell: false,
+    detach: true,
+    onStart: "ignore",
+    custom: true,
+    hidden: false,
+  };
+}
+
+/** The tool Vortex has for the game, if any. */
+function presentTool(state, game) {
+  return state?.settings?.gameMode?.discovered?.[game]?.tools?.[DASHBOARD_TOOL_ID];
+}
+
 /**
- * Decides whether the tool is to be added or its program updated, without
- * doing it. `added` holds the games it was added to before: where the
- * user removed it since, it stays removed.
- *
- * Returns `{ game, toolId, result }`, the arguments of the action, or
- * undefined when nothing is to be done.
+ * Decides what a request to add or remove the tool comes to, without doing
+ * it. Returns `{ code, detail }` and, for `applied`, `tool: { op, game,
+ * result }`.
  */
-function planDashboardTool(state, note, added = {}) {
+function planMalletTool(state, request, env = process.env, exists = fs.existsSync) {
   const game = activeGame(state);
   if (typeof game !== "string" || !MALLET_GAMES.has(game)) {
-    return undefined;
+    return { code: "failed", detail: "Mod Mallet does not know this game" };
   }
-  const discovered = state?.settings?.gameMode?.discovered?.[game];
   // Vortex ignores a tool for a game it has not found.
-  if (discovered === undefined) {
-    return undefined;
+  if (state?.settings?.gameMode?.discovered?.[game] === undefined) {
+    return { code: "failed", detail: "Vortex has not found the game" };
   }
-  const existing = discovered.tools?.[DASHBOARD_TOOL_ID];
-  if (existing === undefined && Object.hasOwn(added, game)) {
-    return undefined;
+  if (request.action === "remove-from-tools") {
+    if (presentTool(state, game) === undefined) {
+      return { code: "applied", tool: { op: "forget", game } };
+    }
+    return { code: "applied", tool: { op: "remove", game } };
   }
-  if (existing?.path === note.exe) {
-    return undefined;
+  const dir = bridgeDir(env);
+  const note = dir === undefined ? undefined : readAppNote(dir, exists);
+  if (note === undefined) {
+    return { code: "failed", detail: "Mod Mallet has not said where it runs from" };
   }
-  return {
-    game,
-    toolId: DASHBOARD_TOOL_ID,
-    result: {
-      id: DASHBOARD_TOOL_ID,
-      name: "Mod Mallet",
-      shortName: "Mod Mallet",
-      path: note.exe,
-      requiredFiles: [],
-      executable: null,
-      parameters: [],
-      environment: {},
-      workingDirectory: path.win32.dirname(note.exe),
-      shell: false,
-      detach: true,
-      onStart: "ignore",
-      custom: true,
-      hidden: false,
-    },
-  };
+  return { code: "applied", tool: { op: "add", game, result: toolEntry(note), exe: note.exe } };
 }
 
 /**
@@ -739,38 +767,63 @@ function vortexUserData(env) {
   }
 }
 
-/**
- * Puts Mod Mallet among the tools of the game Vortex is managing, once,
- * and keeps its program current when Mod Mallet moved.
- */
-function registerDashboardTool(api, dir, log, userData = vortexUserData(process.env)) {
-  const note = readAppNote(dir);
-  if (note === undefined || userData === undefined) {
-    return;
-  }
-  let added = {};
+/** What was added before, by game; empty if nothing is remembered. */
+function readMarker(dir) {
   try {
-    added = JSON.parse(fs.readFileSync(path.join(dir, DASHBOARD_MARKER), "utf8")) ?? {};
+    const marker = JSON.parse(fs.readFileSync(path.join(dir, DASHBOARD_MARKER), "utf8"));
+    return marker !== null && typeof marker === "object" ? marker : {};
   } catch {
-    // Nothing remembered yet.
+    return {};
   }
+}
+
+/**
+ * Carries out a planned add or remove: the state, the icon and the note of
+ * what was added. Only called for a request of the user.
+ */
+function applyMalletTool(api, dir, tool, userData = vortexUserData(process.env)) {
+  const marker = readMarker(dir);
+  if (tool.op === "add") {
+    if (userData !== undefined) {
+      // Before the tool, so that the dashboard finds the picture at once.
+      placeIcon(dir, userData, tool.game);
+    }
+    api.store.dispatch({
+      type: "ADD_DISCOVERED_TOOL",
+      payload: { gameId: tool.game, toolId: DASHBOARD_TOOL_ID, result: tool.result, manual: true },
+    });
+    marker[tool.game] = tool.exe;
+  } else {
+    if (tool.op === "remove") {
+      // Removes a tool the user added entirely, as Vortex's own dialog does.
+      api.store.dispatch({
+        type: "SET_TOOL_VISIBLE",
+        payload: { gameId: tool.game, toolId: DASHBOARD_TOOL_ID, visible: false },
+      });
+    }
+    delete marker[tool.game];
+  }
+  writeJson(path.join(dir, DASHBOARD_MARKER), marker);
+}
+
+/**
+ * Keeps the program of the tool current when Mod Mallet moved, but only
+ * for a tool the user added before (the marker names the game). Never adds
+ * a tool, never touches one the user did not add.
+ */
+function keepToolCurrent(api, dir, userData = vortexUserData(process.env)) {
   const state = api.getState();
-  const plan = planDashboardTool(state, note, added);
-  const game = plan?.game ?? activeGame(state);
-  const present = state?.settings?.gameMode?.discovered?.[game]?.tools?.[DASHBOARD_TOOL_ID];
-  if (typeof game === "string" && MALLET_GAMES.has(game) && (plan || present)) {
-    // Before the tool, so that the dashboard finds the picture at once.
-    placeIcon(dir, userData, game);
+  const game = activeGame(state);
+  if (typeof game !== "string" || !Object.hasOwn(readMarker(dir), game)) {
+    return false;
   }
-  if (plan === undefined) {
-    return;
+  const existing = presentTool(state, game);
+  const note = readAppNote(dir);
+  if (existing === undefined || note === undefined || existing.path === note.exe) {
+    return false;
   }
-  api.store.dispatch({
-    type: "ADD_DISCOVERED_TOOL",
-    payload: { gameId: plan.game, toolId: plan.toolId, result: plan.result, manual: true },
-  });
-  writeJson(path.join(dir, DASHBOARD_MARKER), { ...added, [plan.game]: note.exe });
-  log("info", "added Mod Mallet to the tools", { game: plan.game });
+  applyMalletTool(api, dir, { op: "add", game, result: toolEntry(note), exe: note.exe }, userData);
+  return true;
 }
 
 /** Writes JSON so that a reader never sees half a file. */
@@ -853,8 +906,13 @@ function start(api, dir, log) {
       written = writeStateIfChanged(dir, api.getState(), written, Date.now());
     });
   writeState();
+  // Only for a tool the user added before: its program follows Mod Mallet.
   const listTool = () =>
-    guarded("listing Mod Mallet among the tools", () => registerDashboardTool(api, dir, log));
+    guarded("keeping Mod Mallet's tool current", () => {
+      if (keepToolCurrent(api, dir)) {
+        log("info", "updated the program of Mod Mallet's tool");
+      }
+    });
   listTool();
 
   const heartbeat = setInterval(() => {
@@ -906,8 +964,9 @@ module.exports = {
   patchesDir,
   snapshot,
   readAppNote,
-  planDashboardTool,
-  registerDashboardTool,
+  planMalletTool,
+  applyMalletTool,
+  keepToolCurrent,
   toolIconPath,
   writeStateIfChanged,
   handle,

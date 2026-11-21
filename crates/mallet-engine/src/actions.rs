@@ -173,6 +173,19 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
     }
 }
 
+/// Asks Vortex to list Mod Mallet among its tools for the game in use, or
+/// to take it off the list (ADR 0063). Only to be called because the user
+/// pressed the button.
+pub fn set_mallet_tool(options: &ManagerOptions, add: bool) -> ActionOutcome {
+    in_vortex(options, |link, timeout| {
+        tracing::info!(
+            add,
+            "asking Vortex to change Mod Mallet's place among its tools"
+        );
+        link.mallet_tool(options.vortex_game(), add, timeout)
+    })
+}
+
 /// Hands a request to Vortex through the link, if the link is there.
 fn in_vortex(
     options: &ManagerOptions,

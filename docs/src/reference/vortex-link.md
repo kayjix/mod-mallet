@@ -30,7 +30,7 @@ Vortex is answering.
 | `status.json` | the extension, every five seconds while Vortex runs | that the extension is alive |
 | `state\<game>.json` | the extension, at start and within a second of a change | the installed mods of the game |
 | `app.json`, `app-icon.png` | Mod Mallet, when it starts, if the folder exists | where Mod Mallet's program is and its picture, for the dashboard entry below |
-| `dashboard-tool.json` | the extension | the games Mod Mallet was added to Vortex's tools for |
+| `dashboard-tool.json` | the extension, on the user's request | the games the user had Mod Mallet added to Vortex's tools for |
 | `requests\<id>.json` | Mod Mallet | what Vortex is asked to do |
 | `results\<id>.json` | the extension | what became of the request |
 | `extension.log` | the extension | one line per start, request and install, for looking up what happened |
@@ -97,16 +97,20 @@ and `hidden` (not their parameters or environment). The toolbox shows them
 
 ## Mod Mallet among Vortex's tools
 
-Vortex has no call to register a tool. The extension adds Mod Mallet the
-way Vortex's own "add tool" dialog adds one: it dispatches
-`ADD_DISCOVERED_TOOL` for the game in use, with the program named in
-`app.json` (an absolute path to an existing `.exe`; anything else is
-ignored), and copies `app-icon.png` to
-`<Vortex data>\<game>\icons\mod-mallet.png`, where the dashboard looks for a
-tool's picture. It does so once for each game Mod Mallet understands that
-Vortex has found; if the user removes the tool in Vortex it stays removed
-(delete `dashboard-tool.json` to have it added again), and if Mod Mallet
-moves the path is updated.
+Vortex has no call to register a tool. On the request `add-to-tools`, which
+Mod Mallet sends only when the user presses the button in the toolbox, the
+extension adds Mod Mallet the way Vortex's own "add tool" dialog adds one:
+it dispatches `ADD_DISCOVERED_TOOL` for the game in use (one Mod Mallet
+understands and Vortex has found), with the program named in `app.json` (an
+absolute path to an existing `.exe`; anything else is refused), copies
+`app-icon.png` to `<Vortex data>\<game>\icons\mod-mallet.png`, where the
+dashboard looks for a tool's picture, and notes the game in
+`dashboard-tool.json`. `remove-from-tools` dispatches `SET_TOOL_VISIBLE`
+(hidden), which removes a tool added by hand, and forgets the note.
+
+The extension adds nothing when it starts. Only for a game noted in
+`dashboard-tool.json`, whose tool is still in Vortex's state, it updates the
+tool's program if `app.json` names another one (Mod Mallet moved).
 
 ## A request
 
@@ -125,7 +129,7 @@ moves the path is updated.
 |---|---|
 | `protocol` | Version of this format. The extension refuses other versions. |
 | `id` | The name of the file without `.json`. |
-| `action` | `reinstall-mod`, `install-archive`, `load-after`, `set-mod-enabled` or `file-overrides`. |
+| `action` | `reinstall-mod`, `install-archive`, `load-after`, `set-mod-enabled`, `file-overrides`, `add-to-tools` or `remove-from-tools` (the last two since extension 0.8.0, without further fields). |
 | `game` | Vortex's identifier of the game. The request is refused if Vortex is managing another game. |
 | `modId` | For `reinstall-mod` and `set-mod-enabled`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
 | `plugin`, `after` | For `load-after`: two plugin file names (`.esp`, `.esm`, `.esl`). |

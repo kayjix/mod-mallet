@@ -1245,6 +1245,12 @@ export const sampleApi: Api = {
         : "The extension was installed. Restart Vortex to load it.",
     );
   },
+  setVortexTool: (_add, lang) =>
+    later({
+      outcome: { status: "applied" as const },
+      message:
+        lang === "de" ? "Vortex hat die Änderung vorgenommen." : "Vortex has made the change.",
+    }),
   places: (lang) => later(places(lang, confirmed)),
   confirmPlaces: (_named, lang) => {
     confirmed = true;

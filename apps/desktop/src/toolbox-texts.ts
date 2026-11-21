@@ -12,6 +12,10 @@ export interface ToolboxTexts {
   listed: string;
   /** What those tools are and how to start them. */
   listedHint: string;
+  /** The button that lists Mod Mallet among Vortex's tools. */
+  addToVortex: string;
+  /** The button that takes it off the list again. */
+  removeFromVortex: string;
   /** In place of the update button once the extension is in Vortex's folder. */
   placed: string;
   /** Why Vortex has to start again before the extension works. */
@@ -25,6 +29,8 @@ export const toolboxTexts: Record<Lang, ToolboxTexts> = {
     listed: "Tools in Vortex",
     listedHint:
       "Programs for working on your mods that Vortex knows. Start them from Vortex's dashboard, under Tools: Vortex makes sure they see your mods. Mod Mallet only looks.",
+    addToVortex: "Add Mod Mallet to Vortex's tools",
+    removeFromVortex: "Remove Mod Mallet from Vortex's tools",
     placed: "✓ Extension placed",
     placedHint: "Vortex loads the new extension when it starts again: restart Vortex.",
   },
@@ -34,6 +40,8 @@ export const toolboxTexts: Record<Lang, ToolboxTexts> = {
     listed: "Werkzeuge in Vortex",
     listedHint:
       "Programme zum Bearbeiten deiner Mods, die Vortex kennt. Starte sie über Vortex' Übersicht unter Werkzeuge: Vortex sorgt dafür, dass sie deine Mods sehen. Mod Mallet schaut nur nach.",
+    addToVortex: "Mod Mallet zu Vortex' Werkzeugen hinzufügen",
+    removeFromVortex: "Mod Mallet aus Vortex' Werkzeugen entfernen",
     placed: "✓ Erweiterung hinterlegt",
     placedHint: "Vortex lädt die neue Erweiterung beim nächsten Start: Vortex neu starten.",
   },

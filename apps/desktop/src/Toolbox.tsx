@@ -83,6 +83,11 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
 
   const texts = toolboxTexts[lang];
 
+  // Asks Vortex, through the link, to list Mod Mallet among its tools or to
+  // take it off the list. Only on the click.
+  const setOwnTool = (add: boolean) =>
+    attempt(async () => (await api.setVortexTool(add, lang)).message);
+
   const actionFor = (rendered: RenderedTool) => {
     const { tool } = rendered;
     if (tool.id === "vortex" && tool.state !== "missing") {
@@ -95,6 +100,14 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
           onClick={restart}
         >
           {tool.state === "stopped" ? t.startVortex : t.restartVortex}
+        </button>
+      );
+    }
+    if (tool.id === "mod-mallet-tool") {
+      const add = tool.state !== "ready";
+      return (
+        <button type="button" disabled={busy} onClick={() => setOwnTool(add)}>
+          {add ? texts.addToVortex : texts.removeFromVortex}
         </button>
       );
     }
