@@ -48,8 +48,10 @@ import {
 } from "./patch";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, usePaintReach, useReach } from "./reach";
+import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
+import { WideAdvice, wideFindings } from "./wide-advice";
 
 /** One plugin's objects at a spot. */
 interface Side {
@@ -643,6 +645,39 @@ export function Collisions({
 
   const pairs = useMemo(() => pairsOf(report, ignored), [report, ignored]);
   const hiddenObjects = useMemo(() => objectsOf(pairs, choices), [pairs, choices]);
+  // The suggestion about a mod that collides widely, when the list is
+  // narrowed to that mod or to a pair with it (ADR 0043, 0061).
+  const wide = useMemo(() => {
+    const names = [...(pairAt ?? []), ...(needle.length >= 3 ? [needle] : [])].map((name) =>
+      name.toLowerCase(),
+    );
+    return wideFindings(report.findings, ignored).filter((rendered) => {
+      const mod = String(rendered.finding.args.mod ?? "").toLowerCase();
+      return mod !== "" && names.some((name) => mod === name || mod.includes(name));
+    });
+  }, [report.findings, ignored, pairAt, needle]);
+  const wideBanners = wide.map((rendered) => (
+    <WideAdvice key={rendered.finding.id} rendered={rendered} />
+  ));
+  // A plugin of a mod switched off in Vortex that the game still loads.
+  const stillLoaded = useMemo(() => {
+    const found = new Map<string, string>();
+    for (const plugin of report.switchedOffPlugins ?? []) {
+      if (plugin.loaded) {
+        found.set(plugin.plugin.toLowerCase(), plugin.mod.name);
+      }
+    }
+    return found;
+  }, [report.switchedOffPlugins]);
+  const offHere = current?.sides.find((side) => stillLoaded.has(side.plugin.toLowerCase()));
+  const offNote = offHere !== undefined && (
+    <p className="still-loaded-note" role="note">
+      {switchedOffTexts[lang].stillLoadedSpot(
+        stillLoaded.get(offHere.plugin.toLowerCase()) ?? offHere.plugin,
+        offHere.plugin,
+      )}
+    </p>
+  );
   const modCount = useMemo(
     () => new Set(items.filter((item) => item.pairs.length > 0).map((item) => item.mods.key)).size,
     [items],
@@ -689,6 +724,7 @@ export function Collisions({
           {toPatch}
         </div>
         {items.length === 0 && <p className="empty">{t.workEmpty}</p>}
+        {wideBanners}
         <ModPairs
           items={items}
           decision={decision}
@@ -813,6 +849,7 @@ export function Collisions({
                 <PinIcon /> {pinText.filter(pins.size)}
               </label>
             )}
+            {wideBanners}
           </div>
           <WorkList
             groups={groups}
@@ -826,6 +863,7 @@ export function Collisions({
           />
         </div>
         <div className="work-stage">
+          {offNote}
           {current === null ? (
             <p className="empty">{t.workPickSpot}</p>
           ) : (

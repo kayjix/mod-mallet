@@ -326,7 +326,20 @@ const samples: Sample[] = [
       "14 of the 17 objects Water Mod puts into the world stand in or against objects of Old Town.",
       "14 der 17 Objekte, die Water Mod in die Welt stellt, stehen in oder an Objekten von Old Town.",
     ),
-    args: { mod: "Water Mod", count: 2, objects: 14, total: 17, interiors: 0, modCount: 1 },
+    args: {
+      mod: "Water Mod",
+      count: 24,
+      clearCount: 4,
+      objects: 14,
+      total: 17,
+      interiors: 0,
+      modCount: 1,
+      dependentCount: 2,
+      dependentModCount: 1,
+      dependents: "Patch Hub (Water Mod - Old Town Patch.esp, Water Mod - Weather Patch.esp)",
+      assetCount: 3,
+      assetUsers: "Old Town (3)",
+    },
   },
 ];
 
@@ -396,32 +409,41 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
                 guide: [],
               },
             ]
-          : sample.direct && provider !== undefined
+          : sample.kind === "mods.collides-widely" && provider !== undefined
             ? [
                 {
-                  action: { type: "reinstall-mod", mod: provider },
-                  label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
-                  description: de
-                    ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
-                    : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
-                  guide: [
-                    {
-                      tick: {
-                        page: 5,
-                        pages: 7,
-                        step: "Additional Patches A-M",
-                        group: "Towns",
-                        option: "City Overhaul",
-                        description: de
-                          ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
-                          : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
-                      },
-                      pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
-                    },
-                  ],
+                  action: { type: "disable-mod", mod: provider },
+                  label: de ? "In Vortex ausschalten" : "Switch it off in Vortex",
+                  description: "",
+                  guide: [],
                 },
               ]
-            : [],
+            : sample.direct && provider !== undefined
+              ? [
+                  {
+                    action: { type: "reinstall-mod", mod: provider },
+                    label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+                    description: de
+                      ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
+                      : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
+                    guide: [
+                      {
+                        tick: {
+                          page: 5,
+                          pages: 7,
+                          step: "Additional Patches A-M",
+                          group: "Towns",
+                          option: "City Overhaul",
+                          description: de
+                            ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
+                            : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
+                        },
+                        pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
+                      },
+                    ],
+                  },
+                ]
+              : [],
   };
 }
 
@@ -504,6 +526,14 @@ function report(lang: Lang): RenderedReport {
       ],
       provider: { source: "vortex", id: "Mod Mallet Patch", name: "Mod Mallet Patch" },
     },
+    // Switched off in Vortex; the decisions about it wait (ADR 0061).
+    switchedOffPlugins: [
+      {
+        plugin: "Gone Mod.esp",
+        mod: { source: "vortex", id: "Gone Mod", name: "Gone Mod" },
+        loaded: false,
+      },
+    ],
   };
 }
 
@@ -523,6 +553,7 @@ const sampleMods: ModInfo[] = [
   modInfo("Old Town", "4.0"),
   modInfo("Texture Pack", "1.5"),
   modInfo("Mesh Improvements", "2.0", { enabled: false }),
+  modInfo("Gone Mod", "1.1", { enabled: false }),
 ];
 
 /** Made-up land: hills around a lake, a sea in the north. */
@@ -1157,7 +1188,10 @@ let linkInstalled = false;
 const ignoredIds = new Set<string>();
 let decided: Record<string, number> = {};
 let ranked: string[] = [];
-let chosen: Record<string, string | null> | null = null;
+// A decision made while Gone Mod was on; it waits while the mod is off.
+let chosen: Record<string, string | null> | null = {
+  "objects.overlapping:pair:file:data/gone mod.esp+file:data/old town.esp": "Gone Mod.esp",
+};
 
 /** The game the sample looks at. */
 let activeGame = "skyrimse";

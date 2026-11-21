@@ -1,0 +1,114 @@
+/* ---- a mod that collides with very many others (ADR 0043, 0061) ---------- */
+
+.wide-advice {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--info);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.wide-advice p {
+  margin: 0;
+}
+
+/* Loud: think about removing it. */
+.wide-advice[data-tone="remove"] {
+  border-left-color: var(--warning);
+}
+
+/* Quietest: keep it. */
+.wide-advice[data-tone="keep"] {
+  border-left-color: var(--ok);
+  background: var(--sunken);
+}
+
+.wide-buttons,
+.wide-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wide-buttons:empty {
+  display: none;
+}
+
+.wide-confirm {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-small);
+}
+
+.wide-more > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.wide-more[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.wide-tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.wide-tag[data-tone="remove"] {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* A note on a collision with a plugin of a mod that is switched off. */
+.still-loaded-note {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+/* The decisions that wait for mods that are switched off, on the patch page. */
+.patch-paused {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-small);
+}
+
+.patch-paused p {
+  margin: 0;
+}
+
+/* The note stands above a spot in the worklist's stage, whose rows are
+   otherwise the spot's head and its body. */
+.work-stage:has(> .still-loaded-note) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/* In the narrow column of the worklist, the banner is compact. */
+.work-filters .wide-advice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+}
+
+.work-filters .wide-advice .aside {
+  display: none;
+}

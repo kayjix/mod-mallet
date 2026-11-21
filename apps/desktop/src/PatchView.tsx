@@ -22,6 +22,9 @@ import {
   undoDecision,
 } from "./patch";
 import { type PatchTexts, patchTexts } from "./patch-texts";
+import { NOTHING_WAITS, splitWaiting } from "./switched-off";
+import { switchedOffTexts } from "./switched-off-texts";
+import "./wide-advice.css";
 
 /** Base Object Swapper's page, for when it is missing. */
 const SWAPPER_PAGE = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
@@ -62,10 +65,19 @@ export function PatchView({ report }: { report: RenderedReport }) {
   // A question before decisions are replaced, and the way back after.
   const [asking, setAsking] = useState<"clear" | "installed" | null>(null);
   const [before, setBefore] = useState<PatchChoices | null>(null);
+  // What the installed patch stands for, without what waits for mods that
+  // are switched off (ADR 0061): the next patch leaves that out.
   const fromInstalled = useMemo(
-    () => choicesOf(pairs, installed, installedObjects ?? []),
-    [pairs, installed, installedObjects],
+    () =>
+      splitWaiting(
+        choicesOf(pairs, installed, installedObjects ?? []),
+        report.switchedOffPlugins ?? [],
+        report.installedPatch,
+      ).active,
+    [pairs, installed, installedObjects, report.switchedOffPlugins, report.installedPatch],
   );
+  const paused = session.waiting ?? NOTHING_WAITS;
+  const off = switchedOffTexts[session.lang];
   const sameAsInstalled = signatureOf(objectsOf(pairs, fromInstalled)) === signature;
   const spotOf = (key: string | undefined): MapSpot | undefined =>
     key === undefined ? undefined : spots.get(key);
@@ -99,7 +111,40 @@ export function PatchView({ report }: { report: RenderedReport }) {
       </section>
     );
   }
+  const pausedNote = (paused.decisions > 0 ||
+    paused.installed > 0 ||
+    paused.stillLoaded.length > 0) && (
+    <div className="patch-paused" role="note">
+      {paused.decisions > 0 && (
+        <p>
+          {off.waiting(paused.decisions, paused.mods)} <InfoTip text={off.waitingNote} />
+        </p>
+      )}
+      {paused.installed > 0 && (
+        <p>
+          {off.installed(paused.installed, paused.installedPlugins)} {off.installedNote}{" "}
+          <button
+            type="button"
+            className="small"
+            disabled={objects.length === 0 || creating}
+            onClick={create}
+          >
+            {off.makePatch}
+          </button>
+        </p>
+      )}
+      {paused.stillLoaded.length > 0 && <p>{off.stillLoaded(paused.stillLoaded)}</p>}
+    </div>
+  );
   if (pairs.length === 0 && own.length === 0) {
+    if (pausedNote) {
+      return (
+        <section className="patch-view">
+          {pausedNote}
+          <p className="empty">{t.nothingHere}</p>
+        </section>
+      );
+    }
     return <p className="empty">{t.nothingHere}</p>;
   }
   return (
@@ -207,6 +252,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
         </div>
       )}
       {createError && <p className="failure">{createError}</p>}
+      {pausedNote}
       <ActionResult state={action} />
       {waiting > 0 && (
         <p className="patch-line patch-waiting">{p.waiting(waiting, waitingPairs)}</p>

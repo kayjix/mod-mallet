@@ -7,6 +7,7 @@ import { type CollisionSpot, collisionSpots, weightOf } from "./health";
 import type { WorkKind } from "./map-places";
 import { type ModFilter, type ModSort, useOverviewTexts } from "./overview-texts";
 import { FindingRow } from "./Tasks";
+import { COLLIDES_WIDELY, toneOf, WideAdvice, WideTag } from "./wide-advice";
 import "./overview.css";
 
 /** The kinds of collision, the worst first. */
@@ -325,6 +326,7 @@ function ModRow({
   const worst = state.problems.some(({ finding }) => finding.severity === "error")
     ? "error"
     : "warning";
+  const wide = wideOf(state);
 
   return (
     <li className="mod-entry" data-open={open} data-enabled={info.enabled}>
@@ -340,6 +342,7 @@ function ModRow({
         </button>
         <button type="button" className="mod-name" onClick={onToggle}>
           <strong>{info.mod.name}</strong>
+          {wide !== undefined && <WideTag rendered={wide} />}
           {info.author != null && <span className="aside">{info.author}</span>}
         </button>
         <span className="mod-version">
@@ -386,9 +389,15 @@ function ModRow({
   );
 }
 
+/** The suggestion that a mod collides widely, if there is one (ADR 0043). */
+const wideOf = (state: ModState) =>
+  state.advice.find((rendered) => rendered.finding.kind === COLLIDES_WIDELY);
+
 /** What is open about a mod: findings, collisions, what others cover, suggestions. */
 function ModDetails({ state }: { state: ModState }) {
-  const { t, decideSpot, mods } = useSession();
+  const { t, decideSpot, mods, showModOnMap } = useSession();
+  const wide = wideOf(state);
+  const advice = state.advice.filter((rendered) => rendered !== wide);
   const o = useOverviewTexts();
   const nothing =
     state.problems.length === 0 &&
@@ -401,6 +410,12 @@ function ModDetails({ state }: { state: ModState }) {
   }
   return (
     <>
+      {wide !== undefined && (
+        <WideAdvice
+          rendered={wide}
+          onShowMod={toneOf(wide) === "keep" ? undefined : () => showModOnMap(state.info.mod.name)}
+        />
+      )}
       {state.problems.length > 0 && (
         <div className="mod-section tasks">
           <h3>{o.sectionFindings}</h3>
@@ -473,13 +488,13 @@ function ModDetails({ state }: { state: ModState }) {
           </ul>
         </div>
       )}
-      {state.advice.length > 0 && (
+      {advice.length > 0 && (
         <div className="mod-section tasks">
           <h3>
             {o.sectionAdvice} <span className="tag optional-tag">{o.optional}</span>
           </h3>
           <ul>
-            {state.advice.map((rendered) => (
+            {advice.map((rendered) => (
               <FindingRow key={rendered.finding.id} rendered={rendered} />
             ))}
           </ul>

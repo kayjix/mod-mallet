@@ -5,6 +5,7 @@ import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { Lang, Texts } from "./i18n";
 import type { PatchChoices } from "./patch";
+import type { Waiting } from "./switched-off";
 
 /** What the components of a report need from the window around them. */
 export interface Session {
@@ -41,6 +42,10 @@ export interface Session {
   showPatch: () => void;
   /** The tools the setup has, once looked at; null until then. */
   toolbox: RenderedToolbox | null;
+  /** The decisions that wait for mods that are switched off (ADR 0061). */
+  waiting?: Waiting;
+  /** Switches to the guided review of the collisions, where clear suggestions are taken at once. */
+  showReview?: () => void;
   /** The side picked in each decided duel, by duel. */
   decisions: Record<string, number>;
   /** Remembers the side picked in a duel, or forgets it with null. */

@@ -26,6 +26,7 @@ import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
 import { useTaskRowTexts } from "./task-row-texts";
 import { ToolHint } from "./tool-hint";
+import { COLLIDES_WIDELY, SwitchOffButton, WideAdvice, wideFindings } from "./wide-advice";
 import "./overview.css";
 import "./tasks.css";
 
@@ -196,7 +197,11 @@ export function FindingRow({
               key={available.label}
               title={available.description}
               disabled={action.busy}
-              onClick={() => action.run(available.action)}
+              // Switching off a mod that collides widely opens the row first:
+              // what relies on it is said there, and asked about (ADR 0061).
+              onClick={() =>
+                finding.kind === COLLIDES_WIDELY ? setOpen(true) : action.run(available.action)
+              }
             >
               {available.label}
             </button>
@@ -432,18 +437,24 @@ function Ways({
 
   return (
     <div className="ways">
-      {rendered.actions.map((available) => (
-        <button
-          type="button"
-          className="primary"
-          key={available.label}
-          title={available.description}
-          disabled={action.busy}
-          onClick={() => action.run(available.action)}
-        >
-          {available.label}
-        </button>
-      ))}
+      {rendered.actions.map((available) =>
+        // Switching off a mod that collides widely asks first about what
+        // relies on it (ADR 0061).
+        finding.kind === COLLIDES_WIDELY && available.action.type === "disable-mod" ? (
+          <SwitchOffButton key={available.label} rendered={rendered} />
+        ) : (
+          <button
+            type="button"
+            className="primary"
+            key={available.label}
+            title={available.description}
+            disabled={action.busy}
+            onClick={() => action.run(available.action)}
+          >
+            {available.label}
+          </button>
+        ),
+      )}
       {ways.map((way) => (
         <button
           type="button"
@@ -538,7 +549,7 @@ const FOLDED: Step[] = ["notes", "ignored"];
  * recommendations and notes come after everything that is required.
  */
 export function TasksPage({ report }: { report: RenderedReport }) {
-  const { ignored } = useSession();
+  const { ignored, showModOnMap } = useSession();
   const o = useOverviewTexts();
   // Duels about the same files in two mods are decided on Assets; their
   // findings are not listed again here, only one line leads there. Duels
@@ -581,6 +592,14 @@ export function TasksPage({ report }: { report: RenderedReport }) {
           folded={FOLDED.includes(step)}
         >
           {step === "choose" && duels.length > 0 && <DuelsLine duels={duels} />}
+          {step === "advice" &&
+            wideFindings(report.findings, ignored).map((rendered) => (
+              <WideAdvice
+                key={rendered.finding.id}
+                rendered={rendered}
+                onShowMod={() => showModOnMap(String(rendered.finding.args.mod ?? ""))}
+              />
+            ))}
           {groups.length > 0 && <GroupList groups={groups} />}
         </StepSection>
       ))}

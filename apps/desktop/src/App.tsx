@@ -42,6 +42,7 @@ import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
 import { ScanProgressView, scanStepLine, useScanProgress } from "./scan-progress";
 import { scanTexts } from "./scan-texts";
+import { splitWaiting, withWaiting } from "./switched-off";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 import { NotDrawnHere, UnrealPaks } from "./Unreal";
@@ -151,6 +152,23 @@ export default function App({ api, startLang }: AppProps) {
       saveTimer.current = window.setTimeout(saveChoices, SAVE_CHOICES_AFTER);
     },
     [saveChoices],
+  );
+  // Decisions about mods that are switched off wait (ADR 0061): the pages
+  // see the others, and what they change is kept together with them.
+  const split = useMemo(
+    () =>
+      splitWaiting(
+        patchChoices ?? {},
+        report?.switchedOffPlugins ?? [],
+        report?.installedPatch ?? null,
+      ),
+    [patchChoices, report],
+  );
+  const waitingRef = useRef(split.waiting);
+  waitingRef.current = split.waiting;
+  const setActiveChoices = useCallback(
+    (wanted: PatchChoices) => setPatchChoices(withWaiting(wanted, waitingRef.current)),
+    [setPatchChoices],
   );
   // A choice made just before the window closes is still kept.
   useEffect(() => {
@@ -415,8 +433,8 @@ export default function App({ api, startLang }: AppProps) {
 
   // Creating the patch also writes the report of what it does next to it
   // (ADR 0050), from the decisions as they are at that moment.
-  const reportNow = useRef({ report, ignored, patchChoices, lang });
-  reportNow.current = { report, ignored, patchChoices, lang };
+  const reportNow = useRef({ report, ignored, patchChoices: split.active, lang });
+  reportNow.current = { report, ignored, patchChoices: split.active, lang };
   const game = games.choice?.active ?? "";
   const sessionApi = useMemo<Api>(
     () => ({
@@ -450,8 +468,10 @@ export default function App({ api, startLang }: AppProps) {
       spots: spotsByFinding(report),
       showOnMap,
       decideSpot,
-      patchChoices: patchChoices ?? {},
-      setPatchChoices,
+      patchChoices: split.active,
+      setPatchChoices: setActiveChoices,
+      waiting: split.waiting,
+      showReview: () => go("review"),
       showPatch,
       decisions,
       decide,
@@ -479,8 +499,9 @@ export default function App({ api, startLang }: AppProps) {
       report,
       showOnMap,
       decideSpot,
-      patchChoices,
-      setPatchChoices,
+      split,
+      setActiveChoices,
+      go,
       showPatch,
       decisions,
       decide,
@@ -502,8 +523,8 @@ export default function App({ api, startLang }: AppProps) {
     [report, ignored],
   );
   const health = useMemo(
-    () => (report === null ? null : healthOf(report, ignored, patchChoices ?? {})),
-    [report, ignored, patchChoices],
+    () => (report === null ? null : healthOf(report, ignored, split.active)),
+    [report, ignored, split],
   );
 
   // Nothing is read before the user has seen where Mod Mallet looks.
