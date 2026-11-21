@@ -441,6 +441,14 @@ patch-hides-walkway = Der Patch von Mod Mallet versteckt etwas, worauf Figuren l
         } darauf, an { $placeCount ->
             [one] einem Ort
            *[other] { $placeCount } Orten
-        }: { $places }. Diese Wege stammen aus { $navmeshes }. Angegeben ist ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+        }: { $places }. Diese Wege stammen aus { $navmeshes }. Angegeben ist ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.{ $unreachable ->
+            [0] {""}
+            [one] {" "}Ein Ort, zu dem Figuren gehen, etwa eine Tür, ein Bett oder ein Sitz, ist nur über das Versteckte zu erreichen oder steht darauf: { $unreachableNames }.
+           *[other] {" "}{ $unreachable } Orte, zu denen Figuren gehen, etwa Türen, Betten oder Sitze, sind nur über das Versteckte zu erreichen oder stehen darauf: { $unreachableNames }.
+        }{ $longer ->
+            [0] {""}
+            [one] {" "}Ohne die Wege darüber erreichten Figuren einen anderen Ort nur auf einem viel längeren Weg.
+           *[other] {" "}Ohne die Wege darüber erreichten Figuren { $longer } andere Orte nur auf viel längeren Wegen.
+        }
     .explanation = Figuren im Spiel finden ihren Weg über ein unsichtbares Netz, das über allem liegt, worauf sie laufen können: über dem Boden, aber auch über Brücken, Stegen, Schiffsdecks und Treppen. Der Patch von Mod Mallet versteckt ein Objekt, indem er es unsichtbar macht und alle hindurchlässt, doch das Netz bleibt, wie es gemacht wurde. Wo es über ein verstecktes Deck, einen Steg oder eine Brücke führt, laufen Bewohner, Wachen, Begleiter und Tiere durch die Luft oder bleiben an der Kante hängen, und eine Quest, die jemanden hinüberschickt, kann stehen bleiben. Du selbst fällst dort hindurch, wo das Objekt war.
     .remedy = Entscheide, was dir hier wichtiger ist. Behalte das Objekt: Lass auf der Seite der Kollisionen stattdessen das Objekt der anderen Mod weichen, oder behalte beide. Oder nimm es bewusst in Kauf, wenn dort niemand laufen muss, etwa auf einem Schiff, das niemand betritt. Die Wege so zu reparieren, dass sie ohne das Objekt passen, kann Mod Mallet noch nicht.

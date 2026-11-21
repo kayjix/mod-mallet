@@ -447,6 +447,14 @@ patch-hides-walkway = Mod Mallet's patch hides something characters walk on
         }, in { $placeCount ->
             [one] one place
            *[other] { $placeCount } places
-        }: { $places }. These paths come from { $navmeshes }. An interior is given by its internal name, outside by worldspace and cell.
+        }: { $places }. These paths come from { $navmeshes }. An interior is given by its internal name, outside by worldspace and cell.{ $unreachable ->
+            [0] {""}
+            [one] {" "}One place characters walk to, such as a door, a bed or a seat, can only be reached over what is hidden, or stands on it: { $unreachableNames }.
+           *[other] {" "}{ $unreachable } places characters walk to, such as doors, beds or seats, can only be reached over what is hidden, or stand on it: { $unreachableNames }.
+        }{ $longer ->
+            [0] {""}
+            [one] {" "}Without the paths over it, characters would reach one other place only by a much longer way.
+           *[other] {" "}Without the paths over it, characters would reach { $longer } other places only by a much longer way.
+        }
     .explanation = Characters in the game find their way on an invisible net laid over everything they can walk on: the ground, but also bridges, piers, decks and stairs. Mod Mallet's patch hides an object by making it invisible and letting everyone pass through it, but the net stays as it was made. Where the net runs over a hidden deck, pier or bridge, townspeople, guards, followers and animals walk on thin air or get stuck at its edge, and a quest that sends someone across can stop. You yourself fall through where the object was.
     .remedy = Decide what matters more to you here. Keep the object: on the collisions page, let the other mod's object give way instead, or keep both. Or accept it knowingly if nobody needs to walk there, such as on a ship that nobody boards. Mod Mallet cannot yet repair the paths so that they fit without the object.

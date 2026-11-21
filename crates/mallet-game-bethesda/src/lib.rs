@@ -32,6 +32,7 @@ pub mod archives;
 pub mod area;
 pub mod catalogue;
 pub mod crash_logs;
+mod destinations;
 pub mod files;
 pub mod game;
 pub mod ingest;

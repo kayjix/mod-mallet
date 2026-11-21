@@ -5,7 +5,15 @@
 // out, decides which of them the patch hides (spot by spot, for a passage
 // of spots close together, or for a pair of mods at once) and goes on.
 
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "./work-panel.css";
 import { CopyButton, useSession } from "./Actions";
 import { objectKey, type PartTools } from "./area-layer";
@@ -39,6 +47,7 @@ import {
   undecideSpot,
 } from "./patch";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
+import { ReachNote, usePaintReach, useReach } from "./reach";
 import { TaskList } from "./Tasks";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
 
@@ -1152,6 +1161,22 @@ function Spot(props: SpotProps) {
     );
     return { parts, pieces };
   };
+  // Where characters could no longer go with a side's parts hidden (ADR
+  // 0059): the ways are drawn for the side looked at without its parts.
+  const walkCentre: [number, number] | null =
+    location.type === "interior" || at === null ? null : [at[0], at[1]];
+  const leftWalked = item.sides.find(
+    (side) =>
+      side.hideable &&
+      (preview.has(side.plugin) || decided === side.plugin) &&
+      walkedOf(side).parts.length > 0,
+  );
+  const leftReach = useReach(
+    walkPlace,
+    walkCentre,
+    leftWalked === undefined ? [] : walkedOf(leftWalked).parts.map((part) => part.object),
+  );
+  const paintReach = usePaintReach(leftReach);
 
   /** One mod's column: hiding its part here, in the passage and around, and what ties it. */
   const sideColumn = (side: Side, at: number) => {
@@ -1400,16 +1425,38 @@ function Spot(props: SpotProps) {
             const { parts, pieces } = walkedOf(side);
             const names = [...new Set(parts.map((part) => part.name))].join(", ");
             return (
-              <p key={side.plugin} className="walk-warning">
-                <PathIcon />
-                <span>{w.spotWarning(names, shortName(side.plugin), pieces)}</span>
-              </p>
+              <div key={side.plugin}>
+                <p className="walk-warning">
+                  <PathIcon />
+                  <span>{w.spotWarning(names, shortName(side.plugin), pieces)}</span>
+                </p>
+                <SideReach
+                  place={walkPlace}
+                  centre={walkCentre}
+                  objects={parts.map((part) => part.object)}
+                />
+              </div>
             );
           })}
       </div>
-      <Stage {...props} onArea={setArea} previewObjects={previewObjects} tools={viewTools} />
+      <Stage
+        {...props}
+        onArea={setArea}
+        previewObjects={previewObjects}
+        tools={viewTools}
+        paint={paintReach}
+      />
     </>
   );
+}
+
+/** What hiding one side's parts would break for the characters (ADR 0059). */
+function SideReach(props: {
+  place: string | null;
+  centre: [number, number] | null;
+  objects: ObjectRef[];
+}) {
+  return <ReachNote reach={useReach(props.place, props.centre, props.objects)} />;
 }
 
 /**
@@ -1466,12 +1513,15 @@ function Stage({
   onArea,
   previewObjects,
   tools,
+  paint,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
   previewObjects: ObjectRef[];
   /** The page's tools for the bar over the view. */
   tools: ReactNode;
+  /** What more to draw over the 3D view, such as the ways characters take. */
+  paint?: ComponentProps<typeof MapView3D>["paint"];
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -1625,6 +1675,7 @@ function Stage({
       plain={!marks}
       onArea={onArea}
       tools={tools}
+      paint={paint}
     />
   );
 }

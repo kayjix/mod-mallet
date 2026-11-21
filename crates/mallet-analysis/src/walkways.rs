@@ -25,7 +25,7 @@ use mallet_core::{Facts, Finding, GamePath, Party, Subject, kinds};
 
 use crate::contact::Point;
 use crate::objects::placed_points;
-use crate::{Analysis, Context, examples};
+use crate::{Analysis, Context, examples, reachability};
 
 /// The file Base Object Swapper reads Mod Mallet's patch from (ADR 0025).
 const PATCH_FILE: &str = "data/ModMallet_SWAP.ini";
@@ -199,6 +199,12 @@ impl Analysis for HiddenWalkways {
             walked.places.extend(shape.place_name.as_deref());
             walked.navmesh_plugins.insert(shape.plugin.as_str());
             walked.triangles += carried.triangles.len();
+            walked.carried.push(carried);
+        }
+        // Where characters could no longer go if those paths were cut out
+        // (ADR 0059): only over the hidden objects do they reach it now.
+        for walked in by_plugin.values_mut() {
+            walked.reach = Some(unreachable(facts, &walked.carried));
         }
         by_plugin
             .into_iter()
@@ -215,6 +221,56 @@ struct Walked<'a> {
     places: BTreeSet<&'a str>,
     navmesh_plugins: BTreeSet<&'a str>,
     triangles: usize,
+    carried: Vec<Carried>,
+    reach: Option<Unreachable>,
+}
+
+/// The destinations characters reach only over hidden objects.
+#[derive(Default)]
+struct Unreachable {
+    /// How many can be reached no longer, or lose what they stood on.
+    count: usize,
+    /// Their names, where known.
+    names: BTreeSet<String>,
+    /// How many are reached only by a much longer way.
+    longer: usize,
+}
+
+/// What cutting the triangles `carried` out of the paths the game uses
+/// would cut off.
+fn unreachable(facts: &Facts, carried: &[Carried]) -> Unreachable {
+    let near = &facts.navmeshes.near_hidden;
+    let destinations = &facts.navmeshes.destinations;
+    let after = reachability::cut(&near.navmeshes, carried);
+    let found = reachability::reachability(&near.navmeshes, &after, destinations);
+    let markers: HashMap<&RecordId, &str> = facts
+        .markers
+        .markers
+        .iter()
+        .filter_map(|marker| Some((&marker.id, marker.last.name.as_deref()?)))
+        .collect();
+    let mut unreachable = Unreachable::default();
+    // Two mods may place the same thing at the same spot: counted once.
+    let mut counted = BTreeSet::new();
+    for reach in &found.reaches {
+        let Some(destination) = destinations.get(reach.destination) else {
+            continue;
+        };
+        if !counted.insert((destination.kind, &destination.name, destination.position)) {
+            continue;
+        }
+        if matches!(reach.outcome, reachability::Outcome::Longer { .. }) {
+            unreachable.longer += 1;
+            continue;
+        }
+        unreachable.count += 1;
+        let name = markers
+            .get(&destination.id)
+            .copied()
+            .or(destination.name.as_deref());
+        unreachable.names.extend(name.map(str::to_owned));
+    }
+    unreachable
 }
 
 fn finding(context: &Context<'_>, plugin: &str, walked: &Walked<'_>) -> Finding {
@@ -253,6 +309,24 @@ fn finding(context: &Context<'_>, plugin: &str, walked: &Walked<'_>) -> Finding 
     .with_arg(
         "navmeshes",
         examples(walked.navmesh_plugins.iter().copied(), EXAMPLE_LIMIT),
+    )
+    .with_arg(
+        "unreachable",
+        count(walked.reach.as_ref().map_or(0, |reach| reach.count)),
+    )
+    .with_arg(
+        "unreachableNames",
+        examples(
+            walked
+                .reach
+                .iter()
+                .flat_map(|reach| reach.names.iter().map(String::as_str)),
+            EXAMPLE_LIMIT,
+        ),
+    )
+    .with_arg(
+        "longer",
+        count(walked.reach.as_ref().map_or(0, |reach| reach.longer)),
     )
     .with_provider(context.mods.provider_of(&patch))
 }
@@ -780,6 +854,7 @@ mod tests {
                     ],
                     ground: vec![flat_ground(-200)],
                 },
+                destinations: Vec::new(),
             },
             ..Facts::default()
         }
@@ -805,6 +880,39 @@ mod tests {
             finding.id.as_str(),
             "patch.hides-walkway:override:file:data/modmallet_swap.ini>file:data/docks.esp"
         );
+    }
+
+    #[test]
+    fn what_characters_reach_only_over_the_hidden_pier_is_named() {
+        let mut facts = facts(true);
+        assert_eq!(
+            HiddenWalkways.run(&Context::new(&facts, &NoModSource))[0].args["unreachable"],
+            ArgValue::Number(0)
+        );
+        // The path on the pier leads on to the shore, and a bed stands on
+        // the pier.
+        if let Some(edges) = facts.navmeshes.near_hidden.navmeshes[1].edges.get_mut(0) {
+            edges[1] = Beyond::Link {
+                navmesh: id("Skyrim.esm", 0x6000),
+                triangle: 0,
+            };
+        }
+        facts.navmeshes.destinations = vec![mallet_core::facts::navmeshes::PlacedDestination {
+            id: id("Docks.esp", 0x901),
+            plugin: "Docks.esp".to_owned(),
+            kind: mallet_core::reach::DestinationKind::Furniture,
+            name: Some("Bed".to_owned()),
+            place: Place::Exterior {
+                worldspace: world(),
+            },
+            position: [1000, 1000, 110],
+            leads_to: None,
+        }];
+        let findings = HiddenWalkways.run(&Context::new(&facts, &NoModSource));
+        let finding = &findings[0];
+        assert_eq!(finding.args["unreachable"], ArgValue::Number(1));
+        assert_eq!(finding.args["unreachableNames"], ArgValue::from("Bed"));
+        assert_eq!(finding.args["longer"], ArgValue::Number(0));
     }
 
     #[test]

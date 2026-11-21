@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WalkwayReach",
+  "description": "What hiding objects, with the paths over them cut out or repaired, does\nto the ways characters take near them (ADR 0059).",
+  "type": "object",
+  "properties": {
+    "after": {
+      "description": "What the paths are compared with: the paths over the objects cut\nout (ADR 0052), or repaired.",
+      "$ref": "#/$defs/ReachAfter"
+    },
+    "changes": {
+      "description": "The destinations whose way changes, the worst first: cut off before\nlonger ways.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ReachChange"
+      }
+    },
+    "checked": {
+      "description": "How many destinations near the objects were checked.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "place": {
+      "description": "The worldspace or interior cell asked about.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "place",
+    "after",
+    "checked",
+    "changes"
+  ],
+  "$defs": {
+    "Destination": {
+      "description": "A place characters walk to.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "Where it lies, for people: an interior cell's internal name, or the\nworldspace and the cell's grid position.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "What kind of place it is.",
+          "$ref": "#/$defs/DestinationKind"
+        },
+        "name": {
+          "description": "Its name: the one players see where known, else the internal one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object": {
+          "description": "The placed object.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "position": {
+          "description": "Where it stands, in whole game units.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "usedBy": {
+          "description": "For an object a quest or routine uses: that quest or routine, by its\ninternal name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "object",
+        "kind",
+        "position"
+      ]
+    },
+    "DestinationKind": {
+      "description": "What kind of place characters walk to.",
+      "oneOf": [
+        {
+          "description": "A door, which may lead into another cell.",
+          "type": "string",
+          "const": "door"
+        },
+        {
+          "description": "Furniture: a bed, a chair, a work station.",
+          "type": "string",
+          "const": "furniture"
+        },
+        {
+          "description": "A spot where characters stand or do something, an idle marker.",
+          "type": "string",
+          "const": "idle-marker"
+        },
+        {
+          "description": "A place of the world map.",
+          "type": "string",
+          "const": "map-marker"
+        },
+        {
+          "description": "An object a quest or a character's routine sends characters to.",
+          "type": "string",
+          "const": "used"
+        }
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "ReachAfter": {
+      "description": "What the paths after hiding are.",
+      "oneOf": [
+        {
+          "description": "The triangles over the hidden objects are taken out of the paths\n(ADR 0052): what characters would walk on if nothing is added.",
+          "type": "string",
+          "const": "cut"
+        },
+        {
+          "description": "The paths are repaired with new triangles around or under the\nhidden objects.",
+          "type": "string",
+          "const": "repaired"
+        }
+      ]
+    },
+    "ReachChange": {
+      "description": "How the way to one destination changes.",
+      "type": "object",
+      "properties": {
+        "after": {
+          "description": "The way after, if there is one.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Route"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "before": {
+          "description": "The way before. For a destination cut off, the shortest way from\nwhere the paths lead on into the rest of the world.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Route"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination": {
+          "description": "Where characters want to go.",
+          "$ref": "#/$defs/Destination"
+        },
+        "from": {
+          "description": "For a longer way: where the way is measured from, another\ndestination nearby.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Destination"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "description": "What happens to it.",
+          "$ref": "#/$defs/ReachOutcome"
+        }
+      },
+      "required": [
+        "outcome",
+        "destination"
+      ]
+    },
+    "ReachOutcome": {
+      "description": "What happens to the way to a destination.",
+      "oneOf": [
+        {
+          "description": "What characters stood on to use it is gone with the hidden object.",
+          "type": "string",
+          "const": "gone"
+        },
+        {
+          "description": "No way leads there any more.",
+          "type": "string",
+          "const": "cut-off"
+        },
+        {
+          "description": "A way still leads there, but a much longer one, or one only\nthrough the places around that were not looked at.",
+          "type": "string",
+          "const": "longer"
+        }
+      ]
+    },
+    "Route": {
+      "description": "A way characters walk, to draw.",
+      "type": "object",
+      "properties": {
+        "metres": {
+          "description": "How long it is, in whole metres.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "points": {
+          "description": "Its points from start to end, in whole game units, in the\ncoordinates of the worldspace or the interior cell.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        }
+      },
+      "required": [
+        "metres",
+        "points"
+      ]
+    }
+  }
+}

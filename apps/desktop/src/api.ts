@@ -24,6 +24,7 @@ import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
 import type { Action, ObjectRef, Patch, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { ScanProgress } from "./generated/scan-progress";
+import type { WalkwayReach } from "./generated/walkway-reach";
 import type { Lang } from "./i18n";
 
 /** The places the user named, by what they are for. */
@@ -130,6 +131,17 @@ export interface Api {
     y: number | null,
     objects: ObjectRef[],
   ): Promise<HiddenWalkways | null>;
+  /**
+   * Whether characters still reach where they go once `objects` are hidden
+   * and the paths over them cut out (ADR 0059), asked as `hiddenWalkways`.
+   * `null` if the setup cannot be read.
+   */
+  walkwayReach(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    objects: ObjectRef[],
+  ): Promise<WalkwayReach | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -211,6 +223,8 @@ const tauriApi: Api = {
     invoke<ObjectAnchors[] | null>("object_anchors", { worldOrCell, objects }),
   hiddenWalkways: (worldOrCell, x, y, objects) =>
     invoke<HiddenWalkways | null>("hidden_walkways", { worldOrCell, x, y, objects }),
+  walkwayReach: (worldOrCell, x, y, objects) =>
+    invoke<WalkwayReach | null>("walkway_reach", { worldOrCell, x, y, objects }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

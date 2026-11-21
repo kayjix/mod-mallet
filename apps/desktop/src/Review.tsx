@@ -31,6 +31,7 @@ import {
   revealObjects,
 } from "./patch";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
+import { ReachNote, useReach } from "./reach";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
@@ -1164,6 +1165,18 @@ function CollisionsStep({
               effect={effects[side]}
               anchors={anchors.byPart}
               walked={walked}
+              walkPlace={
+                stagePlace === null
+                  ? null
+                  : stagePlace.place.type === "exterior"
+                    ? stagePlace.place.world
+                    : stagePlace.place.cell
+              }
+              walkCentre={
+                stagePlace === null || stagePlace.place.type === "interior"
+                  ? null
+                  : [cluster.centre[0], cluster.centre[1]]
+              }
               decor={new Set(shownSegments.flatMap((segment) => segment.decor))}
               onAnyway={() => keep(side, shownSegments, true, true)}
             />
@@ -1406,6 +1419,8 @@ function KeepEffect({
   effect,
   anchors,
   walked,
+  walkPlace,
+  walkCentre,
   decor,
   onAnyway,
 }: {
@@ -1422,6 +1437,9 @@ function KeepEffect({
   anchors: Map<string, ObjectAnchors>;
   /** The pieces of path characters walk on, by part. */
   walked: Map<string, number> | null;
+  /** Where the paths are asked about, as for `walked`. */
+  walkPlace: string | null;
+  walkCentre: [number, number] | null;
   /** The parts that are decor resting on others, by key. */
   decor: Set<string>;
   onAnyway: () => void;
@@ -1442,6 +1460,12 @@ function KeepEffect({
   );
   const anyway = effect.careful.length + effect.walked.length;
   const staying = [...effect.careful, ...effect.locked];
+  // Where characters could no longer go with those parts hidden (ADR 0059).
+  const reach = useReach(
+    walkPlace,
+    walkCentre,
+    effect.walked.map((part) => part.id),
+  );
   if (effect.parts.length === 0) {
     return null;
   }
@@ -1490,6 +1514,7 @@ function KeepEffect({
           </span>
         </p>
       )}
+      {effect.walked.length > 0 && <ReachNote reach={reach} />}
       {anyway > 0 && (
         <button type="button" className="small" onClick={onAnyway}>
           {effect.walked.length > 0

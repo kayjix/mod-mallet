@@ -12,11 +12,14 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use mallet_core::facts::RecordId;
-use mallet_core::facts::navmeshes::{Beyond, GroundCell, NavmeshShape, NearHidden};
+use mallet_core::facts::navmeshes::{
+    Beyond, GroundCell, NavmeshShape, NearHidden, PlacedDestination,
+};
 use mallet_core::facts::objects::Place;
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, group_type};
 
+use crate::destinations::{self, Collector};
 use crate::game::Game;
 use crate::ingest;
 use crate::navmeshes::NAVMESH;
@@ -59,6 +62,37 @@ pub fn read(game: Game, game_dir: &Path, local_dir: Option<&Path>, around: &Arou
 /// The navigation meshes and the ground of the cells `around` in
 /// `plugins`, the active plugins in load order by name and file.
 pub fn read_plugins(plugins: &[(String, PathBuf)], around: &Around) -> NearHidden {
+    read_plugins_with_destinations(plugins, around).0
+}
+
+/// The navigation meshes and the ground of the cells `around` in the
+/// setup of `game` in `game_dir`, as [`read`], and the places characters
+/// walk to there (ADR 0059).
+pub fn read_with_destinations(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    around: &Around,
+) -> (NearHidden, Vec<PlacedDestination>) {
+    let data_dir = game_dir.join("Data");
+    let plugins: Vec<(String, PathBuf)> = ingest::active_plugin_names(game, game_dir, local_dir)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|name| {
+            let path = data_dir.join(&name);
+            (name, path)
+        })
+        .collect();
+    read_plugins_with_destinations(&plugins, around)
+}
+
+/// The navigation meshes and the ground of the cells `around` in
+/// `plugins`, as [`read_plugins`], and the places characters walk to
+/// there: doors, furniture, idle markers and map markers (ADR 0059).
+pub fn read_plugins_with_destinations(
+    plugins: &[(String, PathBuf)],
+    around: &Around,
+) -> (NearHidden, Vec<PlacedDestination>) {
     let mut found = Found::default();
     if around.worlds.values().any(|cells| !cells.is_empty()) {
         outside(plugins, around, &mut found);
@@ -66,7 +100,8 @@ pub fn read_plugins(plugins: &[(String, PathBuf)], around: &Around) -> NearHidde
     if !around.interiors.is_empty() {
         inside(plugins, around, &mut found);
     }
-    found.finish()
+    let destinations = std::mem::take(&mut found.destinations).finish();
+    (found.finish(), destinations)
 }
 
 /// What the passes found, before the version the game uses is known.
@@ -82,6 +117,8 @@ struct Found {
     land_of: HashMap<RecordId, RecordId>,
     /// The cells chosen in each worldspace read.
     cells: HashMap<RecordId, BTreeSet<(i32, i32)>>,
+    /// The places characters walk to (ADR 0059).
+    destinations: Collector,
 }
 
 impl Found {
@@ -143,9 +180,9 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
     let all_cells: BTreeSet<(i32, i32)> = around.worlds.values().flatten().copied().collect();
     let descend = |group: GroupLabel| holds_any(group, &all_cells);
     let request = plugin::Request {
-        flat: &[],
+        flat: &destinations::BASES,
         nested: &[*b"WRLD"],
-        nested_records: &[*b"WRLD", *b"CELL", NAVMESH, *b"LAND"],
+        nested_records: &[*b"WRLD", *b"CELL", NAVMESH, *b"LAND", *b"REFR"],
         nested_overrides: &[],
     };
     let wanted_names: HashMap<String, &BTreeSet<(i32, i32)>> = around
@@ -160,6 +197,7 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
             continue;
         };
         let masters = &read.header.masters;
+        let localized = read.header.is_localized;
         // This plugin's versions of the chosen cells: where they lie.
         let mut cells: HashMap<RecordId, (RecordId, (i32, i32))> = HashMap::new();
         for record in &read.records {
@@ -224,10 +262,48 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
                         .versions
                         .push(version(record, masters, name, place, place_name));
                 }
+                b"REFR" => placed_outside(found, record, masters, name, localized),
+                signature if destinations::BASES.contains(signature) => {
+                    found.destinations.base(record, masters, name, localized);
+                }
                 _ => {}
             }
         }
     }
+}
+
+/// Takes in a placed object outside, if it stands in a chosen cell. Placed
+/// objects are kept by where they stand: those the game keeps loaded lie
+/// in a cell of their own.
+fn placed_outside(
+    found: &mut Found,
+    record: &Record,
+    masters: &[String],
+    plugin_name: &str,
+    localized: bool,
+) {
+    let Some(world) = in_world(record, masters, plugin_name) else {
+        return;
+    };
+    let Some(chosen) = found.cells.get(&world) else {
+        return;
+    };
+    let place = Place::Exterior { worldspace: world };
+    found.destinations.placed(
+        record,
+        masters,
+        plugin_name,
+        localized,
+        place,
+        |[x, y, _]| chosen.contains(&(cell_at(x), cell_at(y))),
+    );
+}
+
+/// The outside cell a coordinate in game units lies in.
+#[allow(clippy::cast_possible_truncation)]
+fn cell_at(coordinate: f32) -> i32 {
+    // Worldspaces lie within a few hundred cells of their origin.
+    (coordinate / 4096.0).floor().clamp(-32_768.0, 32_767.0) as i32
 }
 
 /// Reads the chosen interior cells of every plugin.
@@ -240,9 +316,9 @@ fn inside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
         !CHILDREN.contains(&group.group_type) || numbers.contains(&(group.label & 0x00FF_FFFF))
     };
     let request = plugin::Request {
-        flat: &[],
+        flat: &destinations::BASES,
         nested: &[*b"CELL"],
-        nested_records: &[*b"CELL", NAVMESH],
+        nested_records: &[*b"CELL", NAVMESH, *b"REFR"],
         nested_overrides: &[],
     };
     let mut names: HashMap<RecordId, String> = HashMap::new();
@@ -251,7 +327,12 @@ fn inside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
             continue;
         };
         let masters = &read.header.masters;
+        let localized = read.header.is_localized;
         for record in &read.records {
+            if destinations::BASES.contains(&record.signature) {
+                found.destinations.base(record, masters, name, localized);
+                continue;
+            }
             if &record.signature == b"CELL" {
                 let id = record_id(record.form_id, masters, name);
                 if around.interiors.contains(&id)
@@ -270,8 +351,17 @@ fn inside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
             else {
                 continue;
             };
-            let place_name = names.get(&cell).cloned();
             let place = Place::Interior { cell };
+            if &record.signature == b"REFR" {
+                found
+                    .destinations
+                    .placed(record, masters, name, localized, place, |_| true);
+                continue;
+            }
+            let place_name = match &place {
+                Place::Interior { cell } => names.get(cell).cloned(),
+                Place::Exterior { .. } => None,
+            };
             found
                 .versions
                 .push(version(record, masters, name, place, place_name));
@@ -583,6 +673,78 @@ mod tests {
         assert_eq!((near.ground[0].x, near.ground[0].y), (5, 3));
         assert_eq!(near.ground[0].heights.len(), 33 * 33);
         assert_eq!(near.ground[0].heights[0], 8);
+    }
+
+    #[test]
+    fn the_doors_and_furniture_of_the_chosen_cells_are_read() {
+        let directory = tempfile::tempdir().unwrap();
+        let door = RecordSpec::new(*b"DOOR", 0x0000_0050).with(*b"EDID", fixture::zstring("Door"));
+        let bed = RecordSpec::new(*b"FURN", 0x0000_0051).with(*b"EDID", fixture::zstring("Bed"));
+        let bases = fixture::group(
+            *b"DOOR",
+            0,
+            &[fixture::record(&door), fixture::record(&bed)].concat(),
+        );
+        let inn = RecordSpec::new(*b"CELL", 0x0000_0100).with(*b"EDID", fixture::zstring("Inn"));
+        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
+        let mut xtel = 0x0000_0211u32.to_le_bytes().to_vec();
+        xtel.extend([0; 28]);
+        let inner_door = fixture::reference(0x0000_0111, 0x50, [1.0, 2.0, 3.0], [0.0; 3], None)
+            .with(*b"XTEL", xtel);
+        let mut xtel = 0x0000_0111u32.to_le_bytes().to_vec();
+        xtel.extend([0; 28]);
+        let outer_door = fixture::reference(
+            0x0000_0211,
+            0x50,
+            [5.0 * 4096.0 + 10.0, 3.0 * 4096.0 + 10.0, 0.0],
+            [0.0; 3],
+            None,
+        )
+        .with(*b"XTEL", xtel);
+        // A bed in a cell that was not chosen.
+        let far_bed = fixture::reference(0x0000_0212, 0x51, [0.0, 0.0, 0.0], [0.0; 3], None);
+        let game = fixture::plugin_with_raw_groups(
+            &[],
+            0,
+            &[
+                bases,
+                fixture::interior_cells(&[(inn, vec![inner_door])]),
+                fixture::worldspace(&world(), &[(field, vec![outer_door, far_bed])]),
+            ],
+        );
+        let path = directory.path().join("Skyrim.esm");
+        File::create(&path).unwrap().write_all(&game).unwrap();
+        let around = Around {
+            worlds: BTreeMap::from([("Tamriel".to_owned(), BTreeSet::from([(5, 3)]))]),
+            interiors: BTreeSet::from([id("skyrim.esm", 0x100)]),
+        };
+        let (_, found) =
+            read_plugins_with_destinations(&[("Skyrim.esm".to_owned(), path)], &around);
+        let summary: Vec<_> = found
+            .iter()
+            .map(|found| (found.id.local_id, found.kind, found.leads_to.clone()))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                (
+                    0x111,
+                    mallet_core::reach::DestinationKind::Door,
+                    Some(id("skyrim.esm", 0x211))
+                ),
+                (
+                    0x211,
+                    mallet_core::reach::DestinationKind::Door,
+                    Some(id("skyrim.esm", 0x111))
+                ),
+            ]
+        );
+        assert_eq!(
+            found.first().map(|found| found.place.clone()),
+            Some(Place::Interior {
+                cell: id("skyrim.esm", 0x100)
+            })
+        );
     }
 
     #[test]

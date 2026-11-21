@@ -430,7 +430,7 @@ This is only a suggestion; nothing is broken. Collections ("all in one") often c
 
 - Severity: Warning
 - Confidence: likely
-- Message arguments: `plugin`, `count`, `objects`, `places`, `placeCount`, `triangles`, `navmeshes`
+- Message arguments: `plugin`, `count`, `objects`, `places`, `placeCount`, `triangles`, `navmeshes`, `unreachable`, `unreachableNames`, `longer`
 
 Characters in the game find their way on an invisible net laid over everything they can walk on: the ground, but also bridges, piers, decks and stairs. Mod Mallet's patch hides an object by making it invisible and letting everyone pass through it, but the net stays as it was made. Where the net runs over a hidden deck, pier or bridge, townspeople, guards, followers and animals walk on thin air or get stuck at its edge, and a quest that sends someone across can stop. You yourself fall through where the object was.
 

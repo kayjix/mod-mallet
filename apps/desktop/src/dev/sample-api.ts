@@ -1342,6 +1342,69 @@ export const sampleApi: Api = {
       },
     });
   },
+  // Hiding the same planks cuts off a bench on the dock's far end, and
+  // the way between the two ends of the dock goes round (made up).
+  walkwayReach: (worldOrCell, _x, _y, objects) => {
+    const hides = objects.some(
+      (object) =>
+        object.plugin === "Water Mod.esp" &&
+        (object.localId === 0xa11 ||
+          object.localId === 0xa21 ||
+          (object.localId >= 0x6000 && object.localId <= 0x6008)),
+    );
+    const cell = `${worldOrCell} 6,1`;
+    const place = (localId: number, name: string, position: [number, number, number]) => ({
+      object: { plugin: "Skyrim.esm", localId },
+      kind: "furniture" as const,
+      name,
+      position,
+      cell,
+    });
+    return later({
+      place: worldOrCell,
+      after: "cut" as const,
+      checked: hides ? 6 : 0,
+      changes: hides
+        ? [
+            {
+              outcome: "cut-off" as const,
+              destination: place(0xb01, "Bench", [25_100, 5_300, -120]),
+              before: {
+                metres: 14,
+                points: [
+                  [24_400, 5_200, -120],
+                  [24_800, 5_250, -120],
+                  [25_100, 5_300, -120],
+                ] as [number, number, number][],
+              },
+            },
+            {
+              outcome: "longer" as const,
+              destination: place(0xb02, "Chair", [24_300, 4_900, -100]),
+              from: { ...place(0xb03, "Crate", [24_900, 4_700, -110]), kind: "used" as const },
+              before: {
+                metres: 9,
+                points: [
+                  [24_900, 4_700, -110],
+                  [24_600, 4_800, -105],
+                  [24_300, 4_900, -100],
+                ] as [number, number, number][],
+              },
+              after: {
+                metres: 31,
+                points: [
+                  [24_900, 4_700, -110],
+                  [25_000, 4_200, -110],
+                  [24_500, 4_000, -105],
+                  [24_100, 4_400, -100],
+                  [24_300, 4_900, -100],
+                ] as [number, number, number][],
+              },
+            },
+          ]
+        : [],
+    });
+  },
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),

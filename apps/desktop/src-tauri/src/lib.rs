@@ -446,6 +446,27 @@ fn hidden_walkways(
     ))
 }
 
+/// Whether characters still reach where they go once `objects` are hidden
+/// and the paths over them cut out (ADR 0059): in a worldspace near the
+/// point `x`, `y`, or, without a point, in an interior cell by its editor
+/// ID.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn walkway_reach(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    objects: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::reach::WalkwayReach>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::walkway_reach(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &objects,
+    ))
+}
+
 /// Every thing of the setup worth looking at, for the assets page. The
 /// first call for a setup reads every plugin and takes a few seconds.
 #[tauri::command(async)]
@@ -725,6 +746,7 @@ pub fn run() -> tauri::Result<()> {
             interior_objects,
             object_anchors,
             hidden_walkways,
+            walkway_reach,
             area_mesh,
             area_texture,
             ranking,

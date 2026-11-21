@@ -168,6 +168,19 @@ impl AreaReader {
         crate::walkways::read_plugins(&self.plugins, around)
     }
 
+    /// The navigation meshes and the ground of the cells `around`, every
+    /// plugin's version, and the places characters walk to there (ADR
+    /// 0059).
+    pub fn navmeshes_with_destinations(
+        &self,
+        around: &crate::walkways::Around,
+    ) -> (
+        mallet_core::facts::navmeshes::NearHidden,
+        Vec<mallet_core::facts::navmeshes::PlacedDestination>,
+    ) {
+        crate::walkways::read_plugins_with_destinations(&self.plugins, around)
+    }
+
     /// The ground of the outside cells of the worldspace named `world`
     /// that reach within `radius` game units of `centre` in both
     /// directions: the same cells [`AreaReader::objects`] reads. Cells

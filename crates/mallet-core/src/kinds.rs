@@ -413,6 +413,10 @@ pub const PATCH_HIDES_WALKWAY: KindInfo = KindInfo {
         "placeCount",
         "triangles",
         "navmeshes",
+        // What characters reach only over the hidden objects (ADR 0059).
+        "unreachable",
+        "unreachableNames",
+        "longer",
     ],
 };
 

@@ -10,7 +10,7 @@ use mallet_analysis::path_repair;
 use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
-use mallet_core::facts::navmeshes::NearHidden;
+use mallet_core::facts::navmeshes::{NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
 use mallet_core::{Facts, InstalledPatch, ObjectRef};
@@ -23,7 +23,7 @@ use crate::area::{library, reader};
 
 /// How far around the point the objects asked about are looked for, in
 /// game units: the cell they are in and its neighbours.
-const SEARCH_RADIUS: f32 = 4096.0;
+pub(crate) const SEARCH_RADIUS: f32 = 4096.0;
 
 /// The objects the patch in the game hides, by the identity the plugins
 /// use.
@@ -36,15 +36,16 @@ pub(crate) fn hidden_by(patch: Option<&InstalledPatch>) -> Vec<RecordId> {
 }
 
 /// The navigation meshes and the ground around the objects that the
-/// patch in the game hides, as far as `facts` know them: their models are
-/// added to `models`, to be read with the other models.
+/// patch in the game hides, as far as `facts` know them, and the places
+/// characters walk to there (ADR 0059): their models are added to
+/// `models`, to be read with the other models.
 pub(crate) fn near_hidden(
     game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
     facts: &Facts,
     models: &mut BTreeSet<String>,
-) -> NearHidden {
+) -> (NearHidden, Vec<PlacedDestination>) {
     let needs = walkways::hidden_needs(facts);
     models.extend(needs.models);
     let names: BTreeMap<&RecordId, &str> = facts
@@ -67,17 +68,19 @@ pub(crate) fn near_hidden(
         }
     }
     if around.is_empty() {
-        return NearHidden::default();
+        return (NearHidden::default(), Vec::new());
     }
     let started = std::time::Instant::now();
-    let near = mallet_game_bethesda::walkways::read(game, game_dir, local_dir, &around);
+    let (near, destinations) =
+        mallet_game_bethesda::walkways::read_with_destinations(game, game_dir, local_dir, &around);
     tracing::info!(
         hidden = facts.hidden_objects.len(),
         navmeshes = near.navmeshes.len(),
+        destinations = destinations.len(),
         elapsed_ms = started.elapsed().as_millis(),
         "read the paths around the objects the patch hides"
     );
-    near
+    (near, destinations)
 }
 
 /// The paths characters walk on that run over `objects`, which stand in
@@ -237,7 +240,7 @@ fn whole_f64(value: f64) -> i32 {
 }
 
 /// An object as the window names it, by the identity the plugins use.
-fn record_id(object: &ObjectRef) -> RecordId {
+pub(crate) fn record_id(object: &ObjectRef) -> RecordId {
     RecordId {
         plugin: object.plugin.to_lowercase(),
         local_id: object.local_id,
@@ -245,7 +248,7 @@ fn record_id(object: &ObjectRef) -> RecordId {
 }
 
 /// An object read up close as the analyses know placed objects.
-fn placed_object(object: &AreaObject, cell: Option<&RecordId>) -> Option<PlacedObject> {
+pub(crate) fn placed_object(object: &AreaObject, cell: Option<&RecordId>) -> Option<PlacedObject> {
     let place = match (&object.world, cell) {
         (Some(world), _) => Place::Exterior {
             worldspace: world.clone(),

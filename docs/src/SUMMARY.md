@@ -72,6 +72,7 @@
   - [0055 A magic wand for what belongs together, and one column per mod](adr/0055-a-magic-wand-for-what-belongs-together.md)
   - [0056 Missing textures found in switched-off mods](adr/0056-missing-textures-found-in-switched-off-mods.md)
   - [0057 One version for the app](adr/0057-one-version-for-the-app.md)
+  - [0059 Where characters still go](adr/0059-where-characters-still-go.md)
   - [0063 The tools Vortex knows](adr/0063-the-tools-vortex-knows.md)
   - [0065 Oblivion Remastered](adr/0065-oblivion-remastered.md)
   - [Template](adr/template.md)

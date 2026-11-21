@@ -8,6 +8,7 @@
 
 use super::RecordId;
 use super::objects::Place;
+use crate::reach::DestinationKind;
 
 /// The navigation meshes that mods change.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -18,6 +19,9 @@ pub struct NavmeshFacts {
     pub changes: Vec<NavmeshChanges>,
     /// The navigation meshes under the objects Mod Mallet's patch hides.
     pub near_hidden: NearHidden,
+    /// The places characters walk to in the cells of [`Self::near_hidden`]
+    /// (ADR 0059).
+    pub destinations: Vec<PlacedDestination>,
 }
 
 /// The navigation meshes of other plugins that one plugin changes.
@@ -114,4 +118,27 @@ pub struct GroundCell {
     /// The heights of 33 rows of 33 points, 128 game units apart, in whole
     /// game units; the southern row first, each from west to east.
     pub heights: Vec<i32>,
+}
+
+/// A placed object characters walk to, in the cells of navigation meshes
+/// that were read (ADR 0059): a door, furniture, an idle marker or a map
+/// marker, in the version the game uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlacedDestination {
+    /// The placed object, by the plugin that placed it first.
+    pub id: RecordId,
+    /// The plugin whose version the game uses, in the spelling of the load
+    /// order.
+    pub plugin: String,
+    /// What kind of place it is.
+    pub kind: DestinationKind,
+    /// Its name: the one players see where the plugin spells it out, else
+    /// the internal name of what is placed. `None` if neither is known.
+    pub name: Option<String>,
+    /// The cell it lies in inside, or its worldspace outside.
+    pub place: Place,
+    /// Where it stands, in whole game units.
+    pub position: [i32; 3],
+    /// For a door that leads elsewhere, the door on the other side.
+    pub leads_to: Option<RecordId>,
 }

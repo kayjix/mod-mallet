@@ -76,6 +76,15 @@ interface MapView3DProps {
   plain?: boolean;
   /** Told about the objects of each area once they are read. */
   onArea?: (area: AreaObjects | null) => void;
+  /**
+   * Draws more over the relief after everything else, such as the ways
+   * characters take (ADR 0059). `toScreen` gives where a point in game
+   * units shows, or `null` where it does not.
+   */
+  paint?: (
+    context: CanvasRenderingContext2D,
+    toScreen: (point: [number, number, number]) => { x: number; y: number } | null,
+  ) => void;
 }
 
 const NO_KEYS = new Set<string>();
@@ -464,6 +473,7 @@ export function MapView3D({
   spotDistance = NEAR * 0.7,
   plain = false,
   onArea,
+  paint,
 }: MapView3DProps) {
   const { t, api, patchChoices } = useSession();
   // The spots pinned to solve later, read while drawing.
@@ -564,6 +574,9 @@ export function MapView3D({
   const camera = useRef<Camera>(fitted());
   const animation = useRef<number | null>(null);
   const pending = useRef<number | null>(null);
+  /** What more to draw over the relief, read while drawing. */
+  const paintNow = useRef(paint);
+  paintNow.current = paint;
   /** Where each pin's head was drawn last, for picking. */
   const heads = useRef<{ pin: Pin; x: number; y: number }[]>([]);
   const state = useRef({
@@ -941,6 +954,15 @@ export function MapView3D({
         context.stroke();
       }
     }
+    paintNow.current?.(context, (point) => {
+      const shown = project(
+        matrix,
+        [point[0] / CELL, point[1] / CELL, (point[2] / CELL) * raise],
+        width,
+        height,
+      );
+      return shown === null || shown.depth > 1 ? null : shown;
+    });
   }, [terrain, mesh]);
 
   const redraw = useCallback(() => {
@@ -1307,6 +1329,12 @@ export function MapView3D({
     current.headCount = pins.length;
     redraw();
   }, [markers, spots, mesh, terrain, redraw]);
+
+  // What is drawn over the relief shows at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new painter triggers a redraw.
+  useEffect(() => {
+    redraw();
+  }, [paint, redraw]);
 
   // The objects are drawn anew when what is looked at or hidden changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.

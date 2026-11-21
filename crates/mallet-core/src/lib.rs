@@ -29,6 +29,7 @@ pub mod mods;
 pub mod patch;
 pub mod path;
 pub mod progress;
+pub mod reach;
 pub mod report;
 pub mod toolbox;
 pub mod unreal;

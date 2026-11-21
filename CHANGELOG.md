@@ -23,6 +23,12 @@ in [Releases](docs/src/contributing/releases.md).
   Engine, not with the meshes and textures in its Data folder.
 - A Vortex deployment of a game that was moved to another drive is read
   where it lies instead of stopping the scan.
+- Where hiding an object takes away the paths characters walk on, Mod
+  Mallet now says what they could no longer reach: a door, a bed, a
+  forge, a place of the map, or a spot a quest sends them to, and where
+  they would only get by a long way round. The collisions page draws the
+  way before in grey, the way round in green, and marks in red where no
+  way is left.
 
 ## [0.2.2] - 2026-11-19
 

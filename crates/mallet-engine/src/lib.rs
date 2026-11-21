@@ -27,6 +27,7 @@ mod mesh;
 mod patch;
 mod png;
 mod preview;
+mod reach;
 mod settings;
 mod staging;
 mod toolbox;
@@ -59,6 +60,7 @@ pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use mesh::mesh_view;
 pub use preview::file_preview;
+pub use reach::{walkway_reach, walkway_reach_after};
 pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
     select_game, setup_fingerprint, update_settings,
@@ -289,7 +291,7 @@ fn scan_with(
     let started = Instant::now();
     let mut wanted =
         mallet_analysis::objects::models_to_check(&Context::new(&facts, mods.as_ref()));
-    facts.navmeshes.near_hidden = walkways::near_hidden(
+    (facts.navmeshes.near_hidden, facts.navmeshes.destinations) = walkways::near_hidden(
         game,
         &game_dir,
         options.local_dir.as_deref(),
