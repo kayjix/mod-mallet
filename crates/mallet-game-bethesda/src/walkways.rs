@@ -119,6 +119,11 @@ struct Found {
     cells: HashMap<RecordId, BTreeSet<(i32, i32)>>,
     /// The places characters walk to (ADR 0059).
     destinations: Collector,
+    /// By worldspace and cell, whether the cell has water and the height
+    /// it sets, the last version.
+    cell_water: HashMap<(RecordId, i32, i32), (bool, Option<f32>)>,
+    /// The height of each worldspace's water where cells set none.
+    world_water: HashMap<RecordId, f32>,
 }
 
 impl Found {
@@ -145,6 +150,14 @@ impl Found {
             .into_iter()
             .filter_map(|(key, heights)| Some((key, heights?)))
             .collect();
+        let water = |world: &RecordId, x: i32, y: i32| -> Option<i32> {
+            let (has_water, own) = self.cell_water.get(&(world.clone(), x, y))?;
+            let default = self.world_water.get(world).copied().or_else(|| {
+                let parent = self.land_of.get(world)?;
+                self.world_water.get(parent).copied()
+            });
+            has_water.then(|| own.or(default)).flatten().map(whole)
+        };
         let mut ground: Vec<GroundCell> = Vec::new();
         for ((world, x, y), heights) in &own {
             ground.push(GroundCell {
@@ -152,6 +165,7 @@ impl Found {
                 x: *x,
                 y: *y,
                 heights: heights.clone(),
+                water: water(world, *x, *y),
             });
         }
         // A city stands on the land of the worldspace around it.
@@ -166,6 +180,7 @@ impl Found {
                         x,
                         y,
                         heights: heights.clone(),
+                        water: water(child, x, y).or_else(|| water(parent, x, y)),
                     });
                 }
             }
@@ -204,6 +219,9 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
             match &record.signature {
                 b"WRLD" => {
                     let id = record_id(record.form_id, masters, name);
+                    if let Some(water) = terrain::world_water(record) {
+                        found.world_water.insert(id.clone(), water);
+                    }
                     if worlds.contains_key(&id) {
                         continue;
                     }
@@ -235,6 +253,10 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
                         .get(&world)
                         .is_some_and(|chosen| chosen.contains(&position))
                     {
+                        found.cell_water.insert(
+                            (world.clone(), position.0, position.1),
+                            terrain::cell_water(record),
+                        );
                         cells.insert(record_id(record.form_id, masters, name), (world, position));
                     }
                 }
@@ -370,7 +392,7 @@ fn inside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
 }
 
 /// The groups that hold what is placed in a cell.
-const CHILDREN: [u32; 3] = [
+pub(crate) const CHILDREN: [u32; 3] = [
     group_type::CELL_CHILDREN,
     group_type::CELL_PERSISTENT_CHILDREN,
     group_type::CELL_TEMPORARY_CHILDREN,
@@ -445,7 +467,7 @@ fn cell_of<'a>(
 }
 
 /// The worldspace a record lies in, if it is outside.
-fn in_world(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
+pub(crate) fn in_world(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
     record
         .groups
         .iter()
@@ -462,7 +484,7 @@ fn land_parent(record: &Record, masters: &[String], plugin_name: &str) -> Option
 
 /// Whether a block of outside cells holds one of `cells`. Groups that are
 /// not blocks are entered.
-fn holds_any(group: GroupLabel, cells: &BTreeSet<(i32, i32)>) -> bool {
+pub(crate) fn holds_any(group: GroupLabel, cells: &BTreeSet<(i32, i32)>) -> bool {
     let size = match group.group_type {
         group_type::EXTERIOR_BLOCK => 32,
         group_type::EXTERIOR_SUB_BLOCK => 8,
@@ -476,7 +498,7 @@ fn holds_any(group: GroupLabel, cells: &BTreeSet<(i32, i32)>) -> bool {
         .any(|(cx, cy)| cx.div_euclid(size) == x && cy.div_euclid(size) == y)
 }
 
-fn read_where(
+pub(crate) fn read_where(
     path: &Path,
     request: &plugin::Request<'_>,
     descend: &dyn Fn(GroupLabel) -> bool,
@@ -745,6 +767,48 @@ mod tests {
                 cell: id("skyrim.esm", 0x100)
             })
         );
+    }
+
+    #[test]
+    fn the_water_of_a_cell_is_its_own_or_its_worldspace_s() {
+        let mut world_heights = (-27_000f32).to_le_bytes().to_vec();
+        world_heights.extend((-14_000f32).to_le_bytes());
+        let world = world().with(*b"DNAM", world_heights);
+        let cell = |form_id: u32, x: i32, own: Option<f32>| {
+            let mut spec = RecordSpec::new(*b"CELL", form_id)
+                .with(*b"XCLC", grid(x, 3))
+                .with(*b"DATA", vec![0x02, 0]);
+            if let Some(height) = own {
+                spec = spec.with(*b"XCLW", height.to_le_bytes().to_vec());
+            }
+            spec
+        };
+        let land = |form_id: u32| RecordSpec::new(*b"LAND", form_id).with(*b"VHGT", heights(0.0));
+        let game = fixture::plugin_with_raw_groups(
+            &[],
+            0,
+            &[fixture::worldspace(
+                &world,
+                &[
+                    (cell(0x200, 5, None), vec![land(0x201)]),
+                    (cell(0x300, 6, Some(-13_500.0)), vec![land(0x301)]),
+                ],
+            )],
+        );
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("Skyrim.esm");
+        File::create(&path).unwrap().write_all(&game).unwrap();
+        let around = Around {
+            worlds: BTreeMap::from([("Tamriel".to_owned(), BTreeSet::from([(5, 3), (6, 3)]))]),
+            interiors: BTreeSet::new(),
+        };
+        let near = read_plugins(&[("Skyrim.esm".to_owned(), path)], &around);
+        let water: Vec<(i32, Option<i32>)> = near
+            .ground
+            .iter()
+            .map(|cell| (cell.x, cell.water))
+            .collect();
+        assert_eq!(water, vec![(5, Some(-14_000)), (6, Some(-13_500))]);
     }
 
     #[test]

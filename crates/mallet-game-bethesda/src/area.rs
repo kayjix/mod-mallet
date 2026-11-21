@@ -181,6 +181,16 @@ impl AreaReader {
         crate::walkways::read_plugins_with_destinations(&self.plugins, around)
     }
 
+    /// The records of the navigation meshes in `repaired`, repaired, from
+    /// the cells `around` (ADR 0058).
+    pub fn navmesh_records(
+        &self,
+        around: &crate::walkways::Around,
+        repaired: &[crate::navmesh_records::Repaired<'_>],
+    ) -> Vec<crate::navmesh_records::NavmeshRecord> {
+        crate::navmesh_records::repaired_records(&self.plugins, around, repaired)
+    }
+
     /// The ground of the outside cells of the worldspace named `world`
     /// that reach within `radius` game units of `centre` in both
     /// directions: the same cells [`AreaReader::objects`] reads. Cells

@@ -46,6 +46,7 @@ pub mod markers;
 pub mod meshes;
 pub mod models;
 pub mod moves;
+pub mod navmesh_records;
 pub mod navmeshes;
 pub mod npc;
 pub mod objects;

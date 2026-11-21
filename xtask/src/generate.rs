@@ -8,6 +8,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use mallet_core::walkway_repair::WalkwayRepair;
 use mallet_core::{ScanReport, kinds};
 use mallet_messages::{
     Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
@@ -103,6 +104,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "schemas/created-moves.schema.json",
         "apps/desktop/src/generated/created-moves.ts",
     ),
+    (
+        "schemas/walkway-repair.schema.json",
+        "apps/desktop/src/generated/walkway-repair.ts",
+    ),
 ];
 
 /// A file and the content it should have.
@@ -141,6 +146,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::ScanProgress>("schemas/scan-progress.schema.json")?,
         schema_of::<mallet_core::reach::WalkwayReach>("schemas/walkway-reach.schema.json")?,
         schema_of::<mallet_core::moves::CreatedMoves>("schemas/created-moves.schema.json")?,
+        schema_of::<WalkwayRepair>("schemas/walkway-repair.schema.json")?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),

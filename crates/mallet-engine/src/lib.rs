@@ -75,7 +75,7 @@ pub use settings::{
 };
 pub use toolbox::{game_art, restart_manager, toolbox};
 pub use versions::{asset_versions, asset_view};
-pub use walkways::hidden_walkways;
+pub use walkways::{NavmeshRecord, hidden_walkways, repaired_navmeshes, walkway_repair};
 
 /// Where to look. Every field that is `None` is detected automatically.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

@@ -35,6 +35,7 @@ pub mod map;
 pub mod masters;
 pub mod meshes;
 pub mod missing_textures;
+pub mod navmesh_repair;
 pub mod navmeshes;
 pub mod objects;
 pub mod path_repair;
@@ -43,6 +44,7 @@ pub mod reachability;
 pub mod recommendations;
 pub mod setup;
 pub mod switched_off;
+mod tin;
 pub mod walkways;
 
 use std::cell::OnceCell;

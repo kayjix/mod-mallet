@@ -40,7 +40,7 @@ const BELOW: f64 = 16.0;
 /// How far above the ground a surface must be to carry anybody the ground
 /// would not carry anyway: about a step. An object less high than this
 /// lies on something that carries as well, as a rug lies on a floor.
-const RAISED: f64 = 32.0;
+pub(crate) const RAISED: f64 = 32.0;
 
 /// The side of the squares the surface's triangles are sorted into.
 const SQUARE: f64 = 64.0;
@@ -374,7 +374,7 @@ pub fn cells_reached(hidden: &Hidden<'_>) -> Vec<(i32, i32)> {
 }
 
 /// The surface of a placed object, its triangles sorted into squares.
-struct Surface {
+pub(crate) struct Surface {
     triangles: Vec<[Point; 3]>,
     min: Point,
     max: Point,
@@ -384,7 +384,7 @@ struct Surface {
 
 impl Surface {
     /// The surface of the model, or else the box, of `hidden`.
-    fn of(hidden: &Hidden<'_>) -> Option<Self> {
+    pub(crate) fn of(hidden: &Hidden<'_>) -> Option<Self> {
         let (points, triangles): (Vec<Point>, Vec<[u32; 3]>) = match (hidden.mesh, hidden.bounds) {
             (Some(mesh), _) => (
                 placed_points(hidden.object, &mesh.points)?,
@@ -508,6 +508,60 @@ impl Surface {
         };
         ground(x, y).is_none_or(|ground| surface - ground >= RAISED)
     }
+
+    /// The least and greatest corners of the box around the surface.
+    pub(crate) fn bounds(&self) -> (Point, Point) {
+        (self.min, self.max)
+    }
+
+    /// Whether the surface lies over or under `x`, `y`, seen from above,
+    /// or within `margin` of it (ADR 0058).
+    pub(crate) fn covers(&self, x: f64, y: f64, margin: f64) -> bool {
+        if x < self.min[0] - margin
+            || x > self.max[0] + margin
+            || y < self.min[1] - margin
+            || y > self.max[1] + margin
+        {
+            return false;
+        }
+        let (low, high) = (
+            self.square_of(x - margin, y - margin),
+            self.square_of(x + margin, y + margin),
+        );
+        (low.0..=high.0).any(|column| {
+            (low.1..=high.1).any(|row| {
+                self.squares.get(&(column, row)).is_some_and(|members| {
+                    members.iter().any(|&index| {
+                        self.triangles
+                            .get(index)
+                            .is_some_and(|triangle| flat_distance(triangle, x, y) <= margin)
+                    })
+                })
+            })
+        })
+    }
+}
+
+/// How far `x`, `y` lies from a triangle, seen from above: 0 inside.
+#[allow(clippy::many_single_char_names)]
+fn flat_distance(corners: &[Point; 3], x: f64, y: f64) -> f64 {
+    if height_in(corners, x, y).is_some() {
+        return 0.0;
+    }
+    let [a, b, c] = *corners;
+    [(a, b), (b, c), (c, a)]
+        .iter()
+        .map(|(from, to)| {
+            let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+            let length = dx * dx + dy * dy;
+            let along = if length < EPSILON {
+                0.0
+            } else {
+                (((x - from[0]) * dx + (y - from[1]) * dy) / length).clamp(0.0, 1.0)
+            };
+            (x - from[0] - along * dx).hypot(y - from[1] - along * dy)
+        })
+        .fold(f64::MAX, f64::min)
 }
 
 /// The height of a triangle at `x`, `y`, if the point lies in it seen from
@@ -529,12 +583,13 @@ fn height_in(corners: &[Point; 3], x: f64, y: f64) -> Option<f64> {
 }
 
 /// The heights of the land by worldspace and cell.
-struct Ground<'a> {
+pub(crate) struct Ground<'a> {
     cells: HashMap<(&'a RecordId, i32, i32), &'a [i32]>,
+    water: HashMap<(&'a RecordId, i32, i32), i32>,
 }
 
 impl<'a> Ground<'a> {
-    fn new(near: &'a NearHidden) -> Self {
+    pub(crate) fn new(near: &'a NearHidden) -> Self {
         Self {
             cells: near
                 .ground
@@ -542,12 +597,25 @@ impl<'a> Ground<'a> {
                 .filter(|cell| cell.heights.len() == GROUND_POINTS * GROUND_POINTS)
                 .map(|cell| ((&cell.worldspace, cell.x, cell.y), cell.heights.as_slice()))
                 .collect(),
+            water: near
+                .ground
+                .iter()
+                .filter_map(|cell| Some(((&cell.worldspace, cell.x, cell.y), cell.water?)))
+                .collect(),
         }
+    }
+
+    /// The height of the water's surface at `x`, `y` in `world`, if the
+    /// cell there has water.
+    pub(crate) fn water(&self, world: &RecordId, x: f64, y: f64) -> Option<f64> {
+        self.water
+            .get(&(world, cell_of(x), cell_of(y)))
+            .map(|height| f64::from(*height))
     }
 
     /// The height of the land at `x`, `y` in `world`, between its four
     /// nearest points.
-    fn height(&self, world: &RecordId, x: f64, y: f64) -> Option<f64> {
+    pub(crate) fn height(&self, world: &RecordId, x: f64, y: f64) -> Option<f64> {
         let (column, row) = (cell_of(x), cell_of(y));
         let heights = self.cells.get(&(world, column, row))?;
         let local = |value: f64, cell: i32| {
@@ -582,7 +650,7 @@ fn index_value(index: usize) -> f64 {
 
 /// The cell a coordinate lies in.
 #[allow(clippy::cast_possible_truncation)]
-fn cell_of(coordinate: f64) -> i32 {
+pub(crate) fn cell_of(coordinate: f64) -> i32 {
     // Worldspaces lie within a few hundred cells of their origin.
     (coordinate / CELL).floor().clamp(-32_768.0, 32_767.0) as i32
 }
@@ -706,6 +774,7 @@ mod tests {
             x: 0,
             y: 0,
             heights: vec![height; GROUND_POINTS * GROUND_POINTS],
+            water: None,
         }
     }
 

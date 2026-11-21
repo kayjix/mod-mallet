@@ -37,6 +37,7 @@ pub mod reach;
 pub mod report;
 pub mod toolbox;
 pub mod unreal;
+pub mod walkway_repair;
 
 pub use action::{Action, ActionOutcome, ActionStatus, ObjectRef, OptionToTick};
 pub use cache::{NoCache, TextCache};

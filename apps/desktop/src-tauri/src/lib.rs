@@ -467,6 +467,26 @@ fn object_anchors(
     ))
 }
 
+/// What repairing the paths over objects about to be hidden does (ADR
+/// 0058): the triangles taken out and those laid instead, as for
+/// `hidden_walkways`.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn walkway_repair(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    objects: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::walkway_repair::WalkwayRepair>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::walkway_repair(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &objects,
+    ))
+}
+
 /// The paths characters walk on that run over objects about to be hidden
 /// (ADR 0051): in a worldspace near the point `x`, `y`, or, without a
 /// point, in an interior cell by its editor ID.
@@ -811,6 +831,7 @@ pub fn run() -> tauri::Result<()> {
             object_anchors,
             hidden_walkways,
             walkway_reach,
+            walkway_repair,
             area_mesh,
             area_texture,
             ranking,

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WalkwayRepair",
+  "description": "What repairing the paths over objects about to be hidden does: the\ntriangles of the paths taken out, and those laid on the ground below\ninstead.",
+  "type": "object",
+  "properties": {
+    "areasLaid": {
+      "description": "How many areas of new paths are laid where the objects stood, each\njoined to the paths around.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "bareObjects": {
+      "description": "How many of the objects that carried paths get none below them:\ncharacters go around them.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "lostDoors": {
+      "description": "The doors characters could no longer step through, by plugin and\nnumber.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "navmeshes": {
+      "description": "Each navigation mesh the repair changes.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RepairedPaths"
+      }
+    },
+    "place": {
+      "description": "The worldspace or interior cell asked about.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "place",
+    "navmeshes",
+    "areasLaid",
+    "bareObjects",
+    "lostDoors"
+  ],
+  "$defs": {
+    "RepairedPaths": {
+      "description": "One navigation mesh as the repair changes it.",
+      "type": "object",
+      "properties": {
+        "added": {
+          "description": "The new triangles, likewise.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        },
+        "cell": {
+          "description": "Where it lies, for people.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "navmesh": {
+          "description": "The mesh, by the plugin that first defined it and its number there,\nsuch as `skyrim.esm:102F4F`.",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "The plugin of the version the game uses, which the repair copies.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "The triangles taken out, three corners each, in whole game units,\nin the coordinates of the worldspace or the cell.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        },
+        "water": {
+          "description": "How many of the new triangles lie under water.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "writable": {
+          "description": "Whether the repaired record could be built from the plugin's own\nversion; if not, the mesh cannot be repaired.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "navmesh",
+        "plugin",
+        "removed",
+        "added",
+        "water",
+        "writable"
+      ]
+    }
+  }
+}

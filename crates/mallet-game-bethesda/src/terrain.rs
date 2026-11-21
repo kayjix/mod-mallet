@@ -472,6 +472,28 @@ pub(crate) fn cell_position(record: &Record) -> Option<(i32, i32)> {
     Some((x, y))
 }
 
+/// Whether a cell has water, and the height it sets for it, if any
+/// (ADR 0058).
+pub(crate) fn cell_water(record: &Record) -> (bool, Option<f32>) {
+    let flags = record
+        .first(b"DATA")
+        .and_then(|data| data.first().copied())
+        .unwrap_or_default();
+    let water = record
+        .first(b"XCLW")
+        .and_then(|data| float_at(data, 0))
+        .filter(|water| water.abs() < MAX_WATER);
+    (flags & HAS_WATER != 0, water)
+}
+
+/// The height of a worldspace's water where its cells set none.
+pub(crate) fn world_water(record: &Record) -> Option<f32> {
+    record
+        .first(b"DNAM")
+        .and_then(|data| float_at(data, 4))
+        .filter(|water| water.abs() < MAX_WATER)
+}
+
 /// The position and water of an outside cell; `None` for a cell inside.
 fn cell_info(record: &Record, world: RecordId) -> Option<CellInfo> {
     let (x, y) = cell_position(record)?;

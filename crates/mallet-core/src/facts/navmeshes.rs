@@ -118,6 +118,9 @@ pub struct GroundCell {
     /// The heights of 33 rows of 33 points, 128 game units apart, in whole
     /// game units; the southern row first, each from west to east.
     pub heights: Vec<i32>,
+    /// The height of the water's surface, in whole game units, if the
+    /// cell has water (ADR 0058): below it, a path runs through water.
+    pub water: Option<i32>,
 }
 
 /// A placed object characters walk to, in the cells of navigation meshes

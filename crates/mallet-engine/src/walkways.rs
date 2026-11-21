@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
+use mallet_analysis::navmesh_repair::{self, PathsRepair};
 use mallet_analysis::path_repair;
 use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::facts::RecordId;
@@ -13,9 +14,12 @@ use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::{NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
+use mallet_core::walkway_repair::{RepairedPaths, WalkwayRepair};
 use mallet_core::{Facts, InstalledPatch, ObjectRef};
 use mallet_game_bethesda::Game;
 use mallet_game_bethesda::area::AreaObject;
+pub use mallet_game_bethesda::navmesh_records::NavmeshRecord;
+use mallet_game_bethesda::navmesh_records::Repaired;
 use mallet_game_bethesda::walkways::Around;
 
 use crate::ScanOptions;
@@ -95,68 +99,11 @@ pub fn hidden_walkways(
     objects: &[ObjectRef],
 ) -> Option<HiddenWalkways> {
     let started = std::time::Instant::now();
-    let wanted: HashSet<RecordId> = objects.iter().map(record_id).collect();
-    let reader = reader(options)?;
-    let mut reader = reader.lock().ok()?;
-    let (placed, cell) = if let Some(centre) = centre {
-        (reader.objects(place, centre, SEARCH_RADIUS), None)
-    } else {
-        let cell = reader.interior_cell(place)?;
-        (reader.interior(place), Some(cell))
-    };
-    let found: Vec<AreaObject> = placed
-        .into_iter()
-        .filter(|object| wanted.contains(&object.id))
-        .collect();
-
-    // Their models, from the files the game uses.
-    let library = library(options)?;
-    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
-    let mut models: Vec<Option<String>> = Vec::new();
-    for object in &found {
-        let model = reader.base(&object.base).map(|base| base.model.clone());
-        if let Some(model) = &model
-            && !meshes.contains_key(model)
-            && let Some(mesh) = library
-                .read(model)
-                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
-        {
-            meshes.insert(model.clone(), mesh);
-        }
-        models.push(model);
-    }
-
-    let placed: Vec<PlacedObject> = found
-        .iter()
-        .filter_map(|object| placed_object(object, cell.as_ref()))
-        .collect();
-    let hidden: Vec<Hidden<'_>> = placed
-        .iter()
-        .zip(&models)
-        .map(|(object, model)| Hidden {
-            object,
-            mesh: model.as_ref().and_then(|model| meshes.get(model)),
-            bounds: None,
-        })
-        .collect();
-
-    let mut around = Around::default();
-    if let Some(cell) = &cell {
-        around.interiors.insert(cell.clone());
-    } else {
-        let cells = around.worlds.entry(place.to_owned()).or_default();
-        for object in &hidden {
-            cells.extend(walkways::cells_reached(object));
-        }
-    }
-    let near = if hidden.is_empty() {
-        NearHidden::default()
-    } else {
-        reader.navmeshes(&around)
-    };
-
-    let carried = walkways::carried(&hidden, &near);
-    let repair = path_repair(&near, &carried);
+    let gathered = gather(options, place, centre, objects, false)?;
+    let Gathered { placed, near, .. } = &gathered;
+    let hidden = gathered.hidden();
+    let carried = walkways::carried(&hidden, near);
+    let repair = path_repair(near, &carried);
     let walkways: Vec<Walkway> = carried
         .into_iter()
         .filter_map(|carried| {
@@ -193,6 +140,238 @@ pub fn hidden_walkways(
         walkways,
         repair,
     })
+}
+
+/// The objects asked about as the analyses know them, their models, and
+/// the navigation meshes and ground of their cells.
+struct Gathered {
+    placed: Vec<PlacedObject>,
+    models: Vec<Option<String>>,
+    meshes: BTreeMap<String, ModelMesh>,
+    near: NearHidden,
+    around: Around,
+}
+
+impl Gathered {
+    fn hidden(&self) -> Vec<Hidden<'_>> {
+        self.placed
+            .iter()
+            .zip(&self.models)
+            .map(|(object, model)| Hidden {
+                object,
+                mesh: model.as_ref().and_then(|model| self.meshes.get(model)),
+                bounds: None,
+            })
+            .collect()
+    }
+}
+
+/// Reads `objects`, which stand in the worldspace `place` near `centre`,
+/// or, without a centre, in the interior cell `place`, with the
+/// navigation meshes and the ground of the cells they reach into; with
+/// `wider`, also of the cells around those outside, whose meshes may lead
+/// onto theirs.
+fn gather(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    objects: &[ObjectRef],
+    wider: bool,
+) -> Option<Gathered> {
+    let wanted: HashSet<RecordId> = objects.iter().map(record_id).collect();
+    let reader = reader(options)?;
+    let mut reader = reader.lock().ok()?;
+    let (placed, cell) = if let Some(centre) = centre {
+        (reader.objects(place, centre, SEARCH_RADIUS), None)
+    } else {
+        let cell = reader.interior_cell(place)?;
+        (reader.interior(place), Some(cell))
+    };
+    let found: Vec<AreaObject> = placed
+        .into_iter()
+        .filter(|object| wanted.contains(&object.id))
+        .collect();
+
+    // Their models, from the files the game uses.
+    let library = library(options)?;
+    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
+    let mut models: Vec<Option<String>> = Vec::new();
+    for object in &found {
+        let model = reader.base(&object.base).map(|base| base.model.clone());
+        if let Some(model) = &model
+            && !meshes.contains_key(model)
+            && let Some(mesh) = library
+                .read(model)
+                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
+        {
+            meshes.insert(model.clone(), mesh);
+        }
+        models.push(model);
+    }
+
+    let placed: Vec<PlacedObject> = found
+        .iter()
+        .filter_map(|object| placed_object(object, cell.as_ref()))
+        .collect();
+    let mut gathered = Gathered {
+        placed,
+        models,
+        meshes,
+        near: NearHidden::default(),
+        around: Around::default(),
+    };
+    let mut around = Around::default();
+    if let Some(cell) = &cell {
+        around.interiors.insert(cell.clone());
+    } else {
+        let cells = around.worlds.entry(place.to_owned()).or_default();
+        for object in &gathered.hidden() {
+            cells.extend(walkways::cells_reached(object));
+        }
+        if wider {
+            let reached: Vec<(i32, i32)> = cells.iter().copied().collect();
+            for (x, y) in reached {
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        cells.insert((x + dx, y + dy));
+                    }
+                }
+            }
+        }
+    }
+    if !gathered.placed.is_empty() {
+        gathered.near = reader.navmeshes(&around);
+    }
+    gathered.around = around;
+    Some(gathered)
+}
+
+/// What repairing the paths over `objects` does (ADR 0058), for the
+/// window to show: the triangles taken out and those laid instead, by
+/// navigation mesh. `objects` stand in `place` as for [`hidden_walkways`].
+/// `None` if the setup cannot be read.
+pub fn walkway_repair(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    objects: &[ObjectRef],
+) -> Option<WalkwayRepair> {
+    let started = std::time::Instant::now();
+    let (gathered, repair, records) = repaired(options, place, centre, objects)?;
+    let corners = |shape: &mallet_core::facts::navmeshes::NavmeshShape, triangle: u32| {
+        let corners = shape.triangles.get(usize::try_from(triangle).ok()?)?;
+        let at = |vertex: u32| shape.vertices.get(usize::try_from(vertex).ok()?).copied();
+        Some([at(corners[0])?, at(corners[1])?, at(corners[2])?])
+    };
+    let navmeshes: Vec<RepairedPaths> = repair
+        .navmeshes
+        .iter()
+        .filter(|mesh| !mesh.removed.is_empty() || !mesh.added.is_empty())
+        .filter_map(|mesh| {
+            let before = gathered.near.navmeshes.get(mesh.navmesh)?;
+            Some(RepairedPaths {
+                navmesh: before.id.to_string(),
+                plugin: before.plugin.clone(),
+                cell: before.place_name.clone(),
+                removed: mesh
+                    .removed
+                    .iter()
+                    .filter_map(|triangle| corners(before, *triangle))
+                    .collect(),
+                added: mesh
+                    .added
+                    .iter()
+                    .filter_map(|triangle| corners(&mesh.after, *triangle))
+                    .collect(),
+                water: u32::try_from(mesh.water.len()).unwrap_or(u32::MAX),
+                writable: records.iter().any(|record| record.navmesh == before.id),
+            })
+        })
+        .collect();
+    let laid = repair.laid.len();
+    let bare = repair.bare;
+    tracing::info!(
+        place,
+        objects = objects.len(),
+        removed = repair.removed(),
+        added = repair.added(),
+        areas_laid = laid,
+        bare_objects = bare,
+        records = records.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "worked out how to repair the paths over objects to hide"
+    );
+    Some(WalkwayRepair {
+        place: place.to_owned(),
+        navmeshes,
+        areas_laid: u32::try_from(laid).unwrap_or(u32::MAX),
+        bare_objects: u32::try_from(bare).unwrap_or(u32::MAX),
+        lost_doors: repair.lost_doors.iter().map(ToString::to_string).collect(),
+    })
+}
+
+/// The navigation mesh records to override so that the paths over
+/// `objects` are repaired (ADR 0058), for the patch writer: one per mesh
+/// the repair changes, a copy of the version the game uses with its
+/// geometry repaired. `objects` are all the objects the patch hides in
+/// `place`, as for [`hidden_walkways`]; `navmeshes`, if given, keeps only
+/// the meshes the user chose to repair, named as in
+/// [`RepairedPaths::navmesh`]. `None` if the setup cannot be read.
+pub fn repaired_navmeshes(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    objects: &[ObjectRef],
+    navmeshes: Option<&BTreeSet<String>>,
+) -> Option<Vec<NavmeshRecord>> {
+    let (_, _, records) = repaired(options, place, centre, objects)?;
+    Some(
+        records
+            .into_iter()
+            .filter(|record| {
+                navmeshes.is_none_or(|chosen| chosen.contains(&record.navmesh.to_string()))
+            })
+            .collect(),
+    )
+}
+
+/// The repair of the paths over `objects`, and the records it writes.
+fn repaired(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    objects: &[ObjectRef],
+) -> Option<(Gathered, PathsRepair, Vec<NavmeshRecord>)> {
+    let gathered = gather(options, place, centre, objects, true)?;
+    let hidden = gathered.hidden();
+    let carried = walkways::carried(&hidden, &gathered.near);
+    let repair = navmesh_repair::repair(&gathered.near, &hidden, &carried);
+    let empty = BTreeSet::new();
+    let repaired: Vec<Repaired<'_>> = repair
+        .navmeshes
+        .iter()
+        .filter_map(|mesh| {
+            Some(Repaired {
+                before: gathered.near.navmeshes.get(mesh.navmesh)?,
+                after: &mesh.after,
+                removed: if mesh.removed.is_empty() {
+                    &empty
+                } else {
+                    &mesh.removed
+                },
+                water: &mesh.water,
+            })
+        })
+        .collect();
+    let records = if repaired.is_empty() {
+        Vec::new()
+    } else {
+        let reader = reader(options)?;
+        let reader = reader.lock().ok()?;
+        reader.navmesh_records(&gathered.around, &repaired)
+    };
+    drop(hidden);
+    Some((gathered, repair, records))
 }
 
 /// Square game units per square metre: a metre is about 70 units.
