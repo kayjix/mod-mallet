@@ -27,6 +27,7 @@ pub mod dds;
 pub mod fixture;
 pub mod material;
 pub mod navmesh;
+pub mod navmesh_write;
 pub mod nif;
 pub mod nif_geometry;
 mod nif_oblivion;
