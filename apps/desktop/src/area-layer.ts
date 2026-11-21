@@ -309,6 +309,11 @@ export function isFlora(model: string): boolean {
   return FLORA.test(model);
 }
 
+/** Whether a model is nature rather than something placed by hand: trees, rocks, landscape. */
+export function isNature(model: string): boolean {
+  return NATURE.test(model);
+}
+
 /** Below this longest side, in game units (about 35 cm), a part is clutter, not building. */
 const SMALL = 24;
 
