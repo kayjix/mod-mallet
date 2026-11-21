@@ -17,6 +17,8 @@
 //! first damaged spot while keeping what they read up to there.
 //!
 //! [`fixture`] builds small files in these formats for tests.
+//! [`plugin_write`] writes the one kind of file Mod Mallet makes: a small
+//! plugin of overrides, into its own folder (ADR 0060).
 
 pub mod ba2;
 pub mod bc7;
@@ -29,6 +31,7 @@ pub mod nif;
 pub mod nif_geometry;
 mod nif_oblivion;
 pub mod plugin;
+pub mod plugin_write;
 pub mod strings;
 
 /// A cursor over bytes that fails instead of reading past the end.

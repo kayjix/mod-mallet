@@ -257,6 +257,21 @@ pub fn read_request_each<R: Read + Seek>(
     descend: &dyn Fn(GroupLabel) -> bool,
     visit: &mut dyn FnMut(&PluginHeader, Record),
 ) -> Result<(PluginHeader, u32), PluginError> {
+    read_request_versions(reader, request, descend, &mut |header, record, _| {
+        visit(header, record);
+    })
+}
+
+/// Like [`read_request_each`], but hands each record over with the version
+/// of the record format it was written in (its *form version*; 0 in
+/// Oblivion, whose headers have none). For copying records into another
+/// plugin unchanged, see [`crate::plugin_write`].
+pub fn read_request_versions<R: Read + Seek>(
+    reader: &mut R,
+    request: &Request<'_>,
+    descend: &dyn Fn(GroupLabel) -> bool,
+    visit: &mut dyn FnMut(&PluginHeader, Record, u16),
+) -> Result<(PluginHeader, u32), PluginError> {
     let (header, header_len) = read_plugin_header(reader)?;
     let mut damaged = 0;
 
@@ -300,7 +315,7 @@ pub fn read_request_each<R: Read + Seek>(
                 scope,
                 descend,
             };
-            let mut sink = |record: Record| visit(&header, record);
+            let mut sink = |record: Record, version: u16| visit(&header, record, version);
             read_group(&body, &reading, &mut Vec::new(), &mut sink, &mut damaged);
         } else {
             let Ok(offset) = i64::try_from(body_len) else {
@@ -421,7 +436,7 @@ fn read_group(
     body: &[u8],
     reading: &Reading<'_>,
     groups: &mut Vec<GroupLabel>,
-    sink: &mut dyn FnMut(Record),
+    sink: &mut dyn FnMut(Record, u16),
     damaged: &mut u32,
 ) {
     let Reading {
@@ -470,7 +485,17 @@ fn read_group(
         }
 
         let flags = third;
-        let Some(data) = bytes.skip(rest_of_header).and_then(|()| bytes.take(size)) else {
+        // The rest of a long header: version control data (four bytes),
+        // the form version and two more bytes.
+        let Some(rest) = bytes.take(rest_of_header) else {
+            *damaged += 1;
+            return;
+        };
+        let version = rest
+            .get(4..6)
+            .and_then(|version| version.try_into().ok())
+            .map_or(0, u16::from_le_bytes);
+        let Some(data) = bytes.take(size) else {
             *damaged += 1;
             return;
         };
@@ -486,13 +511,16 @@ fn read_group(
             decompress(data).map(|data| read_subrecords(&data))
         };
         match subrecords {
-            Some(subrecords) => sink(Record {
-                signature,
-                form_id,
-                flags,
-                subrecords,
-                groups: groups.clone(),
-            }),
+            Some(subrecords) => sink(
+                Record {
+                    signature,
+                    form_id,
+                    flags,
+                    subrecords,
+                    groups: groups.clone(),
+                },
+                version,
+            ),
             None => *damaged += 1,
         }
     }
