@@ -13,6 +13,7 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { DuelLine } from "./Duels";
+import { DoorPanel, mergeChoices } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, RenderedFinding, RenderedReport } from "./generated/rendered-report";
@@ -25,7 +26,9 @@ import { counted, rememberObjects } from "./pair-report";
 import {
   chooseObject,
   chooseSpot,
+  freeObjects,
   hiddenKeysOf,
+  matchKey,
   type PatchChoices,
   pinsOf,
   revealObjects,
@@ -1076,6 +1079,20 @@ function CollisionsStep({
         }}
         onPick={pick}
       />
+      {cluster.spots.map(({ key, item }) =>
+        item.spot.doors === null || item.spot.doors === undefined ? null : (
+          <DoorPanel
+            key={key}
+            group={item.spot.doors}
+            hidden={(object) => hidden.has(matchKey(object))}
+            keptAll={patchChoices[key] === null}
+            onMerge={(plan) =>
+              apply(mergeChoices(patchChoices, key, plan, freeObjects(patchChoices)), false)
+            }
+            onKeepAll={() => apply(chooseSpot(patchChoices, key, null), false)}
+          />
+        ),
+      )}
       {suggested !== null && (
         <p className="review-suggest">
           <span className="suggested-mark">{r.suggestedTag}</span> {suggestReason(suggested)}

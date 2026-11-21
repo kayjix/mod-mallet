@@ -10,7 +10,7 @@ import { decisionAt, type PatchChoices, spotKey } from "./patch";
 const CLUSTER_GAP = 2048;
 
 /** The worst collisions first. */
-const KIND_ORDER: WorkKind[] = ["duplicate", "overlap", "deep", "touch"];
+const KIND_ORDER: WorkKind[] = ["duplicate", "door", "overlap", "deep", "touch"];
 
 /** One spot of a cluster, with its identity among the choices. */
 export interface ClusterSpot {

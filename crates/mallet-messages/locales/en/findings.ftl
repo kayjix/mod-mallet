@@ -194,6 +194,20 @@ objects-touching = Objects of two mods cut into each other
     .explanation = Two mods that place things in the same area did not know of each other, so a fence may run into a wall, a cart may stand half in a market stall, or a lamp post may grow out of a roof. Mod Mallet compared the shapes of both models, not just the boxes around them. Within one mod such contacts are usually wanted, so they are only reported between mods that do not know each other.
     .remedy = Look at the places named above in the game or on the map. Often it does not show; where it does, decide which object you want to keep, or look for a compatibility patch of both mods.
 
+doors-stacked = Doors of two mods stand on top of each other
+    .headline =
+        { $first } and { $second }: { $count ->
+            [one] 1 door stands
+           *[other] { $count } doors stand
+        } on top of another
+    .summary =
+        { $first } and { $second } each put a door at the same spot, a few centimetres apart at most, in { $count ->
+            [one] 1 place
+           *[other] { $count } places
+        }. For example: { $examples }. Each is given with its place: an interior by its internal name, outside by worldspace and cell.
+    .explanation = Many mods add doors, and a second mod often puts its own door where the first, or the game, already has one: a little in front of it or behind it, because its wall is thicker or its frame sits elsewhere. The game shows both. One flickers through the other, you open whichever is in front, and it may lead somewhere else than the one you see. Characters of the game walk through the door their paths name, which may be the other one. A second door right behind the first on purpose, such as a porch with an inner door, is rare.
+    .remedy = Open the spot on the collisions page. It shows the doors side by side, where each leads, and which one Mod Mallet suggests to keep: usually the one whose other side leads back and that characters walk through. Choose "merge into this one": the others are hidden, and whatever used them is to use the kept door.
+
 navmeshes-door-cut-off = Characters can no longer walk through doors of a mod
     .headline =
         { $winner } cuts off { $count ->

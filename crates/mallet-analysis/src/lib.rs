@@ -23,6 +23,7 @@ pub mod assets;
 mod contact;
 pub mod crashes;
 pub mod dependencies;
+pub mod doors;
 pub mod duels;
 pub mod extender;
 pub mod faces;
@@ -60,6 +61,8 @@ pub struct Context<'a> {
     pub assets: AssetIndex<'a>,
     /// The comparison of placed objects, made when first asked for.
     collisions: OnceCell<objects::Collisions>,
+    /// The comparison of doors, made when first asked for.
+    doors: OnceCell<doors::DoorGroups>,
 }
 
 impl<'a> Context<'a> {
@@ -70,6 +73,7 @@ impl<'a> Context<'a> {
             mods,
             assets: AssetIndex::new(facts),
             collisions: OnceCell::new(),
+            doors: OnceCell::new(),
         }
     }
 
@@ -78,6 +82,12 @@ impl<'a> Context<'a> {
     /// it and the map that shows it.
     pub fn collisions(&self) -> &objects::Collisions {
         self.collisions.get_or_init(|| objects::compute(self))
+    }
+
+    /// Where doors stand on top of each other (ADR 0067), shared by the
+    /// analysis that reports it, the map and the comparison of objects.
+    pub fn doors(&self) -> &doors::DoorGroups {
+        self.doors.get_or_init(|| doors::compute(self))
     }
 }
 
@@ -105,6 +115,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(meshes::BypassedRetextures),
         Box::new(missing_textures::MissingTextures),
         Box::new(objects::PlacedObjects),
+        Box::new(doors::StackedDoors),
         Box::new(navmeshes::NavmeshConflicts),
         Box::new(assets::ArchiveOverrides),
         Box::new(crashes::RecentCrashes),

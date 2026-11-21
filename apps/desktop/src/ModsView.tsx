@@ -280,7 +280,7 @@ function ModList({
             other,
             spots: [],
             open: 0,
-            kinds: { duplicate: 0, overlap: 0, deep: 0, touch: 0 },
+            kinds: { duplicate: 0, door: 0, overlap: 0, deep: 0, touch: 0 },
           };
           state.collisions.push(entry);
         }

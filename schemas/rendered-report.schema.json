@@ -330,6 +330,96 @@
         }
       ]
     },
+    "DoorDestination": {
+      "description": "Where a door leads.",
+      "type": "object",
+      "properties": {
+        "door": {
+          "description": "The door on the other side, if it is there.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "description": "The place on the other side.",
+          "$ref": "#/$defs/SpotLocation"
+        }
+      },
+      "required": [
+        "location"
+      ]
+    },
+    "DoorGroup": {
+      "description": "Doors that stand on almost the same spot.",
+      "type": "object",
+      "properties": {
+        "doors": {
+          "description": "The doors, the one suggested to keep first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StackedDoor"
+          }
+        },
+        "flicker": {
+          "description": "Whether two of the doors stand in the same plane, so that the game\nshows them flickering through each other.",
+          "type": "boolean"
+        },
+        "plans": {
+          "description": "For each door, in the same order, what keeping it means.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DoorMerge"
+          }
+        }
+      },
+      "required": [
+        "doors",
+        "plans",
+        "flicker"
+      ]
+    },
+    "DoorMerge": {
+      "description": "What keeping one door of a group means.",
+      "type": "object",
+      "properties": {
+        "changes": {
+          "description": "What has to change in the plugins, so that whatever used a hidden\ndoor uses the kept one. Empty if hiding is all it takes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordChange"
+          }
+        },
+        "hide": {
+          "description": "The doors the patch hides.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectRef"
+          }
+        },
+        "keep": {
+          "description": "The door that stays.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "lost": {
+          "description": "Places only a hidden door led to: they can no longer be entered\nhere.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DoorDestination"
+          }
+        }
+      },
+      "required": [
+        "keep",
+        "hide",
+        "changes",
+        "lost"
+      ]
+    },
     "DuelFile": {
       "description": "One file the two mods disagree about, to look at.",
       "type": "object",
@@ -936,6 +1026,17 @@
           ],
           "format": "uint32",
           "minimum": 0
+        },
+        "doors": {
+          "description": "For a spot of stacked doors: the doors, where each leads, and how\nto merge them (ADR 0067).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorGroup"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "finding": {
           "description": "The finding that reports the collision.",
@@ -1818,6 +1919,116 @@
         }
       ]
     },
+    "RecordChange": {
+      "description": "A change to a record that merging doors needs. Mod Mallet writes such\nchanges as overrides in a plugin of its own (ADR 0060); the record is\ncopied from the version the game uses and only the named field changes.",
+      "oneOf": [
+        {
+          "description": "A door leads to another door: its teleport (`XTEL`) names `to`\ninstead of `from`.",
+          "type": "object",
+          "properties": {
+            "arrival": {
+              "description": "Where the player is to arrive, in game units, if that moves.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "door": {
+              "description": "The door whose teleport changes.",
+              "$ref": "#/$defs/ObjectRef"
+            },
+            "facing": {
+              "description": "Which way the player is to face there, in thousandths of a\nradian, if that changes.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "from": {
+              "description": "The door it led to; `None` where it led nowhere before.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ObjectRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "plugin": {
+              "description": "The plugin whose version of it the game uses.",
+              "type": "string"
+            },
+            "to": {
+              "description": "The door it is to lead to.",
+              "$ref": "#/$defs/ObjectRef"
+            },
+            "type": {
+              "type": "string",
+              "const": "teleport"
+            }
+          },
+          "required": [
+            "type",
+            "door",
+            "plugin",
+            "to"
+          ]
+        },
+        {
+          "description": "A door triangle of a navigation mesh (`NVNM`) names `to` instead of\n`from`.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "The door it named.",
+              "$ref": "#/$defs/ObjectRef"
+            },
+            "navmesh": {
+              "description": "The navigation mesh.",
+              "$ref": "#/$defs/ObjectRef"
+            },
+            "plugin": {
+              "description": "The plugin whose version of it the game uses.",
+              "type": "string"
+            },
+            "to": {
+              "description": "The door it is to name.",
+              "$ref": "#/$defs/ObjectRef"
+            },
+            "triangle": {
+              "description": "The triangle, by its number in the mesh.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "navmesh-door"
+            }
+          },
+          "required": [
+            "type",
+            "navmesh",
+            "plugin",
+            "triangle",
+            "from",
+            "to"
+          ]
+        }
+      ]
+    },
     "RenderedAction": {
       "description": "An action together with its texts in one language.",
       "type": "object",
@@ -2039,6 +2250,11 @@
           "description": "Two objects whose models touch or cut a little into each other.",
           "type": "string",
           "const": "touch"
+        },
+        {
+          "description": "Doors standing on almost the same spot, which lead to the same\nplace or to different ones (ADR 0067).",
+          "type": "string",
+          "const": "door"
         }
       ]
     },
@@ -2120,6 +2336,79 @@
         "object",
         "name",
         "hideable",
+        "suggested"
+      ]
+    },
+    "StackedDoor": {
+      "description": "One door of a [`DoorGroup`].",
+      "type": "object",
+      "properties": {
+        "front": {
+          "description": "Whether the player sees this door in front of the others.",
+          "type": "boolean"
+        },
+        "leadsBack": {
+          "description": "Whether the door on the other side leads back to this one.",
+          "type": "boolean"
+        },
+        "leadsTo": {
+          "description": "Where it leads; `None` for a door that only opens.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorDestination"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "The internal name of the door's base object.",
+          "type": "string"
+        },
+        "object": {
+          "description": "The door, by the plugin that placed it first.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "offset": {
+          "description": "How far it stands from the first door, in game units.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "otherSideWalkable": {
+          "description": "Whether characters walk through the door on the other side.",
+          "type": "boolean"
+        },
+        "plugin": {
+          "description": "The plugin whose version of the door the game uses, as the load\norder spells it.",
+          "type": "string"
+        },
+        "references": {
+          "description": "How many doors lead to this one and how many paths name it.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "suggested": {
+          "description": "Whether keeping this one is suggested.",
+          "type": "boolean"
+        },
+        "walkable": {
+          "description": "Whether characters walk through it: a path of the game names it.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "object",
+        "plugin",
+        "name",
+        "leadsBack",
+        "walkable",
+        "otherSideWalkable",
+        "references",
+        "front",
+        "offset",
         "suggested"
       ]
     },

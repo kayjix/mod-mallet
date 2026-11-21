@@ -18,8 +18,8 @@ use std::path::{Path, PathBuf};
 use loadorder::GameSettings;
 use mallet_core::facts::objects::PlaceName;
 use mallet_core::facts::{
-    ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, MeshTextures, NavmeshFacts, ObjectFacts,
-    PluginFacts, TerrainFacts, UnreadableFile,
+    ArchiveFacts, DoorFacts, ForeignMesh, MarkerFacts, MeshOverride, MeshTextures, NavmeshFacts,
+    ObjectFacts, PluginFacts, TerrainFacts, UnreadableFile,
 };
 use mallet_core::{GamePath, Progress, ScanStep, TextCache, WorldOrigin};
 use mallet_formats_bethesda::plugin;
@@ -27,8 +27,8 @@ use mallet_formats_bethesda::plugin;
 use crate::game::Game;
 use crate::meshes::{self, LoadedArchive};
 use crate::{
-    DATA_DIR, archive, archive_meshes, archives, loose_meshes, markers, navmeshes, npc, objects,
-    terrain,
+    DATA_DIR, archive, archive_meshes, archives, doors, loose_meshes, markers, navmeshes, npc,
+    objects, terrain,
 };
 
 /// What was read from the installation.
@@ -58,6 +58,8 @@ pub struct SetupFacts {
     pub markers: MarkerFacts,
     /// The navigation meshes of other plugins that mods change.
     pub navmeshes: NavmeshFacts,
+    /// Every door, where it leads and which paths go through it.
+    pub doors: DoorFacts,
 }
 
 /// Why an installation could not be read at all.
@@ -125,6 +127,7 @@ pub fn read_setup(
 
 /// Like [`read_setup`], and tells `progress` which archives and plugins it
 /// is reading.
+#[allow(clippy::too_many_lines)]
 pub fn read_setup_with(
     game: Game,
     game_dir: &Path,
@@ -191,6 +194,7 @@ pub fn read_setup_in(
     let mut land = terrain::Collector::default();
     let mut game_plugins = Vec::new();
     let mut map_markers = MarkerReader::new(game, &loose, &loaded_archives, cache);
+    let mut door_collector = doors::Collector::default();
     progress.step(ScanStep::Plugins);
     let plugin_total = active_plugins.len();
     for (index, name) in active_plugins.into_iter().enumerate() {
@@ -214,6 +218,7 @@ pub fn read_setup_in(
                     });
                 }
                 placed.add(&name, &plugin);
+                add_doors(&mut door_collector, &name, &file, official, &plugin, cache);
                 add_navmeshes(&mut facts.navmeshes, reading, &name, &plugin);
                 map_markers.add(&name, &file, official, &plugin);
                 land.merge(cached_land.unwrap_or_else(|| {
@@ -245,6 +250,7 @@ pub fn read_setup_in(
     facts.terrain = land.finish(game, &|plugin| origin(game, &shipped, plugin));
     name_worldspaces(&mut facts.objects, &facts.terrain);
     facts.markers = map_markers.finish();
+    facts.doors = door_collector.finish();
 
     Ok(facts)
 }
@@ -664,6 +670,63 @@ fn add_navmeshes(facts: &mut NavmeshFacts, reading: Reading, name: &str, plugin:
     if reading == Reading::Everything {
         facts.changes.extend(navmeshes::changes(name, plugin));
     }
+}
+
+/// Takes in the doors of the plugin `name` at `file`, already read as
+/// `plugin` (ADR 0067). The game's own plugins were not read for their
+/// places; their doors come from the cache or a reading of their own.
+fn add_doors(
+    collector: &mut doors::Collector,
+    name: &str,
+    file: &Path,
+    official: bool,
+    plugin: &plugin::Plugin,
+    cache: &dyn TextCache,
+) {
+    collector.add_bases(name, &plugin.header, &plugin.records);
+    let contribution = if official {
+        official_doors(collector, name, file, cache).unwrap_or_default()
+    } else {
+        collector.contribution(name, &plugin.header, &plugin.records)
+    };
+    collector.merge(name, official, contribution);
+}
+
+/// The doors and door triangles of one of the game's own plugins: from
+/// the cache, or read record by record and then kept. `None` if the plugin
+/// cannot be read; the main reading of it reports why.
+fn official_doors(
+    collector: &doors::Collector,
+    name: &str,
+    file: &Path,
+    cache: &dyn TextCache,
+) -> Option<doors::Contribution> {
+    let fingerprint = fingerprint(file);
+    let key = name.to_lowercase();
+    if let Some(fingerprint) = &fingerprint
+        && let Some(text) = cache.get(doors::CACHE, &key, fingerprint)
+        && let Some(contribution) = doors::Contribution::from_text(&text)
+    {
+        return Some(contribution);
+    }
+    let reader = File::open(file).ok()?;
+    let mut contribution = doors::Contribution::default();
+    plugin::read_request_each(
+        &mut BufReader::new(reader),
+        &plugin::Request {
+            flat: &[],
+            nested: &objects::PLACE_GROUPS,
+            nested_records: &doors::RECORDS,
+            nested_overrides: &[],
+        },
+        &|_| true,
+        &mut |header, record| collector.take(&mut contribution, name, header, &record),
+    )
+    .ok()?;
+    if let Some(fingerprint) = fingerprint {
+        cache.put(doors::CACHE, &key, &fingerprint, &contribution.to_text());
+    }
+    Some(contribution)
 }
 
 /// Reads only the placed objects of a plugin.

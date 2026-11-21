@@ -1,0 +1,88 @@
+/* Doors stacked on top of each other (ADR 0067): the doors side by side
+   and what merging into one of them means. */
+
+.door-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.door-intro {
+  margin: 0;
+}
+
+.door-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.door-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--spot-door);
+  border-radius: 10px;
+}
+
+.door-card[data-merged] {
+  border-color: var(--spot-door);
+  background: var(--sunken);
+}
+
+.door-card[data-gone] {
+  opacity: 0.6;
+}
+
+.door-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.door-leads {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+
+.door-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.door-checks li::before {
+  content: "✓ ";
+  color: var(--brand);
+}
+
+.door-checks li[data-ok="false"]::before {
+  content: "✗ ";
+  color: var(--warning);
+}
+
+.door-plan {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--sunken);
+}
+
+.door-plan ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.door-plan p {
+  margin: 0;
+}
+
+.door-lost {
+  color: var(--warning);
+}

@@ -188,6 +188,20 @@ objects-touching = Objekte zweier Mods ragen ineinander
     .explanation = Zwei Mods, die Dinge in dieselbe Gegend stellen, wussten nichts voneinander. So läuft ein Zaun in eine Mauer, ein Karren steht halb in einem Marktstand oder eine Laterne wächst aus einem Dach. Mod Mallet hat die Formen beider Modelle verglichen, nicht nur die Kästen um sie herum. Innerhalb einer Mod sind solche Berührungen meist gewollt, deshalb werden sie nur zwischen Mods gemeldet, die nichts voneinander wissen.
     .remedy = Sieh dir die genannten Orte im Spiel oder auf der Karte an. Oft fällt es nicht auf; wo doch, entscheide, welches Objekt du behalten willst, oder suche nach einem Kompatibilitäts-Patch beider Mods.
 
+doors-stacked = Türen zweier Mods stehen übereinander
+    .headline =
+        { $first } und { $second }: { $count ->
+            [one] 1 Tür steht
+           *[other] { $count } Türen stehen
+        } auf einer anderen
+    .summary =
+        { $first } und { $second } setzen jeweils eine Tür an dieselbe Stelle, höchstens ein paar Zentimeter auseinander, an { $count ->
+            [one] 1 Ort
+           *[other] { $count } Orten
+        }. Zum Beispiel: { $examples }. Angegeben ist jeweils der Ort: ein Innenraum mit seinem internen Namen, draußen Weltraum und Zelle.
+    .explanation = Viele Mods fügen Türen hinzu, und oft setzt eine zweite Mod ihre eigene Tür dorthin, wo schon die der ersten oder die des Spiels ist: ein Stück davor oder dahinter, weil ihre Wand dicker ist oder ihr Rahmen woanders sitzt. Das Spiel zeigt beide. Eine flackert durch die andere, du öffnest die, die vorne steht, und die führt vielleicht woandershin als die, die du siehst. Die Figuren des Spiels gehen durch die Tür, die ihre Wege nennen, und das kann die andere sein. Eine zweite Tür absichtlich direkt hinter der ersten, etwa ein Windfang mit Innentür, ist selten.
+    .remedy = Öffne die Stelle auf der Seite der Kollisionen. Dort stehen die Türen nebeneinander, mit dem, wohin jede führt, und welche Mod Mallet zu behalten vorschlägt: meist die, deren andere Seite zurückführt und durch die Figuren gehen. Wähle „In diese zusammenführen“: Die anderen werden ausgeblendet, und was sie benutzt hat, soll die behaltene Tür benutzen.
+
 navmeshes-door-cut-off = Figuren können Türen einer Mod nicht mehr benutzen
     .headline =
         { $winner } schneidet { $count ->

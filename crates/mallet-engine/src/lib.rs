@@ -737,6 +737,7 @@ fn gather_facts(
             facts.terrain = setup.terrain;
             facts.markers = setup.markers;
             facts.navmeshes = setup.navmeshes;
+            facts.doors = setup.doors;
             tracing::info!(
                 placed = facts.objects.placed.len(),
                 bases = facts.objects.bases.len(),

@@ -127,7 +127,11 @@ pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
     WorldMap {
         owners: names_of_owners,
         worlds: map_worlds,
-        spots: spots.clone(),
+        spots: spots
+            .iter()
+            .chain(&context.doors().spots)
+            .cloned()
+            .collect(),
     }
 }
 

@@ -19,8 +19,10 @@ import { CopyButton, useSession } from "./Actions";
 import { objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
 import { collisionsTexts } from "./collisions-texts";
+import { DoorPanel, doorHidden, mergeChoices } from "./doors";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type {
+  DoorMerge,
   MapSpot,
   ObjectRef,
   RenderedDuel,
@@ -107,9 +109,9 @@ function sidesOfMods(pairs: Pair[]): { plugin: string; objects: number }[] {
 const spotsOf = (pairs: Pair[]) => pairs.reduce((sum, pair) => sum + pair.spots.length, 0);
 
 /** The kinds of the worklist, the worst first. */
-const WORK_KINDS: WorkKind[] = ["duplicate", "overlap", "deep", "touch"];
+const WORK_KINDS: WorkKind[] = ["duplicate", "door", "overlap", "deep", "touch"];
 
-const RANK: Record<WorkKind, number> = { duplicate: 0, overlap: 1, deep: 2, touch: 3 };
+const RANK: Record<WorkKind, number> = { duplicate: 0, door: 1, overlap: 2, deep: 3, touch: 4 };
 
 /** Game units in a metre, for the depth of a collision. */
 const UNITS_PER_METRE = 70;
@@ -413,8 +415,8 @@ export function Collisions({
   };
   const [kinds, setKinds] = useState<Set<WorkKind>>(() =>
     remembered(
-      "mallet.workKinds2",
-      new Set<WorkKind>(["duplicate", "overlap", "deep"]),
+      "mallet.workKinds3",
+      new Set<WorkKind>(["duplicate", "door", "overlap", "deep"]),
       (value) =>
         new Set(
           value
@@ -456,7 +458,13 @@ export function Collisions({
     [choices],
   );
   const counts = useMemo(() => {
-    const found: Record<WorkKind, number> = { duplicate: 0, overlap: 0, deep: 0, touch: 0 };
+    const found: Record<WorkKind, number> = {
+      duplicate: 0,
+      door: 0,
+      overlap: 0,
+      deep: 0,
+      touch: 0,
+    };
     for (const item of items) {
       found[item.kind] += 1;
     }
@@ -567,6 +575,14 @@ export function Collisions({
     setPatchChoices(next);
     setPreview(new Set());
     goOn(next);
+  };
+  const mergeDoors = (item: Item, plan: DoorMerge) => {
+    const next = mergeChoices(choices, item.key, plan, hiddenObjects);
+    setPatchChoices(next);
+    setPreview(new Set());
+    if (item === current) {
+      goOn(next);
+    }
   };
   const undecide = (item: Item) => setPatchChoices(undecideSpot(choices, item.key));
   const decideMods = (pairs: Pair[], plugin: string | null) => {
@@ -794,7 +810,7 @@ export function Collisions({
                         next.delete(kind);
                       }
                       setKinds(next);
-                      remember("mallet.workKinds2", [...next].join(","));
+                      remember("mallet.workKinds3", [...next].join(","));
                     }}
                   />
                   <PlaceIcon shape="circle" origin="spot" kind={kind} />
@@ -897,6 +913,7 @@ export function Collisions({
               }}
               onDecidePassage={decidePassage}
               onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
+              onMergeDoors={(plan) => mergeDoors(current, plan)}
               onPick={(spot) => {
                 const key = spotKey(spot);
                 if (key !== null && byKey.has(key)) {
@@ -1095,6 +1112,8 @@ interface SpotProps {
   onOpenPair: () => void;
   onDecidePassage: (passage: Item[], plugin: string, extra: ObjectRef[]) => void;
   onObject: (object: ObjectRef, hide: boolean) => void;
+  /** Merges stacked doors into the one `plan` keeps (ADR 0067). */
+  onMergeDoors: (plan: DoorMerge) => void;
   onPick: (spot: MapSpot) => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -1412,53 +1431,65 @@ function Spot(props: SpotProps) {
             )}
           </span>
         </div>
-        <div className="work-columns">
-          {leftSide !== undefined && sideColumn(leftSide, 0)}
-          <div className="work-column work-common">
-            <div className="work-column-head">
-              <strong>{own.common}</strong>
-            </div>
-            <div className="work-common-choices">
-              <button
-                type="button"
-                className="work-choice"
-                aria-pressed={decided === null}
-                onClick={() => props.onDecide(null)}
-              >
-                <kbd>0</kbd>
-                <span className="work-choice-text">
-                  <span className="work-choice-verb">{t.workKeepVerb}</span>
-                  <strong className="work-choice-title">{t.patchKeepBoth}</strong>
-                </span>
-              </button>
-              {props.ownChoice && (
-                <button type="button" className="small quiet" onClick={props.onUndecide}>
-                  {t.workReset}
+        {spot.doors !== null && spot.doors !== undefined ? (
+          <DoorPanel
+            group={spot.doors}
+            hidden={(object) => doorHidden(object, decided, props.hiddenObjects)}
+            keptAll={decided === null}
+            onMerge={props.onMergeDoors}
+            onKeepAll={() => props.onDecide(null)}
+            onPreview={props.onPreview}
+            previewed={preview}
+          />
+        ) : (
+          <div className="work-columns">
+            {leftSide !== undefined && sideColumn(leftSide, 0)}
+            <div className="work-column work-common">
+              <div className="work-column-head">
+                <strong>{own.common}</strong>
+              </div>
+              <div className="work-common-choices">
+                <button
+                  type="button"
+                  className="work-choice"
+                  aria-pressed={decided === null}
+                  onClick={() => props.onDecide(null)}
+                >
+                  <kbd>0</kbd>
+                  <span className="work-choice-text">
+                    <span className="work-choice-verb">{t.workKeepVerb}</span>
+                    <strong className="work-choice-title">{t.patchKeepBoth}</strong>
+                  </span>
                 </button>
+                {props.ownChoice && (
+                  <button type="button" className="small quiet" onClick={props.onUndecide}>
+                    {t.workReset}
+                  </button>
+                )}
+              </div>
+              {item.sides.every((side) => !side.hideable) && (
+                <p className="work-note">{t.workBothNeeded}</p>
+              )}
+              {first !== undefined && second !== undefined && pairSpots > 1 && (
+                <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
+                  <span>
+                    {pairSpots >= MANY
+                      ? t.workPairMany(first.plugin, second.plugin, pairSpots)
+                      : own.pairSpots(shortName(first.plugin), shortName(second.plugin), pairSpots)}
+                  </span>
+                  <button type="button" className="small" onClick={props.onOpenPair}>
+                    {own.openThePair}
+                  </button>
+                </div>
               )}
             </div>
-            {item.sides.every((side) => !side.hideable) && (
-              <p className="work-note">{t.workBothNeeded}</p>
-            )}
-            {first !== undefined && second !== undefined && pairSpots > 1 && (
-              <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
-                <span>
-                  {pairSpots >= MANY
-                    ? t.workPairMany(first.plugin, second.plugin, pairSpots)
-                    : own.pairSpots(shortName(first.plugin), shortName(second.plugin), pairSpots)}
-                </span>
-                <button type="button" className="small" onClick={props.onOpenPair}>
-                  {own.openThePair}
-                </button>
+            {rightSides.length > 0 && (
+              <div className="work-column-stack">
+                {rightSides.map((side, at) => sideColumn(side, at + 1))}
               </div>
             )}
           </div>
-          {rightSides.length > 0 && (
-            <div className="work-column-stack">
-              {rightSides.map((side, at) => sideColumn(side, at + 1))}
-            </div>
-          )}
-        </div>
+        )}
         {item.sides
           .filter((side) => side.hideable && walkedOf(side).parts.length > 0)
           .map((side) => {

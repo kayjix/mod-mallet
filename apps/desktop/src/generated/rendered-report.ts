@@ -89,6 +89,54 @@ export type ArgValue = string | number;
  * ```
  */
 export type GamePath = string;
+/**
+ * A change to a record that merging doors needs. Mod Mallet writes such
+ * changes as overrides in a plugin of its own (ADR 0060); the record is
+ * copied from the version the game uses and only the named field changes.
+ */
+export type RecordChange =
+  | {
+      /**
+       * Where the player is to arrive, in game units, if that moves.
+       *
+       * @minItems 3
+       * @maxItems 3
+       */
+      arrival?: [number, number, number] | null;
+      door: ObjectRef3;
+      /**
+       * Which way the player is to face there, in thousandths of a
+       * radian, if that changes.
+       *
+       * @minItems 3
+       * @maxItems 3
+       */
+      facing?: [number, number, number] | null;
+      /**
+       * The door it led to; `None` where it led nowhere before.
+       */
+      from?: ObjectRef | null;
+      /**
+       * The plugin whose version of it the game uses.
+       */
+      plugin: string;
+      to: ObjectRef4;
+      type: "teleport";
+    }
+  | {
+      from: ObjectRef5;
+      navmesh: ObjectRef6;
+      /**
+       * The plugin whose version of it the game uses.
+       */
+      plugin: string;
+      to: ObjectRef7;
+      /**
+       * The triangle, by its number in the mesh.
+       */
+      triangle: number;
+      type: "navmesh-door";
+    };
 
 /**
  * A scan report together with its texts in one language.
@@ -1167,6 +1215,11 @@ export interface MapSpot {
    */
   depth?: number | null;
   /**
+   * For a spot of stacked doors: the doors, where each leads, and how
+   * to merge them (ADR 0067).
+   */
+  doors?: DoorGroup | null;
+  /**
    * The identity of a finding across scans.
    *
    * It is derived from the kind and the subject only, so a decision such as
@@ -1177,7 +1230,7 @@ export interface MapSpot {
   /**
    * What kind of collision it is.
    */
-  kind?: "duplicate" | "overlap" | "touch";
+  kind?: "duplicate" | "overlap" | "touch" | "door";
   /**
    * Where it is.
    */
@@ -1222,6 +1275,231 @@ export interface MapSpot {
   position?: [number, number, number] | null;
 }
 /**
+ * Doors that stand on almost the same spot.
+ */
+export interface DoorGroup {
+  /**
+   * The doors, the one suggested to keep first.
+   */
+  doors: StackedDoor[];
+  /**
+   * Whether two of the doors stand in the same plane, so that the game
+   * shows them flickering through each other.
+   */
+  flicker: boolean;
+  /**
+   * For each door, in the same order, what keeping it means.
+   */
+  plans: DoorMerge[];
+}
+/**
+ * One door of a [`DoorGroup`].
+ */
+export interface StackedDoor {
+  /**
+   * Whether the player sees this door in front of the others.
+   */
+  front: boolean;
+  /**
+   * Whether the door on the other side leads back to this one.
+   */
+  leadsBack: boolean;
+  /**
+   * Where it leads; `None` for a door that only opens.
+   */
+  leadsTo?: DoorDestination | null;
+  /**
+   * The internal name of the door's base object.
+   */
+  name: string;
+  object: ObjectRef2;
+  /**
+   * How far it stands from the first door, in game units.
+   */
+  offset: number;
+  /**
+   * Whether characters walk through the door on the other side.
+   */
+  otherSideWalkable: boolean;
+  /**
+   * The plugin whose version of the door the game uses, as the load
+   * order spells it.
+   */
+  plugin: string;
+  /**
+   * How many doors lead to this one and how many paths name it.
+   */
+  references: number;
+  /**
+   * Whether keeping this one is suggested.
+   */
+  suggested: boolean;
+  /**
+   * Whether characters walk through it: a path of the game names it.
+   */
+  walkable: boolean;
+}
+/**
+ * Where a door leads.
+ */
+export interface DoorDestination {
+  /**
+   * The door on the other side, if it is there.
+   */
+  door?: ObjectRef | null;
+  /**
+   * The place on the other side.
+   */
+  location:
+    | {
+        type: "exterior";
+        /**
+         * The worldspace's internal name.
+         */
+        world: string;
+        /**
+         * The cell's column.
+         */
+        x: number;
+        /**
+         * The cell's row.
+         */
+        y: number;
+      }
+    | {
+        /**
+         * The cell's internal name.
+         */
+        cell: string;
+        type: "interior";
+      };
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef2 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * What keeping one door of a group means.
+ */
+export interface DoorMerge {
+  /**
+   * What has to change in the plugins, so that whatever used a hidden
+   * door uses the kept one. Empty if hiding is all it takes.
+   */
+  changes: RecordChange[];
+  /**
+   * The doors the patch hides.
+   */
+  hide: ObjectRef[];
+  keep: ObjectRef8;
+  /**
+   * Places only a hidden door led to: they can no longer be entered
+   * here.
+   */
+  lost: DoorDestination[];
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef3 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef4 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef5 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef6 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef7 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef8 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
  * One object of a collision.
  */
 export interface SpotPart {
@@ -1234,7 +1512,7 @@ export interface SpotPart {
    * The internal name of what it is.
    */
   name: string;
-  object: ObjectRef2;
+  object: ObjectRef9;
   /**
    * Whether hiding this one rather than the other is suggested: of two
    * copies, the one from the plugin that places fewer objects.
@@ -1246,7 +1524,7 @@ export interface SpotPart {
  * that plugin. Unlike a form ID as the game shows it, this does not
  * depend on the load order.
  */
-export interface ObjectRef2 {
+export interface ObjectRef9 {
   /**
    * The object's number in that plugin.
    */

@@ -23,6 +23,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `objects.duplicated` | Warning | likely | Two mods place the same object twice |
 | `objects.overlapping` | Warning | hint | Objects of two mods stand inside each other |
 | `objects.touching` | Note | hint | Objects of two mods cut into each other |
+| `doors.stacked` | Warning | likely | Doors of two mods stand on top of each other |
 | `navmeshes.door-cut-off` | Warning | likely | Characters can no longer walk through doors of a mod |
 | `navmeshes.changes-undone` | Note | likely | A mod undoes where another mod lets characters walk |
 | `meshes.made-for-other-game` | Note | hint | Meshes of a mod were made for another game |
@@ -244,6 +245,18 @@ Two mods that change the same place each put their own buildings, trees or other
 Two mods that place things in the same area did not know of each other, so a fence may run into a wall, a cart may stand half in a market stall, or a lamp post may grow out of a roof. Mod Mallet compared the shapes of both models, not just the boxes around them. Within one mod such contacts are usually wanted, so they are only reported between mods that do not know each other.
 
 **What to do:** Look at the places named above in the game or on the map. Often it does not show; where it does, decide which object you want to keep, or look for a compatibility patch of both mods.
+
+## doors.stacked
+
+**Doors of two mods stand on top of each other**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `first`, `second`, `count`, `examples`
+
+Many mods add doors, and a second mod often puts its own door where the first, or the game, already has one: a little in front of it or behind it, because its wall is thicker or its frame sits elsewhere. The game shows both. One flickers through the other, you open whichever is in front, and it may lead somewhere else than the one you see. Characters of the game walk through the door their paths name, which may be the other one. A second door right behind the first on purpose, such as a porch with an inner door, is rare.
+
+**What to do:** Open the spot on the collisions page. It shows the doors side by side, where each leads, and which one Mod Mallet suggests to keep: usually the one whose other side leads back and that characters walk through. Choose "merge into this one": the others are hidden, and whatever used them is to use the kept door.
 
 ## navmeshes.door-cut-off
 

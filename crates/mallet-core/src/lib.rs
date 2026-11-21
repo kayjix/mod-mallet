@@ -20,6 +20,7 @@ pub mod anchors;
 pub mod cache;
 pub mod catalogue;
 pub mod compare;
+pub mod doors;
 pub mod duel;
 pub mod encoding;
 pub mod facts;
@@ -39,6 +40,7 @@ pub mod unreal;
 
 pub use action::{Action, ActionOutcome, ActionStatus, ObjectRef, OptionToTick};
 pub use cache::{NoCache, TextCache};
+pub use doors::{DoorDestination, DoorGroup, DoorMerge, RecordChange, StackedDoor};
 pub use facts::Facts;
 pub use finding::{ArgValue, Confidence, Finding, FindingId, Party, Severity, Subject};
 pub use kinds::KindInfo;

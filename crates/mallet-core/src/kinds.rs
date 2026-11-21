@@ -184,6 +184,16 @@ pub const OBJECTS_TOUCHING: KindInfo = KindInfo {
     args: &["first", "second", "count", "examples"],
 };
 
+/// Doors of two mods, or twice of one, stand on almost the same spot: the
+/// player sees one flicker through the other or opens the wrong one, and
+/// characters may use a door that leads elsewhere (ADR 0067).
+pub const DOORS_STACKED: KindInfo = KindInfo {
+    id: "doors.stacked",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &["first", "second", "count", "examples"],
+};
+
 /// Meshes of a mod are in the format of another game or of another edition
 /// of this one. A note and a hint: many such meshes work, and well-kept
 /// mods ship hundreds of them; they are a lead when something crashes or
@@ -331,6 +341,7 @@ pub const ALL: &[KindInfo] = &[
     OBJECTS_DUPLICATED,
     OBJECTS_OVERLAPPING,
     OBJECTS_TOUCHING,
+    DOORS_STACKED,
     NAVMESHES_DOOR_CUT_OFF,
     NAVMESHES_CHANGES_UNDONE,
     MESHES_MADE_FOR_OTHER_GAME,

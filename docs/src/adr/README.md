@@ -91,4 +91,5 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0064](0064-mod-organizer-2-as-the-second-manager.md) | Mod Organizer 2 as the second mod manager | accepted |
 | [0065](0065-oblivion-remastered.md) | Oblivion Remastered: the old game's data below the installation, Unreal mods beside it | accepted |
 | [0066](0066-other-files-compared-side-by-side.md) | Other files are compared side by side | accepted |
+| [0067](0067-stacked-doors-are-merged-into-one.md) | Stacked doors are found and merged into one | accepted |
 | [0068](0068-which-plugin-needs-which.md) | The report carries which plugin needs which, drawn as arcs | accepted |

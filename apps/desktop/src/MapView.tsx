@@ -492,6 +492,7 @@ function palette(element: Element): Palette {
     dim: colour("--map-dim"),
     spots: {
       duplicate: colour(kindVariable("duplicate")),
+      door: colour(kindVariable("door")),
       overlap: colour(kindVariable("overlap")),
       touch: colour(kindVariable("touch")),
     },

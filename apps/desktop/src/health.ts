@@ -51,6 +51,7 @@ const CAP: Record<Impact | "collisions", number> = {
 /** How much one open spot weighs, by its kind in the worklist. */
 const SPOT_WEIGHT: Record<WorkKind, number> = {
   duplicate: 1,
+  door: 0.6,
   overlap: 0.4,
   deep: 0.15,
   touch: 0.01,

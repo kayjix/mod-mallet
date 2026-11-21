@@ -453,6 +453,10 @@
   background: var(--spot-duplicate);
 }
 
+.kind-count[data-kind="door"] .kind-dot {
+  background: var(--spot-door);
+}
+
 .kind-count[data-kind="deep"] .kind-dot {
   background: var(--spot-deep);
 }

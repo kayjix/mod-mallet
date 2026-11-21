@@ -268,7 +268,7 @@ export function tracePlace(
 export type SpotKind = NonNullable<MapSpot["kind"]>;
 
 /** The kinds of collisions, the worst first. */
-export const SPOT_KINDS: SpotKind[] = ["duplicate", "overlap", "touch"];
+export const SPOT_KINDS: SpotKind[] = ["duplicate", "door", "overlap", "touch"];
 
 /** A spot's kind; spots of older scans overlap. */
 export const kindOf = (spot: MapSpot): SpotKind => spot.kind ?? "overlap";

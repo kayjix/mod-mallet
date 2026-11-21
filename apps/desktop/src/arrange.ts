@@ -43,7 +43,7 @@ export interface Section {
 /** Whether a finding is about objects of two mods in the same spot. */
 export function isCollision(rendered: RenderedFinding): boolean {
   const { kind } = rendered.finding;
-  return kind.startsWith("objects.") || kind === "plugins.contained";
+  return kind.startsWith("objects.") || kind === "plugins.contained" || kind === "doors.stacked";
 }
 
 export function isDirect(rendered: RenderedFinding): boolean {

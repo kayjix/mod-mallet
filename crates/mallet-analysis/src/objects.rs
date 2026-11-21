@@ -142,6 +142,10 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
     let mut pairs: BTreeMap<(String, String, Clash), Vec<Found>> = BTreeMap::new();
 
     for (a, b, clash) in candidates(&solids, &mut owners) {
+        if same_door_group(context, a, b) {
+            // Stacked doors are a spot of their own (ADR 0067).
+            continue;
+        }
         let crossing = mesh_crossing(a, b, &context.facts.models);
         // Where both models are known, they decide: an overlap of boxes
         // whose models do not cross is an arch over a path, not a clash.
@@ -208,10 +212,20 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
                 position: Some(found.position),
                 kind: found.kind,
                 depth: found.depth,
+                doors: None,
             }));
         collisions.findings.push(finding);
     }
     collisions
+}
+
+/// Whether two objects are doors of one group of stacked doors.
+fn same_door_group(context: &Context<'_>, a: &Solid<'_>, b: &Solid<'_>) -> bool {
+    let members = &context.doors().members;
+    matches!(
+        (members.get(&a.object.id), members.get(&b.object.id)),
+        (Some(first), Some(second)) if first == second
+    )
 }
 
 /// The models of the objects that may collide, by their paths as the base
@@ -517,7 +531,7 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
 }
 
 /// The point halfway between two positions.
-fn middle([ax, ay, az]: [i32; 3], [bx, by, bz]: [i32; 3]) -> [i32; 3] {
+pub(crate) fn middle([ax, ay, az]: [i32; 3], [bx, by, bz]: [i32; 3]) -> [i32; 3] {
     let half = |a: i32, b: i32| {
         // Summed wide, so that no position can overflow.
         i32::try_from((i64::from(a) + i64::from(b)).div_euclid(2)).unwrap_or(a)
@@ -527,12 +541,12 @@ fn middle([ax, ay, az]: [i32; 3], [bx, by, bz]: [i32; 3]) -> [i32; 3] {
 
 /// The cell a coordinate lies in. The world is laid out in cells of 4096
 /// units.
-fn cell_of(coordinate: i32) -> i32 {
+pub(crate) fn cell_of(coordinate: i32) -> i32 {
     coordinate.div_euclid(4096)
 }
 
 /// The command of the game's console that takes the player to a spot.
-fn console(location: &SpotLocation) -> String {
+pub(crate) fn console(location: &SpotLocation) -> String {
     match location {
         SpotLocation::Exterior { world, x, y } => format!("cow {world} {x} {y}"),
         SpotLocation::Interior { cell } => format!("coc {cell}"),
@@ -696,7 +710,7 @@ impl<'a> Owners<'a> {
 
     /// The subject of a finding about two plugins, in an order that does
     /// not depend on the load order.
-    fn pair(&self, a: &str, b: &str) -> Subject {
+    pub(crate) fn pair(&self, a: &str, b: &str) -> Subject {
         let (first, second) = if a <= b { (a, b) } else { (b, a) };
         Subject::Pair {
             first: self.party(first),
@@ -711,7 +725,7 @@ impl<'a> Owners<'a> {
     }
 
     /// The plugin's file name in the spelling of the load order.
-    fn file_name(&self, plugin: &str) -> String {
+    pub(crate) fn file_name(&self, plugin: &str) -> String {
         self.plugins
             .get(plugin)
             .map_or_else(|| plugin.to_owned(), |facts| facts.name.clone())

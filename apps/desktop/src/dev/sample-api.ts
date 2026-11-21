@@ -256,6 +256,25 @@ const samples: Sample[] = [
     args: { first: "Old Town", second: "Water Mod", count: 2 },
   },
   {
+    kind: "doors.stacked",
+    severity: "warning",
+    confidence: "likely",
+    key: "Old Town+Water Mod",
+    title: two(
+      "Doors of two mods stand on top of each other",
+      "Türen zweier Mods stehen übereinander",
+    ),
+    headline: two(
+      "Old Town and Water Mod: 1 door stands on top of another",
+      "Old Town und Water Mod: 1 Tür steht auf einer anderen",
+    ),
+    summary: two(
+      "Old Town and Water Mod each put a door at the same spot.",
+      "Old Town und Water Mod setzen jeweils eine Tür an dieselbe Stelle.",
+    ),
+    args: { first: "Old Town", second: "Water Mod", count: 1 },
+  },
+  {
     kind: "navmeshes.door-cut-off",
     severity: "warning",
     confidence: "likely",
@@ -728,6 +747,82 @@ function sampleMap(): RenderedReport["map"] {
       },
     ],
   });
+  // Two doors on top of each other (ADR 0067): the mod's door 6 cm in
+  // front of the town's, leading into the same house but not back.
+  const doors = (x: number, y: number): MapSpot => {
+    const town = { plugin: "Old Town.esp", localId: 0xc10 };
+    const water = { plugin: "Water Mod.esp", localId: 0xc20 };
+    const inside = { plugin: "Old Town.esp", localId: 0xc11 };
+    const house = { location: { type: "interior" as const, cell: "OldTownInn" }, door: inside };
+    return {
+      finding: "doors.stacked:Old Town+Water Mod",
+      kind: "door",
+      location: { type: "exterior", world: "Tamriel", x, y },
+      objects: "InnDoor01 / WaterInnDoor",
+      console: `cow Tamriel ${x} ${y}`,
+      parts: [
+        { object: town, name: "InnDoor01", hideable: true, suggested: false },
+        { object: water, name: "WaterInnDoor", hideable: true, suggested: true },
+      ],
+      doors: {
+        flicker: false,
+        doors: [
+          {
+            object: town,
+            plugin: "Old Town.esp",
+            name: "InnDoor01",
+            leadsTo: house,
+            leadsBack: true,
+            walkable: true,
+            otherSideWalkable: true,
+            references: 3,
+            front: false,
+            offset: 0,
+            suggested: true,
+          },
+          {
+            object: water,
+            plugin: "Water Mod.esp",
+            name: "WaterInnDoor",
+            leadsTo: house,
+            leadsBack: false,
+            walkable: false,
+            otherSideWalkable: true,
+            references: 0,
+            front: true,
+            offset: 4,
+            suggested: false,
+          },
+        ],
+        plans: [
+          { keep: town, hide: [water], changes: [], lost: [] },
+          {
+            keep: water,
+            hide: [town],
+            changes: [
+              {
+                type: "teleport",
+                door: inside,
+                plugin: "Old Town.esp",
+                from: town,
+                to: water,
+                arrival: [x * 4096 + 2048, y * 4096 + 1900, 0],
+              },
+              {
+                type: "navmesh-door",
+                navmesh: { plugin: "Skyrim.esm", localId: 0x1234 },
+                plugin: "Old Town.esp",
+                triangle: 12,
+                from: town,
+                to: water,
+              },
+            ],
+            lost: [],
+          },
+        ],
+      },
+    };
+  };
   return {
     owners: ["Old Town", "Texture Pack", "Water Mod"],
     worlds: [
@@ -764,6 +859,7 @@ function sampleMap(): RenderedReport["map"] {
       placed([6, 1, 0.6, 0.7], duplicate(6, 1, "Boat / Boat", 0xa20)),
       placed([7, 2, 0.5, 0.5], duplicate(7, 2, "Bridge / Lantern post", 0xb12)),
       placed([8, 2, 0.5, 0.5], duplicate(8, 2, "UpperShelf02 / Divider", 0xb20)),
+      placed([5, 3, 0.5, 0.5], doors(5, 3)),
     ],
   };
 }

@@ -357,7 +357,7 @@ fn is_natural(record: &Record) -> bool {
 }
 
 /// The box in an `OBND` field.
-fn bounds(data: &[u8]) -> Option<Bounds> {
+pub(crate) fn bounds(data: &[u8]) -> Option<Bounds> {
     let values: Vec<i32> = data
         .get(..12)?
         .as_chunks::<2>()
@@ -437,7 +437,7 @@ fn large_references(data: &[u8]) -> Vec<u32> {
 }
 
 /// The cell or worldspace a reference lies in, from the groups around it.
-fn place(plugin_name: &str, masters: &[String], record: &Record) -> Option<Place> {
+pub(crate) fn place(plugin_name: &str, masters: &[String], record: &Record) -> Option<Place> {
     let label = |wanted: u32| {
         record
             .groups
@@ -462,7 +462,7 @@ pub(crate) fn floats(data: &[u8]) -> Vec<f32> {
 /// A coordinate rounded to a whole number, or `None` if it is not one a
 /// real place could have.
 #[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> Option<i32> {
+pub(crate) fn whole(value: f32) -> Option<i32> {
     // The range check makes the conversion exact up to rounding.
     (value.is_finite() && value.abs() <= MAX_COORDINATE).then(|| value.round() as i32)
 }

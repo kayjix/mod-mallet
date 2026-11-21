@@ -58,6 +58,11 @@ in [Releases](docs/src/contributing/releases.md).
   and which plugins of which mods need them, on a strip of the whole load
   order. The tab "Dependencies" on the Mods page draws every active plugin
   and its links, with a search; pick a plugin to see both sides.
+- Doors that mods stack on top of each other are found, the game's doors
+  included: on the collisions page as the kind "doors", each shown with
+  where it leads, whether characters walk through it, and which one to
+  keep. "Merge into this one" hides the others and says what else has to
+  change so that whatever used them uses the kept door (ADR 0067).
 
 ## [0.2.2] - 2026-11-19
 

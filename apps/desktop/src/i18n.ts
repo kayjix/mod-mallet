@@ -244,8 +244,8 @@ export interface Texts {
   mapObjectId: string;
   mapObjectModel: string;
   // The collisions as a worklist, decided spot by spot (ADR 0040).
-  spotKinds: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
-  spotKindHints: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
+  spotKinds: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
+  spotKindHints: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
   workTabSpots: string;
   workMarks: string;
   workMarksHint: string;
@@ -636,12 +636,14 @@ export const texts: Record<Lang, Texts> = {
     mapObjectModel: "Model",
     spotKinds: {
       duplicate: "duplicate",
+      door: "doors",
       overlap: "inside each other",
       deep: "cross deeply",
       touch: "touch",
     },
     spotKindHints: {
       duplicate: "The same object twice in the same place.",
+      door: "Doors standing on top of each other, often leading to different places.",
       overlap: "One object stands largely inside the other.",
       deep: "Two objects run into each other over 2 m or more; often two mods building the same thing.",
       touch: "Two objects reach into each other a little; often harmless.",
@@ -1096,12 +1098,14 @@ export const texts: Record<Lang, Texts> = {
     mapObjectModel: "Modell",
     spotKinds: {
       duplicate: "doppelt",
+      door: "Türen",
       overlap: "steckt ineinander",
       deep: "kreuzt tief",
       touch: "berührt sich",
     },
     spotKindHints: {
       duplicate: "Dasselbe Objekt zweimal an derselben Stelle.",
+      door: "Türen übereinander, oft mit verschiedenen Zielen.",
       overlap: "Ein Objekt steckt großteils im anderen.",
       deep: "Zwei Objekte laufen über 2 m oder mehr ineinander; oft bauen zwei Mods dasselbe.",
       touch: "Zwei Objekte ragen ein wenig ineinander; oft harmlos.",

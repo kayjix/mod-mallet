@@ -4,6 +4,7 @@
 //! read them and never touch the disk themselves (ADR 0004).
 
 pub mod crashes;
+pub mod doors;
 pub mod installer;
 pub mod knowledge;
 pub mod markers;
@@ -15,6 +16,7 @@ pub mod terrain;
 use crate::GamePath;
 
 pub use crashes::CrashFacts;
+pub use doors::DoorFacts;
 pub use installer::InstallerFacts;
 pub use knowledge::KnowledgeFacts;
 pub use markers::MarkerFacts;
@@ -75,6 +77,9 @@ pub struct Facts {
     /// the game's own, and whether the game loads them all the same
     /// (ADR 0061).
     pub switched_off_plugins: Vec<crate::SwitchedOffPlugin>,
+    /// Every door, where it leads and which paths go through it
+    /// (ADR 0067).
+    pub doors: DoorFacts,
 }
 
 /// The surface textures a mesh names.

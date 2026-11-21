@@ -69,6 +69,7 @@
      patch would hide (ADR 0040): drawn over the land, the same in both
      themes. */
   --spot-duplicate: #e03131;
+  --spot-door: #7950f2;
   --spot-overlap: #ff7a18;
   --spot-touch: #adb5bd;
   --spot-deep: #fcc419;
@@ -1851,6 +1852,10 @@ button.quiet {
   background: var(--spot-duplicate);
 }
 
+.swatch-spot[data-kind="door"] {
+  background: var(--spot-door);
+}
+
 .swatch-spot[data-kind="touch"] {
   background: var(--spot-touch);
 }
@@ -2678,6 +2683,11 @@ button.quiet {
   color: #fff;
 }
 
+.work-count[data-kind="door"] {
+  background: var(--spot-door);
+  color: #fff;
+}
+
 .work-count[data-kind="touch"] {
   background: var(--spot-touch);
 }
@@ -2784,6 +2794,11 @@ button.quiet {
 
 .work-kind[data-kind="duplicate"] {
   background: var(--spot-duplicate);
+  color: #fff;
+}
+
+.work-kind[data-kind="door"] {
+  background: var(--spot-door);
   color: #fff;
 }
 

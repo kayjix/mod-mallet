@@ -44,6 +44,13 @@ const LINK_LEN: usize = 10;
 /// plugin writes them (relative to its masters), in file order. `None`
 /// if the field is not in Skyrim's format or does not hold together.
 pub fn doors(nvnm: &[u8]) -> Option<Vec<u32>> {
+    door_triangles(nvnm).map(|doors| doors.into_iter().map(|(_, door)| door).collect())
+}
+
+/// The door triangles of a navigation mesh: each triangle's number and the
+/// door's form ID as the plugin writes it, in file order. `None` as for
+/// [`doors`].
+pub fn door_triangles(nvnm: &[u8]) -> Option<Vec<(u16, u32)>> {
     let mut bytes = Bytes::new(nvnm);
     if bytes.u32()? != SKYRIM_VERSION {
         return None;
@@ -61,13 +68,13 @@ pub fn doors(nvnm: &[u8]) -> Option<Vec<u32>> {
     }
     let mut doors = Vec::with_capacity(count);
     for _ in 0..count {
-        let triangle = usize::from(bytes.u16()?);
+        let triangle = bytes.u16()?;
         bytes.skip(4)?;
         let door = bytes.u32()?;
-        if triangle >= triangles {
+        if usize::from(triangle) >= triangles {
             return None;
         }
-        doors.push(door);
+        doors.push((triangle, door));
     }
     Some(doors)
 }

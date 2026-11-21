@@ -626,6 +626,10 @@ pub struct MapSpot {
     /// their meshes were compared; `None` where only their boxes were.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<u32>,
+    /// For a spot of stacked doors: the doors, where each leads, and how
+    /// to merge them (ADR 0067).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doors: Option<crate::DoorGroup>,
 }
 
 /// What kind of collision a spot is.
@@ -639,6 +643,9 @@ pub enum SpotKind {
     Overlap,
     /// Two objects whose models touch or cut a little into each other.
     Touch,
+    /// Doors standing on almost the same spot, which lead to the same
+    /// place or to different ones (ADR 0067).
+    Door,
 }
 
 /// One object of a collision.
