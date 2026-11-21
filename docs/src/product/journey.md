@@ -8,13 +8,21 @@ takes stock and sets the structure the app grows into: one job per page,
 at most two ways to do something on it, and links instead of copies.
 The decisions are recorded in
 [ADR 0048](../adr/0048-one-job-per-page.md). On the same day the user
-added a page for the comparison of files, *Assets*; this page describes
-the plan with it.
+added a page for the comparison of files, then called *Assets*; this page
+describes the plan with it. Since then that page is *Asset collisions*, and
+*Assets* is the catalogue of things ([ADR 0054](../adr/0054-a-catalogue-of-the-games-things.md)).
 
 The page describes the window as it stands on `main` at `fa8c395` plus the
 work merged with it on the same day: the health score, the task page by
 steps and the new mods page (ADR 0045), interiors in 3D (ADR 0042), and
 the scan button at the top of the sidebar.
+
+The sidebar and the pages below are the window as built: *Overview*, *Go
+through it* ([ADR 0050](../adr/0050-a-guided-review-through-the-homes.md)),
+*Tasks*, *Map collisions*, *Asset collisions*, *Patch*, *Map*, *Assets*,
+*Mods*, then *Toolbox* and *Settings*, with the start page behind the name
+*Mod Mallet*. The tables under "What there is today" describe the window
+before this plan and are kept as the reason for it.
 
 ## What there is today
 
@@ -305,7 +313,7 @@ As ADR 0045 sets it out, with three changes: the scan statistics and
 *what was read* move to the overview; a collision finding never appears
 here (it already does not); the step *choose* no longer holds the duel
 cards but one line, like the collisions' line: how many duels about files
-are still open, and the way to Assets.
+are still open, and the way to Asset collisions.
 
 An opened task row is compact: what the finding is, then one row of
 buttons right under it (the mod manager's action, the way to where it is
@@ -337,7 +345,7 @@ and buttons say what they are for.
 │    suggested: hide Trader's (smaller, later)                      │
 │    [Hide JK's] [Hide Trader's] [Keep both]            [Spots ▸]   │
 │    also: 1 object of the game moved by both (finding, no spot)    │
-│    their textures differ too: 1 duel                   [Assets ▸] │
+│    their textures differ too: 1 duel               [Asset coll.▸] │
 │ Cutting Room Floor ⟷ Lanterns of Skyrim   …                       │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -348,7 +356,7 @@ the stage opens the pair on *Mod against mod*. *Show on map* opens the map
 at the spot. The duels about placed objects are folded into their pair
 (the spots show them in 3D), and the collision findings without a spot are
 listed under their pair as *also*. Where the same two mods also have a duel
-about files, the pair says so and leads to Assets.
+about files, the pair says so and leads to Asset collisions.
 
 #### Patch
 
@@ -387,10 +395,10 @@ a cell. A spot on the map opens the worklist at it; the map decides
 nothing. The worldspaces are named and grouped as set out in
 [Worldspaces](#worldspaces).
 
-#### Assets
+#### Asset collisions
 
 ```text
-┌─ Assets ──────────────────────────────────────────────────────────┐
+┌─ Asset collisions ──────────────────────────────────────────────────────────┐
 │ [ Duels 6 | Ranking ]                                             │
 ├──────────────────┬─────────────────────────────┬──────────────────┤
 │ search · open ▾  │  Cut Content ⟷ Face Overhaul│ What they share  │
@@ -403,7 +411,7 @@ nothing. The worldspaces are named and grouped as set out in
 └──────────────────┴─────────────────────────────┴──────────────────┘
 ```
 
-Assets is today's comparison view made a page of its own: the duels about
+Asset collisions is the comparison view made a page of its own: the duels about
 files in the list on the left, the two mods' files side by side on the
 stage, the decision under it, and *Ranking* as the second tab. The
 duel list is grouped by what the mods compete for (faces, textures,
@@ -416,6 +424,15 @@ suggests the side of every duel about files, and it is edited where those
 duels are decided, so that a change shows at once in the suggestions next
 to it. Under Mods it would be a second job on a page whose job is knowing
 the mods.
+
+#### Assets
+
+The catalogue of the game's things (ADR 0054): weapons, armour, characters
+and the other things with a model of their own, listed by kind, by material
+or as the game's outfits. A thing opens to its versions, from the game and
+from each mod, side by side on the same stage as the duels; choosing one
+puts it into the game through Vortex's file overrides. The page decides
+things, not whole pairs of mods.
 
 #### Mods
 
@@ -432,7 +449,7 @@ the mods.
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-*Compare ▸* opens Assets at the duel; *open the pair* opens the pair on
+*Compare ▸* opens Asset collisions at the duel; *open the pair* opens the pair on
 *Mod against mod*; *show on map* opens the map filtered to the mod.
 
 #### Toolbox

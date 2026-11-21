@@ -44,8 +44,6 @@ export interface OverviewTexts {
   collisionsToPatch: string;
   adviceEmpty: string;
   showFolded: (count: number) => string;
-  worklistChoice: string;
-  worklistChoiceNote: string;
   worklistOpen: string;
   pairOpen: string;
   spotToWorklist: string;
@@ -53,9 +51,6 @@ export interface OverviewTexts {
   duelsAllDecided: (total: number) => string;
   toAssets: string;
   navmeshChoice: string;
-  navmeshChoiceNote: string;
-  toToolbox: string;
-
   modsSearch: string;
   modsSort: string;
   modsSortBy: Record<ModSort, string>;
@@ -70,10 +65,8 @@ export interface OverviewTexts {
   disabled: string;
   newer: (version: string) => string;
   page: string;
-  problemsTitle: (count: number) => string;
   findingsCount: (count: number) => string;
   spotsCount: (count: number) => string;
-  noProblems: string;
   sectionFindings: string;
   sectionCollisions: string;
   sectionOverridden: string;
@@ -191,9 +184,6 @@ const en: OverviewTexts = {
   collisionsToPatch: "To the patch",
   adviceEmpty: "No recommendations at the moment.",
   showFolded: (count) => (count === 1 ? "Show 1" : `Show ${count}`),
-  worklistChoice: "Decide in the collisions' worklist",
-  worklistChoiceNote:
-    "There you see each spot in 3D and decide which object goes, spot by spot or for the whole pair of mods at once. What you decide goes into the patch.",
   worklistOpen: "Open in the worklist",
   pairOpen: "Open the pair",
   spotToWorklist: "In the worklist",
@@ -207,10 +197,6 @@ const en: OverviewTexts = {
       : `All ${total} pairs of mods with their own textures, meshes or faces for the same things are decided.`,
   toAssets: "To the assets",
   navmeshChoice: "Repair the paths in the Creation Kit",
-  navmeshChoiceNote:
-    "A patch of Mod Mallet cannot join the paths of characters (navigation meshes). If you want to repair them by hand, Bethesda's Creation Kit does it; the toolbox says what it is for and where to get it.",
-  toToolbox: "To the toolbox",
-
   modsSearch: "Search mods",
   modsSort: "Sort",
   modsSortBy: {
@@ -229,10 +215,8 @@ const en: OverviewTexts = {
   disabled: "Disabled",
   newer: (version) => `${version} available`,
   page: "Page",
-  problemsTitle: (count) => (count === 1 ? "1 open problem" : `${count} open problems`),
   findingsCount: (count) => (count === 1 ? "1 finding" : `${count} findings`),
   spotsCount: (count) => (count === 1 ? "1 spot" : `${count} spots`),
-  noProblems: "No open problems",
   sectionFindings: "What was found",
   sectionCollisions: "Collides with",
   sectionOverridden: "Overridden content",
@@ -354,9 +338,6 @@ const de: OverviewTexts = {
   collisionsToPatch: "Zum Patch",
   adviceEmpty: "Gerade keine Empfehlungen.",
   showFolded: (count) => (count === 1 ? "1 zeigen" : `${count} zeigen`),
-  worklistChoice: "In der Kollisionsliste entscheiden",
-  worklistChoiceNote:
-    "Dort siehst du jede Stelle in 3D und entscheidest, welches Objekt weicht, Stelle für Stelle oder für das ganze Mod-Paar auf einmal. Was du entscheidest, kommt in den Patch.",
   worklistOpen: "In der Kollisionsliste öffnen",
   pairOpen: "Das Paar öffnen",
   spotToWorklist: "In der Kollisionsliste",
@@ -370,10 +351,6 @@ const de: OverviewTexts = {
       : `Alle ${total} Mod-Paare mit eigenen Texturen, Modellen oder Gesichtern für dieselben Dinge sind entschieden.`,
   toAssets: "Zu den Assets",
   navmeshChoice: "Die Wege im Creation Kit reparieren",
-  navmeshChoiceNote:
-    "Die Wege der Figuren (Navigationsnetze) kann ein Patch von Mod Mallet nicht verbinden. Wer sie von Hand reparieren will, macht das mit Bethesdas Creation Kit; der Werkzeugkasten sagt, wofür es da ist und woher es kommt.",
-  toToolbox: "Zum Werkzeugkasten",
-
   modsSearch: "Mods suchen",
   modsSort: "Sortieren",
   modsSortBy: {
@@ -392,10 +369,8 @@ const de: OverviewTexts = {
   disabled: "Aus",
   newer: (version) => `${version} verfügbar`,
   page: "Seite",
-  problemsTitle: (count) => (count === 1 ? "1 offenes Problem" : `${count} offene Probleme`),
   findingsCount: (count) => (count === 1 ? "1 Befund" : `${count} Befunde`),
   spotsCount: (count) => (count === 1 ? "1 Stelle" : `${count} Stellen`),
-  noProblems: "Keine offenen Probleme",
   sectionFindings: "Was gefunden wurde",
   sectionCollisions: "Kollidiert mit",
   sectionOverridden: "Überschriebene Inhalte",

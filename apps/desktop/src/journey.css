@@ -176,11 +176,6 @@
   margin-top: var(--space-1);
 }
 
-.games-later {
-  margin: 0;
-  padding: 0 var(--space-4) var(--space-4);
-}
-
 /* ---- the overview of a game ------------------------------------------------ */
 
 .overview-banner {

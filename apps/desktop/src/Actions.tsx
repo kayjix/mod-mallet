@@ -201,29 +201,3 @@ export function CopyButton({ text }: { text: string }) {
     </button>
   );
 }
-
-/** What is known about a mod, with the way to its page. */
-export function ModCard({ info }: { info: ModInfo }) {
-  const { api, t } = useSession();
-  const page = info.page;
-  return (
-    <div className="mod-card">
-      <div>
-        <strong>{info.mod.name}</strong>
-        {!info.enabled && <span className="tag">{t.disabled}</span>}
-        <p className="aside">
-          {info.version != null && `${t.version} ${info.version}`}
-          {info.author != null && ` · ${t.author}: ${info.author}`}
-          {info.newerVersion != null && (
-            <span className="newer"> · {t.newerVersion(info.newerVersion)}</span>
-          )}
-        </p>
-      </div>
-      {page?.startsWith("https://www.nexusmods.com/") && (
-        <button type="button" className="small" onClick={() => page && api.openPage(page)}>
-          {t.openPage}
-        </button>
-      )}
-    </div>
-  );
-}

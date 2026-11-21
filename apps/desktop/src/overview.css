@@ -171,10 +171,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.health-empty {
-  padding: var(--space-4) var(--space-5);
-}
-
 /* ---- the task page ------------------------------------------------------- */
 
 .tasks-headline {
@@ -204,11 +200,6 @@
 
 .step > header {
   align-items: center;
-}
-
-.step > header .tasks-hint {
-  flex-basis: 100%;
-  order: 10;
 }
 
 .optional-tag {
@@ -486,13 +477,6 @@
 }
 
 /* ---- task rows: the ways out of a finding --------------------------------- */
-
-.choice-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
 
 .duels-line {
   margin-bottom: var(--space-2);

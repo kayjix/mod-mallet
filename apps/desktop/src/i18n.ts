@@ -31,7 +31,6 @@ export interface Texts {
   scanning: string;
   scanningNote: string;
   language: string;
-  readOnlyNote: string;
   noScanYet: string;
   scanFailed: string;
   versionUnknown: string;
@@ -41,33 +40,12 @@ export interface Texts {
   viewTasks: string;
   viewMap: string;
   viewMods: string;
-  viewPlaces: string;
   viewCollisions: string;
   viewPatch: string;
-  patchNeedsSwapper: string;
-  patchCount: (count: number) => string;
-  patchInstall: string;
-  patchInstallHint: string;
-  patchHide: (plugin: string, count: number) => string;
   patchKeepBoth: string;
-  patchSuggest: string;
-  patchClear: string;
-  patchCreate: string;
-  patchCreated: string;
-  patchStale: string;
   patchSuggested: string;
-  patchInstalled: (count: number, mod: string | null) => string;
-  patchMatches: string;
-  patchDiffers: (more: number, fewer: number) => string;
-  patchOwn: (count: number) => string;
   compareSpots: (count: number) => string;
   compareToSpots: string;
-  patchOwnNote: string;
-  patchShowAgain: string;
-  patchUseInstalled: string;
-  patchInPatch: string;
-  patchPartly: (hidden: number, of: number) => string;
-  patchNew: string;
   openFolder: string;
   openLog: string;
   tagline: string;
@@ -88,9 +66,6 @@ export interface Texts {
   /** A game Mod Mallet reads, but not yet with every check. */
   gameBasic: string;
   homeNoArt: string;
-  homeOpenTasks: string;
-  homeCollisions: string;
-  homeMods: string;
   settingsTabGeneral: string;
   settingsTabPlaces: string;
   settingsTabAbout: string;
@@ -125,14 +100,11 @@ export interface Texts {
   changedRescanning: string;
 
   // The overview at the top of the task list.
-  allGood: string;
-  allGoodNote: string;
   headline: (errors: number, warnings: number) => string;
   lastScan: string;
   scanStats: (stats: ScanStats) => string;
 
   // The filters of the task list, which are also its sections.
-  filterOpen: string;
   filterFix: string;
   filterCheck: string;
   filterDirect: string;
@@ -147,15 +119,8 @@ export interface Texts {
 
   // One finding, opened.
   whatToDo: string;
-  choicesTitle: string;
-  choiceRun: string;
   choiceLeave: string;
-  choiceLeaveNote: string;
-  choiceBringBackNote: string;
-  choiceHide: string;
-  choiceHideNote: (chosen: string | null) => string;
   choiceToPatch: string;
-  choiceByHand: string;
   moreAbout: string;
   previewTitle: string;
   viewer3d: string;
@@ -173,7 +138,6 @@ export interface Texts {
   duelNow: (name: string) => string;
   duelPick: (name: string) => string;
   duelCompare: string;
-  duelCompareClose: string;
   duelUndo: string;
   duelPatchChosen: (count: number) => string;
   duelNoPictures: string;
@@ -214,9 +178,6 @@ export interface Texts {
   rankingNothing: string;
   duelCompareFiles: (count: number) => string;
   arrangeLabel: string;
-  arrangeCategory: string;
-  arrangePairs: string;
-  arrangeDuelsAside: (count: number) => string;
   stageStop: string;
   stageTurn: string;
   stageReset: string;
@@ -236,7 +197,6 @@ export interface Texts {
   rescan: string;
   installLink: string;
   guideTitle: string;
-  ignore: string;
   unignore: string;
   spotsTitle: (shown: number, total: number) => string;
   consoleHint: string;
@@ -251,19 +211,10 @@ export interface Texts {
   openPage: string;
   disabled: string;
 
-  // The link to the mod manager.
-  linkReady: string;
-  linkRestart: string;
-  linkNotRunning: string;
-
   // The map.
   mapWorld: string;
   mapMod: string;
   mapAllMods: string;
-  mapLegendOne: string;
-  mapLegendTwo: string;
-  mapLegendThree: string;
-  mapLegendMany: string;
   mapNoMods: string;
   mapLegendSpot: string;
   mapCell: (x: number, y: number) => string;
@@ -281,8 +232,6 @@ export interface Texts {
   mapRelief: string;
   mapNoRelief: string;
   mapReliefHint: string;
-  mapHeight: string;
-  mapHeightValue: (times: number) => string;
   mapBase: string;
   mapLod: string;
   mapNear: string;
@@ -294,8 +243,6 @@ export interface Texts {
   mapObjectPlacedBy: string;
   mapObjectId: string;
   mapObjectModel: string;
-  mapModCells: string;
-
   // The collisions as a worklist, decided spot by spot (ADR 0040).
   spotKinds: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
   spotKindHints: Record<"duplicate" | "overlap" | "deep" | "touch", string>;
@@ -303,12 +250,8 @@ export interface Texts {
   workMarks: string;
   workMarksHint: string;
   workPreviewWithout: (name: string) => string;
-  workPassage: (count: number) => string;
-  workPassageHide: (plugin: string) => string;
-  workPassageAll: (plugin: string, count: number) => string;
   workPairMany: (first: string, second: string, spots: number) => string;
   workShowSpots: string;
-  workObjectLocked: string;
   workObjectGame: string;
   workObjectHide: string;
   workObjectShow: string;
@@ -323,13 +266,11 @@ export interface Texts {
   workKept: string;
   workOpen: string;
   workSpotOf: (index: number, total: number) => string;
-  workHide: (name: string) => string;
   workCannotHide: string;
   workReset: string;
   workPrevious: string;
   workNext: string;
   workNextOpen: string;
-  workPair: (first: string, second: string, spots: number) => string;
   workEverywhere: (plugin: string) => string;
   workKeepEverywhere: string;
   workKeys: string;
@@ -341,9 +282,6 @@ export interface Texts {
   workGhost: string;
   workThisSpot: string;
   workSearch: string;
-  workScopeSpot: string;
-  workScopePassage: (count: number) => string;
-  workScopePair: (count: number) => string;
   workHideVerb: string;
   workKeepVerb: string;
   workNeeded: string;
@@ -376,13 +314,9 @@ export interface Texts {
   workDuelWinner: (mod: string) => string;
   duelFromCollisions: (mod: string) => string;
   duelTakeOver: string;
-  workGroupHide: (count: number) => string;
-  workGroupShow: (count: number) => string;
-  mapObjectGroup: (count: number) => string;
   workHideObject: string;
   workDecideHere: string;
   workAfterDecide: string;
-  patchPerSpot: (count: number) => string;
   mapTopView: string;
   mapPlaces: string;
   placesShowAll: string;
@@ -391,7 +325,6 @@ export interface Texts {
   placesOriginHint: Record<PlaceOrigin, string>;
   placesKind: Record<PlaceKind, string>;
   placesCollisions: string;
-  placesUnnamed: string;
   placesBy: (owner: string) => string;
   placesMoved: (distance: string) => string;
   placesRenamed: (name: string) => string;
@@ -403,9 +336,7 @@ export interface Texts {
   placesPick: string;
 
   // The mods.
-  modsOnlyProblems: string;
   modsSearch: string;
-  modsProblems: (count: number) => string;
   modsNone: string;
 
   // The places a scan reads.
@@ -430,7 +361,6 @@ export const texts: Record<Lang, Texts> = {
     scanning: "Scanning…",
     scanningNote: "Reading your setup. This takes a few seconds.",
     language: "Language",
-    readOnlyNote: "A scan only reads. Nothing in your game or your mods is changed.",
     noScanYet: "No scan yet. Start one to see what Mod Mallet finds.",
     scanFailed: "The scan could not be completed",
     versionUnknown: "version unknown",
@@ -439,42 +369,15 @@ export const texts: Record<Lang, Texts> = {
     viewTasks: "Tasks",
     viewMap: "Map",
     viewMods: "Mods",
-    viewPlaces: "Places",
     viewCollisions: "Collisions",
     viewPatch: "Patch",
-    patchNeedsSwapper:
-      "A patch hides objects with Base Object Swapper, a script extender plugin that is not installed.",
-    patchCount: (count) => (count === 1 ? "1 object chosen" : `${count} objects chosen`),
-    patchInstall: "Install the patch in Vortex",
-    patchInstallHint:
-      "Mod Mallet writes a small mod that shows an invisible marker in place of these objects while the game runs. Remove the mod in Vortex to bring them back.",
-    patchHide: (plugin, count) => `Hide from ${plugin} (${count})`,
     patchKeepBoth: "Keep both",
-    patchSuggest: "Use suggestions",
-    patchClear: "Clear",
-    patchCreate: "Create patch",
-    patchCreated: "Created:",
-    patchStale: "The choice changed since. Create the patch again before installing it.",
     patchSuggested: "suggested",
-    patchInstalled: (count, mod) =>
-      `Installed: ${count === 1 ? "1 object is" : `${count} objects are`} hidden${mod === null ? "" : ` by the mod “${mod}”`}.`,
-    patchMatches: "Your choice is what is installed.",
-    patchDiffers: (more, fewer) =>
-      `Your choice differs from what is installed: ${more} more, ${fewer} fewer. Create the patch and install it again to change that.`,
     compareSpots: (count) =>
       count === 1
         ? "Objects of these two mods collide at 1 spot. Look at it in 3D and decide there."
         : `Objects of these two mods collide at ${count} spots. Look at them in 3D and decide there.`,
     compareToSpots: "Show the spots in 3D",
-    patchOwn: (count) =>
-      count === 1 ? "1 object hidden on its own" : `${count} objects hidden on their own`,
-    patchOwnNote:
-      "Picked one by one in the 3D view, or in the installed patch without a collision of this scan.",
-    patchShowAgain: "Show again",
-    patchUseInstalled: "Use what is installed",
-    patchInPatch: "in the patch",
-    patchPartly: (hidden, of) => `${hidden} of ${of} in the patch`,
-    patchNew: "not in the patch yet",
     openFolder: "Open folder",
     openLog: "Open log",
     tagline: "Hammering on",
@@ -504,9 +407,6 @@ export const texts: Record<Lang, Texts> = {
     gameNotInstalled: "not found on this computer",
     gameBasic: "the basics: load order, files, archives, map, toolbox",
     homeNoArt: "Vortex brings a picture of this game along; it is not installed here.",
-    homeOpenTasks: "open tasks",
-    homeCollisions: "collisions",
-    homeMods: "mods",
     settingsTabGeneral: "General",
     settingsTabPlaces: "Places",
     settingsTabAbout: "About",
@@ -545,8 +445,6 @@ export const texts: Record<Lang, Texts> = {
     liveShort: "Scans again by itself",
     changedRescanning: "Your setup changed. Scanning again…",
 
-    allGood: "Everything is in order",
-    allGoodNote: "Mod Mallet found nothing that needs your attention.",
     headline: (errors, warnings) => {
       const fix = `${errors} ${plural(errors, "error", "errors")} to fix`;
       const check = `${warnings} ${plural(warnings, "thing", "things")} to check`;
@@ -559,7 +457,6 @@ export const texts: Record<Lang, Texts> = {
     scanStats: ({ plugins, archives, installers, meshes }) =>
       `${plugins} plugins · ${archives} archives · ${installers} installers · ${meshes} meshes`,
 
-    filterOpen: "Open",
     filterFix: "To fix",
     filterCheck: "To check",
     filterDirect: "Fixable from here",
@@ -573,19 +470,8 @@ export const texts: Record<Lang, Texts> = {
     nothingHere: "Nothing here.",
 
     whatToDo: "What to do",
-    choicesTitle: "Your options",
-    choiceRun: "Do it",
     choiceLeave: "Leave it as it is",
-    choiceLeaveNote:
-      "If it does not bother you in the game. Mod Mallet sets it aside and stops counting it; you find it again under “Set aside”.",
-    choiceBringBackNote: "You set this aside. Bring it back to decide about it again.",
-    choiceHide: "Hide one of the two",
-    choiceHideNote: (chosen) =>
-      chosen === null
-        ? "Pick whose objects disappear. That goes into Mod Mallet's patch; nothing changes until you install it on the patch page."
-        : `The objects of ${chosen} go into Mod Mallet's patch. Install the patch on the patch page to apply it.`,
     choiceToPatch: "To the patch",
-    choiceByHand: "By hand",
     moreAbout: "More about it",
     previewTitle: "What it looks like",
     viewer3d: "In 3D",
@@ -604,7 +490,6 @@ export const texts: Record<Lang, Texts> = {
     duelNow: (name) => `now: ${name}`,
     duelPick: (name) => `${name} wins`,
     duelCompare: "Compare",
-    duelCompareClose: "Close comparison",
     duelUndo: "Decide again",
     duelPatchChosen: (count) =>
       count === 1
@@ -684,10 +569,6 @@ export const texts: Record<Lang, Texts> = {
     rankingNothing: "The ranking decides no open pair yet",
     duelCompareFiles: (count) => `Compare (${count === 1 ? "1 file" : `${count} files`})`,
     arrangeLabel: "Arrange the tasks",
-    arrangeCategory: "By kind",
-    arrangePairs: "Mod against mod",
-    arrangeDuelsAside: (count) =>
-      `${count === 1 ? "1 pair of mods that disagree is" : `${count} pairs of mods that disagree are`} under "Mod against mod".`,
     stageStop: "Stop turning",
     stageTurn: "Turn",
     stageReset: "Reset",
@@ -707,7 +588,6 @@ export const texts: Record<Lang, Texts> = {
     rescan: "Scan again",
     installLink: "Install the Vortex extension",
     guideTitle: "Tick these in the installer",
-    ignore: "Set aside",
     unignore: "Bring back",
     spotsTitle: (shown, total) =>
       shown === total ? `Where (${total})` : `Where (${shown} of ${total})`,
@@ -723,17 +603,9 @@ export const texts: Record<Lang, Texts> = {
     openPage: "Open the mod's page",
     disabled: "disabled",
 
-    linkReady: "Vortex connected",
-    linkRestart: "Restart Vortex",
-    linkNotRunning: "Vortex is not answering",
-
     mapWorld: "Worldspace",
     mapMod: "Mod",
     mapAllMods: "All mods",
-    mapLegendOne: "1 mod",
-    mapLegendTwo: "2 mods",
-    mapLegendThree: "3 mods",
-    mapLegendMany: "4 or more",
     mapNoMods: "No mod places objects here.",
     mapLegendSpot: "collision",
     mapCell: (x, y) => `Cell ${x}, ${y}`,
@@ -750,7 +622,6 @@ export const texts: Record<Lang, Texts> = {
     mapRelief: "3D relief",
     mapNoRelief: "The land of this worldspace is not known, so there is no relief to show.",
     mapReliefHint: "Drag to move · right-drag to turn · wheel to zoom",
-    mapHeight: "Height",
     mapBase: "On a base",
     mapLod: "Game detail",
     mapNear: "Objects up close",
@@ -778,17 +649,9 @@ export const texts: Record<Lang, Texts> = {
     workMarks: "Markings",
     workMarksHint: "Off: the place as the game would show it, with what you hide left out. Key V.",
     workPreviewWithout: (name) => `Look at it without ${name}, without deciding`,
-    workPassage: (count) => `Passage: ${count} spots of these two mods close together`,
-    workPassageHide: (plugin) => `Hide ${plugin} in this passage`,
-    workPassageAll: (plugin, count) =>
-      count === 1
-        ? `Hide 1 object of ${plugin} here`
-        : `Hide all ${count} objects of ${plugin} here`,
     workPairMany: (first, second, spots) =>
       `${first} and ${second} collide at ${spots} spots. Usually it is better to choose one of them:`,
     workShowSpots: "Show the spots",
-    workObjectLocked:
-      "The game relies on this object: other things refer to it, or it is part of the distant view. It cannot be hidden.",
     workObjectGame:
       "This object belongs to the game itself. Hide it only if you are sure: a quest may need it.",
     workObjectHide: "Hide this object",
@@ -805,14 +668,11 @@ export const texts: Record<Lang, Texts> = {
     workKept: "both kept",
     workOpen: "open",
     workSpotOf: (index, total) => `Spot ${index} of ${total}`,
-    workHide: (name) => `Hide ${name}`,
     workCannotHide: "Other things refer to it, so it cannot be hidden safely.",
     workReset: "Undecide",
     workPrevious: "Previous",
     workNext: "Next",
     workNextOpen: "Next open",
-    workPair: (first, second, spots) =>
-      `${first} against ${second}: ${spots === 1 ? "1 spot" : `${spots} spots`}`,
     workEverywhere: (plugin) => `Hide ${plugin} everywhere`,
     workKeepEverywhere: "Keep both everywhere",
     workKeys: "Keys: ← → spots · 1, 2 hide · 0 keep both · V markings",
@@ -825,9 +685,6 @@ export const texts: Record<Lang, Texts> = {
     workGhost: "Red and see-through: what the patch would hide.",
     workThisSpot: "this spot",
     workSearch: "Search places, mods, objects…",
-    workScopeSpot: "This spot",
-    workScopePassage: (count) => `This passage · ${count} spots`,
-    workScopePair: (count) => `The two mods · ${count} spots`,
     workHideVerb: "Hide",
     workKeepVerb: "Keep",
     anchorAsking: "Looking at what ties it…",
@@ -861,20 +718,12 @@ export const texts: Record<Lang, Texts> = {
     duelFromCollisions: (mod) =>
       `In the collisions you let ${mod} win at every spot. Take that over here, for its files too?`,
     duelTakeOver: "Take it over",
-    workGroupHide: (count) => `Hide with the parts it hangs together with (${count})`,
-    workGroupShow: (count) => `Show the ${count} parts again`,
-    mapObjectGroup: (count) => `Mark the ${count} parts of the same mod that hang together`,
     workNeeded: "Needed by the game",
     workBothNeeded:
       "The game needs both objects (for example doors with a loading screen, or things scripts refer to). Nothing here can be hidden safely; keeping both is usually right.",
     workHideObject: "Hide this object here",
     workDecideHere: "Decide in the worklist",
     workAfterDecide: "After deciding, go on to the next open spot",
-    patchPerSpot: (count) =>
-      count === 1 ? "1 spot decided on its own" : `${count} spots decided on their own`,
-    mapHeightValue: (times) =>
-      times === 1 ? "×1 – as in the game" : `×${times.toLocaleString("en")} of the true height`,
-    mapModCells: "Cells of mods",
     mapTopView: "From above",
     mapPlaces: "Places",
     placesShowAll: "Show all",
@@ -938,7 +787,6 @@ export const texts: Record<Lang, Texts> = {
       other: "Other",
     },
     placesCollisions: "Collisions of mods",
-    placesUnnamed: "Unnamed place",
     placesBy: (owner) => `by ${owner}`,
     placesMoved: (distance) => `Moved ${distance} away from where the game has it.`,
     placesRenamed: (name) => `The game calls it “${name}”.`,
@@ -950,9 +798,7 @@ export const texts: Record<Lang, Texts> = {
       metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${Math.round(metres)} m`,
     placesPick: "Pick a place, a collision or a cell on the map.",
 
-    modsOnlyProblems: "Only mods with something open",
     modsSearch: "Search",
-    modsProblems: (count) => `${count} open`,
     modsNone: "No mod matches.",
 
     places: "Places",
@@ -973,7 +819,6 @@ export const texts: Record<Lang, Texts> = {
     scanning: "Scan läuft…",
     scanningNote: "Dein Setup wird gelesen. Das dauert ein paar Sekunden.",
     language: "Sprache",
-    readOnlyNote: "Ein Scan liest nur. An deinem Spiel und deinen Mods wird nichts verändert.",
     noScanYet: "Noch kein Scan. Starte einen, um zu sehen, was Mod Mallet findet.",
     scanFailed: "Der Scan konnte nicht abgeschlossen werden",
     versionUnknown: "Version unbekannt",
@@ -982,43 +827,15 @@ export const texts: Record<Lang, Texts> = {
     viewTasks: "Aufgaben",
     viewMap: "Karte",
     viewMods: "Mods",
-    viewPlaces: "Orte",
     viewCollisions: "Kollisionen",
     viewPatch: "Patch",
-    patchNeedsSwapper:
-      "Ein Patch blendet Objekte mit Base Object Swapper aus, einem Script-Extender-Plugin, das nicht installiert ist.",
-    patchCount: (count) => (count === 1 ? "1 Objekt ausgewählt" : `${count} Objekte ausgewählt`),
-    patchInstall: "Patch in Vortex installieren",
-    patchInstallHint:
-      "Mod Mallet schreibt eine kleine Mod, die diese Objekte im Spiel durch einen unsichtbaren Marker ersetzt. Entfernst du die Mod in Vortex, sind sie wieder da.",
-    patchHide: (plugin, count) => `Aus ${plugin} ausblenden (${count})`,
     patchKeepBoth: "Beide behalten",
-    patchSuggest: "Vorschläge übernehmen",
-    patchClear: "Zurücksetzen",
-    patchCreate: "Patch erstellen",
-    patchCreated: "Erstellt:",
-    patchStale:
-      "Die Auswahl hat sich seitdem geändert. Erstelle den Patch neu, bevor du ihn installierst.",
     patchSuggested: "Vorschlag",
-    patchInstalled: (count, mod) =>
-      `Installiert: ${count === 1 ? "1 Objekt ist" : `${count} Objekte sind`} ausgeblendet${mod === null ? "" : ` durch die Mod „${mod}“`}.`,
-    patchMatches: "Deine Auswahl entspricht dem installierten Patch.",
-    patchDiffers: (more, fewer) =>
-      `Deine Auswahl weicht vom installierten Patch ab: ${more} mehr, ${fewer} weniger. Erstelle den Patch und installiere ihn erneut, um das zu übernehmen.`,
     compareSpots: (count) =>
       count === 1
         ? "Objekte dieser beiden Mods stoßen an 1 Stelle zusammen. Sieh sie dir in 3D an und entscheide dort."
         : `Objekte dieser beiden Mods stoßen an ${count} Stellen zusammen. Sieh sie dir in 3D an und entscheide dort.`,
     compareToSpots: "Stellen in 3D ansehen",
-    patchOwn: (count) =>
-      count === 1 ? "1 Objekt einzeln ausgeblendet" : `${count} Objekte einzeln ausgeblendet`,
-    patchOwnNote:
-      "Einzeln in der 3D-Ansicht gewählt, oder im installierten Patch ohne Kollision dieses Scans.",
-    patchShowAgain: "Wieder zeigen",
-    patchUseInstalled: "Installierten Stand übernehmen",
-    patchInPatch: "im Patch",
-    patchPartly: (hidden, of) => `${hidden} von ${of} im Patch`,
-    patchNew: "noch nicht im Patch",
     openFolder: "Ordner öffnen",
     openLog: "Protokoll öffnen",
     tagline: "Hammering on",
@@ -1052,9 +869,6 @@ export const texts: Record<Lang, Texts> = {
     gameNotInstalled: "auf diesem Computer nicht gefunden",
     gameBasic: "das Grundlegende: Ladereihenfolge, Dateien, Archive, Karte, Werkzeuge",
     homeNoArt: "Vortex bringt ein Bild dieses Spiels mit; hier ist es nicht installiert.",
-    homeOpenTasks: "offene Aufgaben",
-    homeCollisions: "Kollisionen",
-    homeMods: "Mods",
     settingsTabGeneral: "Allgemein",
     settingsTabPlaces: "Orte",
     settingsTabAbout: "Über",
@@ -1093,8 +907,6 @@ export const texts: Record<Lang, Texts> = {
     liveShort: "Scannt von selbst neu",
     changedRescanning: "Dein Setup hat sich geändert. Es wird neu gescannt…",
 
-    allGood: "Alles in Ordnung",
-    allGoodNote: "Mod Mallet hat nichts gefunden, um das du dich kümmern musst.",
     headline: (errors, warnings) => {
       const fix = `${errors} Fehler zu beheben`;
       const check = `${warnings} ${plural(warnings, "Punkt", "Punkte")} zu prüfen`;
@@ -1107,7 +919,6 @@ export const texts: Record<Lang, Texts> = {
     scanStats: ({ plugins, archives, installers, meshes }) =>
       `${plugins} Plugins · ${archives} Archive · ${installers} Installer · ${meshes} Modelle`,
 
-    filterOpen: "Offen",
     filterFix: "Zu beheben",
     filterCheck: "Zu prüfen",
     filterDirect: "Direkt behebbar",
@@ -1121,19 +932,8 @@ export const texts: Record<Lang, Texts> = {
     nothingHere: "Hier ist nichts.",
 
     whatToDo: "Was tun",
-    choicesTitle: "Deine Möglichkeiten",
-    choiceRun: "Ausführen",
     choiceLeave: "So lassen",
-    choiceLeaveNote:
-      "Wenn es dich im Spiel nicht stört. Mod Mallet legt den Befund beiseite und zählt ihn nicht mehr mit; du findest ihn unter „Beiseitegelegt“ wieder.",
-    choiceBringBackNote: "Du hast das beiseitegelegt. Hol es zurück, um neu zu entscheiden.",
-    choiceHide: "Eines der beiden ausblenden",
-    choiceHideNote: (chosen) =>
-      chosen === null
-        ? "Wähle, wessen Objekte verschwinden. Das kommt in den Patch von Mod Mallet; es ändert sich nichts, bis du ihn auf der Patch-Seite installierst."
-        : `Die Objekte aus ${chosen} kommen in den Patch von Mod Mallet. Installiere den Patch auf der Patch-Seite, damit es wirkt.`,
     choiceToPatch: "Zum Patch",
-    choiceByHand: "Von Hand",
     moreAbout: "Mehr dazu",
     previewTitle: "So sieht es aus",
     viewer3d: "In 3D",
@@ -1152,7 +952,6 @@ export const texts: Record<Lang, Texts> = {
     duelNow: (name) => `jetzt: ${name}`,
     duelPick: (name) => `${name} gewinnt`,
     duelCompare: "Vergleichen",
-    duelCompareClose: "Vergleich schließen",
     duelUndo: "Neu entscheiden",
     duelPatchChosen: (count) =>
       count === 1
@@ -1228,10 +1027,6 @@ export const texts: Record<Lang, Texts> = {
     rankingNothing: "Die Rangfolge entscheidet noch kein offenes Paar",
     duelCompareFiles: (count) => `Vergleichen (${count === 1 ? "1 Datei" : `${count} Dateien`})`,
     arrangeLabel: "Aufgaben ordnen",
-    arrangeCategory: "Nach Art",
-    arrangePairs: "Mod gegen Mod",
-    arrangeDuelsAside: (count) =>
-      `${count === 1 ? "1 Paar von Mods, die sich widersprechen, steht" : `${count} Paare von Mods, die sich widersprechen, stehen`} unter „Mod gegen Mod“.`,
     stageStop: "Drehen anhalten",
     stageTurn: "Drehen",
     stageReset: "Zurücksetzen",
@@ -1251,7 +1046,6 @@ export const texts: Record<Lang, Texts> = {
     rescan: "Erneut scannen",
     installLink: "Vortex-Erweiterung installieren",
     guideTitle: "Im Installer ankreuzen",
-    ignore: "Beiseitelegen",
     unignore: "Zurückholen",
     spotsTitle: (shown, total) =>
       shown === total ? `Wo (${total})` : `Wo (${shown} von ${total})`,
@@ -1267,17 +1061,9 @@ export const texts: Record<Lang, Texts> = {
     openPage: "Mod-Seite öffnen",
     disabled: "deaktiviert",
 
-    linkReady: "Vortex verbunden",
-    linkRestart: "Vortex neu starten",
-    linkNotRunning: "Vortex antwortet nicht",
-
     mapWorld: "Weltraum",
     mapMod: "Mod",
     mapAllMods: "Alle Mods",
-    mapLegendOne: "1 Mod",
-    mapLegendTwo: "2 Mods",
-    mapLegendThree: "3 Mods",
-    mapLegendMany: "4 oder mehr",
     mapNoMods: "Hier platziert keine Mod Objekte.",
     mapLegendSpot: "Zusammenstoß",
     mapCell: (x, y) => `Zelle ${x}, ${y}`,
@@ -1295,7 +1081,6 @@ export const texts: Record<Lang, Texts> = {
     mapRelief: "3D-Relief",
     mapNoRelief: "Das Gelände dieses Weltraums ist nicht bekannt, darum gibt es kein Relief.",
     mapReliefHint: "Ziehen verschiebt · rechts ziehen dreht · Mausrad zoomt",
-    mapHeight: "Höhe",
     mapBase: "Auf Sockel",
     mapLod: "Spieldetail",
     mapNear: "Objekte aus der Nähe",
@@ -1324,17 +1109,9 @@ export const texts: Record<Lang, Texts> = {
     workMarksHint:
       "Aus: die Stelle so, wie das Spiel sie zeigen würde, ohne das, was du ausblendest. Taste V.",
     workPreviewWithout: (name) => `Ohne ${name} ansehen, ohne zu entscheiden`,
-    workPassage: (count) => `Passage: ${count} Stellen dieser beiden Mods dicht beieinander`,
-    workPassageHide: (plugin) => `${plugin} in dieser Passage ausblenden`,
-    workPassageAll: (plugin, count) =>
-      count === 1
-        ? `1 Objekt von ${plugin} hier ausblenden`
-        : `Alle ${count} Objekte von ${plugin} hier ausblenden`,
     workPairMany: (first, second, spots) =>
       `${first} und ${second} stoßen an ${spots} Stellen zusammen. Meist ist es besser, dich für eine zu entscheiden:`,
     workShowSpots: "Stellen ansehen",
-    workObjectLocked:
-      "Das Spiel braucht dieses Objekt: Anderes verweist darauf, oder es gehört zur Fernansicht. Es lässt sich nicht ausblenden.",
     workObjectGame:
       "Dieses Objekt gehört zum Spiel selbst. Blende es nur aus, wenn du sicher bist: Eine Quest könnte es brauchen.",
     workObjectHide: "Dieses Objekt ausblenden",
@@ -1351,14 +1128,11 @@ export const texts: Record<Lang, Texts> = {
     workKept: "beide bleiben",
     workOpen: "offen",
     workSpotOf: (index, total) => `Stelle ${index} von ${total}`,
-    workHide: (name) => `${name} ausblenden`,
     workCannotHide: "Anderes verweist darauf; es lässt sich nicht gefahrlos ausblenden.",
     workReset: "Zurücksetzen",
     workPrevious: "Zurück",
     workNext: "Weiter",
     workNextOpen: "Nächste offene",
-    workPair: (first, second, spots) =>
-      `${first} gegen ${second}: ${spots === 1 ? "1 Stelle" : `${spots} Stellen`}`,
     workEverywhere: (plugin) => `Überall ${plugin} ausblenden`,
     workKeepEverywhere: "Überall beide behalten",
     workKeys: "Tasten: ← → Stellen · 1, 2 ausblenden · 0 beide behalten · V Markierungen",
@@ -1372,9 +1146,6 @@ export const texts: Record<Lang, Texts> = {
     workGhost: "Rot und durchscheinend: was der Patch ausblenden würde.",
     workThisSpot: "diese Stelle",
     workSearch: "Orte, Mods, Objekte suchen…",
-    workScopeSpot: "Diese Stelle",
-    workScopePassage: (count) => `Diese Passage · ${count} Stellen`,
-    workScopePair: (count) => `Die beiden Mods · ${count} Stellen`,
     workHideVerb: "Ausblenden",
     workKeepVerb: "Behalten",
     anchorAsking: "Prüfe, woran es hängt…",
@@ -1409,20 +1180,12 @@ export const texts: Record<Lang, Texts> = {
     duelFromCollisions: (mod) =>
       `In den Kollisionen hast du ${mod} an jeder Stelle gewinnen lassen. Hier übernehmen, auch für die Dateien?`,
     duelTakeOver: "Übernehmen",
-    workGroupHide: (count) => `Mit den zusammenhängenden Teilen ausblenden (${count})`,
-    workGroupShow: (count) => `Die ${count} Teile wieder zeigen`,
-    mapObjectGroup: (count) => `Die ${count} zusammenhängenden Teile dieser Mod markieren`,
     workNeeded: "Vom Spiel gebraucht",
     workBothNeeded:
       "Das Spiel braucht beide Objekte (zum Beispiel Türen mit Ladebildschirm oder Dinge, auf die Skripte verweisen). Hier lässt sich nichts gefahrlos ausblenden; beide zu behalten ist meist richtig.",
     workHideObject: "Dieses Objekt hier ausblenden",
     workDecideHere: "In der Arbeitsliste entscheiden",
     workAfterDecide: "Nach dem Entscheiden zur nächsten offenen Stelle",
-    patchPerSpot: (count) =>
-      count === 1 ? "1 Stelle einzeln entschieden" : `${count} Stellen einzeln entschieden`,
-    mapHeightValue: (times) =>
-      times === 1 ? "×1 – wie im Spiel" : `×${times.toLocaleString("de")} der echten Höhe`,
-    mapModCells: "Zellen von Mods",
     mapTopView: "Von oben",
     mapPlaces: "Orte",
     placesShowAll: "Alle zeigen",
@@ -1487,7 +1250,6 @@ export const texts: Record<Lang, Texts> = {
       other: "Sonstiges",
     },
     placesCollisions: "Zusammenstöße von Mods",
-    placesUnnamed: "Ort ohne Namen",
     placesBy: (owner) => `durch ${owner}`,
     placesMoved: (distance) => `Um ${distance} verschoben gegenüber dem Spiel.`,
     placesRenamed: (name) => `Im Spiel heißt er „${name}“.`,
@@ -1501,9 +1263,7 @@ export const texts: Record<Lang, Texts> = {
         : `${Math.round(metres)} m`,
     placesPick: "Wähle einen Ort, einen Zusammenstoß oder eine Zelle auf der Karte.",
 
-    modsOnlyProblems: "Nur Mods mit offenen Punkten",
     modsSearch: "Suchen",
-    modsProblems: (count) => `${count} offen`,
     modsNone: "Keine Mod passt.",
 
     places: "Orte",
