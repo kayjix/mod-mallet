@@ -1635,6 +1635,89 @@ export const sampleApi: Api = {
         : [],
     });
   },
+  // The repair of the dock's paths (made up): two pieces on the planks
+  // taken out, four laid on the bed of the water below.
+  walkwayRepair: (worldOrCell, x, y, objects) => {
+    const walked = objects.some((object) => object.plugin === "Water Mod.esp");
+    const [cx, cy] = [x ?? 25_000, y ?? 5_200];
+    const deck = -60;
+    const bed = -220;
+    return later({
+      place: worldOrCell,
+      navmeshes: walked
+        ? [
+            {
+              navmesh: "skyrim.esm:00A1B2",
+              plugin: "Skyrim.esm",
+              cell: `${worldOrCell} 6,1`,
+              removed: [
+                [
+                  [cx - 200, cy - 100, deck],
+                  [cx + 200, cy - 100, deck],
+                  [cx + 200, cy + 100, deck],
+                ],
+                [
+                  [cx - 200, cy - 100, deck],
+                  [cx + 200, cy + 100, deck],
+                  [cx - 200, cy + 100, deck],
+                ],
+              ],
+              added: [
+                [
+                  [cx - 260, cy - 160, bed],
+                  [cx, cy - 160, bed],
+                  [cx, cy, bed],
+                ],
+                [
+                  [cx, cy - 160, bed],
+                  [cx + 260, cy - 160, bed],
+                  [cx, cy, bed],
+                ],
+                [
+                  [cx - 260, cy - 160, bed],
+                  [cx, cy, bed],
+                  [cx - 260, cy + 160, bed],
+                ],
+                [
+                  [cx + 260, cy - 160, bed],
+                  [cx + 260, cy + 160, bed],
+                  [cx, cy, bed],
+                ],
+              ],
+              water: 4,
+              writable: true,
+            },
+          ]
+        : [],
+      areasLaid: walked ? 1 : 0,
+      bareObjects: 0,
+      lostDoors: [],
+    });
+  },
+  // After the repair (made up): the bench is reached again over the bed of
+  // the water; the dock's door is lost with its planks.
+  walkwayRepairReach: (worldOrCell, _x, _y, objects) => {
+    const walked = objects.some((object) => object.plugin === "Water Mod.esp");
+    return later({
+      place: worldOrCell,
+      after: "repaired" as const,
+      checked: walked ? 6 : 0,
+      changes: walked
+        ? [
+            {
+              outcome: "gone" as const,
+              destination: {
+                object: { plugin: "Water Mod.esp", localId: 0xa30 },
+                kind: "door" as const,
+                name: "Boathouse door",
+                position: [25_050, 5_250, -60] as [number, number, number],
+                cell: `${worldOrCell} 6,1`,
+              },
+            },
+          ]
+        : [],
+    });
+  },
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),

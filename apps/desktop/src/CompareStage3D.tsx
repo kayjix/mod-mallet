@@ -12,6 +12,7 @@ import { InfoTip } from "./info-tip";
 import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
+import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { useReviewTexts } from "./review-texts";
 import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
 import { drawPathSign, PathIcon, useWalkTexts } from "./walkways";
@@ -53,6 +54,8 @@ export interface CompareStage3DProps {
   onPick?: (object: AreaObject) => void;
   /** The height of the stage, in pixels. */
   height?: number;
+  /** The repair of paths to show in the views (ADR 0058), if any. */
+  paths?: PathsOverlay | null;
 }
 
 /** How long finding the segments rests between two tries while models arrive, in milliseconds. */
@@ -100,6 +103,7 @@ export function CompareStage3D({
   onSegments,
   onPick,
   height = 420,
+  paths = null,
 }: CompareStage3DProps) {
   const seeds: [ObjectRef[], ObjectRef[]] = [
     groups.flatMap((group) => group.seeds[0]),
@@ -111,6 +115,10 @@ export function CompareStage3D({
   const canvas = useRef<HTMLCanvasElement>(null);
   const layer = useRef<AreaLayer | null>(null);
   const land = useRef<LandLayer | null>(null);
+  // The repair of paths shown, taken out and laid new (ADR 0058).
+  const pathsLayer = useRef<PathsLayer | null>(null);
+  const pathsNow = useRef<PathsOverlay | null>(paths);
+  pathsNow.current = paths;
   const pending = useRef<number | null>(null);
   const [state, setState] = useState<"loading" | "missing" | "shown">("loading");
   const [markings, setMarkings] = useState(true);
@@ -348,6 +356,7 @@ export function CompareStage3D({
         current.restyle(lookNow.current(index));
         current.draw(matrix, 1, { mark: SECOND, focus: FIRST, ghost });
       }
+      pathsLayer.current?.draw(matrix, 1);
     }
     gl.disable(gl.SCISSOR_TEST);
     drawSignsNow.current(width / 3, tall, matrix);
@@ -360,6 +369,11 @@ export function CompareStage3D({
   }, [draw]);
   const redrawNow = useRef(redraw);
   redrawNow.current = redraw;
+
+  useEffect(() => {
+    pathsLayer.current?.set(paths);
+    redraw();
+  }, [paths, redraw]);
   // The structures are found as the models arrive, whether or not the
   // stage is drawn just then (a hidden window draws nothing).
   const findNow = useRef(findStructures);
@@ -380,9 +394,17 @@ export function CompareStage3D({
     } catch {
       setFailed(true);
     }
+    try {
+      pathsLayer.current = new PathsLayer(gl);
+      pathsLayer.current.set(pathsNow.current);
+    } catch {
+      pathsLayer.current = null;
+    }
     return () => {
       layer.current?.dispose();
       layer.current = null;
+      pathsLayer.current?.dispose();
+      pathsLayer.current = null;
       land.current?.dispose();
       land.current = null;
       if (pending.current !== null) {

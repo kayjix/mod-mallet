@@ -27,6 +27,7 @@ import type { Action, Moves, ObjectRef, Patch, RenderedReport } from "./generate
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { ScanProgress } from "./generated/scan-progress";
 import type { WalkwayReach } from "./generated/walkway-reach";
+import type { WalkwayRepair } from "./generated/walkway-repair";
 import type { Lang } from "./i18n";
 
 /** The places the user named, by what they are for. */
@@ -160,6 +161,23 @@ export interface Api {
     y: number | null,
     objects: ObjectRef[],
   ): Promise<WalkwayReach | null>;
+  /** What repairing the paths over objects about to be hidden does (ADR 0058). */
+  walkwayRepair(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    objects: ObjectRef[],
+  ): Promise<WalkwayRepair | null>;
+  /**
+   * Whether characters reach where they go once the paths over `objects`
+   * are repaired (ADR 0058, 0059), asked as `walkwayRepair`.
+   */
+  walkwayRepairReach(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    objects: ObjectRef[],
+  ): Promise<WalkwayReach | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -248,6 +266,10 @@ const tauriApi: Api = {
     invoke<HiddenWalkways | null>("hidden_walkways", { worldOrCell, x, y, objects }),
   walkwayReach: (worldOrCell, x, y, objects) =>
     invoke<WalkwayReach | null>("walkway_reach", { worldOrCell, x, y, objects }),
+  walkwayRepair: (worldOrCell, x, y, objects) =>
+    invoke<WalkwayRepair | null>("walkway_repair", { worldOrCell, x, y, objects }),
+  walkwayRepairReach: (worldOrCell, x, y, objects) =>
+    invoke<WalkwayReach | null>("walkway_repair_reach", { worldOrCell, x, y, objects }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

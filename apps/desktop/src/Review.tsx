@@ -38,8 +38,10 @@ import {
   pinsOf,
   revealObjects,
 } from "./patch";
+import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, useReach } from "./reach";
+import { RepairPaths } from "./repair-paths";
 import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
@@ -445,6 +447,9 @@ function CollisionsStep({
   const [measuring, setMeasuring] = useState<{ done: number; total: number } | null>(null);
   const stopMeasuring = useRef(false);
   const [segments, setSegments] = useState<StageSegment[]>([]);
+  // The repair of the paths over what a choice would hide, shown on the
+  // stage (ADR 0058).
+  const [repairShown, setRepairShown] = useState<PathsOverlay | null>(null);
   // Why the game may rely on the parts of the place (ADR 0046), by key, for
   // the parts asked last; null while asking.
   const [anchors, setAnchors] = useState<{
@@ -1083,6 +1088,7 @@ function CollisionsStep({
           );
         }}
         onPick={pick}
+        paths={repairShown}
       />
       {cluster.spots.map(({ key, item }) => {
         const group = item.spot.doors;
@@ -1208,6 +1214,7 @@ function CollisionsStep({
               }
               decor={new Set(shownSegments.flatMap((segment) => segment.decor))}
               onAnyway={() => keep(side, shownSegments, true, true)}
+              onRepairShown={setRepairShown}
             />
           ))}
         </div>
@@ -1452,6 +1459,7 @@ function KeepEffect({
   walkCentre,
   decor,
   onAnyway,
+  onRepairShown,
 }: {
   winner: string;
   loser: string;
@@ -1472,6 +1480,8 @@ function KeepEffect({
   /** The parts that are decor resting on others, by key. */
   decor: Set<string>;
   onAnyway: () => void;
+  /** Told what the repair of the paths shows in the view (ADR 0058). */
+  onRepairShown: (overlay: PathsOverlay | null) => void;
 }) {
   const isDecor = (part: Part) => decor.has(objectKey(part.id.plugin, part.id.localId));
   const resting = effect.go.filter(isDecor);
@@ -1544,6 +1554,14 @@ function KeepEffect({
         </p>
       )}
       {effect.walked.length > 0 && <ReachNote reach={reach} />}
+      {effect.walked.length > 0 && walkPlace !== null && (
+        <RepairPaths
+          place={walkPlace}
+          centre={walkCentre}
+          objects={[...effect.go, ...effect.walked].map((part) => part.id)}
+          onShow={onRepairShown}
+        />
+      )}
       {anyway > 0 && (
         <button type="button" className="small" onClick={onAnyway}>
           {effect.walked.length > 0

@@ -40,6 +40,7 @@ import {
 } from "./map-places";
 import { moveKeysOf } from "./moves";
 import { pinsOf, spotKey } from "./patch";
+import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
@@ -86,6 +87,8 @@ interface MapView3DProps {
     context: CanvasRenderingContext2D,
     toScreen: (point: [number, number, number]) => { x: number; y: number } | null,
   ) => void;
+  /** The repair of paths to show over the view (ADR 0058), if any. */
+  paths?: PathsOverlay | null;
 }
 
 const NO_KEYS = new Set<string>();
@@ -475,6 +478,7 @@ export function MapView3D({
   plain = false,
   onArea,
   paint,
+  paths = null,
 }: MapView3DProps) {
   const { t, api, patchChoices } = useSession();
   // The spots pinned to solve later, read while drawing.
@@ -499,6 +503,10 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
+  // The repair of paths shown, taken out and laid new (ADR 0058).
+  const pathsLayer = useRef<PathsLayer | null>(null);
+  const pathsNow = useRef<PathsOverlay | null>(paths);
+  pathsNow.current = paths;
   // The world as last drawn, for the effects that only run when it changes.
   const worldNow = useRef(world);
   worldNow.current = world;
@@ -821,6 +829,7 @@ export function MapView3D({
         ghost: css("--spot-ghost"),
       });
     }
+    pathsLayer.current?.draw(matrix, raise);
     lastView.current = { matrix, raise };
 
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
@@ -979,6 +988,11 @@ export function MapView3D({
     });
   }, [draw]);
 
+  useEffect(() => {
+    pathsLayer.current?.set(paths);
+    redraw();
+  }, [paths, redraw]);
+
   // A pin set or cleared shows at once; moved objects stand where their
   // moves put them (ADR 0060).
   useEffect(() => {
@@ -1121,6 +1135,12 @@ export function MapView3D({
       area.current = null;
     }
     try {
+      pathsLayer.current = new PathsLayer(gl);
+      pathsLayer.current.set(pathsNow.current);
+    } catch {
+      pathsLayer.current = null;
+    }
+    try {
       land.current = new LandLayer(gl, api, world.name, redraw);
     } catch {
       land.current = null;
@@ -1166,6 +1186,8 @@ export function MapView3D({
       lod.current?.dispose();
       lod.current = null;
       area.current?.dispose();
+      pathsLayer.current?.dispose();
+      pathsLayer.current = null;
       area.current = null;
       land.current?.dispose();
       land.current = null;

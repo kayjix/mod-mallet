@@ -12,6 +12,7 @@ import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
 import { CELL } from "./map-places";
 import { moveKeysOf } from "./moves";
+import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 export interface InteriorViewProps {
@@ -38,6 +39,8 @@ export interface InteriorViewProps {
   children?: ReactNode;
   /** More tools for the bar along the top of the view, after the magic wand. */
   tools?: ReactNode;
+  /** The repair of paths to show over the view (ADR 0058), if any. */
+  paths?: PathsOverlay | null;
 }
 
 /**
@@ -78,6 +81,7 @@ export function InteriorView({
   onArea,
   children,
   tools,
+  paths = null,
 }: InteriorViewProps) {
   const { t, api, lang, patchChoices } = useSession();
   // The choices, for a layer of objects made later (moves, ADR 0060).
@@ -87,6 +91,10 @@ export function InteriorView({
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const layer = useRef<AreaLayer | null>(null);
+  // The repair of paths shown, taken out and laid new (ADR 0058).
+  const pathsLayer = useRef<PathsLayer | null>(null);
+  const pathsNow = useRef<PathsOverlay | null>(paths);
+  pathsNow.current = paths;
   const [height, setHeight] = useState(520);
   const [state, setState] = useState<"loading" | "missing" | "shown">("loading");
   const [area, setArea] = useState<AreaObjects | null>(null);
@@ -193,6 +201,7 @@ export function InteriorView({
       ghost: css("--spot-ghost"),
     });
     gl.disable(gl.CULL_FACE);
+    pathsLayer.current?.draw(matrix, 1);
     const now = current.progress;
     setProgress((before) =>
       before.done === now.done && before.total === now.total ? before : now,
@@ -206,6 +215,11 @@ export function InteriorView({
   }, [draw]);
   const redrawNow = useRef(redraw);
   redrawNow.current = redraw;
+
+  useEffect(() => {
+    pathsLayer.current?.set(paths);
+    redraw();
+  }, [paths, redraw]);
 
   // The canvas fills the width and the height the window leaves it.
   useEffect(() => {
@@ -241,9 +255,17 @@ export function InteriorView({
     } catch {
       setFailed(true);
     }
+    try {
+      pathsLayer.current = new PathsLayer(gl);
+      pathsLayer.current.set(pathsNow.current);
+    } catch {
+      pathsLayer.current = null;
+    }
     return () => {
       layer.current?.dispose();
       layer.current = null;
+      pathsLayer.current?.dispose();
+      pathsLayer.current = null;
       if (pending.current !== null) {
         window.cancelAnimationFrame(pending.current);
         pending.current = null;

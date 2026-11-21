@@ -50,8 +50,10 @@ import {
   spotKey,
   undecideSpot,
 } from "./patch";
+import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, usePaintReach, useReach } from "./reach";
+import { RepairPaths } from "./repair-paths";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
@@ -1203,6 +1205,9 @@ function Spot(props: SpotProps) {
         .flatMap((side) => side.parts.map((part) => ({ id: part.object }))),
     [item],
   );
+  // The repair of the paths over what a choice would hide, shown in the
+  // view (ADR 0058).
+  const [repairShown, setRepairShown] = useState<PathsOverlay | null>(null);
   const walked = useWalkedOn(
     item.key,
     walkPlace,
@@ -1509,6 +1514,12 @@ function Spot(props: SpotProps) {
                   centre={walkCentre}
                   objects={parts.map((part) => part.object)}
                 />
+                <RepairPaths
+                  place={walkPlace}
+                  centre={walkCentre}
+                  objects={side.parts.map((part) => part.object)}
+                  onShow={setRepairShown}
+                />
               </div>
             );
           })}
@@ -1519,6 +1530,7 @@ function Spot(props: SpotProps) {
         previewObjects={previewObjects}
         tools={viewTools}
         paint={paintReach}
+        paths={repairShown}
       />
     </>
   );
@@ -1588,6 +1600,7 @@ function Stage({
   previewObjects,
   tools,
   paint,
+  paths = null,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
@@ -1596,6 +1609,8 @@ function Stage({
   tools: ReactNode;
   /** What more to draw over the 3D view, such as the ways characters take. */
   paint?: ComponentProps<typeof MapView3D>["paint"];
+  /** The repair of paths to show in the view (ADR 0058), if any. */
+  paths?: PathsOverlay | null;
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -1721,6 +1736,7 @@ function Stage({
         onObject={openSpotOf}
         onArea={onArea}
         tools={tools}
+        paths={paths}
       />
     );
   }
@@ -1764,6 +1780,7 @@ function Stage({
       onArea={onArea}
       tools={tools}
       paint={paint}
+      paths={paths}
     />
   );
 }

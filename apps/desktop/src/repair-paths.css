@@ -1,0 +1,42 @@
+/* The repair of paths over hidden objects (ADR 0058). */
+
+.repair-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.5rem 1.75rem;
+}
+
+.repair-paths-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.repair-paths p {
+  margin: 0;
+}
+
+.repair-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85em;
+}
+
+.repair-legend::before {
+  content: "";
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 2px;
+  background: var(--repair-colour);
+}
+
+.repair-legend[data-kind="removed"] {
+  --repair-colour: #d55e00;
+}
+
+.repair-legend[data-kind="added"] {
+  --repair-colour: #009e73;
+}
