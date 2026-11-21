@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScanProgress",
+  "description": "Where a scan stands: the step, and how many of its items are done.",
+  "type": "object",
+  "properties": {
+    "done": {
+      "description": "How many items of the step are done.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "of": {
+      "description": "How many items the step has; 0 if that is not known.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "step": {
+      "description": "The step the scan is in.",
+      "$ref": "#/$defs/ScanStep"
+    },
+    "stepNumber": {
+      "description": "The step's position, counted from 1.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "steps": {
+      "description": "How many steps there are.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "step",
+    "stepNumber",
+    "steps",
+    "done",
+    "of"
+  ],
+  "$defs": {
+    "ScanStep": {
+      "description": "The steps of a scan, in the order they are taken.",
+      "oneOf": [
+        {
+          "description": "Finding the game and listing its files.",
+          "type": "string",
+          "const": "library"
+        },
+        {
+          "description": "Looking into the game's archives.",
+          "type": "string",
+          "const": "archives"
+        },
+        {
+          "description": "Reading the loose meshes.",
+          "type": "string",
+          "const": "meshes"
+        },
+        {
+          "description": "Reading the plugins.",
+          "type": "string",
+          "const": "plugins"
+        },
+        {
+          "description": "Reading the mods from the mod manager.",
+          "type": "string",
+          "const": "mods"
+        },
+        {
+          "description": "Reading the models of objects that may collide.",
+          "type": "string",
+          "const": "models"
+        },
+        {
+          "description": "Looking for problems in everything read.",
+          "type": "string",
+          "const": "checking"
+        },
+        {
+          "description": "Remembering the result.",
+          "type": "string",
+          "const": "saving"
+        }
+      ]
+    }
+  }
+}

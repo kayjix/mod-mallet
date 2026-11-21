@@ -10,6 +10,8 @@ import { openFileDuels, ScoreRing } from "./Overview";
 import { useOverviewTexts } from "./overview-texts";
 import { storedReview } from "./Review";
 import { useReviewTexts } from "./review-texts";
+import { scanTexts } from "./scan-texts";
+import "./charm.css";
 import "./journey.css";
 import "./overview.css";
 
@@ -103,7 +105,7 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
         style={hero === undefined ? undefined : { backgroundImage: `url(${hero})` }}
       >
         <div className="home-hero-text">
-          <span className="brand-tagline">{t.tagline}</span>
+          <span className="brand-tagline">{scanTexts[lang].hammeringOn}</span>
           <div className="home-hero-row">
             {health !== null && <ScoreRing score={health.score} />}
             <div className="home-hero-words">
@@ -200,6 +202,9 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
                   {isActive && <span className="game-in-use">{j.inUse}</span>}
                   {isActive && report === null && <span className="aside">{j.notScanned}</span>}
                   {state !== null && <span className="aside">{state}</span>}
+                  {knownGame !== undefined && scanTexts[lang].quips[game.id] !== undefined && (
+                    <span className="aside game-quip">{scanTexts[lang].quips[game.id]}</span>
+                  )}
                   {playable && !isActive && (
                     <button
                       type="button"

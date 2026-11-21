@@ -1,0 +1,87 @@
+/* ---- scan progress and the small jokes ------------------------------------ */
+
+.scan-progress {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--side-text);
+  font-size: 0.78rem;
+}
+
+.scan-progress-step {
+  line-height: 1.25;
+}
+
+.scan-progress-of {
+  color: var(--side-muted);
+  font-size: 0.72rem;
+}
+
+.scan-progress-bar {
+  position: relative;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 14%);
+}
+
+.scan-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, var(--brand));
+  transition: width 0.2s linear;
+}
+
+/* A step that is not counted: a short stripe goes back and forth. */
+.scan-progress-bar[data-counted="false"] .scan-progress-fill {
+  width: 35%;
+  animation: scan-progress-slide 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes scan-progress-slide {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(185%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-progress-fill {
+    transition: none;
+  }
+
+  .scan-progress-bar[data-counted="false"] .scan-progress-fill {
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* The game box: the wink above the name, the quip below it. */
+.side-game-words {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.side-game-words .brand-tagline {
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.side-game-quip {
+  color: var(--side-muted);
+  font-size: 0.7rem;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.game-quip {
+  font-style: italic;
+}

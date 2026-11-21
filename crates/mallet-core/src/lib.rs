@@ -28,6 +28,7 @@ pub mod mesh;
 pub mod mods;
 pub mod patch;
 pub mod path;
+pub mod progress;
 pub mod report;
 pub mod toolbox;
 
@@ -39,6 +40,7 @@ pub use kinds::KindInfo;
 pub use mods::{ModRef, ModSource, NoModSource};
 pub use patch::{DEFAULT_PATCH_NAME, Patch, PatchInGame, PatchPart};
 pub use path::GamePath;
+pub use progress::{Progress, ScanProgress, ScanStep};
 pub use report::{
     FilePreview, GameChoice, GameInfo, GameSupport, InstalledPatch, KnownGame, LocationOrigin,
     LocationRole, MapBounds, MapCell, MapImage, MapMarker, MapSpot, MapTerrain, MapWorld, ModInfo,

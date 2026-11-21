@@ -15,6 +15,7 @@ import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
+import type { ScanProgress } from "./generated/scan-progress";
 import { type Health, healthOf } from "./health";
 import { initialLive, type Lang, rememberLang, rememberLive, type Texts, texts } from "./i18n";
 import { type JourneyTexts, journeyTexts } from "./journey-texts";
@@ -39,6 +40,8 @@ import { pinTexts } from "./pins";
 import { Review } from "./Review";
 import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
+import { ScanProgressView, scanStepLine, useScanProgress } from "./scan-progress";
+import { scanTexts } from "./scan-texts";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 
@@ -91,6 +94,7 @@ export default function App({ api, startLang }: AppProps) {
   const [link, setLink] = useState<RenderedLink | null>(null);
   const [ignored, setIgnoredList] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
+  const scanProgress = useScanProgress(api, scanning);
   const [changed, setChanged] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [focus, setFocus] = useState<MapSpot | null>(null);
@@ -525,12 +529,14 @@ export default function App({ api, startLang }: AppProps) {
               onOpen={() => go("overview")}
               t={t}
               j={j}
+              lang={lang}
             >
               {!askFirst && (
                 <ScanBox
                   scannedAt={report?.scannedAt ?? null}
                   live={live}
                   scanning={scanning}
+                  progress={scanProgress}
                   onScan={scan}
                   lang={lang}
                   t={t}
@@ -605,7 +611,10 @@ export default function App({ api, startLang }: AppProps) {
             />
           ) : report === null && scanning ? (
             // The first scan: nothing to show yet but that Mod Mallet works.
-            <LoadingScreen title={t.scanning} note={t.scanningNote} />
+            <LoadingScreen
+              title={t.scanning}
+              note={scanProgress === null ? t.scanningNote : scanStepLine(scanProgress, lang)}
+            />
           ) : report === null ? (
             places !== null && (
               <section className="welcome">
@@ -789,16 +798,18 @@ interface GameCardProps {
   onOpen: () => void;
   t: Texts;
   j: JourneyTexts;
+  lang: Lang;
   /** Scanning, below the game's name. */
   children: ReactNode;
 }
 
 /** The game in use: its picture and name, which lead to its overview, and scanning. */
-function GameCard({ games, current, disabled, onOpen, t, j, children }: GameCardProps) {
+function GameCard({ games, current, disabled, onOpen, t, j, lang, children }: GameCardProps) {
   const activeId = games.choice?.active;
   const art = useGameArt(activeId === undefined ? [] : [activeId]);
   const picture = activeId === undefined ? undefined : art[activeId];
   const name = t.games.find((game) => game.id === activeId)?.name ?? "";
+  const quip = activeId === undefined ? undefined : scanTexts[lang].quips[activeId];
   return (
     <div className="side-game">
       <button
@@ -816,7 +827,11 @@ function GameCard({ games, current, disabled, onOpen, t, j, children }: GameCard
         >
           {picture === undefined && name.slice(0, 1)}
         </span>
-        <span className="side-game-name">{name}</span>
+        <span className="side-game-words">
+          <span className="brand-tagline">{scanTexts[lang].hammeringOn}</span>
+          <span className="side-game-name">{name}</span>
+          {quip !== undefined && <span className="side-game-quip">{quip}</span>}
+        </span>
       </button>
       {children}
     </div>
@@ -827,20 +842,23 @@ interface ScanBoxProps {
   scannedAt: number | null;
   live: boolean;
   scanning: boolean;
+  /** Where the running scan stands, if it has said. */
+  progress: ScanProgress | null;
   onScan: () => void;
   lang: Lang;
   t: Texts;
 }
 
-/** The scan button, when the last scan was, and whether Mod Mallet scans by itself. */
-function ScanBox({ scannedAt, live, scanning, onScan, lang, t }: ScanBoxProps) {
+/** The scan button, where a running scan stands, when the last scan was, and whether Mod Mallet scans by itself. */
+function ScanBox({ scannedAt, live, scanning, progress, onScan, lang, t }: ScanBoxProps) {
   return (
     <div className="scan-box">
       <button type="button" className="primary scan-button" onClick={onScan} disabled={scanning}>
         {scanning && <LoadingMallet size={26} className="loading-inline" />}
         {scanning ? t.scanning : t.scan}
       </button>
-      {scannedAt !== null && (
+      {scanning && progress !== null && <ScanProgressView progress={progress} lang={lang} />}
+      {scannedAt !== null && !(scanning && progress !== null) && (
         <span className="scan-when" title={new Date(scannedAt * 1000).toLocaleString(lang)}>
           {t.lastScan}:{" "}
           {new Date(scannedAt * 1000).toLocaleString(lang, {

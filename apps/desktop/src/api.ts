@@ -5,6 +5,7 @@
 // that the other does not follow fails the type check.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
 import type { AssetVersions } from "./generated/asset-versions";
@@ -22,6 +23,7 @@ import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
 import type { Action, ObjectRef, Patch, RenderedReport } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
+import type { ScanProgress } from "./generated/scan-progress";
 import type { Lang } from "./i18n";
 
 /** The places the user named, by what they are for. */
@@ -30,6 +32,11 @@ export type NamedPlaces = Partial<Record<ScanLocation["role"], string>>;
 export interface Api {
   /** Examines the setup and returns what is wrong with it. */
   scan(lang: Lang): Promise<RenderedReport>;
+  /**
+   * Calls `listener` while a scan runs, with the step it is in and how far it
+   * is. Returns the function that stops listening.
+   */
+  onScanProgress(listener: (progress: ScanProgress) => void): () => void;
   /** The result of the last scan, or `null` if there is none yet. */
   lastReport(lang: Lang): Promise<RenderedReport | null>;
   /**
@@ -157,6 +164,12 @@ export interface Api {
 
 const tauriApi: Api = {
   scan: (lang) => invoke<RenderedReport>("scan", { lang }),
+  onScanProgress: (listener) => {
+    const stopped = listen<ScanProgress>("scan-progress", (event) => listener(event.payload));
+    return () => {
+      void stopped.then((stop) => stop());
+    };
+  },
   lastReport: (lang) => invoke<RenderedReport | null>("last_report", { lang }),
   runAction: (action, lang) => invoke<RenderedOutcome>("run_action", { action, lang }),
   managerLink: (lang) => invoke<RenderedLink>("manager_link", { lang }),

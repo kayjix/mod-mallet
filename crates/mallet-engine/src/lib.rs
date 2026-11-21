@@ -39,7 +39,7 @@ use mallet_analysis::Context;
 use mallet_core::facts::{ExtenderReport, InstallerFacts};
 use mallet_core::{
     Facts, GameInfo, GamePath, InstalledPatch, LocationOrigin, LocationRole, ModInfo, ModSource,
-    NoCache, NoModSource, ScanLocation, ScanReport, TextCache, report,
+    NoCache, NoModSource, Progress, ScanLocation, ScanReport, ScanStep, TextCache, report,
 };
 use mallet_game_bethesda::{Game, crash_logs, ingest, locate, skse_log};
 use mallet_source_vortex::{VortexDeployment, VortexError};
@@ -208,10 +208,24 @@ pub enum EngineError {
 /// Nothing is remembered between calls, so everything is read again each
 /// time. [`scan_and_store`] is faster from the second scan on.
 pub fn scan(options: &ScanOptions) -> Result<ScanReport, EngineError> {
-    scan_with(options, None)
+    scan_with(options, None, &Progress::none())
 }
 
-fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport, EngineError> {
+/// Like [`scan`], and tells `progress` which step it is in and how far it is.
+pub fn scan_with_progress(
+    options: &ScanOptions,
+    progress: &Progress<'_>,
+) -> Result<ScanReport, EngineError> {
+    scan_with(options, None, progress)
+}
+
+#[allow(clippy::too_many_lines)]
+fn scan_with(
+    options: &ScanOptions,
+    store: Option<&Store>,
+    progress: &Progress<'_>,
+) -> Result<ScanReport, EngineError> {
+    progress.step(ScanStep::Library);
     let game = options.game()?;
     let (game_dir, game_dir_origin) = options
         .located_game_dir()
@@ -230,12 +244,13 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
     let started = Instant::now();
     let mut facts = match store {
         // Reading the setup writes thousands of small cache entries.
-        Some(store) => {
-            store.batched(|| gather_facts(options, game, &game_dir, store, &mut locations))??
-        }
-        None => gather_facts(options, game, &game_dir, &NoCache, &mut locations)?,
+        Some(store) => store.batched(|| {
+            gather_facts(options, game, &game_dir, store, &mut locations, progress)
+        })??,
+        None => gather_facts(options, game, &game_dir, &NoCache, &mut locations, progress)?,
     };
     facts.knowledge = knowledge::read(options, game, &game_dir, &facts.plugins, &mut locations);
+    progress.step(ScanStep::Mods);
     let (mods, installers, mod_infos) = load_mod_source(options, &game_dir, store, &mut locations)?;
     facts.installers = installers;
     tracing::info!(
@@ -258,6 +273,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
     // Where objects of two mods meet by their boxes, their models decide
     // (ADR 0039). Only those models are read, and those of the hidden
     // objects.
+    progress.step(ScanStep::Models);
     let started = Instant::now();
     let mut wanted =
         mallet_analysis::objects::models_to_check(&Context::new(&facts, mods.as_ref()));
@@ -268,11 +284,12 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         &facts,
         &mut wanted,
     );
-    facts.models = mallet_game_bethesda::models::read_models(
+    facts.models = mallet_game_bethesda::models::read_models_with(
         game,
         &game_dir,
         options.local_dir.as_deref(),
         &wanted,
+        progress,
     );
     tracing::info!(
         wanted = wanted.len(),
@@ -281,6 +298,7 @@ fn scan_with(options: &ScanOptions, store: Option<&Store>) -> Result<ScanReport,
         "read the models of objects that may collide"
     );
 
+    progress.step(ScanStep::Checking);
     let started = Instant::now();
     let context = Context::new(&facts, mods.as_ref());
     let findings = mallet_analysis::run_all(&context);
@@ -459,8 +477,19 @@ pub fn map_image(options: &ScanOptions, world: &str) -> Option<mallet_core::MapI
 /// remembered for [`last_report`]. Each game has a cache of its own next
 /// to `cache_path`.
 pub fn scan_and_store(options: &ScanOptions, cache_path: &Path) -> Result<ScanReport, EngineError> {
+    scan_and_store_with_progress(options, cache_path, &Progress::none())
+}
+
+/// Like [`scan_and_store`], and tells `progress` which step it is in and how
+/// far it is.
+pub fn scan_and_store_with_progress(
+    options: &ScanOptions,
+    cache_path: &Path,
+    progress: &Progress<'_>,
+) -> Result<ScanReport, EngineError> {
     let mut store = open_store(&game_cache_path(cache_path, options.game()?))?;
-    let report = scan_with(options, Some(&store))?;
+    let report = scan_with(options, Some(&store), progress)?;
+    progress.step(ScanStep::Saving);
     store.save_scan(&report)?;
     Ok(report)
 }
@@ -534,6 +563,7 @@ fn gather_facts(
     game_dir: &Path,
     cache: &dyn TextCache,
     locations: &mut Vec<ScanLocation>,
+    progress: &Progress<'_>,
 ) -> Result<Facts, EngineError> {
     let log_path = match &options.extender_log {
         Some(given) => Some((given.clone(), LocationOrigin::Given)),
@@ -571,7 +601,13 @@ fn gather_facts(
     // Without a load order there is nothing to say about plugins and
     // archives. The scan still reports what it can, and says what it could
     // not look at.
-    match ingest::read_setup(game, game_dir, options.local_dir.as_deref(), cache) {
+    match ingest::read_setup_with(
+        game,
+        game_dir,
+        options.local_dir.as_deref(),
+        cache,
+        progress,
+    ) {
         Ok(setup) => {
             locations.push(ScanLocation {
                 role: LocationRole::PluginList,

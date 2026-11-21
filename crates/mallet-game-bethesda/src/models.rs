@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use mallet_core::facts::models::{ModelFacts, ModelMesh};
+use mallet_core::{Progress, ScanStep};
 
 use crate::files;
 use crate::game::Game;
@@ -28,12 +29,24 @@ pub fn read_models(
     local_dir: Option<&Path>,
     paths: &BTreeSet<String>,
 ) -> ModelFacts {
+    read_models_with(game, game_dir, local_dir, paths, &Progress::none())
+}
+
+/// Like [`read_models`], and tells `progress` how far it is.
+pub fn read_models_with(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    paths: &BTreeSet<String>,
+    progress: &Progress<'_>,
+) -> ModelFacts {
     let mut facts = ModelFacts::default();
     if paths.is_empty() {
         return facts;
     }
     let library = LodLibrary::with_prefixes(game, game_dir, local_dir, &["meshes/".to_owned()]);
-    for path in paths {
+    for (index, path) in paths.iter().enumerate() {
+        progress.count(ScanStep::Models, index + 1, paths.len());
         let Some(bytes) = library.read(path) else {
             continue;
         };

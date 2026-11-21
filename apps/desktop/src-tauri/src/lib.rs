@@ -18,7 +18,7 @@ use mallet_messages::{
     Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
     RenderedToolbox,
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Examines the setup and returns what is wrong with it, in the language
 /// `lang`. The result is remembered for [`last_report`].
@@ -26,11 +26,17 @@ use tauri::Manager;
 // window. Tauri hands command arguments over by value.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
-fn scan(lang: String) -> Result<RenderedReport, String> {
+fn scan(app: tauri::AppHandle, lang: String) -> Result<RenderedReport, String> {
     let options = settings()?.scan_options();
+    // The engine rations its reports; they go on to the window as events.
+    let forward = |progress: mallet_core::ScanProgress| {
+        // A window that is gone cannot be told; the scan goes on.
+        let _ = app.emit("scan-progress", progress);
+    };
+    let progress = mallet_core::Progress::to(&forward);
     let report = match mallet_engine::default_cache_path() {
-        Some(cache) => mallet_engine::scan_and_store(&options, &cache),
-        None => mallet_engine::scan(&options),
+        Some(cache) => mallet_engine::scan_and_store_with_progress(&options, &cache, &progress),
+        None => mallet_engine::scan_with_progress(&options, &progress),
     }
     .map_err(|error| error.to_string())?;
     Ok(render(&report, &lang))

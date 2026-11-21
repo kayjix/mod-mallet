@@ -21,7 +21,7 @@ use mallet_core::facts::{
     ArchiveFacts, ForeignMesh, MarkerFacts, MeshOverride, MeshTextures, NavmeshFacts, ObjectFacts,
     PluginFacts, TerrainFacts, UnreadableFile,
 };
-use mallet_core::{GamePath, TextCache, WorldOrigin};
+use mallet_core::{GamePath, Progress, ScanStep, TextCache, WorldOrigin};
 use mallet_formats_bethesda::plugin;
 
 use crate::game::Game;
@@ -82,6 +82,18 @@ pub fn read_setup(
     local_dir: Option<&Path>,
     cache: &dyn TextCache,
 ) -> Result<SetupFacts, IngestError> {
+    read_setup_with(game, game_dir, local_dir, cache, &Progress::none())
+}
+
+/// Like [`read_setup`], and tells `progress` which archives and plugins it
+/// is reading.
+pub fn read_setup_with(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    cache: &dyn TextCache,
+    progress: &Progress<'_>,
+) -> Result<SetupFacts, IngestError> {
     let (active_plugins, plugin_list) = active_plugins(game, game_dir, local_dir)?;
     let data_dir = game_dir.join("Data");
     let data_path = GamePath::new(DATA_DIR);
@@ -95,9 +107,12 @@ pub fn read_setup(
     let mut loaded_archives = Vec::new();
 
     let archives_on_disk = archives_in(game, &data_dir)?;
-    for name in archives::load_order(game, &archives_on_disk, &active_plugins) {
-        let path = data_path.join(&name);
-        let file = data_dir.join(&name);
+    let archive_names = archives::load_order(game, &archives_on_disk, &active_plugins);
+    progress.step(ScanStep::Archives);
+    for (index, name) in archive_names.iter().enumerate() {
+        progress.count(ScanStep::Archives, index + 1, archive_names.len());
+        let path = data_path.join(name);
+        let file = data_dir.join(name);
         match archive::read_directory(&file) {
             Ok(directory) => {
                 facts.archives.push(ArchiveFacts {
@@ -117,6 +132,7 @@ pub fn read_setup(
             Err(reason) => facts.unreadable.push(UnreadableFile { path, reason }),
         }
     }
+    progress.step(ScanStep::Meshes);
     facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
     add_meshes(&mut facts, game, &loose, &loaded_archives, cache);
 
@@ -124,7 +140,10 @@ pub fn read_setup(
     let mut land = terrain::Collector::default();
     let mut game_plugins = Vec::new();
     let mut map_markers = MarkerReader::new(game, &loose, &loaded_archives, cache);
-    for name in active_plugins {
+    progress.step(ScanStep::Plugins);
+    let plugin_total = active_plugins.len();
+    for (index, name) in active_plugins.into_iter().enumerate() {
+        progress.count(ScanStep::Plugins, index + 1, plugin_total);
         let path = data_path.join(&name);
         let file = data_dir.join(&name);
         let official = game.is_official(&name);

@@ -27,6 +27,7 @@ import type {
 } from "../generated/rendered-report";
 import type { RenderedTool, RenderedToolbox, Tool } from "../generated/rendered-toolbox";
 import type { Lang } from "../i18n";
+import { onSampleScanProgress, simulateScan } from "./sample-scan";
 
 type Two = Record<Lang, string>;
 const two = (en: string, de: string): Two => ({ en, de });
@@ -1170,8 +1171,12 @@ function sampleGames(): GameChoice {
 }
 
 export const sampleApi: Api = {
-  // A scan takes a while, as a real one does, so that its animation shows.
-  scan: (lang) => new Promise((resolve) => setTimeout(() => resolve(report(lang)), 2500)),
+  // A scan takes a while and reports its steps, as a real one does.
+  scan: async (lang) => {
+    await simulateScan();
+    return report(lang);
+  },
+  onScanProgress: onSampleScanProgress,
   lastReport: () => later(null),
   runAction: (action, lang) =>
     later(
