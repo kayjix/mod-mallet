@@ -44,6 +44,7 @@ impl Vortex {
             link_dir: Some(self.link_dir()),
             timeout: Some(Duration::from_secs(5)),
             setup: None,
+            by_hand: false,
         }
     }
 

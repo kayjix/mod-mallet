@@ -26,6 +26,7 @@ mallet-formats-bethesda = { path = "crates/mallet-formats-bethesda" }
 mallet-game-bethesda = { path = "crates/mallet-game-bethesda" }
 mallet-knowledge = { path = "crates/mallet-knowledge" }
 mallet-messages = { path = "crates/mallet-messages" }
+mallet-source-mo2 = { path = "crates/mallet-source-mo2" }
 mallet-source-vortex = { path = "crates/mallet-source-vortex" }
 mallet-store = { path = "crates/mallet-store" }
 mallet-unpack = { path = "crates/mallet-unpack" }

@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use anyhow::{Context, bail};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use mallet_core::{Action, ActionStatus, ArgValue, ModRef, ScanReport, kinds};
-use mallet_engine::{ManagerOptions, ScanOptions};
+use mallet_engine::{ManagerOptions, ModManager, ScanOptions};
 use mallet_messages::{Locale, Messages};
 
 pub use text::write_report;
@@ -139,6 +139,20 @@ struct ScanArgs {
     #[arg(long, value_name = "FILE")]
     masterlist: Option<PathBuf>,
 
+    /// The mod manager that looks after the game. For Mod Organizer 2 the
+    /// places of Vortex above are not read.
+    #[arg(long, value_enum, default_value_t = Manager::Vortex)]
+    manager: Manager,
+
+    /// The Mod Organizer 2 instance: its folder, which holds
+    /// `ModOrganizer.ini`. The global instance for the game if omitted.
+    #[arg(long, value_name = "DIR", requires = "manager")]
+    mo2_instance: Option<PathBuf>,
+
+    /// The Mod Organizer 2 profile to read. The one in use if omitted.
+    #[arg(long, value_name = "NAME", requires = "manager")]
+    mo2_profile: Option<String>,
+
     /// Do not use the cache: read everything again, and do not remember the
     /// result for `mallet report`.
     #[arg(long)]
@@ -168,6 +182,14 @@ struct OutputArgs {
     /// Where the result of the last scan is kept.
     #[arg(long, value_name = "FILE")]
     cache: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Manager {
+    /// Vortex.
+    Vortex,
+    /// Mod Organizer 2.
+    Mo2,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -230,6 +252,13 @@ where
                 staging_dir: args.staging_dir,
                 unpacker: args.unpacker,
                 masterlist: args.masterlist,
+                manager: match args.manager {
+                    Manager::Vortex => ModManager::Vortex,
+                    Manager::Mo2 => ModManager::ModOrganizer {
+                        instance: args.mo2_instance,
+                        profile: args.mo2_profile,
+                    },
+                },
             };
             let report = if args.no_cache {
                 mallet_engine::scan(&options)?
@@ -288,6 +317,7 @@ fn vortex(
         link_dir: args.link_dir,
         timeout: None,
         setup: None,
+        by_hand: false,
     };
     match args.command {
         VortexCommand::Status => {

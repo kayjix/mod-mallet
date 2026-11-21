@@ -235,6 +235,7 @@ mod tests {
             duels: Vec::new(),
             unreal_paks: Vec::new(),
             switched_off_plugins: Vec::new(),
+            manager: None,
             findings: file_names
                 .iter()
                 .map(|file_name| {

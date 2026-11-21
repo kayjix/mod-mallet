@@ -114,6 +114,11 @@
           "description": "It is named in the mod manager's record of the files it deployed.",
           "type": "string",
           "const": "manager"
+        },
+        {
+          "description": "It is named in the mod manager's own settings.",
+          "type": "string",
+          "const": "manager-settings"
         }
       ]
     }

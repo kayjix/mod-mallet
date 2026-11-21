@@ -13,9 +13,27 @@ use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
 use mallet_core::duel::{ModDuel, SuggestionReason, Topic};
 use mallet_core::{
     Action, ActionOutcome, ActionStatus, ArgValue, Confidence, Finding, GameInfo, InstalledPatch,
-    KindInfo, LocationOrigin, LocationRole, ModInfo, OptionToTick, ScanLocation, ScanReport,
-    Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
+    KindInfo, LocationOrigin, LocationRole, ManagerChoice, ModInfo, OptionToTick, ScanLocation,
+    ScanReport, Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
 };
+
+/// The mod manager that knows the mod an action is about, if the action is
+/// about a mod.
+fn action_source(action: &Action) -> Option<&str> {
+    match action {
+        Action::ReinstallMod { mod_ref, .. }
+        | Action::DisableMod { mod_ref }
+        | Action::EnableMod { mod_ref } => Some(mod_ref.source.as_str()),
+        Action::FileOverrides {
+            leave_out, provide, ..
+        } => leave_out
+            .iter()
+            .chain(provide)
+            .next()
+            .map(|mod_ref| mod_ref.source.as_str()),
+        Action::HideObjects { .. } | Action::MoveObjects { .. } | Action::LoadAfter { .. } => None,
+    }
+}
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unic_langid::LanguageIdentifier;
@@ -221,6 +239,10 @@ pub struct RenderedPlaces {
     /// The places, each with its role and origin in words. A place with an
     /// empty path could not be found and has to be named by the user.
     pub places: Vec<RenderedLocation>,
+    /// The mod managers Mod Mallet can read, and which one the places are
+    /// for (ADR 0064). Filled in by the caller, which knows the machine.
+    #[serde(default)]
+    pub managers: ManagerChoice,
 }
 
 /// A scan report together with its texts in one language.
@@ -349,6 +371,12 @@ impl Messages {
 
     /// Puts a finding into words.
     pub fn render(&self, finding: &Finding) -> RenderedFinding {
+        self.render_for(finding, None)
+    }
+
+    /// Puts a finding into words, with its actions worded for the mod
+    /// manager `manager` (`vortex`, `mo2`) if it is known.
+    pub fn render_for(&self, finding: &Finding, manager: Option<&str>) -> RenderedFinding {
         let KindText {
             title,
             explanation,
@@ -375,13 +403,23 @@ impl Messages {
             actions: finding
                 .actions
                 .iter()
-                .map(|action| self.render_action(action))
+                .map(|action| self.render_action_for(action, manager))
                 .collect(),
         }
     }
 
     /// Puts an action into words.
     pub fn render_action(&self, action: &Action) -> RenderedAction {
+        self.render_action_for(action, None)
+    }
+
+    /// Puts an action into words for the mod manager `manager` (`vortex`,
+    /// `mo2`), or for the one that knows the action's mod. Mod Organizer
+    /// takes no requests, so for it the words say what to do there by hand
+    /// (ADR 0064).
+    pub fn render_action_for(&self, action: &Action, manager: Option<&str>) -> RenderedAction {
+        let by_hand = manager == Some(mallet_core::managers::MOD_ORGANIZER)
+            || action_source(action) == Some(mallet_core::managers::MOD_ORGANIZER);
         let no_ticks = Vec::new();
         let (id, args, ticks) = match action {
             Action::ReinstallMod { mod_ref, tick } => (
@@ -448,10 +486,15 @@ impl Messages {
             }
         };
         let args: Vec<_> = args.iter().map(|(name, value)| (*name, value)).collect();
+        let id = if by_hand {
+            format!("{id}-mo2")
+        } else {
+            id.to_owned()
+        };
         RenderedAction {
             action: action.clone(),
-            label: self.format(id, None, &args).0,
-            description: self.format(id, Some("description"), &args).0,
+            label: self.format(&id, None, &args).0,
+            description: self.format(&id, Some("description"), &args).0,
             guide: ticks
                 .iter()
                 .map(|tick| RenderedTick {
@@ -482,6 +525,9 @@ impl Messages {
             ActionStatus::ArchiveMissing => "outcome-archive-missing",
             ActionStatus::Unsupported => "outcome-unsupported",
             ActionStatus::Failed => "outcome-failed",
+            // A patch was written for the user to install.
+            ActionStatus::ByHand if outcome.detail.is_some() => "outcome-by-hand-patch",
+            ActionStatus::ByHand => "outcome-by-hand",
         };
         let detail = ArgValue::from(outcome.detail.as_deref().unwrap_or("?"));
         RenderedOutcome {
@@ -637,6 +683,8 @@ impl Messages {
             LocationRole::Masterlist => "location-masterlist",
             LocationRole::CrashLogs => "location-crash-logs",
             LocationRole::ModStaging => "location-mod-staging",
+            LocationRole::ManagerInstance => "location-manager-instance",
+            LocationRole::ManagerMods => "location-manager-mods",
         };
         let origin = match location.origin {
             LocationOrigin::Given => "origin-given",
@@ -645,6 +693,7 @@ impl Messages {
             LocationOrigin::Steam => "origin-steam",
             LocationOrigin::Gog => "origin-gog",
             LocationOrigin::Manager => "origin-manager",
+            LocationOrigin::ManagerSettings => "origin-manager-settings",
         };
         RenderedLocation {
             location: location.clone(),
@@ -661,6 +710,7 @@ impl Messages {
                 .iter()
                 .map(|place| self.render_location(place))
                 .collect(),
+            managers: ManagerChoice::default(),
         }
     }
 
@@ -683,7 +733,7 @@ impl Messages {
             findings: report
                 .findings
                 .iter()
-                .map(|finding| self.render(finding))
+                .map(|finding| self.render_for(finding, report.manager.as_deref()))
                 .collect(),
             mods: report.mods.clone(),
             map: report.map.clone(),
@@ -1000,6 +1050,57 @@ mod tests {
         assert_eq!(rendered.actions.len(), 1);
         assert_eq!(rendered.actions[0].label, "Reinstall in Vortex");
         assert_eq!(rendered.actions[0].action, finding.actions[0]);
+    }
+
+    /// Mod Organizer takes no requests: its actions say what to click
+    /// there (ADR 0064).
+    #[test]
+    fn actions_for_mod_organizer_say_what_to_do_there() {
+        let flora = mallet_core::ModRef {
+            source: "mo2".to_owned(),
+            id: "Flora Mod".to_owned(),
+            name: "Flora Mod".to_owned(),
+        };
+        let load_after = Action::LoadAfter {
+            plugin: "Grass.esp".to_owned(),
+            after: "Old.esp".to_owned(),
+        };
+        let overrides = Action::FileOverrides {
+            files: vec!["meshes/fern.nif".to_owned()],
+            leave_out: Vec::new(),
+            provide: vec![flora.clone()],
+        };
+        for locale in Locale::ALL {
+            let messages = Messages::new(locale);
+            // By the mod's manager, or by the manager of the report.
+            let disable = messages.render_action(&Action::DisableMod {
+                mod_ref: flora.clone(),
+            });
+            let rule = messages.render_action_for(&load_after, Some("mo2"));
+            let reset = messages.render_action_for(&overrides, None);
+            for rendered in [&disable, &rule, &reset] {
+                assert!(
+                    rendered.description.contains("Mod Organizer"),
+                    "{rendered:?}"
+                );
+                assert!(!rendered.description.contains("Vortex"), "{rendered:?}");
+            }
+            assert!(disable.label.contains("Flora Mod"));
+            let vortex_rule = messages.render_action_for(&load_after, Some("vortex"));
+            assert!(vortex_rule.description.contains("Vortex"));
+
+            let outcome = messages.render_outcome(&ActionOutcome::new(ActionStatus::ByHand));
+            assert!(outcome.message.contains("Mod Organizer"));
+            let patch = messages.render_outcome(&ActionOutcome {
+                status: ActionStatus::ByHand,
+                detail: Some(r"C:\patches\patch.zip".to_owned()),
+            });
+            assert!(
+                patch.message.contains(r"C:\patches\patch.zip"),
+                "{}",
+                patch.message
+            );
+        }
     }
 
     #[test]

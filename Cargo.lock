@@ -2340,6 +2340,7 @@ dependencies = [
  "mallet-formats-bethesda",
  "mallet-game-bethesda",
  "mallet-knowledge",
+ "mallet-source-mo2",
  "mallet-source-vortex",
  "mallet-store",
  "mallet-unpack",
@@ -2409,6 +2410,16 @@ dependencies = [
  "serde",
  "serde_json",
  "unic-langid",
+]
+
+[[package]]
+name = "mallet-source-mo2"
+version = "0.2.2"
+dependencies = [
+ "mallet-core",
+ "proptest",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

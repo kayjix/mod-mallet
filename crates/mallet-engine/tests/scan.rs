@@ -149,6 +149,7 @@ impl Setup {
             staging_dir: Some(self.game_dir().with_file_name("staging")),
             unpacker: None,
             masterlist: None,
+            manager: mallet_engine::ModManager::Vortex,
         }
     }
 

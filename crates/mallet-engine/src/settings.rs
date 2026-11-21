@@ -12,11 +12,14 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-use mallet_core::{GameChoice, KnownGame, LocationOrigin, LocationRole, ScanLocation};
+use mallet_core::{
+    GameChoice, KnownGame, LocationOrigin, LocationRole, ManagerChoice, ScanLocation,
+};
 use mallet_game_bethesda::{Game, ingest, locate};
 use mallet_unpack::Unpacker;
 use serde::{Deserialize, Serialize};
 
+use crate::managers::{self, ModManager};
 use crate::{EngineError, ScanOptions, installers, read_if_exists};
 
 /// What the user decided about one game: where Mod Mallet looks, and what
@@ -55,6 +58,11 @@ pub struct Settings {
     /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0054).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub asset_choices: BTreeMap<String, String>,
+    /// The mod manager the user chose for this game, by its identifier
+    /// (`vortex`, `mo2`). `None` while the user has chosen none; then the
+    /// one found on the machine is suggested (ADR 0064).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manager: Option<String>,
 }
 
 impl Settings {
@@ -63,14 +71,72 @@ impl Settings {
         crate::ManagerOptions {
             game: (!self.game.is_empty()).then(|| self.game.clone()),
             setup: Some(self.scan_options()),
+            by_hand: self.manager() == mallet_core::managers::MOD_ORGANIZER,
             ..crate::ManagerOptions::default()
         }
+    }
+
+    /// The identifier of the mod manager in use: the one the user chose,
+    /// or else the one suggested for this machine. Only looks whether a
+    /// few folders exist.
+    pub fn manager(&self) -> String {
+        match &self.manager {
+            Some(chosen) if ModManager::from_id(chosen, None).is_some() => chosen.clone(),
+            _ => managers::suggested(self.game_dir().as_deref()).to_owned(),
+        }
+    }
+
+    /// The mod managers Mod Mallet can read, which of them are on this
+    /// machine, and which one is in use. Opens no file.
+    pub fn managers(&self) -> ManagerChoice {
+        managers::known(
+            self.manager.as_deref(),
+            self.game_dir().as_deref(),
+            self.places
+                .get(&LocationRole::ManagerInstance)
+                .map(PathBuf::as_path),
+        )
+    }
+
+    /// These settings with the mod manager `manager` (`vortex`, `mo2`)
+    /// chosen and its instance at `instance`, or found by its rule if
+    /// `None`: for showing the places that choice would read before it is
+    /// kept. An unknown manager leaves the choice as it was.
+    #[must_use]
+    pub fn with_manager(&self, manager: &str, instance: Option<PathBuf>) -> Self {
+        let mut settings = self.clone();
+        if ModManager::from_id(manager, None).is_some() {
+            settings.manager = Some(manager.to_owned());
+        }
+        match instance {
+            Some(instance) => {
+                settings
+                    .places
+                    .insert(LocationRole::ManagerInstance, instance);
+            }
+            None => {
+                settings.places.remove(&LocationRole::ManagerInstance);
+            }
+        }
+        settings
+    }
+
+    /// The game's directory: where the user said it is, or where it is
+    /// found.
+    fn game_dir(&self) -> Option<PathBuf> {
+        if let Some(dir) = self.places.get(&LocationRole::GameDir) {
+            return Some(dir.clone());
+        }
+        locate::game_dir(Game::from_id(&self.game)?).map(|(dir, _)| dir)
     }
 
     /// The options for a scan that looks where these settings say.
     pub fn scan_options(&self) -> ScanOptions {
         let place = |role: LocationRole| self.places.get(&role).cloned();
+        let manager = ModManager::from_id(&self.manager(), place(LocationRole::ManagerInstance))
+            .unwrap_or_default();
         ScanOptions {
+            manager,
             game: (!self.game.is_empty()).then(|| self.game.clone()),
             game_dir: place(LocationRole::GameDir),
             local_dir: place(LocationRole::PluginList).map(|path| plugin_list_dir(&path)),
@@ -296,8 +362,18 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
     });
     let game_dir = game_dir.map(|(path, _)| path);
 
+    // Mod Organizer keeps the list of plugins in its profile, named in its
+    // settings, which are not opened before the user agrees (ADR 0064).
+    let mo2_instance = match &options.manager {
+        ModManager::ModOrganizer { instance, .. } => Some(instance.as_deref()),
+        ModManager::Vortex => None,
+    };
+    if let Some(instance) = mo2_instance {
+        locations.push(managers::planned_instance(instance));
+    }
     if let Some(list) = game_dir
         .as_deref()
+        .filter(|_| mo2_instance.is_none() || options.local_dir.is_some())
         .and_then(|game_dir| ingest::plugin_list_path(game, game_dir, options.local_dir.as_deref()))
     {
         let origin = given_or_standard(options.local_dir.is_some());
@@ -323,37 +399,8 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
         ));
     }
 
-    if let Some(manifest) = options.deployment_manifest.clone().or_else(|| {
-        game_dir
-            .as_deref()
-            .map(mallet_source_vortex::data_manifest_path)
-    }) {
-        let origin = given_or_standard(options.deployment_manifest.is_some());
-        locations.push(planned(
-            LocationRole::DeploymentManifest,
-            &manifest,
-            origin,
-            manifest.is_file(),
-        ));
-        locations.push(crate::staging::planned(options, manifest.is_file()));
-    }
-
-    if let Some((state, origin)) = installers::planned_state(options) {
-        locations.push(planned(
-            LocationRole::ManagerState,
-            &state,
-            origin,
-            state.is_file(),
-        ));
-    }
-
-    if let Some(downloads) = &options.downloads_dir {
-        locations.push(planned(
-            LocationRole::Downloads,
-            downloads,
-            LocationOrigin::Given,
-            downloads.is_dir(),
-        ));
+    if mo2_instance.is_none() {
+        planned_vortex(options, game_dir.as_deref(), &mut locations);
     }
 
     if let Some((masterlist, origin)) = crate::knowledge::planned_masterlist(options) {
@@ -384,6 +431,48 @@ pub fn planned_locations(options: &ScanOptions) -> Vec<ScanLocation> {
     });
 
     locations
+}
+
+/// The places of Vortex a scan with `options` would read: its list of
+/// deployed files, its folder of installed mods, its saved state and the
+/// folder of downloads if the user named it.
+fn planned_vortex(
+    options: &ScanOptions,
+    game_dir: Option<&Path>,
+    locations: &mut Vec<ScanLocation>,
+) {
+    if let Some(manifest) = options
+        .deployment_manifest
+        .clone()
+        .or_else(|| game_dir.map(mallet_source_vortex::data_manifest_path))
+    {
+        let origin = given_or_standard(options.deployment_manifest.is_some());
+        locations.push(planned(
+            LocationRole::DeploymentManifest,
+            &manifest,
+            origin,
+            manifest.is_file(),
+        ));
+        locations.push(crate::staging::planned(options, manifest.is_file()));
+    }
+
+    if let Some((state, origin)) = installers::planned_state(options) {
+        locations.push(planned(
+            LocationRole::ManagerState,
+            &state,
+            origin,
+            state.is_file(),
+        ));
+    }
+
+    if let Some(downloads) = &options.downloads_dir {
+        locations.push(planned(
+            LocationRole::Downloads,
+            downloads,
+            LocationOrigin::Given,
+            downloads.is_dir(),
+        ));
+    }
 }
 
 /// A short text that changes whenever one of the files a scan starts from
@@ -417,6 +506,10 @@ pub fn setup_fingerprint(options: &ScanOptions) -> String {
         } else {
             add(Path::new(&location.path));
         }
+    }
+    // Mod Organizer's profile changes when a mod is switched or moved.
+    for file in managers::watched_files(options) {
+        add(&file);
     }
     format!("{:016x}", hasher.finish())
 }
@@ -588,6 +681,7 @@ mod tests {
                 "skyrim.esm/00013989".to_owned(),
                 "mod:Better Blades".to_owned(),
             )]),
+            manager: Some("mo2".to_owned()),
         };
 
         save_settings(&path, &settings).unwrap();

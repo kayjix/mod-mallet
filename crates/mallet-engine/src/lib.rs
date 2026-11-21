@@ -24,6 +24,7 @@ mod installers;
 mod knowledge;
 mod lod;
 mod logging;
+mod managers;
 mod mesh;
 mod moves;
 mod patch;
@@ -47,6 +48,7 @@ use mallet_core::{
     Facts, GameInfo, GamePath, InstalledPatch, LocationOrigin, LocationRole, ModInfo, ModSource,
     NoCache, NoModSource, Progress, ScanLocation, ScanReport, ScanStep, TextCache, report,
 };
+use mallet_game_bethesda::ingest::VirtualData;
 use mallet_game_bethesda::{Game, crash_logs, ingest, locate, skse_log};
 use mallet_source_vortex::{VortexDeployment, VortexError};
 use mallet_store::{Store, StoreError};
@@ -62,6 +64,7 @@ pub use compare::compare_files;
 pub use dashboard::announce_app;
 pub use lod::{lod_mesh, lod_texture, lod_tiles};
 pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
+pub use managers::ModManager;
 pub use mesh::mesh_view;
 pub use moves::{create_moves, moves_file};
 pub use preview::file_preview;
@@ -107,6 +110,9 @@ pub struct ScanOptions {
     /// The LOOT masterlist, whose rules about plugins are checked.
     /// Detected automatically only if `manager_state` is, too.
     pub masterlist: Option<PathBuf>,
+    /// The mod manager that looks after the game. The places above that
+    /// belong to Vortex are not read for Mod Organizer (ADR 0064).
+    pub manager: ModManager,
 }
 
 impl ScanOptions {
@@ -269,17 +275,28 @@ fn scan_with(
         found: true,
     }];
 
+    // Mod Organizer leaves the mods in their folders and keeps the list of
+    // plugins in its profile: it is read first, so that the game's data
+    // directory is read as the game sees it (ADR 0064).
+    let manager = managers::ScanManager::read(options, game, &mut locations);
+    let virtual_data = manager.virtual_data();
+    let effective = manager.scan_options(options);
+    let options = effective.as_ref().unwrap_or(options);
+
     let started = Instant::now();
-    let mut facts = match store {
-        // Reading the setup writes thousands of small cache entries.
-        Some(store) => store.batched(|| {
-            gather_facts(options, game, &game_dir, store, &mut locations, progress)
-        })??,
-        None => gather_facts(options, game, &game_dir, &NoCache, &mut locations, progress)?,
-    };
+    let mut facts = gather_cached(
+        options,
+        game,
+        &game_dir,
+        &virtual_data,
+        store,
+        &mut locations,
+        progress,
+    )?;
     facts.knowledge = knowledge::read(options, game, &game_dir, &facts.plugins, &mut locations);
     progress.step(ScanStep::Mods);
-    let (mods, installers, mod_infos) = load_mod_source(options, &game_dir, store, &mut locations)?;
+    let (mods, installers, mod_infos) =
+        manager.into_parts(options, &game_dir, store, &mut locations)?;
     facts.installers = installers;
     facts.switched_off_plugins =
         switched_off::plugins(game, &game_dir, &facts.plugins, mods.as_ref());
@@ -361,16 +378,25 @@ fn scan_with(
         findings,
         mods: mod_infos,
         map,
-        object_swapper: game.has_object_swapper()
-            && game_dir
-                .join("Data")
-                .join(mallet_game_bethesda::swap::SWAPPER_PLUGIN)
-                .is_file(),
+        object_swapper: object_swapper_installed(game, &game_dir, &virtual_data),
         installed_patch,
         duels,
         unreal_paks,
         switched_off_plugins: facts.switched_off_plugins.clone(),
+        manager: Some(options.manager.id().to_owned()),
     })
+}
+
+/// Whether Base Object Swapper is in the game's data directory, or in a
+/// folder a mod manager lays over it (ADR 0064).
+fn object_swapper_installed(game: Game, game_dir: &Path, virtual_data: &VirtualData) -> bool {
+    game.has_object_swapper()
+        && std::iter::once(game_dir.join("Data"))
+            .chain(virtual_data.folders.iter().cloned())
+            .any(|dir| {
+                dir.join(mallet_game_bethesda::swap::SWAPPER_PLUGIN)
+                    .is_file()
+            })
 }
 
 /// Swap files larger than this are not read: a part of a patch is a few
@@ -591,10 +617,46 @@ fn open_store(cache_path: &Path) -> Result<Store, EngineError> {
     Ok(Store::open(cache_path)?)
 }
 
+/// [`gather_facts`] with the cache in `store`, if there is one.
+fn gather_cached(
+    options: &ScanOptions,
+    game: Game,
+    game_dir: &Path,
+    virtual_data: &VirtualData,
+    store: Option<&Store>,
+    locations: &mut Vec<ScanLocation>,
+    progress: &Progress<'_>,
+) -> Result<Facts, EngineError> {
+    match store {
+        // Reading the setup writes thousands of small cache entries.
+        Some(store) => store.batched(|| {
+            gather_facts(
+                options,
+                game,
+                game_dir,
+                virtual_data,
+                store,
+                locations,
+                progress,
+            )
+        })?,
+        None => gather_facts(
+            options,
+            game,
+            game_dir,
+            virtual_data,
+            &NoCache,
+            locations,
+            progress,
+        ),
+    }
+}
+
 fn gather_facts(
     options: &ScanOptions,
     game: Game,
     game_dir: &Path,
+    virtual_data: &VirtualData,
     cache: &dyn TextCache,
     locations: &mut Vec<ScanLocation>,
     progress: &Progress<'_>,
@@ -619,7 +681,9 @@ fn gather_facts(
                 origin,
                 found: text.is_some(),
             });
-            text.map(|text| without_removed_plugins(skse_log::parse(game, &text), game_dir))
+            text.map(|text| {
+                without_removed_plugins(skse_log::parse(game, &text), game_dir, virtual_data)
+            })
         }
         None => None,
     };
@@ -635,10 +699,11 @@ fn gather_facts(
     // Without a load order there is nothing to say about plugins and
     // archives. The scan still reports what it can, and says what it could
     // not look at.
-    match ingest::read_setup_with(
+    match ingest::read_setup_in(
         game,
         game_dir,
         options.local_dir.as_deref(),
+        virtual_data,
         cache,
         progress,
     ) {
@@ -646,7 +711,10 @@ fn gather_facts(
             locations.push(ScanLocation {
                 role: LocationRole::PluginList,
                 path: setup.plugin_list.display().to_string(),
-                origin: if options.local_dir.is_some() {
+                // Mod Organizer's list lies in its profile.
+                origin: if !virtual_data.folders.is_empty() {
+                    LocationOrigin::ManagerSettings
+                } else if options.local_dir.is_some() {
                     LocationOrigin::Given
                 } else {
                     LocationOrigin::Standard
@@ -763,15 +831,31 @@ fn load_mod_source(
 /// game. The log describes the last start of the game; a plugin removed
 /// since, by switching its mod off for example, will not be tried again,
 /// and reporting it would ask the user to fix what they already fixed.
-fn without_removed_plugins(mut report: ExtenderReport, game_dir: &Path) -> ExtenderReport {
+fn without_removed_plugins(
+    mut report: ExtenderReport,
+    game_dir: &Path,
+    virtual_data: &VirtualData,
+) -> ExtenderReport {
     // Without the game's data folder there is nothing to compare with; the
     // scan reports that on its own.
     if !game_dir.join("Data").is_dir() {
         return report;
     }
     let dir = game_dir.join(report.plugin_dir.as_str());
+    // Mod Organizer shows the game the plugins in the mods' folders.
+    let below_data = report.plugin_dir.strip_base(&GamePath::new("data"));
+    let virtual_dirs: Vec<PathBuf> = below_data.map_or_default(|below| {
+        virtual_data
+            .folders
+            .iter()
+            .map(|folder| folder.join(below.as_str()))
+            .collect()
+    });
     report.plugins.retain(|plugin| {
-        let present = dir.join(&plugin.file_name).is_file();
+        let present = dir.join(&plugin.file_name).is_file()
+            || virtual_dirs
+                .iter()
+                .any(|folder| folder.join(&plugin.file_name).is_file());
         if !present {
             tracing::info!(
                 plugin = %plugin.file_name,

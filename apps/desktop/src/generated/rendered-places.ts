@@ -9,11 +9,77 @@ export interface RenderedPlaces {
    * Whether the user has agreed to these places before.
    */
   confirmed: boolean;
+  managers?: ManagerChoice;
   /**
    * The places, each with its role and origin in words. A place with an
    * empty path could not be found and has to be named by the user.
    */
   places: RenderedLocation[];
+}
+/**
+ * The mod managers Mod Mallet can read, and which one the places are
+ * for (ADR 0064). Filled in by the caller, which knows the machine.
+ */
+export interface ManagerChoice {
+  /**
+   * The manager in use, by its identifier: the one the user chose, or
+   * else the one suggested.
+   */
+  active: string;
+  /**
+   * Whether the user chose it. If not, it is a suggestion.
+   */
+  chosen: boolean;
+  /**
+   * Every manager Mod Mallet can read.
+   */
+  managers: KnownManager[];
+}
+/**
+ * A mod manager Mod Mallet can read.
+ */
+export interface KnownManager {
+  /**
+   * Whether it was found on this machine, without opening any of its
+   * files.
+   */
+  found: boolean;
+  /**
+   * Its identifier: `vortex` or `mo2`.
+   */
+  id: string;
+  /**
+   * Its instances that were found, for a manager that has them (Mod
+   * Organizer 2). Portable instances are only known if the user named
+   * one.
+   */
+  instances: KnownInstance[];
+  /**
+   * Whether Mod Mallet can hand it actions through a link. Without one,
+   * actions are described for the user to make by hand.
+   */
+  link: boolean;
+  /**
+   * Its name, as it calls itself.
+   */
+  name: string;
+}
+/**
+ * An instance of a mod manager: one setup it manages, in a folder.
+ */
+export interface KnownInstance {
+  /**
+   * Its name: the folder's name.
+   */
+  name: string;
+  /**
+   * The folder.
+   */
+  path: string;
+  /**
+   * Whether it is portable: kept anywhere, beside the program.
+   */
+  portable: boolean;
 }
 /**
  * A place the scan looked at, with its role and origin in words.
@@ -40,7 +106,7 @@ export interface ScanLocation {
   /**
    * How Mod Mallet came to look there.
    */
-  origin: "given" | "registry" | "standard" | "steam" | "gog" | "manager";
+  origin: "given" | "registry" | "standard" | "steam" | "gog" | "manager" | "manager-settings";
   /**
    * The path on this machine.
    */
@@ -58,5 +124,7 @@ export interface ScanLocation {
     | "deployment-manifest"
     | "masterlist"
     | "crash-logs"
-    | "mod-staging";
+    | "mod-staging"
+    | "manager-instance"
+    | "manager-mods";
 }

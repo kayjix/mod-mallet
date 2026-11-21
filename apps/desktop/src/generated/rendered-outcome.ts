@@ -32,5 +32,6 @@ export interface ActionOutcome {
     | "unknown-mod"
     | "archive-missing"
     | "unsupported"
-    | "failed";
+    | "failed"
+    | "by-hand";
 }

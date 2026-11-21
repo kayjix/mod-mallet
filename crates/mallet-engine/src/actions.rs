@@ -35,6 +35,10 @@ pub struct ManagerOptions {
     /// Where the game's setup is, for actions that read it before they
     /// hand something to the mod manager, such as moving objects.
     pub setup: Option<crate::ScanOptions>,
+    /// Whether the mod manager takes no requests from outside, as Mod
+    /// Organizer 2: every action is then left to the user, who makes the
+    /// change in the manager as the action describes (ADR 0064).
+    pub by_hand: bool,
 }
 
 impl ManagerOptions {
@@ -119,6 +123,9 @@ pub fn install_manager_link(options: &ManagerOptions) -> Result<PathBuf, EngineE
 /// Hands `action` to the tool that carries it out and says what became of
 /// it.
 pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
+    if options.by_hand {
+        return by_hand(action, options);
+    }
     match action {
         Action::ReinstallMod { mod_ref, tick } if mod_ref.source == SOURCE_ID => {
             reinstall_in_vortex(&mod_ref.id, tick, options)
@@ -181,6 +188,10 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
 /// to take it off the list (ADR 0063). Only to be called because the user
 /// pressed the button.
 pub fn set_mallet_tool(options: &ManagerOptions, add: bool) -> ActionOutcome {
+    // Vortex's list of tools is not Mod Organizer's (ADR 0064).
+    if options.by_hand {
+        return ActionOutcome::new(ActionStatus::ByHand);
+    }
     in_vortex(options, |link, timeout| {
         tracing::info!(
             add,
@@ -188,6 +199,27 @@ pub fn set_mallet_tool(options: &ManagerOptions, add: bool) -> ActionOutcome {
         );
         link.mallet_tool(options.vortex_game(), add, timeout)
     })
+}
+
+/// An action for a mod manager that takes no requests (ADR 0064). Nothing
+/// in the manager's files is touched: the user makes the change there.
+/// Only a patch is written, into Mod Mallet's own folder, so that the user
+/// has an archive to install; its path is the outcome's detail.
+fn by_hand(action: &Action, options: &ManagerOptions) -> ActionOutcome {
+    tracing::info!("an action is left to the user: the mod manager takes no requests");
+    let Action::HideObjects { patch } = action else {
+        return ActionOutcome::new(ActionStatus::ByHand);
+    };
+    match create_patch(patch, options) {
+        Ok(created) => ActionOutcome {
+            status: ActionStatus::ByHand,
+            detail: Some(created.path.display().to_string()),
+        },
+        Err(error) => ActionOutcome {
+            status: ActionStatus::Failed,
+            detail: Some(error.to_string()),
+        },
+    }
 }
 
 /// Hands a request to Vortex through the link, if the link is there.

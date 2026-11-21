@@ -102,18 +102,43 @@ fn places(lang: String) -> Result<RenderedPlaces, String> {
     Ok(render_places(&settings()?, &lang))
 }
 
-/// Remembers the places the user named and that they agreed to the rest.
-/// `named` holds only what the user chose; every other place is found by
-/// its rule. Only ever called because the user pressed a button.
+/// The places a scan would read with the mod manager `manager` (`vortex`,
+/// `mo2`) and its instance at `instance`, in the language `lang`. Nothing
+/// is kept and nothing is read: the user is still choosing (ADR 0064).
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn places_for_manager(
+    manager: String,
+    instance: Option<String>,
+    lang: String,
+) -> Result<RenderedPlaces, String> {
+    let instance = instance
+        .map(|path| path.trim().to_owned())
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from);
+    Ok(render_places(
+        &settings()?.with_manager(&manager, instance),
+        &lang,
+    ))
+}
+
+/// Remembers the places the user named, the mod manager they chose, and
+/// that they agreed to the rest. `named` holds only what the user chose;
+/// every other place is found by its rule. Only ever called because the
+/// user pressed a button.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 fn confirm_places(
     named: BTreeMap<LocationRole, String>,
+    manager: Option<String>,
     lang: String,
 ) -> Result<RenderedPlaces, String> {
     // What else the user decided stays as it was.
     let settings = change_settings(|settings| {
         settings.confirmed = true;
+        if let Some(manager) = manager {
+            settings.manager = Some(manager);
+        }
         settings.places = named
             .into_iter()
             .map(|(role, path)| (role, path.trim().to_owned()))
@@ -688,7 +713,10 @@ fn change_settings(change: impl FnOnce(&mut Settings)) -> Result<Settings, Strin
 
 fn render_places(settings: &Settings, lang: &str) -> RenderedPlaces {
     let planned = mallet_engine::planned_locations(&settings.scan_options());
-    messages(lang).render_places(settings.confirmed, &planned)
+    RenderedPlaces {
+        managers: settings.managers(),
+        ..messages(lang).render_places(settings.confirmed, &planned)
+    }
 }
 
 fn messages(lang: &str) -> Messages {
@@ -748,6 +776,7 @@ pub fn run() -> tauri::Result<()> {
             install_manager_link,
             set_vortex_tool,
             places,
+            places_for_manager,
             confirm_places,
             ignored,
             set_ignored,

@@ -447,7 +447,7 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
   };
 }
 
-function places(lang: Lang, confirmed: boolean): RenderedPlaces {
+function places(lang: Lang, confirmed: boolean, manager = "vortex"): RenderedPlaces {
   const de = lang === "de";
   const standard = de ? "am üblichen Ort" : "at its standard place";
   return {
@@ -492,7 +492,43 @@ function places(lang: Lang, confirmed: boolean): RenderedPlaces {
           : "Program for looking into mod archives",
         originLabel: standard,
       },
+      ...(manager === "mo2"
+        ? [
+            {
+              location: {
+                role: "manager-instance" as const,
+                path: "C:\\Users\\you\\AppData\\Local\\ModOrganizer\\Skyrim SE",
+                origin: "standard" as const,
+                found: true,
+              },
+              roleLabel: de
+                ? "Mod Organizers Instanz (seine Einstellungen, das verwendete Profil und was er über jede Mod weiß)"
+                : "Mod Organizer's instance (its settings, the profile in use and what it knows about each mod)",
+              originLabel: standard,
+            },
+          ]
+        : []),
     ],
+    managers: {
+      active: manager,
+      chosen: confirmed,
+      managers: [
+        { id: "vortex", name: "Vortex", found: true, link: true, instances: [] },
+        {
+          id: "mo2",
+          name: "Mod Organizer 2",
+          found: true,
+          link: false,
+          instances: [
+            {
+              name: "Skyrim SE",
+              path: "C:\\Users\\you\\AppData\\Local\\ModOrganizer\\Skyrim SE",
+              portable: false,
+            },
+          ],
+        },
+      ],
+    },
   };
 }
 
@@ -1229,6 +1265,7 @@ function later<T>(value: T): Promise<T> {
 // The made-up machine: nothing is agreed to and the link is missing until
 // the buttons are pressed.
 let confirmed = false;
+let sampleManager = "vortex";
 let linkInstalled = false;
 const ignoredIds = new Set<string>();
 let decided: Record<string, number> = {};
@@ -1331,10 +1368,12 @@ export const sampleApi: Api = {
       message:
         lang === "de" ? "Vortex hat die Änderung vorgenommen." : "Vortex has made the change.",
     }),
-  places: (lang) => later(places(lang, confirmed)),
-  confirmPlaces: (_named, lang) => {
+  places: (lang) => later(places(lang, confirmed, sampleManager)),
+  placesForManager: (manager, _instance, lang) => later(places(lang, confirmed, manager)),
+  confirmPlaces: (_named, manager, lang) => {
     confirmed = true;
-    return later(places(lang, confirmed));
+    sampleManager = manager ?? sampleManager;
+    return later(places(lang, confirmed, sampleManager));
   },
   ignored: () => later([...ignoredIds]),
   setIgnored: (id, aside) => {

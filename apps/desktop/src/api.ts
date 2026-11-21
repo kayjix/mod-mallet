@@ -67,8 +67,16 @@ export interface Api {
   setVortexTool(add: boolean, lang: Lang): Promise<RenderedOutcome>;
   /** The places a scan would read, and whether the user has agreed to them. */
   places(lang: Lang): Promise<RenderedPlaces>;
-  /** Remembers the places the user named and that they agreed to the rest. */
-  confirmPlaces(named: NamedPlaces, lang: Lang): Promise<RenderedPlaces>;
+  /**
+   * The places a scan would read with another mod manager, and its instance
+   * if one was picked. Nothing is kept until the places are confirmed.
+   */
+  placesForManager(manager: string, instance: string | null, lang: Lang): Promise<RenderedPlaces>;
+  /**
+   * Remembers the places the user named, the mod manager they chose (null
+   * keeps the one before), and that they agreed to the rest.
+   */
+  confirmPlaces(named: NamedPlaces, manager: string | null, lang: Lang): Promise<RenderedPlaces>;
   /** The identities of the findings the user has set aside. */
   ignored(): Promise<string[]>;
   /** Sets a finding aside or brings it back; resolves to all set aside. */
@@ -200,7 +208,10 @@ const tauriApi: Api = {
   installManagerLink: (lang) => invoke<string>("install_manager_link", { lang }),
   setVortexTool: (add, lang) => invoke<RenderedOutcome>("set_vortex_tool", { add, lang }),
   places: (lang) => invoke<RenderedPlaces>("places", { lang }),
-  confirmPlaces: (named, lang) => invoke<RenderedPlaces>("confirm_places", { named, lang }),
+  placesForManager: (manager, instance, lang) =>
+    invoke<RenderedPlaces>("places_for_manager", { manager, instance, lang }),
+  confirmPlaces: (named, manager, lang) =>
+    invoke<RenderedPlaces>("confirm_places", { named, manager, lang }),
   ignored: () => invoke<string[]>("ignored"),
   setIgnored: (id, ignored) => invoke<string[]>("set_ignored", { id, ignored }),
   setupFingerprint: () => invoke<string>("setup_fingerprint"),

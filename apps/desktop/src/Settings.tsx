@@ -9,7 +9,7 @@ import { Places } from "./Places";
 interface SettingsProps {
   places: RenderedPlaces | null;
   busy: boolean;
-  onConfirmPlaces: (named: NamedPlaces) => void;
+  onConfirmPlaces: (named: NamedPlaces, manager: string | null) => void;
   onLang: (lang: Lang) => void;
   live: boolean;
   onLive: (live: boolean) => void;

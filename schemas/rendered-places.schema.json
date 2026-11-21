@@ -8,6 +8,15 @@
       "description": "Whether the user has agreed to these places before.",
       "type": "boolean"
     },
+    "managers": {
+      "description": "The mod managers Mod Mallet can read, and which one the places are\nfor (ADR 0064). Filled in by the caller, which knows the machine.",
+      "$ref": "#/$defs/ManagerChoice",
+      "default": {
+        "active": "",
+        "chosen": false,
+        "managers": []
+      }
+    },
     "places": {
       "description": "The places, each with its role and origin in words. A place with an\nempty path could not be found and has to be named by the user.",
       "type": "array",
@@ -21,6 +30,65 @@
     "places"
   ],
   "$defs": {
+    "KnownInstance": {
+      "description": "An instance of a mod manager: one setup it manages, in a folder.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Its name: the folder's name.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The folder.",
+          "type": "string"
+        },
+        "portable": {
+          "description": "Whether it is portable: kept anywhere, beside the program.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "portable"
+      ]
+    },
+    "KnownManager": {
+      "description": "A mod manager Mod Mallet can read.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "description": "Whether it was found on this machine, without opening any of its\nfiles.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Its identifier: `vortex` or `mo2`.",
+          "type": "string"
+        },
+        "instances": {
+          "description": "Its instances that were found, for a manager that has them (Mod\nOrganizer 2). Portable instances are only known if the user named\none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KnownInstance"
+          }
+        },
+        "link": {
+          "description": "Whether Mod Mallet can hand it actions through a link. Without one,\nactions are described for the user to make by hand.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Its name, as it calls itself.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "found",
+        "link",
+        "instances"
+      ]
+    },
     "LocationOrigin": {
       "description": "How Mod Mallet came to look at a place.",
       "oneOf": [
@@ -53,6 +121,11 @@
           "description": "It is named in the mod manager's record of the files it deployed.",
           "type": "string",
           "const": "manager"
+        },
+        {
+          "description": "It is named in the mod manager's own settings.",
+          "type": "string",
+          "const": "manager-settings"
         }
       ]
     },
@@ -108,7 +181,43 @@
           "description": "The folder the mod manager keeps every installed mod's files in,\ndeployed or not. Only the names of the files are read.",
           "type": "string",
           "const": "mod-staging"
+        },
+        {
+          "description": "The instance of a mod manager that keeps its settings in a folder\nof their own, Mod Organizer 2: its settings, the profile in use and\nwhat it knows about each mod (ADR 0064).",
+          "type": "string",
+          "const": "manager-instance"
+        },
+        {
+          "description": "The folder of a mod manager that leaves the files in each mod's\nfolder, Mod Organizer 2. The game sees them there, so the files the\ngame would read are read there (ADR 0064).",
+          "type": "string",
+          "const": "manager-mods"
         }
+      ]
+    },
+    "ManagerChoice": {
+      "description": "The mod managers Mod Mallet knows, which of them are on this machine,\nand which one looks after the game the user looks at.",
+      "type": "object",
+      "properties": {
+        "active": {
+          "description": "The manager in use, by its identifier: the one the user chose, or\nelse the one suggested.",
+          "type": "string"
+        },
+        "chosen": {
+          "description": "Whether the user chose it. If not, it is a suggestion.",
+          "type": "boolean"
+        },
+        "managers": {
+          "description": "Every manager Mod Mallet can read.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KnownManager"
+          }
+        }
+      },
+      "required": [
+        "active",
+        "chosen",
+        "managers"
       ]
     },
     "RenderedLocation": {

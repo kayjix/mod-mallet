@@ -30,7 +30,12 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 /// mod manager and Mod Mallet's link to it, the game's script extender and
 /// its libraries, and the tools Mod Mallet uses. Only reads.
 pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
-    let mut found = vortex(manager);
+    // Mod Organizer has no link to install or restart (ADR 0064).
+    let mut found = if manager.by_hand {
+        Vec::new()
+    } else {
+        vortex(manager)
+    };
     if let (Ok(game), Some((game_dir, _))) = (scan.game(), scan.located_game_dir()) {
         let game_version = scan
             .extender_log
@@ -44,13 +49,19 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
             game_version.as_deref(),
         ));
         // Vortex has LOOT built in; then LOOT on its own is not needed.
-        if let Some(built_in) = loot_in_vortex(manager, scan.game_id())
+        if let Some(built_in) = loot_in_vortex(manager, scan.game_id()).filter(|_| !manager.by_hand)
             && let Some(loot) = found.iter_mut().find(|tool| tool.id == "loot")
         {
             *loot = built_in;
         }
     }
-    let entries = crate::installers::manager_tools(scan);
+    // Vortex's list of tools, and Mod Mallet's place on it, do not apply to
+    // Mod Organizer (ADR 0064).
+    let entries = if manager.by_hand {
+        Vec::new()
+    } else {
+        crate::installers::manager_tools(scan)
+    };
     let listed = listed_tools(&entries, &found, |path| Path::new(path).is_file());
     // Whether Mod Mallet is among Vortex's tools, which the user can change
     // here; shown once the link can carry the request out or when it is

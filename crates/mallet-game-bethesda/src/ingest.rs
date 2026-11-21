@@ -71,6 +71,44 @@ pub enum IngestError {
     DataDir(#[from] io::Error),
 }
 
+/// Folders whose files the game sees in its data directory as if they were
+/// there, as Mod Organizer shows them through its virtual file system
+/// (ADR 0064). Empty for a mod manager that puts the files into the data
+/// directory itself.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct VirtualData {
+    /// The folders, the one whose files win first. Behind all of them lies
+    /// the game's own data directory.
+    pub folders: Vec<PathBuf>,
+}
+
+impl VirtualData {
+    /// The file the game sees as `name` directly in its data directory: the
+    /// copy in the first folder that has one, else the one in `data_dir`.
+    fn resolve(&self, data_dir: &Path, name: &str) -> PathBuf {
+        self.folders
+            .iter()
+            .map(|folder| folder.join(name))
+            .find(|file| file.is_file())
+            .unwrap_or_else(|| data_dir.join(name))
+    }
+
+    /// The archives of `game` the game sees in its data directory, by file
+    /// name: those in `data_dir` and in the folders. A folder that cannot
+    /// be listed adds none.
+    fn archives(&self, game: Game, data_dir: &Path) -> io::Result<Vec<String>> {
+        let mut names = archives_in(game, data_dir)?;
+        for folder in &self.folders {
+            for name in archives_in(game, folder).unwrap_or_default() {
+                if !names.iter().any(|known| known.eq_ignore_ascii_case(&name)) {
+                    names.push(name);
+                }
+            }
+        }
+        Ok(names)
+    }
+}
+
 /// Reads the installation of `game` in `game_dir`.
 ///
 /// `local_dir` is the directory that holds `plugins.txt`. It is detected if
@@ -94,11 +132,36 @@ pub fn read_setup_with(
     cache: &dyn TextCache,
     progress: &Progress<'_>,
 ) -> Result<SetupFacts, IngestError> {
-    let (active_plugins, plugin_list) = active_plugins(game, game_dir, local_dir)?;
+    read_setup_in(
+        game,
+        game_dir,
+        local_dir,
+        &VirtualData::default(),
+        cache,
+        progress,
+    )
+}
+
+/// [`read_setup_with`], for a game whose data directory a mod manager
+/// extends with the folders of `virtual_data`: plugins, archives and loose
+/// files are taken from them as the game would see them.
+pub fn read_setup_in(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    virtual_data: &VirtualData,
+    cache: &dyn TextCache,
+    progress: &Progress<'_>,
+) -> Result<SetupFacts, IngestError> {
+    let (active_plugins, plugin_list) =
+        active_plugins_in(game, game_dir, local_dir, &virtual_data.folders)?;
     let data_dir = game_dir.join("Data");
     let data_path = GamePath::new(DATA_DIR);
 
-    let loose = loose_files(&data_dir, &data_path)?;
+    let mut loose = loose_files(&data_dir, &data_path)?;
+    if !virtual_data.folders.is_empty() {
+        loose = merged_loose_files(loose, &virtual_data.folders, &data_path);
+    }
     let mut facts = SetupFacts {
         plugin_list,
         loose_files: loose.iter().map(|(path, _)| path.clone()).collect(),
@@ -106,13 +169,13 @@ pub fn read_setup_with(
     };
     let mut loaded_archives = Vec::new();
 
-    let archives_on_disk = archives_in(game, &data_dir)?;
+    let archives_on_disk = virtual_data.archives(game, &data_dir)?;
     let archive_names = archives::load_order(game, &archives_on_disk, &active_plugins);
     progress.step(ScanStep::Archives);
     for (index, name) in archive_names.iter().enumerate() {
         progress.count(ScanStep::Archives, index + 1, archive_names.len());
         let path = data_path.join(name);
-        let file = data_dir.join(name);
+        let file = virtual_data.resolve(&data_dir, name);
         match archive::read_directory(&file) {
             Ok(directory) => {
                 facts.archives.push(ArchiveFacts {
@@ -149,7 +212,7 @@ pub fn read_setup_with(
     for (index, name) in active_plugins.into_iter().enumerate() {
         progress.count(ScanStep::Plugins, index + 1, plugin_total);
         let path = data_path.join(&name);
-        let file = data_dir.join(&name);
+        let file = virtual_data.resolve(&data_dir, &name);
         let official = game.is_official(&name);
         if official {
             game_plugins.push((name.clone(), file.clone()));
@@ -332,9 +395,24 @@ fn active_plugins(
     game_dir: &Path,
     local_dir: Option<&Path>,
 ) -> Result<(Vec<String>, PathBuf), IngestError> {
+    active_plugins_in(game, game_dir, local_dir, &[])
+}
+
+/// [`active_plugins`], with plugins also in `folders`, the folder whose
+/// copy wins first.
+fn active_plugins_in(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+    folders: &[PathBuf],
+) -> Result<(Vec<String>, PathBuf), IngestError> {
     let load_order_error = |error: loadorder::Error| IngestError::LoadOrder(error.to_string());
 
-    let settings = load_order_settings(game, game_dir, local_dir).map_err(load_order_error)?;
+    let mut settings = load_order_settings(game, game_dir, local_dir).map_err(load_order_error)?;
+    if !folders.is_empty() {
+        // The load order library takes the first folder that has a plugin.
+        settings.set_additional_plugins_directories(folders.to_vec());
+    }
     let plugin_list = settings.active_plugins_file().clone();
     let mut load_order = settings.into_load_order();
     load_order.load().map_err(load_order_error)?;
@@ -376,6 +454,26 @@ fn loose_files(directory: &Path, base: &GamePath) -> io::Result<Vec<(GamePath, P
         }
     }
     Ok(files)
+}
+
+/// The loose files of the data directory, `in_data`, with the files of
+/// `folders` laid over them: of two files with the same path, the game sees
+/// the one in the folder that comes first. A folder that cannot be listed
+/// adds nothing.
+fn merged_loose_files(
+    in_data: Vec<(GamePath, PathBuf)>,
+    folders: &[PathBuf],
+    base: &GamePath,
+) -> Vec<(GamePath, PathBuf)> {
+    let mut seen: std::collections::HashSet<GamePath> = std::collections::HashSet::new();
+    let layers = folders
+        .iter()
+        .map(|folder| loose_files(folder, base).unwrap_or_default())
+        .chain(std::iter::once(in_data));
+    layers
+        .flatten()
+        .filter(|(path, _)| seen.insert(path.clone()))
+        .collect()
 }
 
 /// The names of the active plugins in load order, as `plugins.txt` in
@@ -724,6 +822,93 @@ mod tests {
         assert_eq!(
             facts.archives[1].files,
             [GamePath::new("data/meshes/grass/fern.nif")]
+        );
+    }
+
+    /// Mod Organizer leaves the data directory alone and shows the game
+    /// the mods' folders instead (ADR 0064).
+    #[test]
+    fn plugins_archives_and_loose_files_come_from_the_virtual_folders() {
+        let installation = Installation::new(&["Grass.esp", "Patch.esp"]);
+        installation.write_data("Textures/Sky.dds", b"game");
+        let mods = installation.root.path().join("mods");
+        let write_mod = |relative: &str, content: &[u8]| {
+            let path = mods.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, content).unwrap();
+        };
+        let plugin = fixture::plugin(&["Skyrim.esm"], 0, &[]);
+        write_mod("Grass/Grass.esp", &plugin);
+        write_mod(
+            "Grass/Grass.bsa",
+            &fixture::bsa(&[r"meshes\grass\fern.nif"]),
+        );
+        write_mod("Grass/Textures/Sky.dds", b"grass");
+        write_mod("Patch/Patch.esp", &plugin);
+        write_mod("Patch/Textures/Sky.dds", b"patch");
+        let virtual_data = VirtualData {
+            folders: vec![mods.join("Patch"), mods.join("Grass")],
+        };
+
+        let facts = read_setup_in(
+            Game::SkyrimSe,
+            &installation.game_dir(),
+            Some(&installation.local_dir()),
+            &virtual_data,
+            &NoCache,
+            &Progress::none(),
+        )
+        .unwrap();
+        assert_eq!(
+            names(&facts.plugins),
+            ["Skyrim.esm", "Grass.esp", "Patch.esp"]
+        );
+        assert_eq!(facts.unreadable, Vec::new());
+        let paths: Vec<_> = facts.archives.iter().map(|a| a.path.as_str()).collect();
+        assert_eq!(paths, ["data/grass.bsa"]);
+        // One path, seen once, though three folders have it.
+        let skies = facts
+            .loose_files
+            .iter()
+            .filter(|path| path.as_str() == "data/textures/sky.dds")
+            .count();
+        assert_eq!(skies, 1);
+        assert!(
+            facts
+                .loose_files
+                .contains(&GamePath::new("data/skyrim.esm"))
+        );
+        // Without the folders, the plugins are not in the game.
+        assert_eq!(names(&installation.read().plugins), ["Skyrim.esm"]);
+    }
+
+    #[test]
+    fn the_first_folder_with_a_file_wins() {
+        let root = tempfile::tempdir().unwrap();
+        let (high, low) = (root.path().join("high"), root.path().join("low"));
+        for folder in [&high, &low] {
+            fs::create_dir_all(folder.join("textures")).unwrap();
+            fs::write(folder.join("textures").join("sky.dds"), b"x").unwrap();
+        }
+        let base = GamePath::new(DATA_DIR);
+        let merged = merged_loose_files(Vec::new(), &[high.clone(), low], &base);
+        assert_eq!(
+            merged,
+            [(
+                GamePath::new("data/textures/sky.dds"),
+                high.join("textures").join("sky.dds")
+            )]
+        );
+        let virtual_data = VirtualData {
+            folders: vec![root.path().join("missing"), high.join("textures")],
+        };
+        assert_eq!(
+            virtual_data.resolve(root.path(), "sky.dds"),
+            high.join("textures").join("sky.dds")
+        );
+        assert_eq!(
+            virtual_data.resolve(root.path(), "other.dds"),
+            root.path().join("other.dds")
         );
     }
 

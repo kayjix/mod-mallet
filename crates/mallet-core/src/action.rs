@@ -149,6 +149,10 @@ pub enum ActionStatus {
     Unsupported,
     /// Something else went wrong; see [`ActionOutcome::detail`].
     Failed,
+    /// The mod manager cannot be asked from outside, Mod Organizer 2: the
+    /// user makes the change there by hand, as the action's description
+    /// says (ADR 0064).
+    ByHand,
 }
 
 /// The result of asking for an action.

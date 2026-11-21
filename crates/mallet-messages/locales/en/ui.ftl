@@ -32,6 +32,9 @@ origin-standard = at its standard place
 origin-steam = found in one of your Steam libraries
 origin-gog = from the entry GOG Galaxy wrote into the Windows registry
 origin-manager = named in Vortex's list of deployed files
+location-manager-instance = Mod Organizer's instance (its settings, the profile in use and what it knows about each mod)
+location-manager-mods = Mod Organizer's folder of installed mods (the game sees their files there, so they are read there)
+origin-manager-settings = named in Mod Organizer's settings
 location-not-found = not found
 
 report-game = { $name } { $version }
@@ -136,6 +139,66 @@ action-file-overrides-reset = Take the choice back
        *[other] them
     } again; the order of the mods decides once more.
 
+## The same actions for Mod Organizer 2, which takes no requests from
+## outside: they say what to do there by hand (ADR 0064).
+
+action-reinstall-mod-mo2 = Reinstall in Mod Organizer
+    .description = Mod Mallet cannot ask Mod Organizer for this, so it is a few clicks for you: in Mod Organizer's list of mods on the left, right-click { $mod } and choose "Reinstall Mod". Go through the installer page by page and tick the options listed here. Scan again when you are done.
+
+action-hide-objects-mo2 = Write the patch for Mod Organizer
+    .description = Mod Mallet writes a small mod that shows an invisible marker in place of { $count ->
+        [one] 1 object
+       *[other] { $count } objects
+    } while the game runs, into its own folder. Mod Organizer cannot be asked to install it: click "Install a new mod from an archive" at the top of Mod Organizer, pick the file, and tick the new mod. It needs Base Object Swapper. Untick or remove the mod to bring the objects back.
+
+action-move-objects-mo2 = Moving objects: not with Mod Organizer yet
+    .description = Mod Mallet makes the plugin that moves { $count ->
+        [one] the object
+       *[other] the { $count } objects
+    } from the plugins in the game's data folder, and with Mod Organizer those stay in the mods' folders. Until that is supported, hide the objects with the patch instead, or move them in the Creation Kit.
+
+action-load-after-mo2 = Let { $plugin } win
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of plugins on the right, drag { $plugin } below { $after }. What both change then comes from { $plugin }; whatever only { $after } changes stays. Sorting with LOOT may move it back; then give LOOT the same rule.
+
+action-disable-mod-mo2 = Untick { $mod } in Mod Organizer
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of mods on the left, untick { $mod }. Nothing is deleted; tick it again to undo it.
+
+action-enable-mod-mo2 = Tick { $mod } in Mod Organizer
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of mods on the left, tick { $mod }. Untick it again to undo it.
+
+action-file-overrides-mo2 = Use { $mod }'s version
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of mods on the left, drag { $mod } below the other mods that bring { $count ->
+        [one] this file
+       *[other] these { $count } files
+    }: the mod lower in the list wins. That moves all of their files; to change only { $count ->
+        [one] this one
+       *[other] these
+    }, double-click each other mod, open its "Conflicts" tab and hide { $count ->
+        [one] it
+       *[other] them
+    } there instead.
+
+action-file-overrides-archives-mo2 = Use the version in the archives
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer, double-click each mod that brings { $count ->
+        [one] the file
+       *[other] the { $count } files
+    } loose, open its "Conflicts" tab and hide { $count ->
+        [one] it
+       *[other] them
+    } there, so that the version in the archives shows. Unhide { $count ->
+        [one] it
+       *[other] them
+    } there to undo it.
+
+action-file-overrides-reset-mo2 = Take the choice back
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer, double-click each mod in which you hid { $count ->
+        [one] the file
+       *[other] the { $count } files
+    }, open its "Filetree" tab and unhide { $count ->
+        [one] it
+       *[other] them
+    }; the order of the mods decides once more.
+
 ## Duels: everything two mods disagree about.
 
 duel-topic-faces = { $count ->
@@ -182,6 +245,8 @@ outcome-unknown-mod = Vortex no longer knows this mod. Scan again.
 outcome-archive-missing = Vortex no longer has the archive this mod was installed from. Download the mod again in Vortex first.
 outcome-unsupported = The extension in Vortex does not know this request. Install the extension again and restart Vortex.
 outcome-failed = That did not work: { $detail }
+outcome-by-hand = Mod Organizer cannot be asked from outside. Make the change there as described, then scan again.
+outcome-by-hand-patch = Mod Mallet wrote the patch to { $detail }. Install it in Mod Organizer with "Install a new mod from an archive", tick the new mod, then scan again.
 
 link-ready = The Vortex extension is installed and Vortex is answering.
 link-not-running = The Vortex extension is installed, but Vortex is not answering. Start Vortex, or restart it if the extension was only just installed.

@@ -3,7 +3,7 @@
 /**
  * How Mod Mallet came to look at a place.
  */
-export type LocationOrigin = "given" | "registry" | "standard" | "steam" | "gog" | "manager";
+export type LocationOrigin = "given" | "registry" | "standard" | "steam" | "gog" | "manager" | "manager-settings";
 
 /**
  * The games Mod Mallet knows, and which of them the user looks at.

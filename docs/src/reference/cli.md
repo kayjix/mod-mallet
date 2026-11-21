@@ -90,6 +90,21 @@ Options:
       --masterlist <FILE>
           The LOOT masterlist, whose rules about plugins are checked. Detected if omitted and `--manager-state` is omitted, too
 
+      --manager <MANAGER>
+          The mod manager that looks after the game. For Mod Organizer 2 the places of Vortex above are not read
+
+          Possible values:
+          - vortex: Vortex
+          - mo2:    Mod Organizer 2
+
+          [default: vortex]
+
+      --mo2-instance <DIR>
+          The Mod Organizer 2 instance: its folder, which holds `ModOrganizer.ini`. The global instance for the game if omitted
+
+      --mo2-profile <NAME>
+          The Mod Organizer 2 profile to read. The one in use if omitted
+
       --no-cache
           Do not use the cache: read everything again, and do not remember the result for `mallet report`
 

@@ -95,6 +95,11 @@
           "description": "Something else went wrong; see [`ActionOutcome::detail`].",
           "type": "string",
           "const": "failed"
+        },
+        {
+          "description": "The mod manager cannot be asked from outside, Mod Organizer 2: the\nuser makes the change there by hand, as the action's description\nsays (ADR 0064).",
+          "type": "string",
+          "const": "by-hand"
         }
       ]
     }

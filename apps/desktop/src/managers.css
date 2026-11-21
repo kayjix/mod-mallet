@@ -1,0 +1,65 @@
+/* The choice of mod manager above the places (ADR 0064). */
+
+.managers {
+  margin: 16px 0 4px;
+  padding: 0;
+  border: 0;
+}
+
+.managers legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.managers-intro,
+.managers-note {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.managers-options {
+  display: grid;
+  gap: 6px;
+}
+
+.manager-option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+  cursor: pointer;
+}
+
+.manager-option[data-selected="true"] {
+  border-color: var(--brand);
+}
+
+.manager-option input {
+  margin: 0;
+}
+
+.manager-name {
+  font-weight: 600;
+}
+
+.manager-state {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.manager-option[data-found="false"] .manager-state {
+  color: var(--warning);
+}
+
+.manager-tag {
+  padding: 0 6px;
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8rem;
+}

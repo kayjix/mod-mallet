@@ -350,9 +350,9 @@ export default function App({ api, startLang }: AppProps) {
     return () => clearInterval(timer);
   }, [api, live, scan]);
 
-  const confirmPlaces = async (named: NamedPlaces) => {
+  const confirmPlaces = async (named: NamedPlaces, manager: string | null) => {
     try {
-      setPlaces(await api.confirmPlaces(named, lang));
+      setPlaces(await api.confirmPlaces(named, manager, lang));
       setView("overview");
       await scan();
     } catch (error: unknown) {

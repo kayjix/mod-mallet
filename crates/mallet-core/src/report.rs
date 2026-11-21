@@ -61,6 +61,14 @@ pub enum LocationRole {
     /// The folder the mod manager keeps every installed mod's files in,
     /// deployed or not. Only the names of the files are read.
     ModStaging,
+    /// The instance of a mod manager that keeps its settings in a folder
+    /// of their own, Mod Organizer 2: its settings, the profile in use and
+    /// what it knows about each mod (ADR 0064).
+    ManagerInstance,
+    /// The folder of a mod manager that leaves the files in each mod's
+    /// folder, Mod Organizer 2. The game sees them there, so the files the
+    /// game would read are read there (ADR 0064).
+    ManagerMods,
 }
 
 /// How Mod Mallet came to look at a place.
@@ -82,6 +90,8 @@ pub enum LocationOrigin {
     Gog,
     /// It is named in the mod manager's record of the files it deployed.
     Manager,
+    /// It is named in the mod manager's own settings.
+    ManagerSettings,
 }
 
 /// How far Mod Mallet can look at a setup of a game.
@@ -199,6 +209,10 @@ pub struct ScanReport {
     /// collisions and decisions wait until the mod is on again (ADR 0061).
     #[serde(default)]
     pub switched_off_plugins: Vec<crate::SwitchedOffPlugin>,
+    /// The mod manager the scan was set to read, by its identifier
+    /// (`vortex`, `mo2`). Actions are worded for it. `None` in older reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manager: Option<String>,
 }
 
 /// Every version of one file that the setup has, as pictures for the

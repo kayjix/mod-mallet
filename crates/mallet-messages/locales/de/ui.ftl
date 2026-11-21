@@ -32,6 +32,9 @@ origin-standard = am üblichen Ort
 origin-steam = in einer deiner Steam-Bibliotheken gefunden
 origin-gog = aus dem Eintrag, den GOG Galaxy in die Windows-Registry schreibt
 origin-manager = genannt in Vortex' Liste der bereitgestellten Dateien
+location-manager-instance = Mod Organizers Instanz (seine Einstellungen, das verwendete Profil und was er über jede Mod weiß)
+location-manager-mods = Mod Organizers Ordner der installierten Mods (das Spiel sieht ihre Dateien dort, deshalb werden sie dort gelesen)
+origin-manager-settings = genannt in Mod Organizers Einstellungen
 location-not-found = nicht gefunden
 
 report-game = { $name } { $version }
@@ -127,6 +130,51 @@ action-file-overrides-reset = Wahl zurücknehmen
        *[other] Dateien
     } dieses Gegenstands wieder von allen Mods bereit, die sie mitbringen; dann entscheidet wieder die Reihenfolge der Mods.
 
+## Dieselben Aktionen für Mod Organizer 2, der keine Anfragen von außen
+## annimmt: Sie sagen, was dort von Hand zu tun ist (ADR 0064).
+
+action-reinstall-mod-mo2 = In Mod Organizer neu installieren
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten, deshalb sind es ein paar Klicks für dich: Klicke in Mod Organizers Mod-Liste links mit der rechten Maustaste auf { $mod } und installiere die Mod dort neu. Geh den Installer Seite für Seite durch und kreuze die hier aufgeführten Optionen an. Prüfe danach noch einmal.
+
+action-hide-objects-mo2 = Patch für Mod Organizer schreiben
+    .description = Mod Mallet schreibt eine kleine Mod, die im Spiel { $count ->
+        [one] 1 Objekt
+       *[other] { $count } Objekte
+    } durch eine unsichtbare Markierung ersetzt, in seinen eigenen Ordner. Mod Organizer kann nicht gebeten werden, sie zu installieren: Installiere sie oben in Mod Organizer als neue Mod aus einem Archiv, wähle die Datei und hake die neue Mod an. Sie braucht Base Object Swapper. Hake die Mod ab oder entferne sie, um die Objekte zurückzuholen.
+
+action-move-objects-mo2 = Objekte verschieben: mit Mod Organizer noch nicht
+    .description = Mod Mallet baut das Plugin, das { $count ->
+        [one] das Objekt
+       *[other] die { $count } Objekte
+    } verschiebt, aus den Plugins im Datenordner des Spiels, und mit Mod Organizer bleiben die in den Ordnern der Mods. Bis das unterstützt wird, verstecke die Objekte stattdessen mit dem Patch oder verschiebe sie im Creation Kit.
+
+action-load-after-mo2 = { $plugin } gewinnen lassen
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Zieh in Mod Organizers Plugin-Liste rechts { $plugin } unter { $after }. Was beide ändern, kommt dann aus { $plugin }; was nur { $after } ändert, bleibt. Sortieren mit LOOT kann es zurückschieben; gib LOOT dann dieselbe Regel.
+
+action-disable-mod-mo2 = { $mod } in Mod Organizer abhaken
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Nimm in Mod Organizers Mod-Liste links den Haken bei { $mod } heraus. Gelöscht wird nichts; setz den Haken wieder, um es rückgängig zu machen.
+
+action-enable-mod-mo2 = { $mod } in Mod Organizer anhaken
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Setz in Mod Organizers Mod-Liste links den Haken bei { $mod }. Nimm ihn wieder heraus, um es rückgängig zu machen.
+
+action-file-overrides-mo2 = Fassung von { $mod } nehmen
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Zieh in Mod Organizers Mod-Liste links { $mod } unter die anderen Mods, die { $count ->
+        [one] diese Datei
+       *[other] diese { $count } Dateien
+    } mitbringen: Die Mod weiter unten gewinnt. Das verschiebt alle ihre Dateien; um nur diese zu ändern, öffne stattdessen jede andere Mod per Doppelklick und verstecke sie im Reiter mit den Konflikten.
+
+action-file-overrides-archives-mo2 = Fassung aus den Archiven nehmen
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Öffne in Mod Organizer jede Mod, die { $count ->
+        [one] die Datei
+       *[other] die { $count } Dateien
+    } lose mitbringt, per Doppelklick und verstecke sie im Reiter mit den Konflikten, damit die Fassung aus den Archiven zu sehen ist. Hol sie dort wieder hervor, um es rückgängig zu machen.
+
+action-file-overrides-reset-mo2 = Wahl zurücknehmen
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Öffne in Mod Organizer jede Mod, in der du { $count ->
+        [one] die Datei
+       *[other] die { $count } Dateien
+    } versteckt hast, per Doppelklick und hol sie im Reiter mit dem Dateibaum wieder hervor; dann entscheidet wieder die Reihenfolge der Mods.
+
 ## Duelle: alles, worin zwei Mods sich uneins sind.
 
 duel-topic-faces = { $count ->
@@ -173,6 +221,8 @@ outcome-unknown-mod = Vortex kennt diese Mod nicht mehr. Scanne erneut.
 outcome-archive-missing = Vortex hat das Archiv nicht mehr, aus dem diese Mod installiert wurde. Lade die Mod zuerst in Vortex erneut herunter.
 outcome-unsupported = Die Erweiterung in Vortex kennt diese Anfrage nicht. Installiere die Erweiterung neu und starte Vortex neu.
 outcome-failed = Das hat nicht geklappt: { $detail }
+outcome-by-hand = Mod Organizer lässt sich nicht von außen bitten. Nimm die Änderung dort wie beschrieben vor und prüfe dann noch einmal.
+outcome-by-hand-patch = Mod Mallet hat den Patch nach { $detail } geschrieben. Installiere ihn in Mod Organizer als neue Mod aus einem Archiv, hake die neue Mod an und prüfe dann noch einmal.
 
 link-ready = Die Vortex-Erweiterung ist installiert und Vortex antwortet.
 link-not-running = Die Vortex-Erweiterung ist installiert, aber Vortex antwortet nicht. Starte Vortex, oder starte es neu, falls die Erweiterung gerade erst installiert wurde.

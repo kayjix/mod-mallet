@@ -32,6 +32,7 @@ const RULES: &[(&str, &[&str])] = &[
         &["mallet-core", "mallet-formats-bethesda"],
     ),
     ("mallet-source-vortex", &["mallet-core"]),
+    ("mallet-source-mo2", &["mallet-core"]),
     ("mallet-knowledge", &["mallet-core"]),
 ];
 

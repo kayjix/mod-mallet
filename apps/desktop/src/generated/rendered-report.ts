@@ -1084,7 +1084,7 @@ export interface ScanLocation {
   /**
    * How Mod Mallet came to look there.
    */
-  origin: "given" | "registry" | "standard" | "steam" | "gog" | "manager";
+  origin: "given" | "registry" | "standard" | "steam" | "gog" | "manager" | "manager-settings";
   /**
    * The path on this machine.
    */
@@ -1102,7 +1102,9 @@ export interface ScanLocation {
     | "deployment-manifest"
     | "masterlist"
     | "crash-logs"
-    | "mod-staging";
+    | "mod-staging"
+    | "manager-instance"
+    | "manager-mods";
 }
 /**
  * Where mods place objects, and where they collide.

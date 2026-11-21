@@ -65,6 +65,7 @@ fn every_mod_with_a_copy_is_a_version_and_the_deployed_one_is_shown() {
         staging_dir: Some(staging),
         unpacker: None,
         masterlist: None,
+        manager: mallet_engine::ModManager::Vortex,
     };
     let versions = asset_versions(&options, &["meshes/weapons/sword.nif".to_owned()]).unwrap();
 

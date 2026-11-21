@@ -16,6 +16,7 @@ mallet-core.workspace = true
 mallet-format-fomod.workspace = true
 mallet-game-bethesda.workspace = true
 mallet-knowledge.workspace = true
+mallet-source-mo2.workspace = true
 mallet-source-vortex.workspace = true
 mallet-store.workspace = true
 mallet-unpack.workspace = true
