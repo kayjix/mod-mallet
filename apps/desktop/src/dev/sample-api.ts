@@ -888,6 +888,28 @@ function toolbox(lang: Lang): RenderedToolbox {
       ),
       { group: "helper", page: "https://store.steampowered.com/app/1946180/" },
     ),
+    tool(
+      "xedit",
+      "SSEEdit (Create or Patch)",
+      "optional",
+      "ready",
+      two(
+        "Looks inside plugins and can repair them.",
+        "Schaut in Plugins hinein und kann sie reparieren.",
+      ),
+      { group: "mod-tool", label: "SSEEdit (Create or Patch)", path: "D:\\Tools\\SSEEdit.exe" },
+    ),
+    tool(
+      "xedit-clean",
+      "SSEEditQuickAutoClean (Clean Dirty Mods)",
+      "optional",
+      "missing",
+      two(
+        "Cleans a plugin of leftovers that can crash the game.",
+        "Säubert ein Plugin von Überresten, die das Spiel abstürzen lassen können.",
+      ),
+      { group: "mod-tool", path: "D:\\Tools\\SSEEditQuickAutoClean.exe" },
+    ),
   ];
   return {
     tools,

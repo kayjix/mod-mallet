@@ -84,3 +84,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0055](0055-a-magic-wand-for-what-belongs-together.md) | A magic wand for what belongs together, and one column per mod | accepted |
 | [0056](0056-missing-textures-found-in-switched-off-mods.md) | Missing textures are looked for in switched-off mods | accepted |
 | [0057](0057-one-version-for-the-app.md) | One version for the app, shown with its build | accepted |
+| [0063](0063-the-tools-vortex-knows.md) | The tools Vortex knows, and Mod Mallet as one of them | accepted |

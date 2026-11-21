@@ -76,6 +76,14 @@
           "description": "Fixed identifier, for example `skse` or `address-library`.",
           "type": "string"
         },
+        "label": {
+          "description": "The name the mod manager gives it, for a tool Mod Mallet has no\nwords of its own for.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "need": {
           "description": "How much the setup depends on it.",
           "$ref": "#/$defs/ToolNeed"
@@ -142,6 +150,11 @@
           "description": "A program Mod Mallet or the user works with, such as 7-Zip.",
           "type": "string",
           "const": "helper"
+        },
+        {
+          "description": "A modding tool the mod manager lists for the game, such as `SSEEdit`.",
+          "type": "string",
+          "const": "mod-tool"
         }
       ]
     },

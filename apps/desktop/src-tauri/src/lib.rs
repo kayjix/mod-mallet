@@ -670,6 +670,10 @@ pub fn run() -> tauri::Result<()> {
             if let Some(window) = app.get_webview_window("main") {
                 fit_window(&window);
             }
+            // So that the Vortex link can list this app among Vortex's tools.
+            if let Err(error) = mallet_engine::announce_app(&manager_options()) {
+                tracing::warn!(%error, "could not tell the Vortex link where Mod Mallet is");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

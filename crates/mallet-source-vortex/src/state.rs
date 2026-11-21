@@ -79,11 +79,30 @@ pub struct VortexMod {
     pub page: Option<String>,
 }
 
+/// A program Vortex lists among the tools of a game on its dashboard.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VortexTool {
+    /// Vortex's identifier of the tool.
+    pub id: String,
+    /// The name Vortex shows.
+    pub name: String,
+    /// The program Vortex starts, as Vortex noted it.
+    pub path: String,
+    /// Whether the user or a collection added it by hand, as opposed to
+    /// one a game extension knows how to find.
+    pub custom: bool,
+    /// Whether Vortex hides it on the dashboard.
+    pub hidden: bool,
+}
+
 /// The parts of Vortex's state that Mod Mallet uses, for one game.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VortexState {
     /// The installed mods of the game.
     pub mods: Vec<VortexMod>,
+    /// The tools Vortex lists for the game, by identifier. `None` when the
+    /// state says nothing about tools, as the copy of an older link does.
+    pub tools: Option<Vec<VortexTool>>,
     downloads_path: Option<String>,
 }
 
@@ -151,8 +170,27 @@ impl VortexState {
             .collect();
         mods.sort_by(|a, b| a.folder.cmp(&b.folder));
 
+        let tools = raw.settings.game_mode.discovered.get(game).map(|found| {
+            let mut tools: Vec<VortexTool> = found
+                .tools
+                .iter()
+                .filter_map(|(id, tool)| {
+                    Some(VortexTool {
+                        id: id.clone(),
+                        name: non_empty(tool.name.as_ref())?,
+                        path: non_empty(tool.path.as_ref())?,
+                        custom: tool.custom,
+                        hidden: tool.hidden,
+                    })
+                })
+                .collect();
+            tools.sort_by(|a, b| a.id.cmp(&b.id));
+            tools
+        });
+
         Ok(Self {
             mods,
+            tools,
             downloads_path: raw.settings.downloads.path,
         })
     }
@@ -245,10 +283,32 @@ struct RawState {
 }
 
 #[derive(Deserialize, Default)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 struct RawSettings {
     downloads: RawDownloadSettings,
     profiles: RawProfileSettings,
+    game_mode: RawGameMode,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct RawGameMode {
+    discovered: HashMap<String, RawDiscovered>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct RawDiscovered {
+    tools: HashMap<String, RawTool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct RawTool {
+    name: Option<String>,
+    path: Option<String>,
+    custom: bool,
+    hidden: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -542,6 +602,27 @@ mod tests {
             VortexState::parse("{}", "skyrimse").unwrap(),
             VortexState::default()
         );
+    }
+
+    #[test]
+    fn the_tools_of_a_game_are_read_with_their_paths() {
+        let json = r#"{ "settings": { "gameMode": { "discovered": {
+          "skyrimse": { "path": "C:\\Games\\Made Up", "tools": {
+            "zz": { "id": "zz", "name": "Made Up Editor (Patch)", "path": "C:\\Tools\\Editor.exe", "custom": true, "hidden": false },
+            "aa": { "id": "aa", "name": "Made Up Idles", "path": "C:\\Tools\\Idles.exe", "custom": false },
+            "nopath": { "id": "nopath", "name": "Never Found" },
+            "noname": { "path": "C:\\Tools\\x.exe" }
+          } },
+          "othergame": { "tools": { "o": { "name": "Elsewhere", "path": "C:\\o.exe" } } }
+        } } } }"#;
+        let tools = VortexState::parse(json, "skyrimse").unwrap().tools.unwrap();
+        let ids: Vec<&str> = tools.iter().map(|tool| tool.id.as_str()).collect();
+        assert_eq!(ids, ["aa", "zz"]);
+        assert!(tools.iter().any(|tool| tool.custom && !tool.hidden));
+        assert_eq!(tools[0].path, r"C:\Tools\Idles.exe");
+        // A game Vortex has no entry for, and a state without the part.
+        assert_eq!(VortexState::parse(json, "fallout4").unwrap().tools, None);
+        assert_eq!(VortexState::parse("{}", "skyrimse").unwrap().tools, None);
     }
 
     proptest! {

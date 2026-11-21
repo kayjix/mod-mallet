@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use mallet_core::{GamePath, ModRef, ModSource};
 use serde::Deserialize;
 
-pub use state::{VortexMod, VortexState};
+pub use state::{VortexMod, VortexState, VortexTool};
 
 /// The value of [`ModRef::source`] for mods managed by Vortex.
 pub const SOURCE_ID: &str = "vortex";

@@ -19,7 +19,7 @@ use mallet_core::facts::InstallerFacts;
 use mallet_core::{LocationOrigin, LocationRole, ModInfo, ModRef, ScanLocation};
 use mallet_format_fomod::MODULE_CONFIG_PATH;
 use mallet_source_vortex::state::{live_state_path, state_backup_path};
-use mallet_source_vortex::{SOURCE_ID, VortexDeployment, VortexMod, VortexState};
+use mallet_source_vortex::{SOURCE_ID, VortexDeployment, VortexMod, VortexState, VortexTool};
 use mallet_store::Store;
 use mallet_unpack::Unpacker;
 
@@ -315,6 +315,25 @@ fn read_live_state(
             None
         }
     }
+}
+
+/// The tools the mod manager lists for the game on its dashboard: from
+/// the link's copy of the state if that has them and is newer than the
+/// backup, else from the backup. Empty when neither can be read. Only reads.
+pub(crate) fn manager_tools(options: &ScanOptions) -> Vec<VortexTool> {
+    let Some(sources) = state_sources(options) else {
+        return Vec::new();
+    };
+    let game = options.game_id();
+    let read = |path: &Path| {
+        let text = read_if_exists(path).ok().flatten()?;
+        VortexState::parse(&text, game).ok()?.tools
+    };
+    sources
+        .newer_live()
+        .and_then(|(path, _)| read(path))
+        .or_else(|| read(&sources.backup.0))
+        .unwrap_or_default()
 }
 
 impl StateSources {

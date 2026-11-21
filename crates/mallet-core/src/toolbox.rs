@@ -31,6 +31,10 @@ pub struct Tool {
     /// own: `vortex` for the LOOT that Vortex has built in.
     #[serde(default)]
     pub provided_by: Option<String>,
+    /// The name the mod manager gives it, for a tool Mod Mallet has no
+    /// words of its own for.
+    #[serde(default)]
+    pub label: Option<String>,
 }
 
 /// What kind of tool a tool is.
@@ -46,6 +50,8 @@ pub enum ToolGroup {
     Game,
     /// A program Mod Mallet or the user works with, such as 7-Zip.
     Helper,
+    /// A modding tool the mod manager lists for the game, such as `SSEEdit`.
+    ModTool,
 }
 
 /// How much a setup depends on a tool.
@@ -86,7 +92,15 @@ impl Tool {
             path: None,
             page: None,
             provided_by: None,
+            label: None,
         }
+    }
+
+    /// The same tool under the name the mod manager gives it.
+    #[must_use]
+    pub fn with_label(mut self, label: &str) -> Self {
+        self.label = Some(label.to_owned());
+        self
     }
 
     /// The same tool in another group.

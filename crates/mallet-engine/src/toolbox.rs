@@ -3,7 +3,11 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
+use std::path::Path;
+
+use mallet_game_bethesda::tools::ListedTool;
 use mallet_game_bethesda::{locate, skse_log, tools};
+use mallet_source_vortex::VortexTool;
 use mallet_source_vortex::app;
 use mallet_source_vortex::link::{self, Link};
 use mallet_unpack::Unpacker;
@@ -42,6 +46,10 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
             *loot = built_in;
         }
     }
+    let listed = listed_tools(&crate::installers::manager_tools(scan), &found, |path| {
+        Path::new(path).is_file()
+    });
+    found.extend(listed);
     let unpacker = scan
         .unpacker
         .clone()
@@ -63,6 +71,57 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
         .with_path(unpacker.map(|unpacker| unpacker.program().display().to_string())),
     );
     found
+}
+
+/// The modding tools Vortex lists for the game on its dashboard, as the
+/// toolbox shows them (ADR 0063). A tool is ready when the program Vortex
+/// noted is still there, missing when it is gone. Hidden tools, the game
+/// and its script extender, and tools the toolbox already has (`have`) are
+/// left out; of two entries for the same kind of program the first wins.
+fn listed_tools(listed: &[VortexTool], have: &[Tool], exists: impl Fn(&str) -> bool) -> Vec<Tool> {
+    let mut found: Vec<Tool> = Vec::new();
+    // Mod Mallet's own entry, which the extension adds, is not a tool to
+    // tell the user about.
+    for entry in listed
+        .iter()
+        .filter(|entry| !entry.hidden && entry.id != "mod-mallet")
+    {
+        let file_name = entry.path.rsplit(['\\', '/']).next().unwrap_or_default();
+        let id = match tools::classify_listed_tool(file_name) {
+            ListedTool::Covered => continue,
+            ListedTool::Known(kind) => kind.to_owned(),
+            ListedTool::Other => format!("vortex-tool-{}", plain(&entry.id)),
+        };
+        if have.iter().chain(&found).any(|tool| tool.id == id) {
+            continue;
+        }
+        let state = if exists(&entry.path) {
+            ToolState::Ready
+        } else {
+            ToolState::Missing
+        };
+        found.push(
+            Tool::new(&id, ToolNeed::Optional, state)
+                .in_group(ToolGroup::ModTool)
+                .with_label(&entry.name)
+                .with_path(Some(entry.path.clone())),
+        );
+    }
+    found
+}
+
+/// A tool's identifier in Vortex reduced to what an identifier of ours may
+/// hold.
+fn plain(id: &str) -> String {
+    id.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect()
 }
 
 /// LOOT as Vortex has it built in: Vortex sorts plugins with LOOT's
@@ -187,6 +246,70 @@ mod tests {
         assert_eq!(at(951_782_400).as_deref(), Some("2000-02-29"));
         // 2026-11-17 18:00 UTC.
         assert_eq!(at(1_794_938_400).as_deref(), Some("2026-11-17"));
+    }
+
+    fn entry(id: &str, name: &str, path: &str, hidden: bool) -> VortexTool {
+        VortexTool {
+            id: id.to_owned(),
+            name: name.to_owned(),
+            path: path.to_owned(),
+            custom: true,
+            hidden,
+        }
+    }
+
+    #[test]
+    fn vortexs_tools_become_mod_tools_with_what_is_on_disk() {
+        let listed = [
+            entry(
+                "a1",
+                "SSEEdit (Create or Patch)",
+                r"C:\Made Up\SSEEdit.exe",
+                false,
+            ),
+            entry("a2", "SSEEdit again", r"C:\Made Up\SSEEdit64.exe", false),
+            entry(
+                "b1",
+                "Quick Clean",
+                r"C:\Made Up\SSEEditQuickAutoClean.exe",
+                false,
+            ),
+            entry(
+                "c1",
+                "Script Extender",
+                r"C:\Made Up\skse64_loader.exe",
+                false,
+            ),
+            entry("d1", "Hidden Editor", r"C:\Made Up\Wrye Bash.exe", true),
+            entry(
+                "mod-mallet",
+                "Mod Mallet",
+                r"C:\Made Up\mod-mallet.exe",
+                false,
+            ),
+            entry("e1", "Some Tool", r"C:\Made Up\Some Tool.exe", false),
+            entry("f1", "Kit", r"C:\Made Up\CreationKit.exe", false),
+        ];
+        let have = [Tool::new(
+            "creation-kit",
+            ToolNeed::Optional,
+            ToolState::Missing,
+        )];
+        let tools = listed_tools(&listed, &have, |path| !path.ends_with("Clean.exe"));
+        let seen: Vec<(&str, ToolState)> = tools
+            .iter()
+            .map(|tool| (tool.id.as_str(), tool.state))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                ("xedit", ToolState::Ready),
+                ("xedit-clean", ToolState::Missing),
+                ("vortex-tool-e1", ToolState::Ready),
+            ]
+        );
+        assert_eq!(tools[0].label.as_deref(), Some("SSEEdit (Create or Patch)"));
+        assert!(tools.iter().all(|tool| tool.group == ToolGroup::ModTool));
     }
 
     #[test]

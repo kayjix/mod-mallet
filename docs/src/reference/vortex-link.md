@@ -29,6 +29,8 @@ Vortex is answering.
 |---|---|---|
 | `status.json` | the extension, every five seconds while Vortex runs | that the extension is alive |
 | `state\<game>.json` | the extension, at start and within a second of a change | the installed mods of the game |
+| `app.json`, `app-icon.png` | Mod Mallet, when it starts, if the folder exists | where Mod Mallet's program is and its picture, for the dashboard entry below |
+| `dashboard-tool.json` | the extension | the games Mod Mallet was added to Vortex's tools for |
 | `requests\<id>.json` | Mod Mallet | what Vortex is asked to do |
 | `results\<id>.json` | the extension | what became of the request |
 | `extension.log` | the extension | one line per start, request and install, for looking up what happened |
@@ -87,6 +89,24 @@ account, no other game, no other profile.
 A scan reads this file instead of the backup Vortex writes once an hour
 (`%APPDATA%\Vortex\temp\state_backups_full\hourly.json`) if it is the
 newer of the two. The file stays when Vortex is closed.
+
+Since extension 0.8.0 the file also has `settings.gameMode.discovered.<game>.tools`:
+the tools Vortex lists for the game, each with `id`, `name`, `path`, `custom`
+and `hidden` (not their parameters or environment). The toolbox shows them
+([ADR 0063](../adr/0063-the-tools-vortex-knows.md)).
+
+## Mod Mallet among Vortex's tools
+
+Vortex has no call to register a tool. The extension adds Mod Mallet the
+way Vortex's own "add tool" dialog adds one: it dispatches
+`ADD_DISCOVERED_TOOL` for the game in use, with the program named in
+`app.json` (an absolute path to an existing `.exe`; anything else is
+ignored), and copies `app-icon.png` to
+`<Vortex data>\<game>\icons\mod-mallet.png`, where the dashboard looks for a
+tool's picture. It does so once for each game Mod Mallet understands that
+Vortex has found; if the user removes the tool in Vortex it stays removed
+(delete `dashboard-tool.json` to have it added again), and if Mod Mallet
+moves the path is updated.
 
 ## A request
 

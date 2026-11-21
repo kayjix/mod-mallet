@@ -125,8 +125,10 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
 
   // Tools the game or Mod Mallet needs first; the optional ones folded
   // below, each saying what it is for.
-  const needed = toolbox.tools.filter((rendered) => rendered.tool.need !== "optional");
-  const optional = toolbox.tools.filter((rendered) => rendered.tool.need === "optional");
+  const listed = toolbox.tools.filter((rendered) => rendered.tool.group === "mod-tool");
+  const others = toolbox.tools.filter((rendered) => rendered.tool.group !== "mod-tool");
+  const needed = others.filter((rendered) => rendered.tool.need !== "optional");
+  const optional = others.filter((rendered) => rendered.tool.need === "optional");
 
   const row = (rendered: RenderedTool) => (
     <li
@@ -172,6 +174,14 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
         </p>
       )}
       <ul className="tool-list">{needed.map(row)}</ul>
+      {listed.length > 0 && (
+        <div className="tool-listed">
+          <h3>
+            {texts.listed} <InfoTip text={texts.listedHint} />
+          </h3>
+          <ul className="tool-list">{listed.map(row)}</ul>
+        </div>
+      )}
       {optional.length > 0 && (
         <details className="tool-optional">
           <summary>

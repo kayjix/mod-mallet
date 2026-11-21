@@ -25,6 +25,7 @@ import type { Texts } from "./i18n";
 import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
 import { useTaskRowTexts } from "./task-row-texts";
+import { ToolHint } from "./tool-hint";
 import "./overview.css";
 import "./tasks.css";
 
@@ -211,6 +212,7 @@ export function FindingRow({
                 <p className="remedy">{rendered.remedy}</p>
               )}
               <Ways rendered={rendered} action={action} ways={ways} />
+              <ToolHint kind={finding.kind} />
               {(finding.previews?.length ?? 0) > 0 && <Previews paths={finding.previews ?? []} />}
               {rendered.actions.map((available) => (
                 <Guide key={available.label} action={available} />

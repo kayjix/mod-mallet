@@ -35,6 +35,59 @@ pub fn requirements(game: Game, game_dir: &Path, game_version: Option<&str>) -> 
     tools
 }
 
+/// What a mod manager's list of tools makes of one program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListedTool {
+    /// A modding tool Mod Mallet has words for, by the identifier of its
+    /// texts: `xedit`, `xedit-clean`, `wrye-bash`, `fnis`, `bodyslide` or
+    /// `creation-kit`.
+    Known(&'static str),
+    /// The game itself or its script extender, which the toolbox already
+    /// shows on its own.
+    Covered,
+    /// A program Mod Mallet knows nothing about.
+    Other,
+}
+
+/// Tells what the program `file_name` is that a mod manager lists among
+/// the tools of a game, by the name of its file.
+pub fn classify_listed_tool(file_name: &str) -> ListedTool {
+    let name = file_name.to_ascii_lowercase();
+    let stem = name.strip_suffix(".exe").unwrap_or(&name);
+    let game_program = [
+        Game::SkyrimSe,
+        Game::SkyrimVr,
+        Game::Skyrim,
+        Game::Fallout4,
+        Game::Fallout4Vr,
+        Game::FalloutNv,
+        Game::Fallout3,
+        Game::Oblivion,
+    ]
+    .iter()
+    .any(|game| game.executable().eq_ignore_ascii_case(&name));
+    if game_program || stem.ends_with("_loader") || stem.ends_with("launcher") {
+        return ListedTool::Covered;
+    }
+    // xEdit is called after the game it is for: SSEEdit, FO4Edit, TES5Edit.
+    let xedit = stem.strip_suffix("64").unwrap_or(stem).ends_with("edit");
+    if stem.ends_with("quickautoclean") {
+        ListedTool::Known("xedit-clean")
+    } else if xedit {
+        ListedTool::Known("xedit")
+    } else if stem.starts_with("wrye bash") || stem.starts_with("wrye_bash") {
+        ListedTool::Known("wrye-bash")
+    } else if stem.starts_with("generatefnis") {
+        ListedTool::Known("fnis")
+    } else if stem.starts_with("bodyslide") {
+        ListedTool::Known("bodyslide")
+    } else if stem == "creationkit" {
+        ListedTool::Known("creation-kit")
+    } else {
+        ListedTool::Other
+    }
+}
+
 /// The script extender: its loader, and its library for the game's
 /// version where it ships one per version.
 fn script_extender(game: Game, game_dir: &Path, game_version: Option<&str>) -> Tool {
@@ -208,6 +261,29 @@ mod tests {
 
     fn state_of(tools: &[Tool], id: &str) -> ToolState {
         tools.iter().find(|tool| tool.id == id).unwrap().state
+    }
+
+    #[test]
+    fn listed_tools_are_told_apart_by_their_file_names() {
+        use ListedTool::{Covered, Known, Other};
+        let cases = [
+            ("SSEEdit.exe", Known("xedit")),
+            ("FO4Edit64.exe", Known("xedit")),
+            ("TES5Edit.exe", Known("xedit")),
+            ("SSEEditQuickAutoClean.exe", Known("xedit-clean")),
+            ("Wrye Bash.exe", Known("wrye-bash")),
+            ("GenerateFNISForUsers.exe", Known("fnis")),
+            ("BodySlide x64.exe", Known("bodyslide")),
+            ("CreationKit.exe", Known("creation-kit")),
+            ("skse64_loader.exe", Covered),
+            ("SkyrimSE.exe", Covered),
+            ("SkyrimSELauncher.exe", Covered),
+            ("Synthesis.exe", Other),
+            ("", Other),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(classify_listed_tool(name), expected, "{name}");
+        }
     }
 
     #[test]

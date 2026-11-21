@@ -12,6 +12,23 @@
   margin-top: 1rem;
 }
 
+/* The modding tools Vortex lists for the game (ADR 0063). */
+.tool-listed {
+  margin-top: 1rem;
+}
+
+.tool-listed > h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+/* The line under a finding that names a tool for it. */
+.tool-hint {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+}
+
 .tool-optional > summary {
   cursor: pointer;
   font-weight: 600;

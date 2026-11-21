@@ -14,7 +14,7 @@ use mallet_core::duel::{ModDuel, SuggestionReason, Topic};
 use mallet_core::{
     Action, ActionOutcome, ActionStatus, ArgValue, Confidence, Finding, GameInfo, InstalledPatch,
     KindInfo, LocationOrigin, LocationRole, ModInfo, OptionToTick, ScanLocation, ScanReport,
-    Severity, Tool, ToolNeed, ToolState, WorldMap,
+    Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -559,8 +559,23 @@ impl Messages {
             .iter()
             .map(|tool| RenderedTool {
                 tool: tool.clone(),
-                name: self.text(&format!("tool-{}-name", tool.id), &[]),
-                purpose: self.text(&format!("tool-{}-purpose", tool.id), &[]),
+                // A modding tool of the mod manager goes by the name the
+                // manager shows, which is the one the user knows it by.
+                name: match (&tool.label, tool.group) {
+                    (Some(label), ToolGroup::ModTool) => label.clone(),
+                    _ => self.text(&format!("tool-{}-name", tool.id), &[]),
+                },
+                purpose: self.text(
+                    &format!(
+                        "tool-{}-purpose",
+                        if tool.id.starts_with("vortex-tool-") {
+                            "vortex-tool"
+                        } else {
+                            tool.id.as_str()
+                        }
+                    ),
+                    &[],
+                ),
                 state_label: self.text(
                     match tool.state {
                         ToolState::Ready => "tool-state-ready",

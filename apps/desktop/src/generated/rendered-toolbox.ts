@@ -46,11 +46,16 @@ export interface Tool {
   /**
    * What kind of tool it is, for showing the mod manager apart.
    */
-  group?: "mod-manager" | "manager-link" | "game" | "helper";
+  group?: "mod-manager" | "manager-link" | "game" | "helper" | "mod-tool";
   /**
    * Fixed identifier, for example `skse` or `address-library`.
    */
   id: string;
+  /**
+   * The name the mod manager gives it, for a tool Mod Mallet has no
+   * words of its own for.
+   */
+  label?: string | null;
   /**
    * How much the setup depends on it.
    */

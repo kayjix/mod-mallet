@@ -226,6 +226,17 @@ tool-loot-name = LOOT
 tool-loot-purpose = Sorts plugins and keeps a list of known problems with them. Vortex has LOOT built in and keeps that list up to date; Mod Mallet reads it to check your plugins. Without Vortex, LOOT on its own does the same.
 tool-seven-zip-name = 7-Zip
 tool-seven-zip-purpose = Opens mod archives. Mod Mallet uses it to read the installers of your mods; Vortex brings one along.
+tool-xedit-name = xEdit (SSEEdit)
+tool-xedit-purpose = Looks inside plugins and can repair them. Its guided variants clean a plugin of leftovers that crash the game, or build a patch that makes two mods work together. Start it from Vortex's dashboard so that it sees your mods.
+tool-xedit-clean-name = xEdit Quick Auto Clean
+tool-xedit-clean-purpose = Cleans a plugin of leftovers that can crash the game, in a few clicks. Mod Mallet points you to it when LOOT says a plugin needs cleaning. Start it from Vortex's dashboard so that it sees your mods.
+tool-wrye-bash-name = Wrye Bash
+tool-wrye-bash-purpose = Combines the small changes of many mods into one plugin (a Bashed Patch), so that they work together and you stay under the plugin limit.
+tool-fnis-name = Fores New Idles in Skyrim (FNIS)
+tool-fnis-purpose = Makes the game aware of the new animations that mods bring, such as walking or fighting styles. It has to run again after you add or remove such a mod, or the characters stand stiff.
+tool-bodyslide-name = BodySlide
+tool-bodyslide-purpose = Builds the bodies and outfits of mods that come in several shapes to your liking. The result is made new each time you change a setting.
+tool-vortex-tool-purpose = A program that Vortex lists among your tools. Mod Mallet does not know what it is for; start it from Vortex's dashboard.
 
 tool-state-ready = Ready
 tool-state-missing = Missing
