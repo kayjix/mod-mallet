@@ -44,6 +44,7 @@ import { ScanProgressView, scanStepLine, useScanProgress } from "./scan-progress
 import { scanTexts } from "./scan-texts";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
+import { NotDrawnHere, UnrealPaks } from "./Unreal";
 
 interface AppProps {
   api: Api;
@@ -628,6 +629,9 @@ export default function App({ api, startLang }: AppProps) {
             )
           ) : current === "review" ? (
             <Review report={report} game={games.choice?.active ?? ""} onOpen={go} />
+          ) : report.game.unrealVisuals &&
+            (current === "collisions" || current === "assets" || current === "catalogue") ? (
+            <NotDrawnHere page={current} />
           ) : current === "collisions" ? (
             <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
@@ -639,7 +643,10 @@ export default function App({ api, startLang }: AppProps) {
           ) : current === "map" ? (
             <MapView map={report.map} headlines={headlinesOf(report)} focus={focus} />
           ) : current === "mods" ? (
-            <ModsView mods={report.mods} findings={report.findings} />
+            <>
+              <UnrealPaks paks={report.unrealPaks ?? []} />
+              <ModsView mods={report.mods} findings={report.findings} />
+            </>
           ) : (
             <TasksPage report={report} />
           )}

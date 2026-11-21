@@ -220,6 +220,7 @@ mod tests {
                 name: "Skyrim Special Edition".to_owned(),
                 version: Some("1.7.104".to_owned()),
                 extender_version: Some("2.3.1".to_owned()),
+                unreal_visuals: false,
             },
             extender_plugins_checked: 46,
             plugins_checked: 300,
@@ -232,6 +233,7 @@ mod tests {
             object_swapper: false,
             installed_patch: None,
             duels: Vec::new(),
+            unreal_paks: Vec::new(),
             findings: file_names
                 .iter()
                 .map(|file_name| {

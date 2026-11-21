@@ -148,6 +148,10 @@ export interface RenderedReport {
    * When the scan ran, in seconds since 1970-01-01 UTC.
    */
   scannedAt: number;
+  /**
+   * The mods for the game's Unreal Engine side (ADR 0065).
+   */
+  unrealPaks?: UnrealPak[];
 }
 /**
  * A duel between two mods, in words.
@@ -918,6 +922,13 @@ export interface GameInfo {
    */
   name: string;
   /**
+   * Whether the game draws its world with Unreal Engine from assets of
+   * its own (Oblivion Remastered), so that the meshes and textures in
+   * its data folder, and views of them, say nothing about what is seen
+   * (ADR 0065).
+   */
+  unrealVisuals?: boolean;
+  /**
    * The game's version, if it could be determined.
    */
   version?: string | null;
@@ -1422,4 +1433,32 @@ export interface ModRef4 {
    * The manager that knows this mod, for example `vortex`.
    */
   source: string;
+}
+/**
+ * One Unreal package a mod brought: the `.pak` file and the files that
+ * belong to it (`.utoc`, `.ucas`).
+ */
+export interface UnrealPak {
+  /**
+   * The size of its files together, in bytes.
+   */
+  bytes: number;
+  /**
+   * The extensions of its files, in lower case, such as `pak`, `ucas`,
+   * `utoc`.
+   */
+  extensions: string[];
+  /**
+   * The folder it lies in.
+   */
+  folder: "mods" | "logic-mods";
+  /**
+   * The package, below the directory the game is installed in, with
+   * `/` between folders and as spelled on disk; without the extension.
+   */
+  path: string;
+  /**
+   * The mod its `.pak` file came from, if the mod manager knows.
+   */
+  provider?: ModRef3 | null;
 }

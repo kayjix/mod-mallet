@@ -30,6 +30,7 @@ mod preview;
 mod settings;
 mod staging;
 mod toolbox;
+mod unreal;
 mod versions;
 mod walkways;
 
@@ -123,11 +124,20 @@ impl ScanOptions {
     /// The game's directory: the one named, or the one found on this
     /// machine, and how it came to be known. `None` for an unknown game or
     /// one that is not found.
+    ///
+    /// It is the folder whose `Data` folder the checks read: for Oblivion
+    /// Remastered the old game's folder below the installation (ADR 0065).
     pub(crate) fn located_game_dir(&self) -> Option<(PathBuf, LocationOrigin)> {
-        match &self.game_dir {
-            Some(given) => Some((given.clone(), LocationOrigin::Given)),
-            None => locate::game_dir(self.game().ok()?),
+        let game = self.game();
+        if let Some(given) = &self.game_dir {
+            return Some((
+                game.map_or_else(|_| given.clone(), |game| locate::data_root(game, given)),
+                LocationOrigin::Given,
+            ));
         }
+        let game = game.ok()?;
+        let (dir, origin) = locate::game_dir(game)?;
+        Some((locate::data_root(game, &dir), origin))
     }
 }
 
@@ -312,6 +322,7 @@ fn scan_with(
         "analysed the setup"
     );
 
+    let unreal_paks = unreal::paks(game, &game_dir, &mod_infos);
     let extender = facts.extender.as_ref();
     Ok(ScanReport {
         schema_version: report::SCHEMA_VERSION,
@@ -321,6 +332,7 @@ fn scan_with(
             name: game.name().to_owned(),
             version: extender.and_then(|report| report.game_version.clone()),
             extender_version: extender.and_then(|report| report.extender_version.clone()),
+            unreal_visuals: !game.draws_its_data(),
         },
         extender_plugins_checked: extender.map_or(0, |report| count(report.plugins.len())),
         plugins_checked: count(facts.plugins.len()),
@@ -338,6 +350,7 @@ fn scan_with(
                 .is_file(),
         installed_patch,
         duels,
+        unreal_paks,
     })
 }
 
@@ -671,7 +684,7 @@ fn load_mod_source(
     let (manifest_path, origin) = match &options.deployment_manifest {
         Some(given) => (given.clone(), LocationOrigin::Given),
         None => (
-            mallet_source_vortex::data_manifest_path(game_dir),
+            mallet_source_vortex::data_manifest_path_for(game_dir, options.game_id()),
             LocationOrigin::Standard,
         ),
     };
@@ -686,7 +699,21 @@ fn load_mod_source(
         tracing::info!("no Vortex deployment found; files will not be attributed to mods");
         return Ok((Box::new(NoModSource), Vec::new(), Vec::new()));
     };
-    let deployment = VortexDeployment::parse(&manifest, &game_dir.to_string_lossy())?;
+    let deployment = match VortexDeployment::parse(&manifest, &game_dir.to_string_lossy()) {
+        // The manifest lies in the data folder it describes, but names
+        // another: the game was moved since Vortex last deployed. Its files
+        // are where the manifest lies (ADR 0065).
+        Err(VortexError::TargetOutsideGame { target, .. })
+            if origin == LocationOrigin::Standard =>
+        {
+            tracing::warn!(
+                %target,
+                "the deployment names another folder; read where it lies"
+            );
+            VortexDeployment::parse_at(&manifest, mallet_game_bethesda::DATA_DIR)?
+        }
+        other => other?,
+    };
     let deployment = staging::read(options, deployment, store, locations);
     tracing::info!(
         files = deployment.file_count(),

@@ -29,7 +29,7 @@ Options:
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 
@@ -68,7 +68,7 @@ Options:
           The script extender's log file. Detected if omitted
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 
@@ -147,7 +147,7 @@ Options:
           Where the result of the last scan is kept
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 
@@ -179,7 +179,7 @@ Options:
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 
@@ -207,7 +207,7 @@ Options:
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 
@@ -249,7 +249,7 @@ Options:
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
       --game <GAME>
-          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`
+          The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
 

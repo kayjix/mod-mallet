@@ -39,6 +39,45 @@ pub fn data_manifest_path(game_dir: &Path) -> PathBuf {
     game_dir.join("Data").join(MANIFEST_FILE)
 }
 
+/// The manifest of the `Data` directory of the game Vortex knows as
+/// `game_id`, below `game_dir`. Most games deploy their mods there as
+/// Vortex's default; for Oblivion Remastered, whose default goes into the
+/// installation's top folder, the data folder is a mod type of its own,
+/// and the manifest is named after it (ADR 0065).
+pub fn data_manifest_path_for(game_dir: &Path, game_id: &str) -> PathBuf {
+    match game_id {
+        "oblivionremastered" => game_dir
+            .join("Data")
+            .join("vortex.deployment.oblivionremastered-data-folder.json"),
+        _ => data_manifest_path(game_dir),
+    }
+}
+
+/// The deployment manifests directly in `dir`: Vortex's default one and
+/// those of its mod types (`vortex.deployment.<type>.json`), sorted. A
+/// folder that cannot be listed has none.
+pub fn manifests_in(dir: &Path) -> Vec<PathBuf> {
+    let mut found: Vec<PathBuf> = std::fs::read_dir(dir).map_or_else(
+        |_| Vec::new(),
+        |entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+                .filter(|entry| {
+                    let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+                    name.starts_with("vortex.deployment")
+                        && Path::new(&name)
+                            .extension()
+                            .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+                })
+                .map(|entry| entry.path())
+                .collect()
+        },
+    );
+    found.sort_unstable();
+    found
+}
+
 /// The files below one mod's folder in Vortex's staging folder, as paths
 /// relative to it with backslashes, the way the deployment manifest names
 /// them. Only the folder listings are read, no file is opened. Entries
@@ -152,6 +191,22 @@ impl VortexDeployment {
                 })?
         };
 
+        Ok(Self::from_raw(raw, &base))
+    }
+
+    /// Reads the text of a deployment manifest whose files lie below
+    /// `base`, a folder below the game directory, whatever folder the
+    /// manifest says Vortex deployed to. For a manifest found in the folder
+    /// it describes: after the game was moved to another drive, the folder
+    /// it names no longer exists, but its files are still where the
+    /// manifest lies.
+    pub fn parse_at(manifest_json: &str, base: &str) -> Result<Self, VortexError> {
+        let raw: RawManifest = serde_json::from_str(manifest_json)?;
+        Ok(Self::from_raw(raw, &GamePath::new(base)))
+    }
+
+    /// The files of `raw`, below `base`.
+    fn from_raw(raw: RawManifest, base: &GamePath) -> Self {
         let mut deployment = Self {
             staging_path: raw.staging_path.filter(|path| !path.is_empty()),
             base: Some(base.clone()),
@@ -169,7 +224,7 @@ impl VortexDeployment {
             };
             deployment.by_path.insert(base.join(&file.rel_path), index);
         }
-        Ok(deployment)
+        deployment
     }
 
     /// Uses the names Vortex shows for the mods instead of their folder
@@ -305,6 +360,52 @@ mod tests {
             { "relPath": "textures\\sky.dds", "source": "Sky Textures 456 2.0", "target": "", "time": 1 }
         ]
     }"#;
+
+    #[test]
+    fn a_manifest_of_a_moved_game_is_read_where_it_lies() {
+        // The manifest names a drive the game is no longer on.
+        assert!(VortexDeployment::parse(MANIFEST, r"E:\Elsewhere\Skyrim").is_err());
+        let deployment = VortexDeployment::parse_at(MANIFEST, "data").unwrap();
+        assert_eq!(
+            deployment
+                .provider_of(&GamePath::new("data/textures/sky.dds"))
+                .unwrap()
+                .id,
+            "Sky Textures 456 2.0"
+        );
+    }
+
+    #[test]
+    fn oblivion_remastered_names_its_data_manifest_after_the_mod_type() {
+        let game = Path::new("game");
+        assert_eq!(
+            data_manifest_path_for(game, "oblivionremastered"),
+            game.join("Data")
+                .join("vortex.deployment.oblivionremastered-data-folder.json")
+        );
+        assert_eq!(
+            data_manifest_path_for(game, "skyrimse"),
+            data_manifest_path(game)
+        );
+    }
+
+    #[test]
+    fn manifests_of_every_mod_type_are_found_in_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("vortex.deployment.json"), b"{}").unwrap();
+        std::fs::write(
+            dir.path()
+                .join("vortex.deployment.example-pak-modtype.json"),
+            b"{}",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("Mod_P.pak"), b"").unwrap();
+        assert_eq!(manifests_in(dir.path()).len(), 2);
+        assert_eq!(
+            manifests_in(&dir.path().join("missing")),
+            Vec::<PathBuf>::new()
+        );
+    }
 
     #[test]
     fn maps_deployed_files_to_their_mod() {

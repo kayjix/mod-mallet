@@ -25,6 +25,12 @@ pub struct GameInfo {
     /// The script extender's version, if one is installed and has run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extender_version: Option<String>,
+    /// Whether the game draws its world with Unreal Engine from assets of
+    /// its own (Oblivion Remastered), so that the meshes and textures in
+    /// its data folder, and views of them, say nothing about what is seen
+    /// (ADR 0065).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unreal_visuals: bool,
 }
 
 /// What a place the scan looked at is for.
@@ -185,6 +191,10 @@ pub struct ScanReport {
     /// The findings about two mods, gathered pair by pair.
     #[serde(default)]
     pub duels: Vec<crate::duel::ModDuel>,
+    /// The mods for the game's Unreal Engine side, for a game drawn with
+    /// it (ADR 0065).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unreal_paks: Vec<crate::UnrealPak>,
 }
 
 /// Every version of one file that the setup has, as pictures for the

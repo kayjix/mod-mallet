@@ -33,7 +33,8 @@ struct Cli {
     verbose: bool,
 
     /// The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `fallout4`,
-    /// `fallout4vr`, `falloutnv`, `fallout3` or `oblivion`.
+    /// `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or
+    /// `oblivionremastered`.
     #[arg(long, global = true, value_name = "GAME", default_value = "skyrimse")]
     game: String,
 

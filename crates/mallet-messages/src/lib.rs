@@ -257,6 +257,9 @@ pub struct RenderedReport {
     pub object_swapper: bool,
     /// Mod Mallet's patch as it is in the game now, if there is one.
     pub installed_patch: Option<InstalledPatch>,
+    /// The mods for the game's Unreal Engine side (ADR 0065).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unreal_paks: Vec<mallet_core::UnrealPak>,
     /// What two mods disagree about, pair by pair.
     pub duels: Vec<RenderedDuel>,
     /// The findings with their texts, most severe first.
@@ -674,6 +677,7 @@ impl Messages {
             map: report.map.clone(),
             object_swapper: report.object_swapper,
             installed_patch: report.installed_patch.clone(),
+            unreal_paks: report.unreal_paks.clone(),
             duels: {
                 // The mod manager knows the proper names; deployments only
                 // know folders.

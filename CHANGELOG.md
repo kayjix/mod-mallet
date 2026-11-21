@@ -16,6 +16,13 @@ in [Releases](docs/src/contributing/releases.md).
   Vortex's dashboard (and takes it off again), so you can start it from
   there. Nothing is added unless you press it. Update the link in the
   toolbox to get it.
+- Oblivion Remastered is found and read: its plugins, load order and
+  archives, with the checks that need only those. Its Unreal mods are
+  listed with the mod each came from. Collisions, assets and the
+  catalogue say why they stay empty for this game: it draws with Unreal
+  Engine, not with the meshes and textures in its Data folder.
+- A Vortex deployment of a game that was moved to another drive is read
+  where it lies instead of stopping the scan.
 
 ## [0.2.2] - 2026-11-19
 

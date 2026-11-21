@@ -1,6 +1,6 @@
 //! Mod Mallet's adapter for the games of the Bethesda family: Skyrim
 //! Special Edition, Skyrim VR, Skyrim, Fallout 4, Fallout 4 VR, Fallout:
-//! New Vegas, Fallout 3 and Oblivion.
+//! New Vegas, Fallout 3, Oblivion and Oblivion Remastered.
 //!
 //! The adapter knows where these games keep their files and what they
 //! mean. It turns them into the game-neutral facts of `mallet-core`. The
@@ -51,6 +51,7 @@ pub mod skse_log;
 pub mod swap;
 pub mod terrain;
 pub mod tools;
+pub mod unreal;
 pub mod walkways;
 
 pub use game::Game;

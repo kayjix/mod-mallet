@@ -404,7 +404,15 @@ pub fn setup_fingerprint(options: &ScanOptions) -> String {
     for location in planned_locations(options) {
         if location.role == LocationRole::GameDir {
             // Installing or removing a plugin changes the data directory.
-            add(&Path::new(&location.path).join("Data"));
+            let root = Path::new(&location.path);
+            add(&root.join("Data"));
+            // And an Unreal mod its folder (ADR 0065).
+            if let Ok(game) = options.game() {
+                let install = locate::install_dir(game, root);
+                for (folder, _) in game.unreal_pak_folders() {
+                    add(&install.join(folder));
+                }
+            }
         } else {
             add(Path::new(&location.path));
         }

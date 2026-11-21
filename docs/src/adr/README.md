@@ -85,3 +85,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0056](0056-missing-textures-found-in-switched-off-mods.md) | Missing textures are looked for in switched-off mods | accepted |
 | [0057](0057-one-version-for-the-app.md) | One version for the app, shown with its build | accepted |
 | [0063](0063-the-tools-vortex-knows.md) | The tools Vortex knows, and Mod Mallet as one of them | accepted |
+| [0065](0065-oblivion-remastered.md) | Oblivion Remastered: the old game's data below the installation, Unreal mods beside it | accepted |

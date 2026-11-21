@@ -41,7 +41,8 @@ pub fn read_models_with(
     progress: &Progress<'_>,
 ) -> ModelFacts {
     let mut facts = ModelFacts::default();
-    if paths.is_empty() {
+    // A game drawn by Unreal Engine does not show these models (ADR 0065).
+    if paths.is_empty() || !game.draws_its_data() {
         return facts;
     }
     let library = LodLibrary::with_prefixes(game, game_dir, local_dir, &["meshes/".to_owned()]);

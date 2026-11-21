@@ -94,6 +94,13 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "unrealPaks": {
+      "description": "The mods for the game's Unreal Engine side (ADR 0065).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/UnrealPak"
+      }
     }
   },
   "required": [
@@ -529,6 +536,10 @@
         "name": {
           "description": "The game's name.",
           "type": "string"
+        },
+        "unrealVisuals": {
+          "description": "Whether the game draws its world with Unreal Engine from assets of\nits own (Oblivion Remastered), so that the meshes and textures in\nits data folder, and views of them, say nothing about what is seen\n(ADR 0065).",
+          "type": "boolean"
         },
         "version": {
           "description": "The game's version, if it could be determined.",
@@ -1244,6 +1255,21 @@
         "group",
         "option",
         "description"
+      ]
+    },
+    "PakFolder": {
+      "description": "The folder below the game's `Content/Paks` an Unreal mod lies in.",
+      "oneOf": [
+        {
+          "description": "`~mods`: packages that replace the game's own assets, such as\nmodels, textures or menus.",
+          "type": "string",
+          "const": "mods"
+        },
+        {
+          "description": "`LogicMods`: packages with game logic of their own, loaded by\nUE4SS's mod loader.",
+          "type": "string",
+          "const": "logic-mods"
+        }
       ]
     },
     "Party": {
@@ -2100,6 +2126,50 @@
           "type": "string",
           "const": "files"
         }
+      ]
+    },
+    "UnrealPak": {
+      "description": "One Unreal package a mod brought: the `.pak` file and the files that\nbelong to it (`.utoc`, `.ucas`).",
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "description": "The size of its files together, in bytes.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "extensions": {
+          "description": "The extensions of its files, in lower case, such as `pak`, `ucas`,\n`utoc`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folder": {
+          "description": "The folder it lies in.",
+          "$ref": "#/$defs/PakFolder"
+        },
+        "path": {
+          "description": "The package, below the directory the game is installed in, with\n`/` between folders and as spelled on disk; without the extension.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "The mod its `.pak` file came from, if the mod manager knows.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "folder",
+        "extensions",
+        "bytes"
       ]
     },
     "WorldMap": {

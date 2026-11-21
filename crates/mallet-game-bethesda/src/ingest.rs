@@ -133,8 +133,12 @@ pub fn read_setup_with(
         }
     }
     progress.step(ScanStep::Meshes);
-    facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
-    add_meshes(&mut facts, game, &loose, &loaded_archives, cache);
+    // The meshes in the data folder are what the game draws, except in a
+    // game drawn by Unreal Engine from assets of its own (ADR 0065).
+    if game.draws_its_data() {
+        facts.mesh_overrides = meshes::read_overrides(&loose, &loaded_archives, cache);
+        add_meshes(&mut facts, game, &loose, &loaded_archives, cache);
+    }
 
     let mut placed = objects::Collector::new(game);
     let mut land = terrain::Collector::default();
@@ -298,15 +302,18 @@ pub fn plugin_list_path(game: Game, game_dir: &Path, local_dir: Option<&Path>) -
     Some(settings.active_plugins_file().clone())
 }
 
-/// The load order library's view of the installation.
+/// The load order library's view of the installation. The library wants
+/// the directory the game is installed in, which for Oblivion Remastered
+/// lies above the folder the checks read (ADR 0065).
 fn load_order_settings(
     game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
 ) -> Result<GameSettings, loadorder::Error> {
+    let install = crate::locate::install_dir(game, game_dir);
     match local_dir {
-        Some(local_dir) => GameSettings::with_local_path(game.load_order_id(), game_dir, local_dir),
-        None => GameSettings::new(game.load_order_id(), game_dir),
+        Some(local_dir) => GameSettings::with_local_path(game.load_order_id(), &install, local_dir),
+        None => GameSettings::new(game.load_order_id(), &install),
     }
 }
 
@@ -807,6 +814,53 @@ mod tests {
         assert_eq!(facts.plugins[1].masters, ["Oblivion.esm"]);
         let paths: Vec<_> = facts.archives.iter().map(|a| a.path.as_str()).collect();
         assert_eq!(paths, ["data/castle - meshes.bsa"]);
+        assert_eq!(facts.unreadable, Vec::new());
+    }
+
+    #[test]
+    fn oblivion_remastered_reads_its_plugin_list_from_the_old_games_data_folder() {
+        // The shape of the real folders: the old game's data four folders
+        // below the installation, with the list of plugins inside it.
+        let install = tempfile::tempdir().unwrap();
+        fs::write(install.path().join("OblivionRemastered.exe"), b"").unwrap();
+        let root = install
+            .path()
+            .join("OblivionRemastered/Content/Dev/ObvData");
+        let data = root.join("Data");
+        fs::create_dir_all(&data).unwrap();
+        fs::write(root.join("Oblivion.ini"), "[Archive]\n").unwrap();
+        fs::write(
+            data.join("Plugins.txt"),
+            "## written by a mod manager\r\nOblivion.esm\r\nAltarESPMain.esp\r\nLanterns.esp\r\n#Switched Off.esp\r\n",
+        )
+        .unwrap();
+        let master = fixture::oblivion::plugin(&[], MASTER_FLAG, &[]);
+        let plugin = fixture::oblivion::plugin(&["Oblivion.esm"], 0, &[]);
+        fs::write(data.join("Oblivion.esm"), &master).unwrap();
+        fs::write(data.join("AltarESPMain.esp"), &plugin).unwrap();
+        fs::write(data.join("Lanterns.esp"), &plugin).unwrap();
+        fs::write(data.join("Switched Off.esp"), &plugin).unwrap();
+        fs::write(
+            data.join("Lanterns.bsa"),
+            fixture::bsa_with_version(&[r"meshes\lantern.nif"], 103),
+        )
+        .unwrap();
+        fs::write(data.join("meshes.nif"), b"not drawn").unwrap();
+
+        let facts = read_setup(Game::OblivionRemastered, &root, None, &NoCache).unwrap();
+
+        assert_eq!(
+            names(&facts.plugins),
+            ["Oblivion.esm", "AltarESPMain.esp", "Lanterns.esp"]
+        );
+        assert_eq!(facts.plugins[2].path, GamePath::new("data/lanterns.esp"));
+        assert_eq!(facts.plugins[2].masters, ["Oblivion.esm"]);
+        assert_eq!(facts.plugin_list, data.join("Plugins.txt"));
+        let paths: Vec<_> = facts.archives.iter().map(|a| a.path.as_str()).collect();
+        assert_eq!(paths, ["data/lanterns.bsa"]);
+        // Unreal Engine draws the game; its meshes are not looked at.
+        assert_eq!(facts.mesh_textures, Vec::new());
+        assert_eq!(facts.mesh_overrides, Vec::new());
         assert_eq!(facts.unreadable, Vec::new());
     }
 

@@ -55,7 +55,7 @@ pub fn native_version(game: Game) -> Option<u32> {
         Game::Skyrim => Some(83),
         Game::Fallout4 | Game::Fallout4Vr => Some(130),
         Game::FalloutNv | Game::Fallout3 => Some(34),
-        Game::Oblivion => None,
+        Game::Oblivion | Game::OblivionRemastered => None,
     }
 }
 

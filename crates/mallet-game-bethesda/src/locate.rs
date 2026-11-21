@@ -54,7 +54,7 @@ pub fn installed_games() -> Vec<(Game, PathBuf, LocationOrigin)> {
 /// The file is not guaranteed to exist: the extender may not be installed,
 /// or the game may never have been started through it.
 pub fn extender_log(game: Game, game_dir: Option<&Path>) -> Option<PathBuf> {
-    match game.script_extender().log {
+    match game.script_extender().log? {
         LogPlace::MyGames { folder, file } => Some(
             dirs::document_dir()?
                 .join("My Games")
@@ -64,6 +64,48 @@ pub fn extender_log(game: Game, game_dir: Option<&Path>) -> Option<PathBuf> {
         ),
         LogPlace::GameDir { file } => game_dir.map(|dir| dir.join(file)),
     }
+}
+
+/// The folder whose `Data` folder holds the plugins and archives of `game`
+/// installed in `dir`: `dir` itself for every game but Oblivion
+/// Remastered, whose old game data lies four folders further down
+/// (ADR 0065). A `dir` that already is that folder, or that does not have
+/// it, is taken as it is, so that the user may name either.
+///
+/// Every check of plugins, archives and loose files reads below this
+/// folder, so the paths the game sees start with `data/` in every game.
+pub fn data_root(game: Game, dir: &Path) -> PathBuf {
+    let below = game.data_root();
+    if below.is_empty() {
+        return dir.to_path_buf();
+    }
+    let root = below
+        .iter()
+        .fold(dir.to_path_buf(), |path, folder| path.join(folder));
+    if root.is_dir() {
+        root
+    } else {
+        dir.to_path_buf()
+    }
+}
+
+/// The directory `game` is installed in, from the folder [`data_root`]
+/// gives: `root` itself for every game but Oblivion Remastered, where it
+/// lies four folders above. A `root` that does not end in those folders is
+/// taken as the installation itself. Only compares names.
+pub fn install_dir(game: Game, root: &Path) -> PathBuf {
+    let below = game.data_root();
+    let mut install = root;
+    for folder in below.iter().rev() {
+        let matches = install
+            .file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case(folder));
+        match install.parent() {
+            Some(parent) if matches => install = parent,
+            _ => return root.to_path_buf(),
+        }
+    }
+    install.to_path_buf()
 }
 
 /// The plugins that come with `game`, in lower case: its own, and the
@@ -237,6 +279,40 @@ mod tests {
             Some(dir.join("nvse.log"))
         );
         assert_eq!(extender_log(Game::Oblivion, None), None);
+    }
+
+    #[test]
+    fn oblivion_remastered_keeps_its_data_four_folders_down() {
+        let install = tempfile::tempdir().unwrap();
+        let root = install
+            .path()
+            .join("OblivionRemastered/Content/Dev/ObvData");
+        // Before the folder exists, the directory is taken as it is.
+        assert_eq!(
+            data_root(Game::OblivionRemastered, install.path()),
+            install.path()
+        );
+        std::fs::create_dir_all(root.join("Data")).unwrap();
+
+        assert_eq!(data_root(Game::OblivionRemastered, install.path()), root);
+        // Naming the folder itself works as well.
+        assert_eq!(data_root(Game::OblivionRemastered, &root), root);
+        assert_eq!(install_dir(Game::OblivionRemastered, &root), install.path());
+        let lower = install
+            .path()
+            .join("oblivionremastered/content/dev/obvdata");
+        assert_eq!(
+            install_dir(Game::OblivionRemastered, &lower),
+            install.path()
+        );
+        assert_eq!(
+            install_dir(Game::OblivionRemastered, install.path()),
+            install.path()
+        );
+        // The other games read below their installation.
+        assert_eq!(data_root(Game::Oblivion, install.path()), install.path());
+        assert_eq!(install_dir(Game::Oblivion, &root), root);
+        assert_eq!(extender_log(Game::OblivionRemastered, Some(&root)), None);
     }
 
     #[test]

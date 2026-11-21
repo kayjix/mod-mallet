@@ -1,0 +1,45 @@
+/* ---- games drawn with Unreal Engine (ADR 0065) --------------------------- */
+
+/* A page that does not apply to the game says why, readable at a glance. */
+.unreal-not-drawn > p {
+  max-width: 72ch;
+}
+
+/* The Unreal mods: one line each, the package, its folder, its mod. */
+.unreal-pak-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.unreal-pak-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) auto minmax(0, 2fr) auto;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.unreal-pak-name,
+.unreal-pak-mod {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unreal-pak-name {
+  font-weight: 600;
+}
+
+.unreal-pak-folder {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .unreal-pak-list > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

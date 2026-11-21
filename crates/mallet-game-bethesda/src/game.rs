@@ -10,7 +10,7 @@
 //! Everything here is a constant. Finding a game on this machine is
 //! [`crate::locate`]'s work.
 
-use mallet_core::GameSupport;
+use mallet_core::{GameSupport, PakFolder};
 
 /// A game this adapter knows. Skyrim Special Edition, the first game Mod
 /// Mallet read, is the one assumed where nothing else is said.
@@ -35,6 +35,10 @@ pub enum Game {
     Fallout3,
     /// The Elder Scrolls IV: Oblivion, as released in 2006.
     Oblivion,
+    /// The Elder Scrolls IV: Oblivion Remastered (2025). It runs the old
+    /// game's logic on the old game's data, below a folder of its own
+    /// (`ObvData`), and draws with Unreal Engine (ADR 0065).
+    OblivionRemastered,
 }
 
 /// Groups of games that share how their records are laid out and what the
@@ -47,7 +51,7 @@ pub enum Family {
     Fallout4,
     /// Fallout 3 and Fallout: New Vegas.
     Fallout3,
-    /// Oblivion.
+    /// Oblivion and Oblivion Remastered.
     Oblivion,
 }
 
@@ -88,14 +92,14 @@ pub struct ScriptExtender {
     pub tool: &'static str,
     /// The short name people know it by, such as `SKSE`.
     pub short_name: &'static str,
-    /// The program that starts the game with the extender, in the game's
-    /// directory.
+    /// The program that starts the game with the extender, relative to the
+    /// directory the game is installed in.
     pub loader: &'static str,
-    /// The directory its plugins are loaded from, relative to the game
-    /// directory, in lower case.
+    /// The directory its plugins are loaded from, relative to the
+    /// directory the game is installed in, in lower case.
     pub plugin_dir: &'static str,
-    /// Where it writes its log.
-    pub log: LogPlace,
+    /// Where it writes its log, if Mod Mallet reads it.
+    pub log: Option<LogPlace>,
     /// The start of the name of the library it ships for each game
     /// version, such as `skse64` for `skse64_1_6_1170.dll`, if the
     /// extender names its libraries that way and logs the game version
@@ -131,7 +135,7 @@ pub struct Editor {
 
 impl Game {
     /// Every game this adapter knows, in the order they are offered.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::SkyrimSe,
         Self::SkyrimVr,
         Self::Skyrim,
@@ -140,6 +144,7 @@ impl Game {
         Self::FalloutNv,
         Self::Fallout3,
         Self::Oblivion,
+        Self::OblivionRemastered,
     ];
 
     /// The game with the identifier `id`, ignoring case.
@@ -160,6 +165,7 @@ impl Game {
             Self::FalloutNv => "falloutnv",
             Self::Fallout3 => "fallout3",
             Self::Oblivion => "oblivion",
+            Self::OblivionRemastered => "oblivionremastered",
         }
     }
 
@@ -174,6 +180,7 @@ impl Game {
             Self::FalloutNv => "Fallout: New Vegas",
             Self::Fallout3 => "Fallout 3",
             Self::Oblivion => "Oblivion",
+            Self::OblivionRemastered => "Oblivion Remastered",
         }
     }
 
@@ -183,7 +190,7 @@ impl Game {
             Self::SkyrimSe | Self::SkyrimVr | Self::Skyrim => Family::Skyrim,
             Self::Fallout4 | Self::Fallout4Vr => Family::Fallout4,
             Self::FalloutNv | Self::Fallout3 => Family::Fallout3,
-            Self::Oblivion => Family::Oblivion,
+            Self::Oblivion | Self::OblivionRemastered => Family::Oblivion,
         }
     }
 
@@ -207,6 +214,43 @@ impl Game {
             Self::FalloutNv => "FalloutNV.exe",
             Self::Fallout3 => "Fallout3.exe",
             Self::Oblivion => "Oblivion.exe",
+            Self::OblivionRemastered => "OblivionRemastered.exe",
+        }
+    }
+
+    /// The folders, from the directory the game is installed in, down to
+    /// the one that holds the game's `Data` folder. Empty for every game
+    /// but Oblivion Remastered, which keeps the old game's data in
+    /// `OblivionRemastered/Content/Dev/ObvData` (ADR 0065).
+    pub const fn data_root(self) -> &'static [&'static str] {
+        match self {
+            Self::OblivionRemastered => &["OblivionRemastered", "Content", "Dev", "ObvData"],
+            _ => &[],
+        }
+    }
+
+    /// Whether the game draws its world from the meshes and textures in its
+    /// data folder. Oblivion Remastered does not: it draws with Unreal
+    /// Engine from assets of its own, so what Mod Mallet reads of meshes
+    /// and textures, and its 3D views, say nothing about it (ADR 0065).
+    pub const fn draws_its_data(self) -> bool {
+        !matches!(self, Self::OblivionRemastered)
+    }
+
+    /// The folders below the directory the game is installed in from
+    /// which Unreal Engine loads mods packed as `.pak` files, with the
+    /// kind of each folder. Empty for the games not drawn with Unreal
+    /// Engine.
+    pub const fn unreal_pak_folders(self) -> &'static [(&'static str, PakFolder)] {
+        match self {
+            Self::OblivionRemastered => &[
+                ("OblivionRemastered/Content/Paks/~mods", PakFolder::Mods),
+                (
+                    "OblivionRemastered/Content/Paks/LogicMods",
+                    PakFolder::LogicMods,
+                ),
+            ],
+            _ => &[],
         }
     }
 
@@ -215,7 +259,11 @@ impl Game {
     pub const fn is_64_bit(self) -> bool {
         matches!(
             self,
-            Self::SkyrimSe | Self::SkyrimVr | Self::Fallout4 | Self::Fallout4Vr
+            Self::SkyrimSe
+                | Self::SkyrimVr
+                | Self::Fallout4
+                | Self::Fallout4Vr
+                | Self::OblivionRemastered
         )
     }
 
@@ -231,6 +279,7 @@ impl Game {
             Self::FalloutNv => "FalloutNV",
             Self::Fallout3 => "Fallout3",
             Self::Oblivion => "Oblivion",
+            Self::OblivionRemastered => "Oblivion Remastered",
         }
     }
 
@@ -246,6 +295,7 @@ impl Game {
             Self::FalloutNv => &["Fallout New Vegas", "FalloutNV"],
             Self::Fallout3 => &["Fallout 3 goty", "Fallout 3"],
             Self::Oblivion => &["Oblivion"],
+            Self::OblivionRemastered => &["Oblivion Remastered"],
         }
     }
 
@@ -258,7 +308,7 @@ impl Game {
             Self::FalloutNv => &["1454587428"],
             Self::Fallout3 => &["1454315831"],
             Self::Oblivion => &["1458058109"],
-            Self::SkyrimVr | Self::Skyrim | Self::Fallout4Vr => &[],
+            Self::SkyrimVr | Self::Skyrim | Self::Fallout4Vr | Self::OblivionRemastered => &[],
         }
     }
 
@@ -274,6 +324,7 @@ impl Game {
             Self::FalloutNv => "FalloutNV",
             Self::Fallout3 => "Fallout3",
             Self::Oblivion => "Oblivion",
+            Self::OblivionRemastered => "Oblivion Remastered",
         }
     }
 
@@ -288,6 +339,7 @@ impl Game {
             Self::FalloutNv => "newvegas",
             Self::Fallout3 => "fallout3",
             Self::Oblivion => "oblivion",
+            Self::OblivionRemastered => "oblivionremastered",
         }
     }
 
@@ -364,6 +416,23 @@ impl Game {
                 "dlcthievesden.esp",
                 "dlcvilelair.esp",
             ],
+            Self::OblivionRemastered => &[
+                "oblivion.esm",
+                "dlcbattlehorncastle.esp",
+                "dlcfrostcrag.esp",
+                "dlchorsearmor.esp",
+                "dlcmehrunesrazor.esp",
+                "dlcorrery.esp",
+                "dlcshiveringisles.esp",
+                "dlcspelltomes.esp",
+                "dlcthievesden.esp",
+                "dlcvilelair.esp",
+                "knights.esp",
+                "altarespmain.esp",
+                "altardeluxe.esp",
+                "altargymnavigation.esp",
+                "tamrielleveledregion.esp",
+            ],
         }
     }
 
@@ -410,7 +479,7 @@ impl Game {
             Self::Fallout4 => &["fallout4 - "],
             Self::Fallout4Vr => &["fallout4 - ", "fallout4_vr - "],
             Self::FalloutNv | Self::Fallout3 => &["fallout - "],
-            Self::Oblivion => &["oblivion - "],
+            Self::Oblivion | Self::OblivionRemastered => &["oblivion - "],
         }
     }
 
@@ -431,10 +500,10 @@ impl Game {
                 short_name: "SKSE",
                 loader: "skse64_loader.exe",
                 plugin_dir: "data/skse/plugins",
-                log: LogPlace::MyGames {
+                log: Some(LogPlace::MyGames {
                     folder: "SKSE",
                     file: "skse64.log",
-                },
+                }),
                 versioned_library: Some("skse64"),
                 page: "https://skse.silverlock.org/",
             },
@@ -443,10 +512,10 @@ impl Game {
                 short_name: "SKSEVR",
                 loader: "sksevr_loader.exe",
                 plugin_dir: "data/skse/plugins",
-                log: LogPlace::MyGames {
+                log: Some(LogPlace::MyGames {
                     folder: "SKSE",
                     file: "sksevr.log",
-                },
+                }),
                 versioned_library: Some("sksevr"),
                 page: "https://skse.silverlock.org/",
             },
@@ -455,10 +524,10 @@ impl Game {
                 short_name: "SKSE",
                 loader: "skse_loader.exe",
                 plugin_dir: "data/skse/plugins",
-                log: LogPlace::MyGames {
+                log: Some(LogPlace::MyGames {
                     folder: "SKSE",
                     file: "skse.log",
-                },
+                }),
                 versioned_library: None,
                 page: "https://skse.silverlock.org/",
             },
@@ -467,10 +536,10 @@ impl Game {
                 short_name: "F4SE",
                 loader: "f4se_loader.exe",
                 plugin_dir: "data/f4se/plugins",
-                log: LogPlace::MyGames {
+                log: Some(LogPlace::MyGames {
                     folder: "F4SE",
                     file: "f4se.log",
-                },
+                }),
                 versioned_library: Some("f4se"),
                 page: "https://f4se.silverlock.org/",
             },
@@ -479,10 +548,10 @@ impl Game {
                 short_name: "F4SEVR",
                 loader: "f4sevr_loader.exe",
                 plugin_dir: "data/f4se/plugins",
-                log: LogPlace::MyGames {
+                log: Some(LogPlace::MyGames {
                     folder: "F4SE",
                     file: "f4sevr.log",
-                },
+                }),
                 versioned_library: Some("f4sevr"),
                 page: "https://f4se.silverlock.org/",
             },
@@ -491,7 +560,7 @@ impl Game {
                 short_name: "xNVSE",
                 loader: "nvse_loader.exe",
                 plugin_dir: "data/nvse/plugins",
-                log: LogPlace::GameDir { file: "nvse.log" },
+                log: Some(LogPlace::GameDir { file: "nvse.log" }),
                 versioned_library: None,
                 page: "https://github.com/xNVSE/NVSE",
             },
@@ -500,7 +569,7 @@ impl Game {
                 short_name: "FOSE",
                 loader: "fose_loader.exe",
                 plugin_dir: "data/fose/plugins",
-                log: LogPlace::GameDir { file: "fose.log" },
+                log: Some(LogPlace::GameDir { file: "fose.log" }),
                 versioned_library: None,
                 page: "https://fose.silverlock.org/",
             },
@@ -509,9 +578,21 @@ impl Game {
                 short_name: "OBSE",
                 loader: "obse_loader.exe",
                 plugin_dir: "data/obse/plugins",
-                log: LogPlace::GameDir { file: "obse.log" },
+                log: Some(LogPlace::GameDir { file: "obse.log" }),
                 versioned_library: None,
                 page: "https://github.com/llde/xOBSE",
+            },
+            // OBSE64 runs with the Steam version only. Its plugins lie
+            // beside the game's Unreal program, not in the data folder,
+            // and its log is not read yet (ADR 0065).
+            Self::OblivionRemastered => ScriptExtender {
+                tool: "obse64",
+                short_name: "OBSE64",
+                loader: "OblivionRemastered/Binaries/Win64/obse64_loader.exe",
+                plugin_dir: "oblivionremastered/binaries/win64/obse/plugins",
+                log: None,
+                versioned_library: None,
+                page: "https://www.nexusmods.com/oblivionremastered/mods/282",
             },
         }
     }
@@ -539,9 +620,20 @@ impl Game {
         }
     }
 
-    /// The editor Bethesda released for the game.
-    pub const fn editor(self) -> Editor {
+    /// Where UE4SS, the loader of the Unreal Engine side's logic mods, puts
+    /// its library, relative to the directory the game is installed in;
+    /// `None` for the games not drawn with Unreal Engine.
+    pub const fn ue4ss(self) -> Option<&'static str> {
         match self {
+            Self::OblivionRemastered => Some("OblivionRemastered/Binaries/Win64/ue4ss/UE4SS.dll"),
+            _ => None,
+        }
+    }
+
+    /// The editor Bethesda released for the game, if there is one.
+    /// Oblivion Remastered has none.
+    pub const fn editor(self) -> Option<Editor> {
+        Some(match self {
             Self::SkyrimSe | Self::SkyrimVr => Editor {
                 tool: "creation-kit",
                 program: "CreationKit.exe",
@@ -567,7 +659,8 @@ impl Game {
                 program: "TESConstructionSet.exe",
                 page: "https://cs.uesp.net/",
             },
-        }
+            Self::OblivionRemastered => return None,
+        })
     }
 
     /// Whether Mod Mallet's patches work in the game: they are read by
@@ -602,6 +695,7 @@ impl Game {
             Self::FalloutNv => GameId::FalloutNV,
             Self::Fallout3 => GameId::Fallout3,
             Self::Oblivion => GameId::Oblivion,
+            Self::OblivionRemastered => GameId::OblivionRemastered,
         }
     }
 }
@@ -640,9 +734,31 @@ mod tests {
     fn script_extender_plugin_dirs_are_below_the_data_directory() {
         for game in Game::ALL {
             let extender = game.script_extender();
-            assert!(extender.plugin_dir.starts_with("data/"), "{game:?}");
+            if game == Game::OblivionRemastered {
+                // Beside the Unreal program, outside the data folder.
+                assert!(!extender.plugin_dir.contains("data/"));
+            } else {
+                assert!(extender.plugin_dir.starts_with("data/"), "{game:?}");
+            }
             assert_eq!(extender.plugin_dir, extender.plugin_dir.to_lowercase());
         }
+    }
+
+    #[test]
+    fn oblivion_remastered_reads_like_oblivion_but_is_drawn_by_unreal() {
+        let game = Game::OblivionRemastered;
+        assert_eq!(game.family(), Family::Oblivion);
+        assert_eq!(game.archive_extension(), "bsa");
+        assert_eq!(game.archive_naming(), ArchiveNaming::Prefixed);
+        assert!(!game.draws_its_data());
+        assert!(Game::Oblivion.draws_its_data());
+        assert_eq!(game.data_root().len(), 4);
+        assert_eq!(Game::Oblivion.data_root().len(), 0);
+        assert_eq!(game.unreal_pak_folders().len(), 2);
+        assert_eq!(Game::Oblivion.unreal_pak_folders().len(), 0);
+        assert!(game.editor().is_none());
+        assert!(game.script_extender().log.is_none());
+        assert!(game.is_official("AltarESPMain.esp"));
     }
 
     #[test]

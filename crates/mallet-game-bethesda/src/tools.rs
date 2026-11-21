@@ -6,8 +6,11 @@ use std::path::Path;
 
 use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
 
-use crate::game::{AddressLibrary, Game};
+use crate::game::{AddressLibrary, Editor, Game};
 use crate::swap::SWAPPER_PLUGIN;
+
+/// UE4SS's page.
+const UE4SS_PAGE: &str = "https://github.com/UE4SS-RE/RE-UE4SS";
 
 /// Base Object Swapper on Nexus Mods.
 const SWAPPER_PAGE: &str = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
@@ -21,8 +24,11 @@ const LOOT_PAGE: &str = "https://loot.github.io/";
 /// `game_version` is the version the game last ran in, as the script
 /// extender logged it (`1.7.104`); without it, versions are not compared.
 pub fn requirements(game: Game, game_dir: &Path, game_version: Option<&str>) -> Vec<Tool> {
-    let plugins = game_dir.join(game.script_extender().plugin_dir);
-    let mut tools = vec![script_extender(game, game_dir, game_version)];
+    // The extender and the editor lie in the installation, which for
+    // Oblivion Remastered is above the folder the checks read (ADR 0065).
+    let install = crate::locate::install_dir(game, game_dir);
+    let plugins = install.join(game.script_extender().plugin_dir);
+    let mut tools = vec![script_extender(game, &install, game_version)];
     if let Some(library) = game.address_library() {
         tools.push(address_library(library, &plugins, game_version));
     }
@@ -30,7 +36,12 @@ pub fn requirements(game: Game, game_dir: &Path, game_version: Option<&str>) -> 
     if game.has_object_swapper() {
         tools.push(swapper(game_dir));
     }
-    tools.push(editor(game, game_dir));
+    if let Some(program) = game.ue4ss() {
+        tools.push(ue4ss(&install.join(program)));
+    }
+    if let Some(editor) = game.editor() {
+        tools.push(editor_tool(editor, &install));
+    }
     tools.push(loot());
     tools
 }
@@ -172,9 +183,21 @@ fn swapper(game_dir: &Path) -> Tool {
         .with_path((state == ToolState::Ready).then(|| path.display().to_string()))
 }
 
+/// UE4SS, which loads the Unreal Engine side's logic mods (`LogicMods`)
+/// and scripts, at `library`.
+fn ue4ss(library: &Path) -> Tool {
+    let state = if library.is_file() {
+        ToolState::Ready
+    } else {
+        ToolState::Missing
+    };
+    Tool::new("ue4ss", ToolNeed::Optional, state)
+        .with_page(UE4SS_PAGE)
+        .with_path((state == ToolState::Ready).then(|| library.display().to_string()))
+}
+
 /// Bethesda's editor for the game, used to make and inspect mods.
-fn editor(game: Game, game_dir: &Path) -> Tool {
-    let editor = game.editor();
+fn editor_tool(editor: Editor, game_dir: &Path) -> Tool {
     let path = game_dir.join(editor.program);
     let state = if path.is_file() {
         ToolState::Ready
@@ -316,6 +339,28 @@ mod tests {
         let ids: Vec<&str> = tools.iter().map(|tool| tool.id.as_str()).collect();
         assert_eq!(ids, ["nvse", "vc-runtime", "geck", "loot"]);
         assert_eq!(state_of(&tools, "nvse"), ToolState::Ready);
+    }
+
+    #[test]
+    fn oblivion_remastered_finds_obse64_and_ue4ss_beside_its_unreal_program() {
+        let install = tempfile::tempdir().unwrap();
+        let root = install
+            .path()
+            .join("OblivionRemastered/Content/Dev/ObvData");
+        std::fs::create_dir_all(root.join("Data")).unwrap();
+        let tools = requirements(Game::OblivionRemastered, &root, None);
+        let ids: Vec<&str> = tools.iter().map(|tool| tool.id.as_str()).collect();
+        assert_eq!(ids, ["obse64", "vc-runtime", "ue4ss", "loot"]);
+        assert_eq!(state_of(&tools, "obse64"), ToolState::Missing);
+        assert_eq!(state_of(&tools, "ue4ss"), ToolState::Missing);
+
+        let binaries = install.path().join("OblivionRemastered/Binaries/Win64");
+        std::fs::create_dir_all(binaries.join("ue4ss")).unwrap();
+        std::fs::write(binaries.join("obse64_loader.exe"), b"").unwrap();
+        std::fs::write(binaries.join("ue4ss/UE4SS.dll"), b"").unwrap();
+        let tools = requirements(Game::OblivionRemastered, &root, None);
+        assert_eq!(state_of(&tools, "obse64"), ToolState::Ready);
+        assert_eq!(state_of(&tools, "ue4ss"), ToolState::Ready);
     }
 
     #[test]

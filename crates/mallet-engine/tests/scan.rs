@@ -864,17 +864,30 @@ fn a_missing_game_directory_is_reported_as_such() {
 }
 
 #[test]
-fn a_deployment_for_another_installation_is_an_error() {
+fn a_named_deployment_for_another_installation_is_an_error() {
+    let setup = Setup::new();
+    let manifest = setup.root.path().join("other.json");
+    fs::write(
+        &manifest,
+        r#"{ "targetPath": "Z:\\Elsewhere\\Data", "files": [] }"#,
+    )
+    .unwrap();
+    let options = ScanOptions {
+        deployment_manifest: Some(manifest),
+        ..setup.options()
+    };
+    assert!(matches!(scan(&options), Err(EngineError::Vortex(_))));
+}
+
+#[test]
+fn the_deployment_of_a_moved_game_is_read_where_it_lies() {
     let setup = Setup::new();
     fs::write(
         setup.manifest_path(),
         r#"{ "targetPath": "Z:\\Elsewhere\\Data", "files": [] }"#,
     )
     .unwrap();
-    assert!(matches!(
-        scan(&setup.options()),
-        Err(EngineError::Vortex(_))
-    ));
+    assert!(scan(&setup.options()).is_ok());
 }
 
 #[test]

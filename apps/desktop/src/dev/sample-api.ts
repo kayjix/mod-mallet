@@ -1188,6 +1188,7 @@ function sampleGames(): GameChoice {
       game("falloutnv", "Fallout: New Vegas", "xNVSE", null),
       game("fallout3", "Fallout 3", "FOSE", null),
       game("oblivion", "Oblivion", "OBSE", null),
+      game("oblivionremastered", "Oblivion Remastered", "OBSE64", null),
     ],
   };
 }
