@@ -104,80 +104,34 @@ struct Generated {
     content: String,
 }
 
+/// The schema of `T`, as the file at `path`.
+fn schema_of<T: schemars::JsonSchema>(path: &'static str) -> Result<Generated> {
+    Ok(Generated {
+        path,
+        content: schema(&schemars::schema_for!(T))?,
+    })
+}
+
 pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
     let mut files = vec![
-        Generated {
-            path: "schemas/scan-report.schema.json",
-            content: schema(&schemars::schema_for!(ScanReport))?,
-        },
-        Generated {
-            path: "schemas/rendered-report.schema.json",
-            content: schema(&schemars::schema_for!(RenderedReport))?,
-        },
-        Generated {
-            path: "schemas/rendered-outcome.schema.json",
-            content: schema(&schemars::schema_for!(RenderedOutcome))?,
-        },
-        Generated {
-            path: "schemas/rendered-link.schema.json",
-            content: schema(&schemars::schema_for!(RenderedLink))?,
-        },
-        Generated {
-            path: "schemas/rendered-places.schema.json",
-            content: schema(&schemars::schema_for!(RenderedPlaces))?,
-        },
-        Generated {
-            path: "schemas/rendered-toolbox.schema.json",
-            content: schema(&schemars::schema_for!(RenderedToolbox))?,
-        },
-        Generated {
-            path: "schemas/map-image.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::MapImage))?,
-        },
-        Generated {
-            path: "schemas/file-preview.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::FilePreview))?,
-        },
-        Generated {
-            path: "schemas/mesh-view.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::MeshView))?,
-        },
-        Generated {
-            path: "schemas/game-choice.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::GameChoice))?,
-        },
-        Generated {
-            path: "schemas/lod-tiles.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::LodTiles))?,
-        },
-        Generated {
-            path: "schemas/lod-mesh.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::LodMesh))?,
-        },
-        Generated {
-            path: "schemas/area-objects.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::AreaObjects))?,
-        },
-        Generated {
-            path: "schemas/area-land.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::AreaLand))?,
-        },
-        Generated {
-            path: "schemas/object-anchors.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::anchors::ObjectAnchors))?,
-        },
-        Generated {
-            path: "schemas/hidden-walkways.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::mesh::HiddenWalkways))?,
-        },
-        Generated {
-            path: "schemas/scan-progress.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::ScanProgress))?,
-        },
-        Generated {
-            path: "schemas/walkway-reach.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::reach::WalkwayReach))?,
-        },
+        schema_of::<ScanReport>("schemas/scan-report.schema.json")?,
+        schema_of::<RenderedReport>("schemas/rendered-report.schema.json")?,
+        schema_of::<RenderedOutcome>("schemas/rendered-outcome.schema.json")?,
+        schema_of::<RenderedLink>("schemas/rendered-link.schema.json")?,
+        schema_of::<RenderedPlaces>("schemas/rendered-places.schema.json")?,
+        schema_of::<RenderedToolbox>("schemas/rendered-toolbox.schema.json")?,
+        schema_of::<mallet_core::MapImage>("schemas/map-image.schema.json")?,
+        schema_of::<mallet_core::FilePreview>("schemas/file-preview.schema.json")?,
+        schema_of::<mallet_core::mesh::MeshView>("schemas/mesh-view.schema.json")?,
+        schema_of::<mallet_core::GameChoice>("schemas/game-choice.schema.json")?,
+        schema_of::<mallet_core::mesh::LodTiles>("schemas/lod-tiles.schema.json")?,
+        schema_of::<mallet_core::mesh::LodMesh>("schemas/lod-mesh.schema.json")?,
+        schema_of::<mallet_core::mesh::AreaObjects>("schemas/area-objects.schema.json")?,
+        schema_of::<mallet_core::mesh::AreaLand>("schemas/area-land.schema.json")?,
+        schema_of::<mallet_core::anchors::ObjectAnchors>("schemas/object-anchors.schema.json")?,
+        schema_of::<mallet_core::mesh::HiddenWalkways>("schemas/hidden-walkways.schema.json")?,
+        schema_of::<mallet_core::ScanProgress>("schemas/scan-progress.schema.json")?,
+        schema_of::<mallet_core::reach::WalkwayReach>("schemas/walkway-reach.schema.json")?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),
@@ -217,16 +171,8 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
 /// The schemas of the catalogue of things and their versions (ADR 0054).
 fn catalogue_schemas() -> Result<Vec<Generated>> {
     Ok(vec![
-        Generated {
-            path: "schemas/catalogue.schema.json",
-            content: schema(&schemars::schema_for!(mallet_core::catalogue::Catalogue))?,
-        },
-        Generated {
-            path: "schemas/asset-versions.schema.json",
-            content: schema(&schemars::schema_for!(
-                mallet_core::catalogue::AssetVersions
-            ))?,
-        },
+        schema_of::<mallet_core::catalogue::Catalogue>("schemas/catalogue.schema.json")?,
+        schema_of::<mallet_core::catalogue::AssetVersions>("schemas/asset-versions.schema.json")?,
     ])
 }
 
