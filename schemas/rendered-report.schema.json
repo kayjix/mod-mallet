@@ -420,6 +420,45 @@
         "lost"
       ]
     },
+    "DoorTarget": {
+      "description": "Where a door is to lead: the door on the other side, and where the\nplayer arrives there (ADR 0067).",
+      "type": "object",
+      "properties": {
+        "arrival": {
+          "description": "Where the player arrives, in whole game units; `None` keeps the\npoint the door has.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "door": {
+          "description": "The door on the other side.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "facing": {
+          "description": "Which way the player faces there, in thousandths of a radian;\n`None` keeps it.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "required": [
+        "door"
+      ]
+    },
     "DuelFile": {
       "description": "One file the two mods disagree about, to look at.",
       "type": "object",
@@ -1426,6 +1465,17 @@
           "maxItems": 3,
           "minItems": 3
         },
+        "teleport": {
+          "description": "For a door: where its teleport is to lead instead, when stacked\ndoors are merged into one (ADR 0067).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "turn": {
           "description": "How far it turns about the upright axis through its own origin, in\ndegrees, the way the game counts (clockwise seen from above).",
           "type": "integer",
@@ -1939,6 +1989,23 @@
               "maxItems": 3,
               "minItems": 3
             },
+            "at": {
+              "description": "Where that door stands, in whole game units, to find it by.",
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "cell": {
+              "description": "The interior cell it stands in, by its editor ID; `None` outside.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "door": {
               "description": "The door whose teleport changes.",
               "$ref": "#/$defs/ObjectRef"
@@ -1983,6 +2050,7 @@
           "required": [
             "type",
             "door",
+            "at",
             "plugin",
             "to"
           ]

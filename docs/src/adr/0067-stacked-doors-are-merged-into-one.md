@@ -2,7 +2,8 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Changes: ADR 0039 and ADR 0040 (doors of one group are a spot of their
+- Changes: ADR 0060 (the plugin of moves also leads doors elsewhere);
+  ADR 0039 and ADR 0040 (doors of one group are a spot of their
   own, not a collision of two objects); ADR 0025 (what hiding a door
   leaves behind is said, and the changes it needs are planned)
 
@@ -74,25 +75,46 @@ worklist never offered to hide them.
    doors stand apart); a kept door without a teleport takes over the
    hidden one's; every door triangle that named a hidden door names the
    kept one (`RecordChange::NavmeshDoor`). Places only a hidden door led
-   to are listed as lost. The suggested door is the one whose other side
+   to are listed as lost. The suggested door is not one the plugin of
+   another door of the group changed (it put that door aside, as Open
+   Cities does with the game's Riften door); then the one whose other side
    leads back and that characters walk through on both sides, then the
    one most things refer to, then the plan with the fewest changes, then
    the one in front.
-7. **The record changes are data until there is a plugin writer.** They
-   name the record, the plugin whose version the game uses, the field and
-   the new value. ADR 0060 brings the writer of overrides of placed
-   objects, ADR 0058 the writer and repair of navigation meshes, ADR 0059
-   the check of what is reachable before and after; this decision's plan
-   is wired to them when they land, and no second writer is built.
-   Until then, hiding works on its own: the door on the other side still
-   leads to the hidden door's place, which is right beside the kept one.
-8. **The window.** The collisions' worklist has the kind *doors*; a spot
+7. **The teleports go into the plugin of moves.** A door's new teleport is
+   an override of the door's winning version, copied as ADR 0060 copies a
+   moved object, with its cell and worldspace, its references rewritten
+   for the new masters, and only `XTEL` changed: the door on the other
+   side named as the kept door, and where the player arrives moved by as
+   far as the doors stand apart. A kept door without a teleport gets the
+   hidden one's, placed before its position as the game's doors have it.
+   The overrides are written into the same plugin as the moves, `Mod
+   Mallet - Moves.esp`, and not into one of their own: a door that is both
+   moved and led elsewhere has to be one override, and two plugins of Mod
+   Mallet that override the same door would undo each other. A move
+   therefore carries an optional door target (`ObjectMove::teleport`),
+   kept among the patch's choices with the move (`move:<plugin>|<id>`,
+   `door` in its JSON); merging sets the targets of the chosen plan and
+   takes out those of the group's other plans, keeping any offset or turn.
+   The hiding of the other doors stays the Base Object Swapper patch
+   (ADR 0025). Both are written and installed on the patch page, on the
+   user's click.
+8. **The door triangles wait for the navigation mesh writer.** Pointing
+   the door triangles of the paths at the kept door changes navigation
+   meshes, which the writer and repair of ADR 0058 write. Until it lands,
+   the plan names those changes as data (`RecordChange::NavmeshDoor`), the
+   window says they come later, and characters still walk to where the
+   hidden door stood, right beside the kept one.
+9. **The window.** The collisions' worklist has the kind *doors*; a spot
    of doors shows them side by side with where each leads and *merge into
    this one*, and what keeping it means in sentences ("Characters who used
-   the door of B now use the door of A"). The guided review shows the
-   same for the doors among a structure's spots. Merging is the spot's
-   choice where the other doors are one plugin's, otherwise each hidden on
-   its own.
+   the door of B now use the door of A"). It says whether the characters'
+   paths lead through the kept door, and asks the check of ADR 0059
+   whether hiding the others leaves every way there (`walkway_reach` with
+   the hidden doors). The guided review shows the same for the doors among
+   a structure's spots. Merging is the spot's choice where the other doors
+   are one plugin's, otherwise each hidden on its own. The patch page
+   lists a led door among the moves ("leads to the door …").
 
 ## Consequences
 
@@ -122,9 +144,13 @@ worklist never offered to hide them.
 - **Treat doors as collisions of two objects.** Collisions know only what
   mods place and pair two objects; doors need the game's doors, all
   members of a group and where each leads.
-- **Write the teleports and door triangles now.** Two plugin writers would
-  be built side by side; the writer of ADR 0060 is close, and the plan as
-  data lets the window say what will change already.
+- **A plugin of its own for the doors, or a shared "Changes" plugin.** A
+  door both moved and led elsewhere would need two overrides that undo
+  each other; renaming the plugin of moves would strand the plugins users
+  installed. One plugin, as it is named, carries both.
+- **A writer of its own for the door triangles now.** The navigation mesh
+  writer of ADR 0058 is under way; two writers of the same records would
+  be built side by side.
 - **Merge by moving the hidden door's record onto the kept one.** Changing
   a door's base and position keeps every reference to it, but replaces the
   kept mod's door with another record and breaks what names the kept one.

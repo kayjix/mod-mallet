@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use mallet_core::ObjectRef;
 use mallet_core::facts::RecordId;
-use mallet_core::moves::{MoveRefusal, ObjectMove, RefusedMove};
+use mallet_core::moves::{DoorTarget, MoveRefusal, ObjectMove, RefusedMove};
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, Subrecord, group_type};
 use mallet_formats_bethesda::plugin_write::{
     Children, Format, PluginBuilder, WriteError, WrittenRecord,
@@ -192,7 +192,13 @@ pub fn build(
                 continue;
             }
         };
-        if !move_data(&mut object, each) {
+        let placed =
+            (each.offset == [0, 0, 0] && each.turn % 360 == 0) || move_data(&mut object, each);
+        let led = each
+            .teleport
+            .as_ref()
+            .is_none_or(|target| retarget(&mut object, target, &masters));
+        if !placed || !led {
             refused.push(RefusedMove {
                 object: each.object.clone(),
                 reason: MoveRefusal::NotFound,
@@ -261,6 +267,10 @@ fn planned<'a>(
                 Ok(names) => wanted.extend(names),
                 Err(field) => unknown = Some(field),
             }
+        }
+        // A door led elsewhere names the door it is to lead to.
+        if let Some(target) = &each.teleport {
+            wanted.push(target.door.plugin.clone());
         }
         if let Some(field) = unknown {
             refused.push(RefusedMove {
@@ -562,6 +572,74 @@ fn move_data(object: &mut WrittenRecord, each: &ObjectMove) -> bool {
     field.data.extend(rest);
     true
 }
+
+/// Lets a copied door lead to `target` (ADR 0067): its teleport (`XTEL`)
+/// names the door, written for `masters`, and where the player arrives
+/// and faces where `target` says so. A door without a teleport gets one
+/// only where `target` says where the player arrives. `false` if the
+/// door cannot be named or the teleport cannot be written.
+fn retarget(object: &mut WrittenRecord, target: &DoorTarget, masters: &[String]) -> bool {
+    let Some(index) = masters
+        .iter()
+        .position(|master| master.eq_ignore_ascii_case(&target.door.plugin))
+        .and_then(|index| u32::try_from(index).ok())
+    else {
+        return false;
+    };
+    let door = (index << 24) | (target.door.local_id & 0x00FF_FFFF);
+    let at = object
+        .subrecords
+        .iter()
+        .position(|field| &field.signature == b"XTEL");
+    let mut data = match at.and_then(|at| object.subrecords.get(at)) {
+        Some(field) => field.data.clone(),
+        None if target.arrival.is_some() => vec![0; XTEL_LEN],
+        None => return false,
+    };
+    if data.len() < XTEL_LEN - 4 {
+        return false;
+    }
+    let mut put = |offset: usize, bytes: [u8; 4]| {
+        if let Some(slot) = data.get_mut(offset..offset + 4) {
+            slot.copy_from_slice(&bytes);
+        }
+    };
+    put(0, door.to_le_bytes());
+    #[allow(clippy::cast_precision_loss)]
+    if let Some(arrival) = target.arrival {
+        for (index, value) in arrival.into_iter().enumerate() {
+            put(4 + index * 4, (value as f32).to_le_bytes());
+        }
+    }
+    #[allow(clippy::cast_precision_loss)]
+    if let Some(facing) = target.facing {
+        for (index, value) in facing.into_iter().enumerate() {
+            put(16 + index * 4, (value as f32 / 1000.0).to_le_bytes());
+        }
+    }
+    if let Some(field) = at.and_then(|at| object.subrecords.get_mut(at)) {
+        field.data = data;
+    } else {
+        // Before the position, where the game's own doors have it.
+        let before = object
+            .subrecords
+            .iter()
+            .position(|field| &field.signature == b"DATA")
+            .unwrap_or(object.subrecords.len());
+        object.subrecords.insert(
+            before,
+            Subrecord {
+                signature: *b"XTEL",
+                data,
+            },
+        );
+    }
+    true
+}
+
+/// The length of a teleport field of Skyrim Special Edition: the door, where
+/// the player arrives and faces, and flags.
+const XTEL_LEN: usize = 32;
 
 /// A 3 × 3 matrix, row by row.
 type Matrix = [[f64; 3]; 3];
@@ -1116,6 +1194,7 @@ mod tests {
             from: [100, 200, 0],
             offset,
             turn,
+            teleport: None,
         }
     }
 
@@ -1134,6 +1213,89 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_door_is_led_to_another_plugins_door_and_its_arrival_moves() {
+        // The game's door in the room leads to its door outside (0x812);
+        // a mod's door outside (0x800) is kept instead.
+        let world = RecordSpec::new(*b"WRLD", 0x3C).with(*b"EDID", fixture::zstring("Tamriel"));
+        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", grid(0, 0));
+        let room = RecordSpec::new(*b"CELL", 0x5555).with(*b"EDID", fixture::zstring("Room"));
+        let mut xtel = ids(&[0x0000_0812]);
+        for value in [100.0f32, 150.0, 0.0, 0.0, 0.0, 1.0] {
+            xtel.extend(value.to_le_bytes());
+        }
+        xtel.extend(0u32.to_le_bytes());
+        let inside = fixture::reference(0x0000_0820, 0x10, [5.0, 5.0, 0.0], [0.0; 3], None)
+            .with(*b"XTEL", xtel);
+        let game = fixture::plugin_with_raw_groups(
+            &[],
+            0x81,
+            &[
+                fixture::interior_cells(&[(room, vec![inside])]),
+                fixture::worldspace(
+                    &world,
+                    &[(
+                        cell.clone(),
+                        vec![fixture::reference(
+                            0x0000_0812,
+                            0x10,
+                            [100.0, 200.0, 0.0],
+                            [0.0; 3],
+                            None,
+                        )],
+                    )],
+                ),
+            ],
+        );
+        let doors = fixture::plugin_with_raw_groups(
+            &[MASTER],
+            0,
+            &[fixture::worldspace(
+                &world,
+                &[(
+                    cell,
+                    vec![fixture::reference(
+                        0x0100_0800,
+                        0x10,
+                        [100.0, 206.0, 0.0],
+                        [0.0; 3],
+                        None,
+                    )],
+                )],
+            )],
+        );
+        let (_dir, plugins) = setup(&[(MASTER, game), ("Doors.esp", doors)]);
+        let mut led = movement(MASTER, 0x820, Some("Room"), [0, 0, 0], 0);
+        led.from = [5, 5, 0];
+        led.teleport = Some(DoorTarget {
+            door: ObjectRef {
+                plugin: "Doors.esp".to_owned(),
+                local_id: 0x800,
+            },
+            arrival: Some([100, 156, 0]),
+            facing: None,
+        });
+        assert!(!led.is_still());
+        let built = build(Game::SkyrimSe, &plugins, &[led], &names).unwrap();
+        assert_eq!(built.refused, []);
+        assert_eq!(built.masters, [MASTER, "Doors.esp"]);
+        let plugin = everything(&built.bytes.unwrap());
+        let door = plugin
+            .records
+            .iter()
+            .find(|record| &record.signature == b"REFR")
+            .unwrap();
+        let xtel = door.first(b"XTEL").unwrap();
+        // The second master's record, where the player now arrives, and
+        // the facing kept.
+        assert_eq!(read_u32(xtel, 0), Some(0x0100_0800));
+        let values = crate::objects::floats(xtel.get(4..28).unwrap());
+        assert_eq!(values, [100.0, 156.0, 0.0, 0.0, 0.0, 1.0]);
+        // Nothing else moved.
+        let data = crate::objects::floats(door.first(b"DATA").unwrap());
+        assert_eq!(&data[..3], &[5.0, 5.0, 0.0]);
     }
 
     #[test]

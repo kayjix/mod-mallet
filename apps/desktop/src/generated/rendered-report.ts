@@ -103,7 +103,18 @@ export type RecordChange =
        * @maxItems 3
        */
       arrival?: [number, number, number] | null;
-      door: ObjectRef3;
+      /**
+       * Where that door stands, in whole game units, to find it by.
+       *
+       * @minItems 3
+       * @maxItems 3
+       */
+      at: [number, number, number];
+      /**
+       * The interior cell it stands in, by its editor ID; `None` outside.
+       */
+      cell?: string | null;
+      door: ObjectRef4;
       /**
        * Which way the player is to face there, in thousandths of a
        * radian, if that changes.
@@ -120,17 +131,17 @@ export type RecordChange =
        * The plugin whose version of it the game uses.
        */
       plugin: string;
-      to: ObjectRef4;
+      to: ObjectRef5;
       type: "teleport";
     }
   | {
-      from: ObjectRef5;
-      navmesh: ObjectRef6;
+      from: ObjectRef6;
+      navmesh: ObjectRef7;
       /**
        * The plugin whose version of it the game uses.
        */
       plugin: string;
-      to: ObjectRef7;
+      to: ObjectRef8;
       /**
        * The triangle, by its number in the mesh.
        */
@@ -506,6 +517,11 @@ export interface ObjectMove {
    */
   offset: [number, number, number];
   /**
+   * For a door: where its teleport is to lead instead, when stacked
+   * doors are merged into one (ADR 0067).
+   */
+  teleport?: DoorTarget | null;
+  /**
    * How far it turns about the upright axis through its own origin, in
    * degrees, the way the game counts (clockwise seen from above).
    */
@@ -517,6 +533,44 @@ export interface ObjectMove {
  * depend on the load order.
  */
 export interface ObjectRef1 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * Where a door is to lead: the door on the other side, and where the
+ * player arrives there (ADR 0067).
+ */
+export interface DoorTarget {
+  /**
+   * Where the player arrives, in whole game units; `None` keeps the
+   * point the door has.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  arrival?: [number, number, number] | null;
+  door: ObjectRef2;
+  /**
+   * Which way the player faces there, in thousandths of a radian;
+   * `None` keeps it.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  facing?: [number, number, number] | null;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef2 {
   /**
    * The object's number in that plugin.
    */
@@ -1312,7 +1366,7 @@ export interface StackedDoor {
    * The internal name of the door's base object.
    */
   name: string;
-  object: ObjectRef2;
+  object: ObjectRef3;
   /**
    * How far it stands from the first door, in game units.
    */
@@ -1379,7 +1433,7 @@ export interface DoorDestination {
  * that plugin. Unlike a form ID as the game shows it, this does not
  * depend on the load order.
  */
-export interface ObjectRef2 {
+export interface ObjectRef3 {
   /**
    * The object's number in that plugin.
    */
@@ -1402,27 +1456,12 @@ export interface DoorMerge {
    * The doors the patch hides.
    */
   hide: ObjectRef[];
-  keep: ObjectRef8;
+  keep: ObjectRef9;
   /**
    * Places only a hidden door led to: they can no longer be entered
    * here.
    */
   lost: DoorDestination[];
-}
-/**
- * A placed object, by the plugin that placed it first and its number in
- * that plugin. Unlike a form ID as the game shows it, this does not
- * depend on the load order.
- */
-export interface ObjectRef3 {
-  /**
-   * The object's number in that plugin.
-   */
-  localId: number;
-  /**
-   * The plugin's file name.
-   */
-  plugin: string;
 }
 /**
  * A placed object, by the plugin that placed it first and its number in
@@ -1500,6 +1539,21 @@ export interface ObjectRef8 {
   plugin: string;
 }
 /**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef9 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
  * One object of a collision.
  */
 export interface SpotPart {
@@ -1512,7 +1566,7 @@ export interface SpotPart {
    * The internal name of what it is.
    */
   name: string;
-  object: ObjectRef9;
+  object: ObjectRef10;
   /**
    * Whether hiding this one rather than the other is suggested: of two
    * copies, the one from the plugin that places fewer objects.
@@ -1524,7 +1578,7 @@ export interface SpotPart {
  * that plugin. Unlike a form ID as the game shows it, this does not
  * depend on the load order.
  */
-export interface ObjectRef9 {
+export interface ObjectRef10 {
   /**
    * The object's number in that plugin.
    */

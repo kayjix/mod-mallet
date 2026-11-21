@@ -22,6 +22,7 @@ import { collisionsTexts } from "./collisions-texts";
 import { DoorPanel, doorHidden, mergeChoices } from "./doors";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type {
+  DoorGroup,
   DoorMerge,
   MapSpot,
   ObjectRef,
@@ -576,8 +577,8 @@ export function Collisions({
     setPreview(new Set());
     goOn(next);
   };
-  const mergeDoors = (item: Item, plan: DoorMerge) => {
-    const next = mergeChoices(choices, item.key, plan, hiddenObjects);
+  const mergeDoors = (item: Item, group: DoorGroup, plan: DoorMerge | null) => {
+    const next = mergeChoices(choices, item.key, group, plan, hiddenObjects);
     setPatchChoices(next);
     setPreview(new Set());
     if (item === current) {
@@ -913,7 +914,7 @@ export function Collisions({
               }}
               onDecidePassage={decidePassage}
               onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
-              onMergeDoors={(plan) => mergeDoors(current, plan)}
+              onMergeDoors={(group, plan) => mergeDoors(current, group, plan)}
               onPick={(spot) => {
                 const key = spotKey(spot);
                 if (key !== null && byKey.has(key)) {
@@ -1113,7 +1114,7 @@ interface SpotProps {
   onDecidePassage: (passage: Item[], plugin: string, extra: ObjectRef[]) => void;
   onObject: (object: ObjectRef, hide: boolean) => void;
   /** Merges stacked doors into the one `plan` keeps (ADR 0067). */
-  onMergeDoors: (plan: DoorMerge) => void;
+  onMergeDoors: (group: DoorGroup, plan: DoorMerge | null) => void;
   onPick: (spot: MapSpot) => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -1436,8 +1437,10 @@ function Spot(props: SpotProps) {
             group={spot.doors}
             hidden={(object) => doorHidden(object, decided, props.hiddenObjects)}
             keptAll={decided === null}
-            onMerge={props.onMergeDoors}
-            onKeepAll={() => props.onDecide(null)}
+            onMerge={(plan) => spot.doors && props.onMergeDoors(spot.doors, plan)}
+            onKeepAll={() => spot.doors && props.onMergeDoors(spot.doors, null)}
+            place={walkPlace}
+            centre={walkCentre}
             onPreview={props.onPreview}
             previewed={preview}
           />

@@ -16,7 +16,12 @@ import { DuelLine } from "./Duels";
 import { DoorPanel, mergeChoices } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
-import type { MapSpot, RenderedFinding, RenderedReport } from "./generated/rendered-report";
+import type {
+  DoorMerge,
+  MapSpot,
+  RenderedFinding,
+  RenderedReport,
+} from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
@@ -1079,20 +1084,27 @@ function CollisionsStep({
         }}
         onPick={pick}
       />
-      {cluster.spots.map(({ key, item }) =>
-        item.spot.doors === null || item.spot.doors === undefined ? null : (
+      {cluster.spots.map(({ key, item }) => {
+        const group = item.spot.doors;
+        if (group === null || group === undefined) {
+          return null;
+        }
+        const at = placeOf(item.spot, report.map.worlds);
+        const merge = (plan: DoorMerge | null) =>
+          apply(mergeChoices(patchChoices, key, group, plan, freeObjects(patchChoices)), false);
+        return (
           <DoorPanel
             key={key}
-            group={item.spot.doors}
+            group={group}
             hidden={(object) => hidden.has(matchKey(object))}
             keptAll={patchChoices[key] === null}
-            onMerge={(plan) =>
-              apply(mergeChoices(patchChoices, key, plan, freeObjects(patchChoices)), false)
-            }
-            onKeepAll={() => apply(chooseSpot(patchChoices, key, null), false)}
+            onMerge={merge}
+            onKeepAll={() => merge(null)}
+            place={at.place.type === "exterior" ? at.place.world : at.place.cell}
+            centre={at.place.type === "exterior" ? [at.centre[0], at.centre[1]] : null}
           />
-        ),
-      )}
+        );
+      })}
       {suggested !== null && (
         <p className="review-suggest">
           <span className="suggested-mark">{r.suggestedTag}</span> {suggestReason(suggested)}

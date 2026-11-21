@@ -223,6 +223,11 @@ export interface ObjectMove {
    */
   offset: [number, number, number];
   /**
+   * For a door: where its teleport is to lead instead, when stacked
+   * doors are merged into one (ADR 0067).
+   */
+  teleport?: DoorTarget | null;
+  /**
    * How far it turns about the upright axis through its own origin, in
    * degrees, the way the game counts (clockwise seen from above).
    */
@@ -234,6 +239,44 @@ export interface ObjectMove {
  * depend on the load order.
  */
 export interface ObjectRef1 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * Where a door is to lead: the door on the other side, and where the
+ * player arrives there (ADR 0067).
+ */
+export interface DoorTarget {
+  /**
+   * Where the player arrives, in whole game units; `None` keeps the
+   * point the door has.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  arrival?: [number, number, number] | null;
+  door: ObjectRef2;
+  /**
+   * Which way the player faces there, in thousandths of a radian;
+   * `None` keeps it.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  facing?: [number, number, number] | null;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef2 {
   /**
    * The object's number in that plugin.
    */

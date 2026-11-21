@@ -98,6 +98,11 @@ pub enum RecordChange {
     Teleport {
         /// The door whose teleport changes.
         door: ObjectRef,
+        /// Where that door stands, in whole game units, to find it by.
+        at: [i32; 3],
+        /// The interior cell it stands in, by its editor ID; `None` outside.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cell: Option<String>,
         /// The plugin whose version of it the game uses.
         plugin: String,
         /// The door it led to; `None` where it led nowhere before.

@@ -166,6 +166,14 @@ impl<'a> Doors<'a> {
         self.by_id.get(&door.teleport.as_ref()?.door).copied()
     }
 
+    /// The editor ID of the interior cell of `place`; `None` outside.
+    fn cell_name(&self, place: &Place) -> Option<String> {
+        match place {
+            Place::Interior { cell } => Some(self.name_of(cell)),
+            Place::Exterior { .. } => None,
+        }
+    }
+
     fn walkable(&self, door: &RecordId) -> bool {
         self.links.get(door).is_some_and(|links| !links.is_empty())
     }
@@ -613,6 +621,8 @@ fn plan(
             };
             changes.push(RecordChange::Teleport {
                 door: object(&other.id),
+                at: other.position,
+                cell: doors.cell_name(&other.place),
                 plugin: owners.file_name(&other.plugin),
                 from: Some(object(&door.id)),
                 to: object(&keep.id),
@@ -631,6 +641,8 @@ fn plan(
             takes_teleport = false;
             changes.push(RecordChange::Teleport {
                 door: object(&keep.id),
+                at: keep.position,
+                cell: doors.cell_name(&keep.place),
                 plugin: owners.file_name(&keep.plugin),
                 from: None,
                 to: object(&teleport.door),
@@ -916,6 +928,8 @@ mod tests {
             vec![
                 RecordChange::Teleport {
                     door: object("skyrim.esm", 0xA01),
+                    at: [0, 0, 0],
+                    cell: Some("HouseInterior".to_owned()),
                     plugin: "skyrim.esm".to_owned(),
                     from: Some(object("skyrim.esm", 0xA02)),
                     to: object("town.esp", 0x800),

@@ -86,3 +86,11 @@
 .door-lost {
   color: var(--warning);
 }
+
+.door-reached {
+  margin: 0;
+}
+
+.door-reached[data-ok="false"] {
+  color: var(--warning);
+}

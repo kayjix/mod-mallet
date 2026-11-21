@@ -27,13 +27,24 @@ export interface DoorTexts {
   /** The heading of what keeping one door means. */
   ifKept: (door: string) => string;
   usersMove: (from: string, to: string) => string;
+  /** The door in `place` leads to the door of the mod `to`. */
   otherSide: (place: string, to: string) => string;
   arrivalMoves: string;
-  takesWay: (door: string, place: string) => string;
+  /** The door of the mod `mod` takes over the way to `place`. */
+  takesWay: (mod: string, place: string) => string;
   paths: (count: number, to: string) => string;
   lost: (place: string, from: string) => string;
   nothingElse: string;
-  notYet: string;
+  /** Where the teleports go: the plugin of moves. */
+  viaMoves: string;
+  /** The paths are re-attached in a later version. */
+  pathsLater: string;
+  /** Characters reach the kept door. */
+  keptReached: string;
+  /** No path leads through the kept door. */
+  keptNotOnPaths: string;
+  /** In the list of moves: a door led to another door. */
+  ledTo: (door: string) => string;
   lookWithout: string;
   /** A door named by its mod. */
   doorOf: (mod: string) => string;
@@ -63,17 +74,23 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     keptAll: "All of them stay",
     ifKept: (door) => `If you keep ${door}:`,
     usersMove: (from, to) => `Characters who used ${from} now use ${to}.`,
-    otherSide: (place, to) => `The door in ${place} leads to ${to} instead.`,
+    otherSide: (place, to) => `The door in ${place} leads to the door of ${to} instead.`,
     arrivalMoves: "You come out in front of it.",
-    takesWay: (door, place) => `${door} takes over the way to ${place}.`,
+    takesWay: (mod, place) => `The door of ${mod} takes over the way to ${place}.`,
     paths: (count, to) =>
       count === 1
-        ? `1 path of the characters is attached to ${to}.`
-        : `${count} paths of the characters are attached to ${to}.`,
+        ? `1 path of the characters is to be attached to ${to} (later).`
+        : `${count} paths of the characters are to be attached to ${to} (later).`,
     lost: (place, from) => `${place} can then no longer be entered here: only ${from} led there.`,
     nothingElse: "Hiding is all it takes: nothing else used the other doors.",
-    notYet:
-      "Hiding works now. Pointing the other side and the paths at the kept door needs a small plugin that Mod Mallet writes in a later version. Until then the hidden door still works from the other side and lets you out right beside the kept one.",
+    viaMoves:
+      "The patch hides the other doors. Leading the doors on the other side to the kept one goes into the plugin Mod Mallet - Moves: write and install it on the patch page.",
+    pathsLater:
+      "Re-attaching the paths of the characters comes with the repair of the paths in a later version. Until then they walk to where the hidden door stood, right beside the kept one.",
+    keptReached: "Characters reach the kept door: their paths lead through it.",
+    keptNotOnPaths:
+      "No path of the characters leads through the kept door yet; they use the paths of the hidden one, beside it.",
+    ledTo: (door) => `leads to the door ${door}`,
     lookWithout: "Look at the place without this door, without deciding",
     doorOf: (mod) => `the door of ${mod}`,
   },
@@ -100,18 +117,24 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     keptAll: "Alle bleiben",
     ifKept: (door) => `Wenn du ${door} behältst:`,
     usersMove: (from, to) => `Figuren, die ${from} benutzt haben, benutzen jetzt ${to}.`,
-    otherSide: (place, to) => `Die Tür in ${place} führt stattdessen zu ${to}.`,
+    otherSide: (place, to) => `Die Tür in ${place} führt stattdessen zur Tür von ${to}.`,
     arrivalMoves: "Du kommst vor ihr heraus.",
-    takesWay: (door, place) => `${door} übernimmt den Weg nach ${place}.`,
+    takesWay: (mod, place) => `Die Tür von ${mod} übernimmt den Weg nach ${place}.`,
     paths: (count, to) =>
       count === 1
-        ? `1 Weg der Figuren wird an ${to} angeschlossen.`
-        : `${count} Wege der Figuren werden an ${to} angeschlossen.`,
+        ? `1 Weg der Figuren wird an ${to} angeschlossen (später).`
+        : `${count} Wege der Figuren werden an ${to} angeschlossen (später).`,
     lost: (place, from) =>
       `${place} ist dann hier nicht mehr zu betreten: Nur ${from} führte dorthin.`,
     nothingElse: "Ausblenden genügt: Nichts anderes hat die anderen Türen benutzt.",
-    notYet:
-      "Ausblenden geht schon jetzt. Die andere Seite und die Wege auf die behaltene Tür umzustellen, braucht ein kleines Plugin, das Mod Mallet in einer späteren Version schreibt. Bis dahin funktioniert die ausgeblendete Tür von der anderen Seite aus weiter und lässt dich direkt neben der behaltenen heraus.",
+    viaMoves:
+      "Der Patch blendet die anderen Türen aus. Die Türen auf der anderen Seite zur behaltenen zu führen, kommt in das Plugin Mod Mallet - Moves: Schreibe und installiere es auf der Patch-Seite.",
+    pathsLater:
+      "Die Wege der Figuren neu anzuschließen, kommt mit der Reparatur der Wege in einer späteren Version. Bis dahin gehen sie dorthin, wo die ausgeblendete Tür stand, direkt neben der behaltenen.",
+    keptReached: "Figuren erreichen die behaltene Tür: Ihre Wege führen durch sie.",
+    keptNotOnPaths:
+      "Noch führt kein Weg der Figuren durch die behaltene Tür; sie nehmen die Wege der ausgeblendeten, direkt daneben.",
+    ledTo: (door) => `führt zur Tür ${door}`,
     lookWithout: "Den Ort ohne diese Tür ansehen, ohne zu entscheiden",
     doorOf: (mod) => `die Tür von ${mod}`,
   },

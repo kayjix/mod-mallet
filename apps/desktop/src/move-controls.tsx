@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActionResult, useAction, useSession } from "./Actions";
 import type { Api } from "./api";
 import { isNature, overlapDepth, ownerOf, type PartTools } from "./area-layer";
+import { doorTexts } from "./door-texts";
 import type { AreaObject } from "./generated/area-objects";
 import type { CreatedMoves } from "./generated/created-moves";
 import type { ObjectAnchors } from "./generated/object-anchors";
@@ -16,6 +17,7 @@ import type { ObjectRef, SpotPart } from "./generated/rendered-report";
 import {
   CM_PER_UNIT,
   groupMoves,
+  isStill,
   type Move,
   moveOf,
   movesOf,
@@ -475,7 +477,9 @@ export function SpotMoves({ parts }: { parts: SpotPart[] }) {
 
 /** On the patch page: the moved objects, and the plugin that carries them into the game. */
 export function MovesPanel() {
-  const { t, api, patchChoices: choices, setPatchChoices } = useSession();
+  const { t, api, lang, patchChoices: choices, setPatchChoices } = useSession();
+  const d = doorTexts[lang];
+  const hex = (object: ObjectRef) => object.localId.toString(16).padStart(6, "0").toUpperCase();
   const m = useMovesTexts();
   const action = useAction();
   const moves = movesOf(choices);
@@ -545,7 +549,10 @@ export function MovesPanel() {
               {object.plugin}{" "}
               <code>{object.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
             </span>{" "}
-            <span className="aside">{m.moved(move.dx, move.dy, move.dz, move.rz)}</span>
+            <span className="aside">
+              {isStill({ ...move, door: null }) ? "" : m.moved(move.dx, move.dy, move.dz, move.rz)}
+              {move.door ? ` ${d.ledTo(`${move.door.door.plugin} ${hex(move.door.door)}`)}` : ""}
+            </span>
           </li>
         ))}
       </ul>

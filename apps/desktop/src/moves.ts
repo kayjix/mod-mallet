@@ -10,7 +10,7 @@
 // views every move is drawn where it puts the object.
 
 import type { AreaObject } from "./generated/area-objects";
-import type { ObjectMove, ObjectRef } from "./generated/rendered-report";
+import type { DoorTarget, ObjectMove, ObjectRef } from "./generated/rendered-report";
 import { matchKey, type PatchChoices } from "./patch";
 
 /** The prefix of a move among the choices. */
@@ -28,6 +28,8 @@ export interface Move {
   at: [number, number, number];
   /** The interior cell it stands in, by its editor ID; null outside. */
   cell: string | null;
+  /** For a door of merged doors: where it is to lead instead (ADR 0067). */
+  door?: DoorTarget | null;
 }
 
 /** About how many centimetres one game unit is. */
@@ -38,6 +40,33 @@ export const moveKey = (object: ObjectRef) => `${MOVE}${object.plugin}|${object.
 
 /** Whether a choice key is a move's. */
 export const isMoveKey = (key: string) => key.startsWith(MOVE);
+
+/** A door target read back from the choices; null if it is not one. */
+function doorTarget(raw: unknown): DoorTarget | null {
+  if (typeof raw !== "object" || raw === null) {
+    return null;
+  }
+  const { door, arrival, facing } = raw as Partial<DoorTarget>;
+  const triple = (value: unknown) =>
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((item) => typeof item === "number" && Number.isFinite(item))
+      ? (value.map(Math.round) as [number, number, number])
+      : null;
+  if (
+    typeof door !== "object" ||
+    door === null ||
+    typeof door.plugin !== "string" ||
+    !Number.isInteger(door.localId)
+  ) {
+    return null;
+  }
+  return {
+    door: { plugin: door.plugin, localId: door.localId },
+    arrival: triple(arrival),
+    facing: triple(facing),
+  };
+}
 
 function parseMove(value: string | null): Move | null {
   if (value === null) {
@@ -55,6 +84,7 @@ function parseMove(value: string | null): Move | null {
       rz: number(raw.rz),
       at: [number(at[0]), number(at[1]), number(at[2])],
       cell: typeof raw.cell === "string" ? raw.cell : null,
+      door: doorTarget(raw.door),
     };
   } catch {
     return null;
@@ -63,7 +93,7 @@ function parseMove(value: string | null): Move | null {
 
 /** Whether a move changes nothing. */
 export const isStill = (move: Move) =>
-  move.dx === 0 && move.dy === 0 && move.dz === 0 && move.rz % 360 === 0;
+  move.dx === 0 && move.dy === 0 && move.dz === 0 && move.rz % 360 === 0 && !move.door;
 
 /** Every move among the choices, by the moved object's {@link matchKey}. */
 const cache = new WeakMap<PatchChoices, Map<string, { object: ObjectRef; move: Move }>>();
@@ -136,6 +166,7 @@ export function objectMovesOf(choices: PatchChoices): ObjectMove[] {
       from: move.at,
       offset: [move.dx, move.dy, move.dz],
       turn: move.rz,
+      teleport: move.door ?? null,
     }));
 }
 

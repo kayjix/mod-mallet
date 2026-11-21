@@ -61,8 +61,10 @@ in [Releases](docs/src/contributing/releases.md).
 - Doors that mods stack on top of each other are found, the game's doors
   included: on the collisions page as the kind "doors", each shown with
   where it leads, whether characters walk through it, and which one to
-  keep. "Merge into this one" hides the others and says what else has to
-  change so that whatever used them uses the kept door (ADR 0067).
+  keep. "Merge into this one" hides the others and leads the doors on the
+  other side to the kept one, through the plugin Mod Mallet - Moves.
+  Re-attaching the characters' paths to it comes with the repair of the
+  paths (ADR 0067).
 
 ## [0.2.2] - 2026-11-19
 

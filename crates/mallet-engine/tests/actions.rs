@@ -359,6 +359,7 @@ fn lifted(local_id: u32) -> mallet_core::moves::Moves {
             from: [100, 200, 0],
             offset: [0, 0, 10],
             turn: 0,
+            teleport: None,
         }],
     }
 }

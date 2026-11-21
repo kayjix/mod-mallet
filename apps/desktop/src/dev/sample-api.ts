@@ -803,6 +803,8 @@ function sampleMap(): RenderedReport["map"] {
               {
                 type: "teleport",
                 door: inside,
+                at: [0, 0, 0],
+                cell: "OldTownInn",
                 plugin: "Old Town.esp",
                 from: town,
                 to: water,

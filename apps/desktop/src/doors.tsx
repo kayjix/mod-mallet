@@ -12,9 +12,12 @@ import type {
   DoorMerge,
   MapSpot,
   ObjectRef,
+  RecordChange,
   StackedDoor,
 } from "./generated/rendered-report";
+import { type Move, moveOf, withMoves } from "./moves";
 import { chooseObject, chooseSpot, matchKey, type PatchChoices } from "./patch";
+import { ReachNote, useReach } from "./reach";
 
 /** Game units in a centimetre. */
 const UNITS_PER_CENTIMETRE = 0.7;
@@ -60,6 +63,10 @@ interface DoorPanelProps {
   onPreview?: (plugin: string) => void;
   /** The plugins looked at without. */
   previewed?: Set<string>;
+  /** The worldspace or interior cell the doors are in, to ask where characters still go. */
+  place: string | null;
+  /** Outside: where the doors stand; null inside. */
+  centre: [number, number] | null;
 }
 
 /** The doors of a spot side by side, and what keeping one of them means. */
@@ -71,6 +78,8 @@ export function DoorPanel({
   keptAll,
   onPreview,
   previewed,
+  place,
+  centre,
 }: DoorPanelProps) {
   const { lang } = useSession();
   const d = doorTexts[lang];
@@ -82,6 +91,11 @@ export function DoorPanel({
   const shown = looked ?? Math.max(mergedAt, 0);
   const plan = group.plans[shown];
   const kept = group.doors[shown];
+  const modOf = (object: ObjectRef) =>
+    short(
+      group.doors.find((candidate) => sameObject(candidate.object, object))?.plugin ??
+        object.plugin,
+    );
   const nameOf = (object: ObjectRef) => {
     const door = group.doors.find((candidate) => sameObject(candidate.object, object));
     return d.doorOf(short(door?.plugin ?? object.plugin));
@@ -142,7 +156,7 @@ export function DoorPanel({
                   )?.leadsTo;
                   const place = destination ?? leads;
                   return place === null || place === undefined ? null : (
-                    <li key={key}>{d.takesWay(nameOf(plan.keep), placeName(place.location))}</li>
+                    <li key={key}>{d.takesWay(modOf(plan.keep), placeName(place.location))}</li>
                   );
                 }
                 const from = change.from;
@@ -153,7 +167,7 @@ export function DoorPanel({
                     : change.door.plugin;
                 return (
                   <li key={key}>
-                    {d.otherSide(there, nameOf(plan.keep))}
+                    {d.otherSide(there, modOf(plan.keep))}
                     {change.arrival !== null && change.arrival !== undefined && (
                       <> {d.arrivalMoves}</>
                     )}
@@ -184,7 +198,17 @@ export function DoorPanel({
                 </li>
               ))}
             </ul>
-            <p className="aside">{plan.changes.length === 0 ? d.nothingElse : d.notYet}</p>
+            <p className="door-reached" data-ok={kept.walkable}>
+              {kept.walkable ? d.keptReached : d.keptNotOnPaths}
+            </p>
+            <DoorReach place={place} centre={centre} hide={plan.hide} />
+            {plan.changes.length === 0 && <p className="aside">{d.nothingElse}</p>}
+            {plan.changes.some((change) => change.type === "teleport") && (
+              <p className="aside">{d.viaMoves}</p>
+            )}
+            {plan.changes.some((change) => change.type === "navmesh-door") && (
+              <p className="aside">{d.pathsLater}</p>
+            )}
           </>
         )}
         <button type="button" className="small" aria-pressed={keptAll} onClick={onKeepAll}>
@@ -193,6 +217,15 @@ export function DoorPanel({
       </div>
     </div>
   );
+}
+
+/** What hiding the doors does to the ways characters take there (ADR 0059). */
+function DoorReach(props: {
+  place: string | null;
+  centre: [number, number] | null;
+  hide: ObjectRef[];
+}) {
+  return <ReachNote reach={useReach(props.place, props.centre, props.hide)} />;
 }
 
 interface DoorCardProps {
@@ -282,18 +315,24 @@ function DoorCard({
 }
 
 /**
- * The patch's choices with a group merged into the door `plan` keeps: as
- * the spot's own choice where the other doors are one plugin's, else each
- * of them hidden on its own. `hiddenObjects` are the objects hidden on
- * their own so far; the kept door is shown again if it is among them.
+ * The patch's choices with a group merged into the door `plan` keeps, or,
+ * with `plan` null, with every door kept. The other doors are hidden as
+ * the spot's own choice where they are one plugin's, else each on its
+ * own; `hiddenObjects` are the objects hidden on their own so far, and the
+ * kept door is shown again if it is among them. The doors on the other
+ * side are led to the kept door through the plugin of moves (ADR 0060).
  */
 export function mergeChoices(
   choices: PatchChoices,
   key: string,
-  plan: DoorMerge,
+  group: DoorGroup,
+  plan: DoorMerge | null,
   hiddenObjects: ObjectRef[],
 ): PatchChoices {
-  let next = choices;
+  let next = withDoorTargets(choices, group, plan);
+  if (plan === null) {
+    return chooseSpot(next, key, null);
+  }
   if (hiddenObjects.some((object) => matchKey(object) === matchKey(plan.keep))) {
     next = chooseObject(next, plan.keep, false);
   }
@@ -308,6 +347,48 @@ export function mergeChoices(
     next = chooseObject(next, object, true);
   }
   return next;
+}
+
+/**
+ * The choices with the teleports of `plan` among the moves, and those any
+ * other plan of the group would set taken out. A move of the same door
+ * keeps its offset and turn.
+ */
+function withDoorTargets(
+  choices: PatchChoices,
+  group: DoorGroup,
+  plan: DoorMerge | null,
+): PatchChoices {
+  const teleports = (changes: RecordChange[]) =>
+    changes.flatMap((change) => (change.type === "teleport" ? [change] : []));
+  const cleared = teleports(group.plans.flatMap((each) => each.changes)).flatMap((change) => {
+    const before = moveOf(choices, change.door);
+    return before?.door ? [{ object: change.door, move: { ...before, door: null } }] : [];
+  });
+  const next = withMoves(choices, cleared);
+  if (plan === null) {
+    return next;
+  }
+  return withMoves(
+    next,
+    teleports(plan.changes).map((change) => {
+      const before: Move = moveOf(next, change.door) ?? {
+        dx: 0,
+        dy: 0,
+        dz: 0,
+        rz: 0,
+        at: change.at,
+        cell: change.cell ?? null,
+      };
+      return {
+        object: change.door,
+        move: {
+          ...before,
+          door: { door: change.to, arrival: change.arrival ?? null, facing: change.facing ?? null },
+        },
+      };
+    }),
+  );
 }
 
 /** Whether a door is hidden: by the spot's choice or on its own. */

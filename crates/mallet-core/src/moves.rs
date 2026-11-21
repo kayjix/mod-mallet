@@ -33,12 +33,33 @@ pub struct ObjectMove {
     /// How far it turns about the upright axis through its own origin, in
     /// degrees, the way the game counts (clockwise seen from above).
     pub turn: i32,
+    /// For a door: where its teleport is to lead instead, when stacked
+    /// doors are merged into one (ADR 0067).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub teleport: Option<DoorTarget>,
+}
+
+/// Where a door is to lead: the door on the other side, and where the
+/// player arrives there (ADR 0067).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorTarget {
+    /// The door on the other side.
+    pub door: ObjectRef,
+    /// Where the player arrives, in whole game units; `None` keeps the
+    /// point the door has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arrival: Option<[i32; 3]>,
+    /// Which way the player faces there, in thousandths of a radian;
+    /// `None` keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facing: Option<[i32; 3]>,
 }
 
 impl ObjectMove {
     /// Whether it changes nothing.
     pub fn is_still(&self) -> bool {
-        self.offset == [0, 0, 0] && self.turn % 360 == 0
+        self.offset == [0, 0, 0] && self.turn % 360 == 0 && self.teleport.is_none()
     }
 }
 
@@ -113,6 +134,7 @@ mod tests {
             from: [1, 2, 3],
             offset: [0, 0, 0],
             turn: 360,
+            teleport: None,
         };
         assert!(still.is_still());
         let json = serde_json::to_value(&still).unwrap();
