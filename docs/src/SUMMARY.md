@@ -6,6 +6,7 @@
 
 - [Vision and non-goals](product/vision.md)
 - [Roadmap](product/roadmap.md)
+- [What works for which game](product/games.md)
 - [The journey through the app](product/journey.md)
 - [Glossary](product/glossary.md)
 
@@ -91,6 +92,7 @@
   - [0075 A place up close is drawn with one call per material](adr/0075-one-call-per-material-for-a-place-up-close.md)
   - [0076 Task rows: crash risks first, one thing to do per row](adr/0076-task-rows-crash-risks-first.md)
   - [0077 One UI kit for every page](adr/0077-one-ui-kit-for-every-page.md)
+  - [0078 Other games closer to Skyrim](adr/0078-other-games-closer-to-skyrim.md)
   - [0079 Version changes are read from the files, and compared with the last scan](adr/0079-version-changes.md)
   - [Template](adr/template.md)
 

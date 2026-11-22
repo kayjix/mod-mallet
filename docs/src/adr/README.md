@@ -103,4 +103,5 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0075](0075-one-call-per-material-for-a-place-up-close.md) | A place up close is drawn with one call per material | accepted |
 | [0076](0076-task-rows-crash-risks-first.md) | Task rows: crash risks first, one thing to do per row | accepted |
 | [0077](0077-one-ui-kit-for-every-page.md) | One UI kit for every page | accepted |
+| [0078](0078-other-games-closer-to-skyrim.md) | Other games closer to Skyrim: Enderal, Fallout 4's paths, and saying what does not apply | accepted |
 | [0079](0079-version-changes.md) | Version changes are read from the files, and compared with the last scan | accepted |
