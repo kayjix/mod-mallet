@@ -1,0 +1,620 @@
+/* Map collisions: the worklist, the stage and the decision (ADR 0040). */
+
+/* ---- the collisions' worklist (ADR 0040) -------------------------------- */
+
+.work {
+  display: grid;
+  gap: 10px;
+}
+
+.work-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.work-progress {
+  display: grid;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.work-meter {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sunken);
+}
+
+.work-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ok);
+  transition: width 0.2s ease;
+}
+
+.work-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.work-bench {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.work-list {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.work-group + .work-group {
+  border-top: 1px solid var(--border);
+}
+
+.work-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.work-group-head:hover {
+  background: var(--sunken);
+}
+
+.work-group-head[aria-expanded="true"] {
+  background: var(--sunken);
+  font-weight: 600;
+}
+
+.work-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-group-name .aside {
+  display: inline;
+  font-weight: 400;
+}
+
+.work-group-counts {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+}
+
+.work-count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--spot-overlap);
+  color: #1b2a2e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.work-count[data-kind="duplicate"] {
+  background: var(--spot-duplicate);
+  color: #fff;
+}
+
+.work-count[data-kind="door"] {
+  background: var(--spot-door);
+  color: #fff;
+}
+
+.work-count[data-kind="touch"] {
+  background: var(--spot-touch);
+}
+
+.work-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px 6px 18px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.work-item:hover {
+  background: var(--sunken);
+}
+
+.work-item[aria-current="true"] {
+  border-left-color: var(--spot-focus);
+  background: color-mix(in srgb, var(--spot-focus) 14%, var(--surface));
+}
+
+.work-item-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.work-item-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-item-text .aside {
+  display: block;
+  font-size: 0.78rem;
+}
+
+.work-status {
+  flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-status.open {
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.work-status.kept {
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+  color: var(--info);
+}
+
+.work-status.hidden {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+
+.work-stage {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.work-decision {
+  display: grid;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.work-kind {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--spot-overlap);
+  color: #1b2a2e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.work-kind[data-kind="duplicate"] {
+  background: var(--spot-duplicate);
+  color: #fff;
+}
+
+.work-kind[data-kind="door"] {
+  background: var(--spot-door);
+  color: #fff;
+}
+
+.work-kind[data-kind="touch"] {
+  background: var(--spot-touch);
+}
+
+.work-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.work-choice[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.work-choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.work-choice-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.work-choice-title {
+  overflow-wrap: anywhere;
+}
+
+.work-choice-text .aside {
+  display: block;
+  font-size: 0.78rem;
+}
+
+.work-choice .suggested-mark {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  font-size: 0.72rem;
+}
+
+.work kbd {
+  min-width: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--sunken);
+  font-family: inherit;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.work-inside {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 40px 20px;
+}
+
+.work-legend-focus,
+.work-legend-ghost {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--spot-focus);
+}
+
+.work-legend-ghost {
+  margin-left: 8px;
+  background: repeating-linear-gradient(45deg, var(--spot-ghost) 0 2px, transparent 2px 4px);
+}
+
+.relief-object-action {
+  margin-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .work-bench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work-list {
+    position: static;
+    max-height: 40vh;
+  }
+}
+
+/* The spots fill the window: nothing below them to scroll to. */
+.content[data-view="collisions"]:has(.work-spots) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.work-spots {
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.work-tabs .count {
+  margin-left: 4px;
+}
+
+.swatch-spot[data-kind="deep"],
+.work-count[data-kind="deep"],
+.work-kind[data-kind="deep"] {
+  background: var(--spot-deep);
+  color: #1b2a2e;
+}
+
+.work-in-passage .work-item {
+  border-left-color: color-mix(in srgb, var(--spot-focus) 35%, transparent);
+}
+
+.work-side {
+  display: flex;
+  align-items: stretch;
+}
+
+.work-side .work-choice {
+  border-radius: 0 6px 6px 0;
+}
+
+.work-side[data-left] .work-choice-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--spot-ghost);
+}
+
+.work-eye {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-right-width: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.work-eye[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--spot-ghost) 18%, var(--surface));
+}
+
+.eye {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -4px;
+}
+
+.work-marks[aria-pressed="false"] {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.work-choice-verb {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.work-note {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--info);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.work-left {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+}
+
+.work-filters {
+  display: grid;
+  gap: 6px;
+}
+
+.work-filters .work-kinds {
+  gap: 2px 10px;
+  font-size: 0.85rem;
+}
+
+.work-search {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.work-pairs {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.work-pair-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-pair-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.work-pair-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.work-pair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.relief-object-warning {
+  margin-bottom: 6px;
+  color: var(--warning);
+}
+
+.compare-spots {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+.patch-own {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.patch-own-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patch-own-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.relief-object-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.work-group[data-done] .work-group-head,
+.work-pair-row[data-done] {
+  opacity: 0.6;
+}
+
+.work-verdict {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.work-verdict[data-done] {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.duel-from-collisions {
+  padding: 6px 10px;
+  border-left: 3px solid var(--ok);
+}
+
+.anchor-reasons {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+  font-size: 0.8rem;
+}
+
+.anchor-reasons[data-verdict="locked"] {
+  color: var(--error);
+}
+
+.anchor-reasons[data-verdict="careful"] {
+  color: var(--warning);
+}
+
+.needed-parts {
+  display: grid;
+  gap: 6px;
+}
+
+.needed-part {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.work-pair-row[data-focus] {
+  border-color: var(--spot-focus);
+  box-shadow: inset 0 0 0 1px var(--spot-focus);
+}
+
+.work-also {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.work-eye-button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--spot-ghost) 18%, var(--surface));
+}
+
+.parts-together {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.parts-hint {
+  font-size: 0.75rem;
+}
+
+.patch-confirm {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}
+
+.about-version {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

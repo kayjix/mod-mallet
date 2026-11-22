@@ -1,0 +1,122 @@
+/* Mod against mod: the duels about files. */
+
+/* ---- mod against mod ---------------------------------------------------- */
+
+.duels {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.duels-head h2 {
+  font-size: 1.05rem;
+}
+
+.duel-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.duels-decided .duel-list {
+  margin-top: var(--space-3);
+}
+
+.duel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.duel[data-decided="true"] {
+  opacity: 0.8;
+}
+
+.duel-main {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.duel-sides {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+.duel-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 1.05rem;
+}
+
+.duel-side:last-of-type {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.duel-versus {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--muted);
+}
+
+.duel-winner {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ok);
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.duel-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.duel-topic {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--sunken);
+  font-size: 0.85rem;
+}
+
+.duel-why {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.duel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.duel-applied {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+  font-size: 0.9rem;
+}
+
+/* ---- duels ------------------------------------------------------------- */
+
+.duels-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+}

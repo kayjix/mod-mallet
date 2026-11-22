@@ -1,0 +1,284 @@
+/* The list of findings with what to do about each (Tasks, and the findings below the collisions). */
+
+/* ---- the task list ----------------------------------------------------- */
+
+.tasks {
+  margin-top: 22px;
+}
+
+.tasks > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 4px 8px;
+}
+
+.tasks h2 {
+  font-size: 1.05rem;
+}
+
+.tasks ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tasks > ul {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tasks > ul > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.group > ul {
+  border-top: 1px solid var(--border);
+  background: var(--sunken);
+}
+
+.group > ul > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.line-with-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+}
+
+.line {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.line.nested {
+  padding-left: 34px;
+}
+
+.line:hover {
+  background: color-mix(in srgb, var(--brand) 7%, transparent);
+}
+
+.line-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.line-mod {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group > .line .line-title {
+  font-weight: 600;
+}
+
+/* The mark in front of a line says how much the finding matters. */
+.chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--info);
+  border-bottom: 2px solid var(--info);
+  transform: rotate(-45deg);
+  transition: transform 0.12s;
+}
+
+[data-severity="error"] > .line .chevron,
+[data-severity="error"] > .line-with-action .chevron {
+  border-color: var(--error);
+}
+
+[data-severity="warning"] > .line .chevron,
+[data-severity="warning"] > .line-with-action .chevron {
+  border-color: var(--warning);
+}
+
+.line[aria-expanded="true"] .chevron {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.act {
+  flex: none;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.body {
+  padding: 4px 16px 14px 32px;
+}
+
+.body.nested {
+  padding-left: 52px;
+}
+
+.body > * + * {
+  margin-top: 10px;
+}
+
+.body h3 {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.body h3 + p {
+  margin-top: 2px;
+}
+
+.more {
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.body details p {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 6px 6px 0;
+  background: var(--sunken);
+}
+
+.outcome-text {
+  flex: 1 1 280px;
+}
+
+.outcome[data-status="started"] {
+  border-left-color: var(--ok);
+}
+
+/* The installer guide: one numbered card per option to tick. */
+.guide {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.guide-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-item {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.guide-page {
+  grid-row: span 3;
+  align-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.guide-where,
+.guide-about {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.guide-tick {
+  font-weight: 600;
+}
+
+.guide-box {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 0.8em;
+}
+
+.newer {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.spot-list {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.spot-objects {
+  flex: 1 1 200px;
+  font-size: 0.9rem;
+}
+
+.command {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+
+/* ---- the options of a finding ------------------------------------------ */
+
+.summary {
+  font-size: 1rem;
+}

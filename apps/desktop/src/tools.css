@@ -1,0 +1,85 @@
+/* The toolbox's list of tools. */
+
+/* ---- the toolbox ------------------------------------------------------- */
+
+.tool-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tool {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.tool-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.tool-dot[data-tone="warning"] {
+  background: var(--warning);
+}
+
+.tool-dot[data-tone="error"] {
+  background: var(--error);
+}
+
+.tool-dot[data-tone="muted"] {
+  background: var(--muted);
+}
+
+.tool-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.tool-need {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.tool-purpose {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.tool-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+}
+
+.tool-facts code {
+  word-break: break-all;
+}
+
+.tool-state {
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tool[data-state="ready"] .tool-state {
+  color: var(--ok);
+}
+
+.tool-action {
+  min-width: 0;
+}

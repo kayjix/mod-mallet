@@ -1,0 +1,82 @@
+/* Where Mod Mallet reads: the first run's form and what a scan read. */
+
+/* ---- what was read, and the places ------------------------------------- */
+
+.sources {
+  margin-top: 26px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sources dl {
+  margin: 0;
+}
+
+.sources dl > div {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.sources dt {
+  color: var(--text);
+}
+
+.sources dd {
+  margin: 0;
+}
+
+.origin {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.places {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.places-text {
+  margin-top: 8px;
+}
+
+.places form {
+  margin-top: 16px;
+}
+
+.place {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.place-role {
+  font-weight: 600;
+}
+
+.place input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--sunken);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88rem;
+}
+
+.place-origin {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.place[data-found="false"] .place-origin {
+  color: var(--warning);
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}

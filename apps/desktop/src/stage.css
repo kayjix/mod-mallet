@@ -1,0 +1,211 @@
+/* Pictures of what a finding is about, the 3D viewer and the stage under one camera. */
+
+/* ---- pictures of what a finding is about -------------------------------- */
+
+.previews {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.preview {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.preview-path {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.preview-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.preview-version {
+  display: grid;
+  gap: var(--space-1);
+  width: 168px;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--sunken);
+}
+
+.preview-version[data-in-game="true"] {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+.preview-version img,
+.preview-missing {
+  width: 150px;
+  height: 150px;
+  border-radius: var(--radius-small);
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+.preview-missing {
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.preview-version figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.preview-badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* The comparison of a duel, drawn after the pictures it builds on. */
+/* ---- the 3D view -------------------------------------------------------- */
+
+.preview-meshes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgb(0 0 0 / 55%);
+}
+
+.viewer {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(1400px, 100%);
+  height: min(860px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.viewer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.viewer-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--radius-small);
+  cursor: grab;
+  touch-action: none;
+}
+
+.viewer-message {
+  display: grid;
+  place-items: center;
+}
+
+/* ---- the stage: one or two things under one camera ---------------------- */
+
+.stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.stage-panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.stage-pane {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: radial-gradient(circle at 50% 40%, #2a3a42, #0c1417);
+}
+
+.stage[data-scene="white"] .stage-pane {
+  background: radial-gradient(circle at 50% 35%, #ffffff, #d4d9dc);
+}
+
+.stage[data-scene="meadow"] .stage-pane {
+  background: linear-gradient(#8fc0e6 0%, #d8ecf6 58%, #86ad5f 58.5%, #4b7633 100%);
+}
+
+.stage[data-scene="forest"] .stage-pane {
+  background: linear-gradient(#6f8d79 0%, #34503b 55%, #2c3d24 55.5%, #172113 100%);
+}
+
+.stage[data-scene="cave"] .stage-pane {
+  background: radial-gradient(circle at 50% 30%, #5d4938, #1b130e 75%);
+}
+
+.stage[data-scene="snow"] .stage-pane {
+  background: linear-gradient(#a9c4da 0%, #e6eef5 58%, #f6f9fb 58.5%, #d9e2ea 100%);
+}
+
+.stage-pane figcaption {
+  padding: 6px var(--space-2);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.stage-pane .stage-note {
+  display: block;
+}
+
+.stage-pane .viewer-message {
+  color: #d9e2e6;
+}
+
+.stage-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.stage-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stage-control input[type="range"] {
+  width: 110px;
+}

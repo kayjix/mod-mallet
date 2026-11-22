@@ -1,0 +1,148 @@
+/*
+ * The brand palette, taken from the mallet icon (public/favicon.svg):
+ *
+ *   #FF7A18  orange       the mallet's head; the one call to action
+ *   #FFA62B  light orange  its highlight; the accent on dark backgrounds
+ *   #2EC4B6  turquoise    the handle; the brand colour on dark backgrounds
+ *   #0B7285  petrol       the icon's background; the brand colour on light
+ *   #F8F9FA  off-white    the light background and the text on dark
+ *
+ * Orange never carries white text: the contrast is too low. It carries the
+ * dark ink below.
+ *
+ * The window is a sidebar with the views, and a page. A page of the task
+ * list has three levels and nothing else competes with them: the overview
+ * (one sentence, a few numbers), the list (one line per finding, the
+ * button where there is one), and what is behind a line.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg: #eef2f3;
+  --surface: #ffffff;
+  --sunken: #f5f8f9;
+  --text: #12262c;
+  --muted: #52666c;
+  --border: #d5dde0;
+  --brand: #0b7285;
+  --accent: #ff7a18;
+  --accent-text: #12262c;
+  --error: #b3261e;
+  --warning: #a14a00;
+  --info: #0b7285;
+  --ok: #17705f;
+  --side-bg: #0b3b45;
+  --side-text: #e6f1f2;
+  --side-muted: #9cc0c5;
+  --side-active: #0b7285;
+  --shadow: 0 1px 2px rgb(18 38 44 / 6%), 0 4px 16px rgb(18 38 44 / 6%);
+  /* One scale of distances and corners for every page. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 10px;
+  --radius-small: 6px;
+  /* How many mods place objects in a cell, from one to four and more:
+     the same in both themes, like a heat map. */
+  --heat-1: #3fbf5a;
+  --heat-2: #f2d43d;
+  --heat-3: #f28c28;
+  --heat-4: #e23b3b;
+  --map-1: #9fd8d1;
+  --map-2: #2ec4b6;
+  --map-3: #0b7285;
+  --map-dim: #dfe6e8;
+  --map-water: #a9cbe0;
+  --map-low: #b8c9a4;
+  --map-high: #f2efe8;
+  /* Places of the map by origin (ADR 0031): drawn over the land, so the
+     same in both themes. */
+  --place-game: #f4f1e8;
+  --place-added: #37b24d;
+  --place-changed: #339af0;
+  --place-removed: #f03e3e;
+  --place-edge: #1b2a2e;
+  /* Collisions by kind (ADR 0039), the collision looked at and what the
+     patch would hide (ADR 0040): drawn over the land, the same in both
+     themes. */
+  --spot-duplicate: #e03131;
+  --spot-door: #7950f2;
+  --spot-overlap: #ff7a18;
+  --spot-touch: #adb5bd;
+  --spot-deep: #fcc419;
+  --spot-focus: #22d3ee;
+  --spot-ghost: #f03e3e;
+
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* The dark palette: by the system's setting, or chosen in the settings. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1a1f;
+    --surface: #11272d;
+    --sunken: #0d2025;
+    --text: #f8f9fa;
+    --muted: #9db3b9;
+    --border: #23414a;
+    --brand: #2ec4b6;
+    --accent: #ffa62b;
+    --accent-text: #12262c;
+    --error: #ff8a80;
+    --warning: #ffa62b;
+    --info: #2ec4b6;
+    --ok: #2ec4b6;
+    --side-bg: #071317;
+    --side-text: #e6f1f2;
+    --side-muted: #8aa9ae;
+    --side-active: #12454f;
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+    --map-1: #1d5a60;
+    --map-2: #2a9d93;
+    --map-3: #7fe3d8;
+    --map-dim: #172e34;
+    --map-water: #13334a;
+    --map-low: #2c3d2c;
+    --map-high: #9aa39a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a1a1f;
+  --surface: #11272d;
+  --sunken: #0d2025;
+  --text: #f8f9fa;
+  --muted: #9db3b9;
+  --border: #23414a;
+  --brand: #2ec4b6;
+  --accent: #ffa62b;
+  --accent-text: #12262c;
+  --error: #ff8a80;
+  --warning: #ffa62b;
+  --info: #2ec4b6;
+  --ok: #2ec4b6;
+  --side-bg: #071317;
+  --side-text: #e6f1f2;
+  --side-muted: #8aa9ae;
+  --side-active: #12454f;
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  --map-1: #1d5a60;
+  --map-2: #2a9d93;
+  --map-3: #7fe3d8;
+  --map-dim: #172e34;
+  --map-water: #13334a;
+  --map-low: #2c3d2c;
+  --map-high: #9aa39a;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}

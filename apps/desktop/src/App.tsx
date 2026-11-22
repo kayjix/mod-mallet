@@ -1,5 +1,21 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./App.css";
+// The window's styles, in the order they cascade (ADR 0077); pages add their own.
+import "./ui/tokens.css";
+import "./ui/base.css";
+import "./shell.css";
+import "./ui/kit.css";
+import "./task-list.css";
+import "./duels.css";
+import "./stage.css";
+import "./compare.css";
+import "./places.css";
+import "./map.css";
+import "./patch-page.css";
+import "./tools.css";
+import "./games.css";
+import "./settings.css";
+import "./mods.css";
+import "./collisions.css";
 import "./journey.css";
 import "./review.css";
 import { type PatchAt, type Session, SessionContext, useSession } from "./Actions";

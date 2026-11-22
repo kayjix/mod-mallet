@@ -1,0 +1,404 @@
+/* The map: its controls, the drawing, the places panel and the 3D relief. */
+
+/* ---- the map ----------------------------------------------------------- */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 18px;
+  margin: 12px 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 3px;
+}
+
+.swatch[data-level="1"] {
+  background: var(--heat-1);
+}
+
+.swatch[data-level="2"] {
+  background: var(--heat-2);
+}
+
+.swatch[data-level="3"] {
+  background: var(--heat-3);
+}
+
+.swatch[data-level="4"] {
+  background: var(--heat-4);
+}
+
+.swatch-spot {
+  border-radius: 50%;
+  background: var(--spot-overlap);
+}
+
+.swatch-spot[data-kind="duplicate"] {
+  background: var(--spot-duplicate);
+}
+
+.swatch-spot[data-kind="door"] {
+  background: var(--spot-door);
+}
+
+.swatch-spot[data-kind="touch"] {
+  background: var(--spot-touch);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-frame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.map-canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.map-canvas:active {
+  cursor: grabbing;
+}
+
+.map-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+}
+
+.map-zoom-button {
+  min-width: 34px;
+  padding: 4px 10px;
+  box-shadow: var(--shadow);
+}
+
+.map-detail {
+  align-self: start;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.map-detail > * + * {
+  margin-top: 8px;
+}
+
+.map-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.map-list-item[data-picked="true"] {
+  font-weight: 700;
+}
+
+.map-here {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.console {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .map-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- places on the map and the 3D relief (ADR 0031) ------------------- */
+
+.map-body-places {
+  grid-template-columns: 210px minmax(0, 1fr) 290px;
+  grid-template-areas: "places stage detail";
+}
+
+.map-body-places > .map-frame {
+  grid-area: stage;
+}
+
+.map-body-places > .map-detail {
+  grid-area: detail;
+}
+
+@media (max-width: 1250px) {
+  .map-body-places {
+    grid-template-columns: minmax(0, 1fr) 270px;
+    grid-template-areas:
+      "stage detail"
+      "stage places";
+    grid-template-rows: auto 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .map-body-places {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stage"
+      "detail"
+      "places";
+  }
+}
+
+.places-panel {
+  grid-area: places;
+  align-self: start;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.places-panel h3 {
+  margin: 0 0 6px;
+}
+
+.places-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.places-kinds {
+  margin-top: 4px;
+}
+
+.places-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: var(--radius-small);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.places-row:hover {
+  background: var(--sunken);
+}
+
+.places-row input {
+  margin: 0;
+}
+
+.places-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.places-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.places-all {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.place-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
+.place-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.place-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-link:hover {
+  background: var(--sunken);
+}
+
+.place-link-block {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.map-missing {
+  display: grid;
+  min-height: 420px;
+  place-items: center;
+  padding: 24px;
+}
+
+.relief-frame {
+  background: radial-gradient(circle at 50% 30%, var(--sunken), var(--surface));
+}
+
+.relief-canvas,
+.relief-overlay {
+  display: block;
+}
+
+.relief-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.relief-controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+.relief-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.relief-control input[type="range"] {
+  width: 110px;
+}
+
+.relief-hint {
+  color: var(--muted);
+}
+
+.relief-object {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  max-width: min(360px, calc(100% - 20px));
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+.relief-object-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.relief-object dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+
+.relief-object dt {
+  color: var(--muted);
+}
+
+.relief-object dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.relief-value {
+  min-width: 12em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

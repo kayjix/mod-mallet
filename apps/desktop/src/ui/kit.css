@@ -1,0 +1,271 @@
+/* The shared UI kit (ADR 0077): the pieces every page builds from. */
+
+.pagehead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin-bottom: 16px;
+}
+
+.pagehead h1 {
+  font-size: 1.45rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.progress,
+.failure {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.failure {
+  border-color: var(--error);
+}
+
+.progress {
+  position: relative;
+  overflow: hidden;
+  color: var(--muted);
+}
+
+.progress .bar {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: sweep 1.4s linear infinite;
+}
+
+@keyframes sweep {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress .bar {
+    animation: none;
+  }
+  .progress .bar {
+    background: var(--accent);
+  }
+}
+
+.welcome,
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.welcome > * + * {
+  margin-top: 14px;
+}
+
+/* ---- the building blocks every page uses --------------------------------- */
+
+/*
+ * A page is a stack of panels. A panel has a head (title, one line of
+ * explanation) and a body. Settings and facts inside a panel are rows:
+ * label and explanation on the left, the control on the right.
+ */
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.page-narrow {
+  max-width: 920px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-head h2 {
+  font-size: 1rem;
+}
+
+.panel-head .aside {
+  flex-basis: 100%;
+}
+
+.panel-body {
+  padding: var(--space-2) var(--space-4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(180px, 300px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-3) 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.row-label {
+  display: grid;
+  gap: 2px;
+}
+
+.row-label > span {
+  font-weight: 600;
+}
+
+.row-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  margin-bottom: -1px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--brand);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.segmented-small {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  overflow: hidden;
+}
+
+.segment {
+  border: 0;
+  border-radius: 0;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--border);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--brand);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.text-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--sunken);
+}
+
+.control {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.control select {
+  max-width: 280px;
+  color: var(--text);
+}
+
+.control-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented button {
+  border-radius: 0;
+  font-size: 0.88rem;
+}
+
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.segmented button + button {
+  border-left-width: 0;
+}
+
+.segmented button[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
