@@ -17,7 +17,7 @@ use crate::game::{Game, LogPlace};
 
 /// The directory `game` is installed in, and how it was found.
 pub fn game_dir(game: Game) -> Option<(PathBuf, LocationOrigin)> {
-    let is_game = |dir: &Path| dir.join(game.executable()).is_file();
+    let is_game = |dir: &Path| is_installed_in(game, dir);
     if let Some(dir) = registry::bethesda(game).filter(|dir| is_game(dir)) {
         return Some((dir, LocationOrigin::Registry));
     }
@@ -37,6 +37,21 @@ pub fn game_dir(game: Game) -> Option<(PathBuf, LocationOrigin)> {
         .filter_map(|id| registry::gog(id))
         .find(|dir| is_game(dir))
         .map(|dir| (dir, LocationOrigin::Gog))
+}
+
+/// Whether `dir` holds `game`: its program is there, and, where another
+/// game runs on the same program, the file that tells them apart is there
+/// for this game and not for the other (Enderal's launcher beside Skyrim
+/// Special Edition's program, ADR 0078).
+pub fn is_installed_in(game: Game, dir: &Path) -> bool {
+    let has = |file: &str| dir.join(file).is_file();
+    has(game.executable())
+        && game.launcher().is_none_or(has)
+        && Game::ALL
+            .into_iter()
+            .filter(|other| *other != game && other.executable() == game.executable())
+            .filter_map(Game::launcher)
+            .all(|launcher| !has(launcher))
 }
 
 /// The games that are installed on this machine, with their directories
@@ -190,7 +205,7 @@ mod registry {
     pub(super) fn bethesda(game: Game) -> Option<PathBuf> {
         value(
             HKEY_LOCAL_MACHINE,
-            &format!(r"SOFTWARE\Bethesda Softworks\{}", game.registry_key()),
+            &format!(r"SOFTWARE\Bethesda Softworks\{}", game.registry_key()?),
             "installed path",
         )
     }
@@ -356,6 +371,21 @@ mod tests {
                 assert!(dir.join(game.executable()).is_file());
             }
         }
+    }
+
+    #[test]
+    fn enderal_and_skyrim_special_edition_are_told_apart_by_the_launcher() {
+        let skyrim = tempfile::tempdir().unwrap();
+        std::fs::write(skyrim.path().join("SkyrimSE.exe"), b"").unwrap();
+        assert!(is_installed_in(Game::SkyrimSe, skyrim.path()));
+        assert!(!is_installed_in(Game::EnderalSe, skyrim.path()));
+
+        let enderal = tempfile::tempdir().unwrap();
+        std::fs::write(enderal.path().join("SkyrimSE.exe"), b"").unwrap();
+        std::fs::write(enderal.path().join("Enderal Launcher.exe"), b"").unwrap();
+        assert!(is_installed_in(Game::EnderalSe, enderal.path()));
+        assert!(!is_installed_in(Game::SkyrimSe, enderal.path()));
+        assert!(!is_installed_in(Game::Fallout4, enderal.path()));
     }
 
     proptest::proptest! {

@@ -39,6 +39,11 @@ pub enum Game {
     /// game's logic on the old game's data, below a folder of its own
     /// (`ObvData`), and draws with Unreal Engine (ADR 0065).
     OblivionRemastered,
+    /// Enderal: Forgotten Stories (Special Edition), a total conversion of
+    /// Skyrim Special Edition by the studio Sure AI, sold as a game of its
+    /// own. It runs on Skyrim Special Edition's program and formats, with
+    /// plugins, archives and settings of its own (ADR 0078).
+    EnderalSe,
 }
 
 /// Groups of games that share how their records are laid out and what the
@@ -135,10 +140,11 @@ pub struct Editor {
 
 impl Game {
     /// Every game this adapter knows, in the order they are offered.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::SkyrimSe,
         Self::SkyrimVr,
         Self::Skyrim,
+        Self::EnderalSe,
         Self::Fallout4,
         Self::Fallout4Vr,
         Self::FalloutNv,
@@ -166,6 +172,7 @@ impl Game {
             Self::Fallout3 => "fallout3",
             Self::Oblivion => "oblivion",
             Self::OblivionRemastered => "oblivionremastered",
+            Self::EnderalSe => "enderalspecialedition",
         }
     }
 
@@ -181,13 +188,14 @@ impl Game {
             Self::Fallout3 => "Fallout 3",
             Self::Oblivion => "Oblivion",
             Self::OblivionRemastered => "Oblivion Remastered",
+            Self::EnderalSe => "Enderal Special Edition",
         }
     }
 
     /// The group of games this one shares its records with.
     pub const fn family(self) -> Family {
         match self {
-            Self::SkyrimSe | Self::SkyrimVr | Self::Skyrim => Family::Skyrim,
+            Self::SkyrimSe | Self::SkyrimVr | Self::Skyrim | Self::EnderalSe => Family::Skyrim,
             Self::Fallout4 | Self::Fallout4Vr => Family::Fallout4,
             Self::FalloutNv | Self::Fallout3 => Family::Fallout3,
             Self::Oblivion | Self::OblivionRemastered => Family::Oblivion,
@@ -197,7 +205,7 @@ impl Game {
     /// How far Mod Mallet can look at a setup of this game.
     pub const fn support(self) -> GameSupport {
         match self {
-            Self::SkyrimSe => GameSupport::Full,
+            Self::SkyrimSe | Self::EnderalSe => GameSupport::Full,
             _ => GameSupport::Basic,
         }
     }
@@ -206,7 +214,9 @@ impl Game {
     /// directory from any other.
     pub const fn executable(self) -> &'static str {
         match self {
-            Self::SkyrimSe => "SkyrimSE.exe",
+            // Enderal runs on Skyrim Special Edition's program;
+            // [`Game::launcher`] tells the two apart.
+            Self::SkyrimSe | Self::EnderalSe => "SkyrimSE.exe",
             Self::SkyrimVr => "SkyrimVR.exe",
             Self::Skyrim => "TESV.exe",
             Self::Fallout4 => "Fallout4.exe",
@@ -260,6 +270,7 @@ impl Game {
         matches!(
             self,
             Self::SkyrimSe
+                | Self::EnderalSe
                 | Self::SkyrimVr
                 | Self::Fallout4
                 | Self::Fallout4Vr
@@ -268,9 +279,10 @@ impl Game {
     }
 
     /// The key below `HKEY_LOCAL_MACHINE\SOFTWARE\Bethesda Softworks` in
-    /// which the game's launcher writes where it installed the game.
-    pub const fn registry_key(self) -> &'static str {
-        match self {
+    /// which the game's launcher writes where it installed the game, if it
+    /// writes one there. Enderal, not a game of Bethesda's, writes none.
+    pub const fn registry_key(self) -> Option<&'static str> {
+        Some(match self {
             Self::SkyrimSe => "Skyrim Special Edition",
             Self::SkyrimVr => "Skyrim VR",
             Self::Skyrim => "Skyrim",
@@ -280,6 +292,28 @@ impl Game {
             Self::Fallout3 => "Fallout3",
             Self::Oblivion => "Oblivion",
             Self::OblivionRemastered => "Oblivion Remastered",
+            Self::EnderalSe => return None,
+        })
+    }
+
+    /// A file in the directory the game is installed in that tells it from
+    /// another game with the same program: Enderal's launcher, beside
+    /// Skyrim Special Edition's program. `None` for the games whose
+    /// program is their own.
+    pub const fn launcher(self) -> Option<&'static str> {
+        match self {
+            Self::EnderalSe => Some("Enderal Launcher.exe"),
+            _ => None,
+        }
+    }
+
+    /// The identifiers of games whose picture may stand for this one where
+    /// the mod manager has none of its own: Vortex brings one of the first
+    /// Enderal but none of Enderal Special Edition.
+    pub const fn related_art(self) -> &'static [&'static str] {
+        match self {
+            Self::EnderalSe => &["enderal"],
+            _ => &[],
         }
     }
 
@@ -296,6 +330,7 @@ impl Game {
             Self::Fallout3 => &["Fallout 3 goty", "Fallout 3"],
             Self::Oblivion => &["Oblivion"],
             Self::OblivionRemastered => &["Oblivion Remastered"],
+            Self::EnderalSe => &["Enderal Special Edition"],
         }
     }
 
@@ -308,7 +343,13 @@ impl Game {
             Self::FalloutNv => &["1454587428"],
             Self::Fallout3 => &["1454315831"],
             Self::Oblivion => &["1458058109"],
-            Self::SkyrimVr | Self::Skyrim | Self::Fallout4Vr | Self::OblivionRemastered => &[],
+            // GOG sells Enderal Special Edition too; its identifier there
+            // could not be confirmed, so only Steam's copy is looked for.
+            Self::SkyrimVr
+            | Self::Skyrim
+            | Self::Fallout4Vr
+            | Self::OblivionRemastered
+            | Self::EnderalSe => &[],
         }
     }
 
@@ -325,6 +366,7 @@ impl Game {
             Self::Fallout3 => "Fallout3",
             Self::Oblivion => "Oblivion",
             Self::OblivionRemastered => "Oblivion Remastered",
+            Self::EnderalSe => "Enderal Special Edition",
         }
     }
 
@@ -340,6 +382,7 @@ impl Game {
             Self::Fallout3 => "fallout3",
             Self::Oblivion => "oblivion",
             Self::OblivionRemastered => "oblivionremastered",
+            Self::EnderalSe => "enderalspecialedition",
         }
     }
 
@@ -371,6 +414,17 @@ impl Game {
                 "highrestexturepack01.esp",
                 "highrestexturepack02.esp",
                 "highrestexturepack03.esp",
+            ],
+            // Enderal ships its own versions of Skyrim's masters, its own
+            // master and SkyUI.
+            Self::EnderalSe => &[
+                "skyrim.esm",
+                "update.esm",
+                "dawnguard.esm",
+                "hearthfires.esm",
+                "dragonborn.esm",
+                "enderal - forgotten stories.esm",
+                "skyui_se.esp",
             ],
             Self::Fallout4 => &[
                 "fallout4.esm",
@@ -475,6 +529,9 @@ impl Game {
     pub const fn base_archive_prefixes(self) -> &'static [&'static str] {
         match self {
             Self::SkyrimSe | Self::Skyrim => &["skyrim - "],
+            // Enderal's own archives are named `E - Meshes.bsa`, `L - Voices.bsa`
+            // and so on.
+            Self::EnderalSe => &["skyrim - ", "e - ", "l - "],
             Self::SkyrimVr => &["skyrim - ", "skyrim_vr - "],
             Self::Fallout4 => &["fallout4 - "],
             Self::Fallout4Vr => &["fallout4 - ", "fallout4_vr - "],
@@ -486,7 +543,9 @@ impl Game {
     /// The game's own archives that load after the others, in lower case.
     pub const fn base_archives_last(self) -> &'static [&'static str] {
         match self {
-            Self::SkyrimSe | Self::SkyrimVr | Self::Skyrim => &["skyrim - patch.bsa"],
+            Self::SkyrimSe | Self::SkyrimVr | Self::Skyrim | Self::EnderalSe => {
+                &["skyrim - patch.bsa"]
+            }
             Self::FalloutNv => &["update.bsa"],
             _ => &[],
         }
@@ -495,7 +554,7 @@ impl Game {
     /// The game's script extender.
     pub const fn script_extender(self) -> ScriptExtender {
         match self {
-            Self::SkyrimSe => ScriptExtender {
+            Self::SkyrimSe | Self::EnderalSe => ScriptExtender {
                 tool: "skse",
                 short_name: "SKSE",
                 loader: "skse64_loader.exe",
@@ -601,7 +660,7 @@ impl Game {
     /// game has one.
     pub const fn address_library(self) -> Option<AddressLibrary> {
         match self {
-            Self::SkyrimSe => Some(AddressLibrary {
+            Self::SkyrimSe | Self::EnderalSe => Some(AddressLibrary {
                 tool: "address-library",
                 extension: "bin",
                 page: "https://www.nexusmods.com/skyrimspecialedition/mods/32444",
@@ -659,15 +718,32 @@ impl Game {
                 program: "TESConstructionSet.exe",
                 page: "https://cs.uesp.net/",
             },
-            Self::OblivionRemastered => return None,
+            // Mods for Enderal are made with Skyrim Special Edition's
+            // Creation Kit; Enderal brings no editor of its own.
+            Self::OblivionRemastered | Self::EnderalSe => return None,
         })
     }
 
     /// Whether Mod Mallet's patches work in the game: they are read by
-    /// Base Object Swapper, which exists for Skyrim Special Edition and
-    /// Skyrim VR.
+    /// Base Object Swapper, which exists for Skyrim Special Edition, and so
+    /// for Enderal on its program, and for Skyrim VR.
     pub const fn has_object_swapper(self) -> bool {
-        matches!(self, Self::SkyrimSe | Self::SkyrimVr)
+        matches!(self, Self::SkyrimSe | Self::SkyrimVr | Self::EnderalSe)
+    }
+
+    /// Whether Mod Mallet writes plugins for the game: of moves, paths and
+    /// doors. They copy fields as Skyrim Special Edition lays them out, which
+    /// Enderal, on the same program, reads too.
+    pub const fn writes_plugins(self) -> bool {
+        matches!(self, Self::SkyrimSe | Self::EnderalSe)
+    }
+
+    /// Whether Mod Mallet reads the paths characters walk in the game: the
+    /// navigation meshes of Skyrim's and Fallout 4's layout. Oblivion keeps
+    /// path grids instead, Fallout 3 and New Vegas navigation meshes of an
+    /// older layout.
+    pub const fn reads_walkways(self) -> bool {
+        matches!(self.family(), Family::Skyrim | Family::Fallout4)
     }
 
     /// Whether the game keeps each character's face in a mesh of its
@@ -687,7 +763,9 @@ impl Game {
     pub const fn load_order_id(self) -> loadorder::GameId {
         use loadorder::GameId;
         match self {
-            Self::SkyrimSe => GameId::SkyrimSE,
+            // The library tells Enderal from Skyrim by its launcher, and then
+            // reads its list of plugins from its own folder.
+            Self::SkyrimSe | Self::EnderalSe => GameId::SkyrimSE,
             Self::SkyrimVr => GameId::SkyrimVR,
             Self::Skyrim => GameId::Skyrim,
             Self::Fallout4 => GameId::Fallout4,
@@ -759,6 +837,27 @@ mod tests {
         assert!(game.editor().is_none());
         assert!(game.script_extender().log.is_none());
         assert!(game.is_official("AltarESPMain.esp"));
+    }
+
+    #[test]
+    fn enderal_reads_like_skyrim_special_edition_with_files_of_its_own() {
+        let game = Game::EnderalSe;
+        assert_eq!(game.family(), Family::Skyrim);
+        assert_eq!(game.executable(), Game::SkyrimSe.executable());
+        assert_eq!(game.launcher(), Some("Enderal Launcher.exe"));
+        assert_eq!(Game::SkyrimSe.launcher(), None);
+        assert_eq!(game.load_order_id(), Game::SkyrimSe.load_order_id());
+        assert_eq!(game.my_games_folder(), "Enderal Special Edition");
+        assert_eq!(game.steam_folders(), ["Enderal Special Edition"]);
+        assert_eq!(game.registry_key(), None);
+        assert!(game.is_official("Enderal - Forgotten Stories.esm"));
+        assert!(!Game::SkyrimSe.is_official("Enderal - Forgotten Stories.esm"));
+        assert!(game.base_archive_prefixes().contains(&"e - "));
+        assert_eq!(game.script_extender().loader, "skse64_loader.exe");
+        assert!(game.has_object_swapper());
+        assert!(game.editor().is_none());
+        assert_eq!(game.related_art(), ["enderal"]);
+        assert_eq!(Game::from_id("EnderalSpecialEdition"), Some(game));
     }
 
     #[test]

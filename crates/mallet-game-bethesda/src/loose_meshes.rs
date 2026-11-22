@@ -51,7 +51,7 @@ pub struct LooseMeshes {
 /// meshes do not say (Oblivion).
 pub fn native_version(game: Game) -> Option<u32> {
     match game {
-        Game::SkyrimSe | Game::SkyrimVr => Some(100),
+        Game::SkyrimSe | Game::SkyrimVr | Game::EnderalSe => Some(100),
         Game::Skyrim => Some(83),
         Game::Fallout4 | Game::Fallout4Vr => Some(130),
         Game::FalloutNv | Game::Fallout3 => Some(34),

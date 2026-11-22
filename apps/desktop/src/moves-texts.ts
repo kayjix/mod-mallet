@@ -139,7 +139,8 @@ const en: MovesTexts = {
     "unknown-field": (field) =>
       `it carries data Mod Mallet does not know how to copy safely (${field}).`,
     "name-not-found": "the name of its place could not be read from the game's string tables.",
-    "unsupported-game": "Mod Mallet writes plugins only for Skyrim Special Edition so far.",
+    "unsupported-game":
+      "Mod Mallet writes plugins only for Skyrim Special Edition and Enderal so far.",
   },
   putAllBack: "Put all back",
   limits:
@@ -222,7 +223,8 @@ const de: MovesTexts = {
       `Es trägt Daten, die Mod Mallet nicht sicher kopieren kann (${field}).`,
     "name-not-found":
       "Der Name seines Ortes ließ sich nicht aus den Texttabellen des Spiels lesen.",
-    "unsupported-game": "Mod Mallet schreibt Plugins bisher nur für Skyrim Special Edition.",
+    "unsupported-game":
+      "Mod Mallet schreibt Plugins bisher nur für Skyrim Special Edition und Enderal.",
   },
   putAllBack: "Alle zurückstellen",
   limits:

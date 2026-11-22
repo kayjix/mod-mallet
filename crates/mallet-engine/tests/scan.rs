@@ -1099,3 +1099,58 @@ fn a_crash_report_next_to_the_extender_log_is_read() {
             .any(|location| location.role == LocationRole::CrashLogs)
     );
 }
+
+/// Enderal Special Edition runs on Skyrim Special Edition's program with
+/// plugins of its own (ADR 0078): its master and `SkyUI_SE.esp` count as the
+/// game's, its `E - ` archives as the game's own, and a mod's plugin is
+/// read as in Skyrim.
+#[test]
+fn enderal_is_read_as_a_game_of_its_own() {
+    let mut setup = Setup::new();
+    fs::write(setup.game_dir().join("SkyrimSE.exe"), b"").unwrap();
+    fs::write(setup.game_dir().join("Enderal Launcher.exe"), b"").unwrap();
+    setup.write_data(
+        "Enderal - Forgotten Stories.esm",
+        &fixture::plugin(&["Skyrim.esm"], MASTER_FLAG, &[]),
+    );
+    setup.write_data("SkyUI_SE.esp", &fixture::plugin(&["Skyrim.esm"], 0, &[]));
+    setup.write_data(
+        "E - Meshes.bsa",
+        &fixture::bsa(&[r"meshes\enderal\tree.nif"]),
+    );
+    setup.deploy(
+        "Better Trees",
+        "Trees.esp",
+        &fixture::plugin(&["Enderal - Forgotten Stories.esm"], 0, &[]),
+    );
+    setup.activate(&[
+        "Enderal - Forgotten Stories.esm",
+        "SkyUI_SE.esp",
+        "Trees.esp",
+    ]);
+    let setup = setup.with_vortex_deployment();
+    let options = ScanOptions {
+        game: Some("enderalspecialedition".to_owned()),
+        ..setup.options()
+    };
+
+    let report = scan(&options).unwrap();
+
+    assert_eq!(report.game.id, "enderalspecialedition");
+    assert_eq!(report.game.name, "Enderal Special Edition");
+    let origin = |name: &str| {
+        report
+            .load_order
+            .iter()
+            .find(|plugin| plugin.name.eq_ignore_ascii_case(name))
+            .map(|plugin| plugin.origin)
+    };
+    assert_eq!(
+        origin("Enderal - Forgotten Stories.esm"),
+        Some(mallet_core::WorldOrigin::Game)
+    );
+    assert_eq!(origin("SkyUI_SE.esp"), Some(mallet_core::WorldOrigin::Game));
+    assert_eq!(origin("Trees.esp"), Some(mallet_core::WorldOrigin::Mod));
+    assert_eq!(report.archives_checked, 1);
+    assert!(!report.object_swapper);
+}

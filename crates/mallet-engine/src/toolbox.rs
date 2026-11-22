@@ -346,9 +346,16 @@ fn vortex(options: &ManagerOptions) -> Vec<Tool> {
 }
 
 /// The picture of a game as a `data:` address for the window, taken from
-/// the mod manager's installation, or `None` if it has none.
+/// the mod manager's installation or the game's extension it downloaded,
+/// or `None` if it has none. A game Vortex brings no picture of may show
+/// that of a game it is made from (Enderal Special Edition, ADR 0078).
 pub fn game_art(game_id: &str) -> Option<String> {
-    let bytes = app::game_art(game_id)?;
+    let vortex_data_dir = dirs::config_dir().map(|dir| dir.join("Vortex"));
+    let related = mallet_game_bethesda::Game::from_id(game_id)
+        .map_or(&[][..], mallet_game_bethesda::Game::related_art);
+    let bytes = std::iter::once(game_id)
+        .chain(related.iter().copied())
+        .find_map(|id| app::game_art(id, vortex_data_dir.as_deref()))?;
     Some(format!(
         "data:image/jpeg;base64,{}",
         mallet_core::encoding::base64(&bytes)

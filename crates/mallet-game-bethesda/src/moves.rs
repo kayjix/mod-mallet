@@ -38,10 +38,7 @@ use crate::objects::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, record_id
 /// The format of the plugins Mod Mallet writes for `game`, if it writes
 /// any for it. The fields copied are those of Skyrim Special Edition.
 pub fn plugin_format(game: Game) -> Option<Format> {
-    match game {
-        Game::SkyrimSe => Some(Format::SKYRIM_SE),
-        _ => None,
-    }
+    game.writes_plugins().then_some(Format::SKYRIM_SE)
 }
 
 /// The active plugins of `game` in `game_dir`, name and file in load

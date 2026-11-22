@@ -5,7 +5,7 @@
 //! Vortex is asked to close the way the window's close button would; it
 //! is never killed. If it does not close in time, nothing else happens.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -39,9 +39,11 @@ pub fn executable() -> Option<PathBuf> {
 }
 
 /// The picture Vortex shows for a game, read from Vortex's own
-/// installation: `game_id` is Vortex's identifier, such as `skyrimse`.
-/// Mod Mallet ships no pictures of games; without Vortex there are none.
-pub fn game_art(game_id: &str) -> Option<Vec<u8>> {
+/// installation, or else from the game's extension that Vortex downloaded
+/// into the `plugins` folder of `vortex_data_dir` (`%APPDATA%Vortex`):
+/// `game_id` is Vortex's identifier, such as `skyrimse`. Mod Mallet ships
+/// no pictures of games; without Vortex there are none. Only reads.
+pub fn game_art(game_id: &str, vortex_data_dir: Option<&Path>) -> Option<Vec<u8>> {
     let plain = !game_id.is_empty()
         && game_id
             .chars()
@@ -49,14 +51,47 @@ pub fn game_art(game_id: &str) -> Option<Vec<u8>> {
     if !plain {
         return None;
     }
-    let file = executable()?
-        .parent()?
-        .join("resources")
-        .join("app.asar.unpacked")
-        .join("bundledPlugins")
-        .join(format!("game-{game_id}"))
-        .join("gameart.jpg");
-    std::fs::read(file).ok()
+    let bundled = executable().and_then(|program| {
+        let file = program
+            .parent()?
+            .join("resources")
+            .join("app.asar.unpacked")
+            .join("bundledPlugins")
+            .join(format!("game-{game_id}"))
+            .join("gameart.jpg");
+        std::fs::read(file).ok()
+    });
+    bundled.or_else(|| downloaded_game_art(&vortex_data_dir?.join("plugins"), game_id))
+}
+
+/// Extension scripts larger than this are not read: a game's extension is
+/// a few dozen kilobytes.
+const MAX_EXTENSION_SCRIPT: u64 = 1024 * 1024;
+
+/// The picture of the downloaded extension in `plugins` that adds the game
+/// `game_id` to Vortex: the one whose `index.js` names that identifier in
+/// quotes and that has a `gameart.jpg` beside it.
+fn downloaded_game_art(plugins: &Path, game_id: &str) -> Option<Vec<u8>> {
+    let quoted = [format!("\"{game_id}\""), format!("'{game_id}'")];
+    let mut folders: Vec<PathBuf> = std::fs::read_dir(plugins)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.join("gameart.jpg").is_file())
+        .collect();
+    folders.sort();
+    folders.into_iter().find_map(|folder| {
+        let script = folder.join("index.js");
+        let small = std::fs::metadata(&script)
+            .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_EXTENSION_SCRIPT);
+        let text = small.then(|| std::fs::read(&script).ok()).flatten()?;
+        let text = String::from_utf8_lossy(&text);
+        quoted
+            .iter()
+            .any(|id| text.contains(id.as_str()))
+            .then(|| std::fs::read(folder.join("gameart.jpg")).ok())
+            .flatten()
+    })
 }
 
 /// Whether Vortex runs right now.
@@ -149,4 +184,57 @@ fn registered_executable() -> Option<PathBuf> {
 #[cfg(not(windows))]
 fn registered_executable() -> Option<PathBuf> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Writes a downloaded extension named `folder` whose script says
+    /// `script`, with a picture if `picture` is given.
+    fn extension(plugins: &Path, folder: &str, script: &str, picture: Option<&[u8]>) {
+        let dir = plugins.join(folder);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("index.js"), script).unwrap();
+        if let Some(picture) = picture {
+            std::fs::write(dir.join("gameart.jpg"), picture).unwrap();
+        }
+    }
+
+    #[test]
+    fn the_picture_of_a_downloaded_extension_is_found_by_its_game() {
+        let plugins = tempfile::tempdir().unwrap();
+        let plugins = plugins.path();
+        extension(
+            plugins,
+            "Game Other",
+            "const GAME_ID = 'other';",
+            Some(b"other"),
+        );
+        extension(
+            plugins,
+            "Game Enderal SE",
+            "const GAME_ID = \"enderalspecialedition\";",
+            Some(b"enderal"),
+        );
+        extension(plugins, "No Picture", "id: 'nopicture'", None);
+        assert_eq!(
+            downloaded_game_art(plugins, "enderalspecialedition"),
+            Some(b"enderal".to_vec())
+        );
+        assert_eq!(
+            downloaded_game_art(plugins, "other"),
+            Some(b"other".to_vec())
+        );
+        // A name merely contained in another is not the game.
+        assert_eq!(downloaded_game_art(plugins, "enderal"), None);
+        assert_eq!(downloaded_game_art(plugins, "nopicture"), None);
+        assert_eq!(downloaded_game_art(&plugins.join("missing"), "other"), None);
+    }
+
+    #[test]
+    fn identifiers_that_are_not_plain_are_refused() {
+        assert_eq!(game_art("../skyrimse", None), None);
+        assert_eq!(game_art("", None), None);
+    }
 }

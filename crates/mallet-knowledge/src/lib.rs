@@ -48,6 +48,9 @@ fn loot_game(game: &str) -> Option<(GameType, &'static str)> {
         "falloutnv" => (GameType::FalloutNV, "FalloutNV"),
         "fallout3" => (GameType::Fallout3, "Fallout3"),
         "oblivion" => (GameType::Oblivion, "Oblivion"),
+        // LOOT reads Enderal as Skyrim Special Edition, from a folder of its
+        // own (ADR 0078).
+        "enderalspecialedition" => (GameType::SkyrimSE, "Enderal Special Edition"),
         _ => return None,
     })
 }

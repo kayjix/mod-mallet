@@ -93,7 +93,7 @@ const en: RepairTexts = {
     "unknown-field": (field) =>
       `its cell has a field Mod Mallet does not know how to copy (${field})`,
     "not-found": "its cell was not found in the plugins",
-    "unsupported-game": "Mod Mallet writes plugins only for Skyrim Special Edition",
+    "unsupported-game": "Mod Mallet writes plugins only for Skyrim Special Edition and Enderal",
   },
   limits:
     "The repair lays new paths on the ground where the hidden objects stood. It writes no cover for fights and leaves the game's map of long ways as it is; a plugin loaded later that changes the same paths undoes it.",
@@ -144,7 +144,7 @@ const de: RepairTexts = {
     "unknown-field": (field) =>
       `seine Zelle hat ein Feld, das Mod Mallet nicht zu kopieren weiß (${field})`,
     "not-found": "seine Zelle wurde in den Plugins nicht gefunden",
-    "unsupported-game": "Mod Mallet schreibt Plugins nur für Skyrim Special Edition",
+    "unsupported-game": "Mod Mallet schreibt Plugins nur für Skyrim Special Edition und Enderal",
   },
   limits:
     "Die Reparatur legt neue Wege auf den Boden, wo die versteckten Objekte standen. Deckung für Kämpfe schreibt sie nicht, und die Karte des Spiels für weite Wege bleibt, wie sie ist; ein später geladenes Plugin, das dieselben Wege ändert, macht sie rückgängig.",

@@ -161,7 +161,8 @@ impl InstanceSettings {
 
 /// Mod Mallet's identifier of a game, given the name Mod Organizer writes
 /// into `ModOrganizer.ini`. `None` for games Mod Mallet does not know,
-/// such as Enderal, which runs on Skyrim but is a game of its own.
+/// such as the first Enderal, which runs on Skyrim (2011) but is a game
+/// of its own.
 pub fn game_id(game_name: &str) -> Option<&'static str> {
     const GAMES: &[(&str, &str)] = &[
         ("skyrim special edition", "skyrimse"),
@@ -174,6 +175,7 @@ pub fn game_id(game_name: &str) -> Option<&'static str> {
         ("ttw", "falloutnv"),
         ("fallout 3", "fallout3"),
         ("oblivion", "oblivion"),
+        ("enderal special edition", "enderalspecialedition"),
     ];
     let wanted = game_name.trim().to_lowercase();
     GAMES
@@ -271,8 +273,12 @@ mod tests {
 
     #[test]
     fn games_mod_mallet_does_not_know_have_no_identifier() {
-        assert_eq!(game_id("Enderal Special Edition"), None);
+        assert_eq!(game_id("Enderal"), None);
         assert_eq!(game_id("  oblivion "), Some("oblivion"));
+        assert_eq!(
+            game_id("Enderal Special Edition"),
+            Some("enderalspecialedition")
+        );
     }
 
     #[test]
