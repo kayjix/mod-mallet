@@ -115,6 +115,17 @@ interface Item {
   text: string;
 }
 
+/**
+ * Where the camera of the view stays while a place larger than a spot is
+ * looked at, such as a passage (ADR 0072): its middle, how far away, and
+ * the spot it was framed from. Its spots are then picked without moving.
+ */
+interface StageFrame {
+  centre: [number, number, number];
+  distance: number;
+  spot: MapSpot;
+}
+
 interface Group {
   key: string;
   label: string;
@@ -594,6 +605,8 @@ export function Collisions({
     setVersion("now");
   }, [passageAt]);
   const openedPassage = passageClusters.find((cluster) => cluster.key === passageAt) ?? null;
+  // The passage the camera frames, also while one of its spots is open.
+  const [framed, setFramed] = useState<{ key: string; frame: StageFrame } | null>(null);
   const startKey = start === null ? null : spotKey(start);
   const [currentKey, setCurrentKey] = useState<string | null>(startKey);
   // A spot handed over later (from the map or a comparison) is opened too.
@@ -601,6 +614,7 @@ export function Collisions({
     if (startKey !== null) {
       setCurrentKey(startKey);
       setPassageAt(null);
+      setFramed(null);
       setTab("spots");
     }
   }, [startKey]);
@@ -645,7 +659,29 @@ export function Collisions({
     if (item !== null) {
       setCurrentKey(item.key);
       setPassageAt(null);
+      // A spot of the passage in view is picked where it is: the camera and
+      // the objects read stay. Elsewhere, the view goes to the spot.
+      setFramed((before) => (before !== null && before.key === item.passage ? before : null));
     }
+  };
+  /** Frames a passage in the view, to decide it as a whole. */
+  const openPassage = (key: string) => {
+    const cluster = passageClusters.find((candidate) => candidate.key === key);
+    const first = cluster?.spots
+      .map(({ key: spot }) => byKey.get(spot))
+      .find((item) => item !== undefined);
+    if (cluster === undefined || first === undefined) {
+      return;
+    }
+    setPassageAt(key);
+    setFramed({
+      key,
+      frame: {
+        centre: cluster.centre,
+        distance: Math.max(CLOSE, (cluster.radius * 2.4) / CELL),
+        spot: first.spot,
+      },
+    });
   };
   const goOn = (next: PatchChoices) => {
     if (advance) {
@@ -930,6 +966,9 @@ export function Collisions({
     openedPassage === null
       ? undefined
       : openedPassage.spots.map(({ key }) => byKey.get(key)).find((item) => item !== undefined);
+  // The spot the panel and the view are about: a passage's first while the
+  // passage is open.
+  const shownItem = passageItem ?? current;
   return (
     <section className="work work-spots">
       <div className="work-bar">
@@ -1045,134 +1084,114 @@ export function Collisions({
             pins={pins}
             onPick={go}
             passageAt={openedPassage?.key ?? null}
-            onPassage={setPassageAt}
+            onPassage={openPassage}
           />
         </div>
         <div className="work-stage">
-          {openedPassage !== null && passageItem !== undefined ? (
-            <NotesInFull value={notesInFull}>
-              <div className="work-decision">
-                <PassageHead
-                  cluster={openedPassage}
-                  worlds={report.map.worlds}
-                  decided={decidedOf(openedPassage.spots, choices)}
-                  segments={passageSegments}
-                  held={held !== null && held.key === openedPassage.key ? held.count : 0}
-                  onKeep={(side) => keepWhole(openedPassage, passageItem, side)}
-                />
-              </div>
-              <Stage
-                report={report}
-                item={passageItem}
-                ordered={ordered}
-                hiddenObjects={hiddenObjects}
-                preview={preview}
-                marks={marks}
-                choices={choices}
-                onPick={() => {}}
-                onDecide={(plugin) => decide(passageItem, plugin)}
-                onDoor={(object, hide) => hideOrShowDoor(passageItem, object, hide)}
-                onArea={setPassageArea}
-                onLayer={setPassageLayer}
-                previewObjects={
-                  version === "now"
-                    ? []
-                    : openedPassage.passage === undefined
-                      ? []
-                      : sideParts(
-                          openedPassage.passage.passage,
-                          passageSegments,
-                          version === 0 ? 1 : 0,
-                        )
-                }
-                tools={
-                  <VersionSwitch
-                    plugins={openedPassage.plugins}
-                    version={version}
-                    onVersion={setVersion}
-                  />
-                }
-                view={{
-                  centre: openedPassage.centre,
-                  distance: Math.max(CLOSE, (openedPassage.radius * 2.4) / CELL),
-                  focus:
-                    openedPassage.passage === undefined ? new Set() : openedPassage.passage.keys,
-                  plain: version !== "now" || !marks,
-                }}
-              />
-            </NotesInFull>
+          {offNote}
+          {openedPassage === null &&
+            currentInPassage !== undefined &&
+            currentInPassage.passage !== undefined && (
+              <p className="work-passage-note">
+                <span>
+                  {p.inPassage(passageTitle(currentInPassage.passage.passage, report.map.worlds))}
+                </span>
+                <button
+                  type="button"
+                  className="small quiet"
+                  onClick={() => openPassage(currentInPassage.key)}
+                >
+                  {p.openPassage}
+                </button>
+              </p>
+            )}
+          {shownItem === null ? (
+            <p className="empty">{t.workPickSpot}</p>
           ) : (
-            <>
-              {offNote}
-              {currentInPassage !== undefined && currentInPassage.passage !== undefined && (
-                <p className="work-passage-note">
-                  <span>
-                    {p.inPassage(passageTitle(currentInPassage.passage.passage, report.map.worlds))}
-                  </span>
-                  <button
-                    type="button"
-                    className="small quiet"
-                    onClick={() => setPassageAt(currentInPassage.key)}
-                  >
-                    {p.openPassage}
-                  </button>
-                </p>
-              )}
-              {current === null ? (
-                <p className="empty">{t.workPickSpot}</p>
-              ) : (
-                <Spot
-                  report={report}
-                  item={current}
-                  index={ordered.indexOf(current)}
-                  total={ordered.length}
-                  ordered={ordered}
-                  passage={passage}
-                  decided={decision(current)}
-                  ownChoice={current.key in choices}
-                  choices={choices}
-                  hiddenObjects={hiddenObjects}
-                  preview={preview}
-                  marks={marks}
-                  advance={advance}
-                  onMarks={setMarks}
-                  onAdvance={(next) => {
-                    setAdvance(next);
-                    remember("mallet.workAdvance2", next ? "on" : "off");
-                  }}
-                  notesInFull={notesInFull}
-                  onNotesInFull={(next) => {
-                    setNotesInFull(next);
-                    remember("mallet.workNotes", next ? "on" : "off");
-                  }}
-                  onPreview={togglePreview}
-                  onDecide={(plugin) => decide(current, plugin)}
-                  onUndecide={() => undecide(current)}
-                  onDecideMods={decideMods}
-                  onOpenPair={() => {
-                    setOpenedPair(current.mods.key);
-                    changeTab("mods");
-                  }}
-                  onOpenMods={(key) => {
-                    setOpenedPair(key);
-                    changeTab("mods");
-                  }}
-                  onDecidePassage={decidePassage}
-                  onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
-                  onMergeDoors={(group, plan) => mergeDoors(current, group, plan)}
-                  onDoor={(object, hide) => hideOrShowDoor(current, object, hide)}
-                  onPick={(spot) => {
-                    const key = spotKey(spot);
-                    if (key !== null && byKey.has(key)) {
-                      setCurrentKey(key);
+            <Spot
+              report={report}
+              item={shownItem}
+              frame={framed?.frame ?? null}
+              passageView={
+                openedPassage === null
+                  ? null
+                  : {
+                      head: (
+                        <PassageHead
+                          cluster={openedPassage}
+                          worlds={report.map.worlds}
+                          decided={decidedOf(openedPassage.spots, choices)}
+                          segments={passageSegments}
+                          held={held !== null && held.key === openedPassage.key ? held.count : 0}
+                          onKeep={(side) => keepWhole(openedPassage, shownItem, side)}
+                        />
+                      ),
+                      focus: openedPassage.passage?.keys ?? new Set(),
+                      plain: version !== "now" || !marks,
+                      previewObjects:
+                        version === "now" || openedPassage.passage === undefined
+                          ? []
+                          : sideParts(
+                              openedPassage.passage.passage,
+                              passageSegments,
+                              version === 0 ? 1 : 0,
+                            ),
+                      tool: (
+                        <VersionSwitch
+                          plugins={openedPassage.plugins}
+                          version={version}
+                          onVersion={setVersion}
+                        />
+                      ),
                     }
-                  }}
-                  onPrevious={() => go(step(-1, shown))}
-                  onNext={() => go(step(1, shown))}
-                  onNextOpen={() => go(step(1, (item) => decision(item) === undefined))}
-                />
-              )}
-            </>
+              }
+              onArea={setPassageArea}
+              onLayer={setPassageLayer}
+              index={ordered.indexOf(shownItem)}
+              total={ordered.length}
+              ordered={ordered}
+              passage={passage}
+              decided={decision(shownItem)}
+              ownChoice={shownItem.key in choices}
+              choices={choices}
+              hiddenObjects={hiddenObjects}
+              preview={preview}
+              marks={marks}
+              advance={advance}
+              onMarks={setMarks}
+              onAdvance={(next) => {
+                setAdvance(next);
+                remember("mallet.workAdvance2", next ? "on" : "off");
+              }}
+              notesInFull={notesInFull}
+              onNotesInFull={(next) => {
+                setNotesInFull(next);
+                remember("mallet.workNotes", next ? "on" : "off");
+              }}
+              onPreview={togglePreview}
+              onDecide={(plugin) => decide(shownItem, plugin)}
+              onUndecide={() => undecide(shownItem)}
+              onDecideMods={decideMods}
+              onOpenPair={() => {
+                setOpenedPair(shownItem.mods.key);
+                changeTab("mods");
+              }}
+              onOpenMods={(key) => {
+                setOpenedPair(key);
+                changeTab("mods");
+              }}
+              onDecidePassage={decidePassage}
+              onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
+              onMergeDoors={(group, plan) => mergeDoors(shownItem, group, plan)}
+              onDoor={(object, hide) => hideOrShowDoor(shownItem, object, hide)}
+              onPick={(spot) => {
+                const key = spotKey(spot);
+                go(key === null ? null : (byKey.get(key) ?? null));
+              }}
+              onPrevious={() => go(step(-1, shown))}
+              onNext={() => go(step(1, shown))}
+              onNextOpen={() => go(step(1, (item) => decision(item) === undefined))}
+            />
           )}
         </div>
       </div>
@@ -1353,6 +1372,27 @@ function shortName(plugin: string): string {
   return plugin.replace(/\.(esp|esm|esl)$/i, "");
 }
 
+/**
+ * What makes the spot's stage frame a passage (ADR 0072): the camera kept
+ * on it, and while the passage itself is open its head in place of the
+ * spot's panel. The stage stays the same, so nothing is read anew.
+ */
+interface SpotFrameProps {
+  frame?: StageFrame | null;
+  passageView?: {
+    head: ReactNode;
+    focus: Set<string>;
+    plain: boolean;
+    previewObjects: ObjectRef[];
+    /** The switch between the place now and one mod's version. */
+    tool: ReactNode;
+  } | null;
+  /** Told about the objects the view reads, besides the spot's own use. */
+  onArea?: (area: AreaObjects | null) => void;
+  /** Told about the view's layer of objects, to measure what it shows. */
+  onLayer?: (layer: AreaLayer | null) => void;
+}
+
 interface SpotProps {
   report: RenderedReport;
   item: Item;
@@ -1396,7 +1436,7 @@ interface SpotProps {
 }
 
 /** The spot looked at: what it is, what to do about it, and the place in 3D. */
-function Spot(props: SpotProps) {
+function Spot(props: SpotProps & SpotFrameProps) {
   const { t, lang, showOnMap, spots: spotsByFinding } = useSession();
   const own = collisionsTexts[lang];
   const { item, passage, preview, decided, marks } = props;
@@ -1691,9 +1731,10 @@ function Spot(props: SpotProps) {
   const [leftSide, ...rightSides] = item.sides;
   // The tools of this page in the bar over the view: how far "around"
   // reaches, the marks, and what the colours mean.
+  const passageView = props.passageView ?? null;
   const viewTools = (
     <>
-      {spot.location.type === "exterior" && (
+      {passageView === null && spot.location.type === "exterior" && (
         <label className="view-tool" title={own.aroundHint}>
           <span className="view-tool-name">{own.aroundTool}</span>
           <input
@@ -1730,141 +1771,161 @@ function Spot(props: SpotProps) {
   return (
     <NotesInFull value={props.notesInFull}>
       <div className="work-decision">
-        <div className="work-nav">
-          <span className="work-kind" data-kind={item.kind} title={t.spotKindHints[item.kind]}>
-            {t.spotKinds[item.kind]}
-          </span>
-          <strong>{item.region.label}</strong>
-          {item.region.aside !== null && <span className="aside">{item.region.aside}</span>}
-          {depth !== null && item.kind !== "duplicate" && (
-            <span className="aside">· {t.workDepth(depth / UNITS_PER_METRE)}</span>
-          )}
-          <span className="spacer" />
-          <span className="aside" title={t.workKeys}>
-            {props.index >= 0 ? t.workSpotOf(props.index + 1, props.total) : ""}
-          </span>
-          <span className="work-nav-group">
-            <button type="button" className="small" onClick={props.onPrevious}>
-              ‹ {t.workPrevious}
-            </button>
-            <button type="button" className="small" onClick={props.onNext}>
-              {t.workNext} ›
-            </button>
-            <button type="button" className="small" onClick={props.onNextOpen}>
-              {t.workNextOpen} »
-            </button>
-          </span>
-          <span className="work-nav-more">
-            <label className="control-check aside" title={t.workAfterDecideHint}>
-              <input
-                type="checkbox"
-                checked={props.advance}
-                onChange={(event) => props.onAdvance(event.target.checked)}
-              />
-              {t.workAfterDecide}
-            </label>
-            <label className="control-check aside" title={n.showNotesHint}>
-              <input
-                type="checkbox"
-                checked={props.notesInFull}
-                onChange={(event) => props.onNotesInFull(event.target.checked)}
-              />
-              {n.showNotes}
-            </label>
-            <PinButton keys={decided === undefined ? [item.key] : []} />
-            {spot.location.type === "exterior" && (
-              <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
-                {own.showOnMap}
-              </button>
-            )}
-          </span>
-        </div>
-        {spot.doors !== null && spot.doors !== undefined ? (
-          <DoorPanel
-            group={spot.doors}
-            hidden={(object) => hiddenKeys.has(matchKey(object))}
-            keptAll={decided === null}
-            onMerge={(plan) => spot.doors && props.onMergeDoors(spot.doors, plan)}
-            onKeepAll={() => spot.doors && props.onMergeDoors(spot.doors, null)}
-            place={walkPlace}
-            centre={walkCentre}
-            looking={doorLook}
-            onLookAt={setDoorLook}
-            pair={doorPair(spot.doors, props.onOpenMods)}
-            onLocate={(door) => locate([door.object], door.position ?? spot.position)}
-            notesOf={(door) => {
-              const side = item.sides.find((candidate) =>
-                candidate.parts.some((part) => matchKey(part.object) === matchKey(door.object)),
-              );
-              return side === undefined
-                ? null
-                : sideNotes(
-                    side,
-                    side.parts.filter((part) => matchKey(part.object) === matchKey(door.object)),
-                  );
-            }}
-          />
+        {passageView !== null ? (
+          passageView.head
         ) : (
-          <div className="work-columns">
-            {leftSide !== undefined && sideColumn(leftSide, 0)}
-            <div className="work-column work-common">
-              <div className="work-column-head">
-                <strong>{own.common}</strong>
-              </div>
-              <div className="work-common-choices">
-                <button
-                  type="button"
-                  className="work-choice"
-                  aria-pressed={decided === null}
-                  onClick={() => props.onDecide(null)}
-                >
-                  <kbd>0</kbd>
-                  <span className="work-choice-text">
-                    <span className="work-choice-verb">{t.workKeepVerb}</span>
-                    <strong className="work-choice-title">{t.patchKeepBoth}</strong>
-                  </span>
+          <>
+            <div className="work-nav">
+              <span className="work-kind" data-kind={item.kind} title={t.spotKindHints[item.kind]}>
+                {t.spotKinds[item.kind]}
+              </span>
+              <strong>{item.region.label}</strong>
+              {item.region.aside !== null && <span className="aside">{item.region.aside}</span>}
+              {depth !== null && item.kind !== "duplicate" && (
+                <span className="aside">· {t.workDepth(depth / UNITS_PER_METRE)}</span>
+              )}
+              <span className="spacer" />
+              <span className="aside" title={t.workKeys}>
+                {props.index >= 0 ? t.workSpotOf(props.index + 1, props.total) : ""}
+              </span>
+              <span className="work-nav-group">
+                <button type="button" className="small" onClick={props.onPrevious}>
+                  ‹ {t.workPrevious}
                 </button>
-                {props.ownChoice && (
-                  <button type="button" className="small quiet" onClick={props.onUndecide}>
-                    {t.workReset}
+                <button type="button" className="small" onClick={props.onNext}>
+                  {t.workNext} ›
+                </button>
+                <button type="button" className="small" onClick={props.onNextOpen}>
+                  {t.workNextOpen} »
+                </button>
+              </span>
+              <span className="work-nav-more">
+                <label className="control-check aside" title={t.workAfterDecideHint}>
+                  <input
+                    type="checkbox"
+                    checked={props.advance}
+                    onChange={(event) => props.onAdvance(event.target.checked)}
+                  />
+                  {t.workAfterDecide}
+                </label>
+                <label className="control-check aside" title={n.showNotesHint}>
+                  <input
+                    type="checkbox"
+                    checked={props.notesInFull}
+                    onChange={(event) => props.onNotesInFull(event.target.checked)}
+                  />
+                  {n.showNotes}
+                </label>
+                <PinButton keys={decided === undefined ? [item.key] : []} />
+                {spot.location.type === "exterior" && (
+                  <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
+                    {own.showOnMap}
                   </button>
                 )}
-              </div>
-              {item.sides.every((side) => !side.hideable) && (
-                <p className="work-note">{t.workBothNeeded}</p>
-              )}
-              {first !== undefined && second !== undefined && pairSpots > 1 && (
-                <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
-                  <span>
-                    {pairSpots >= MANY
-                      ? t.workPairMany(first.plugin, second.plugin, pairSpots)
-                      : own.pairSpots(shortName(first.plugin), shortName(second.plugin), pairSpots)}
-                  </span>
-                  <button type="button" className="small" onClick={props.onOpenPair}>
-                    {own.openThePair}
-                  </button>
-                </div>
-              )}
+              </span>
             </div>
-            {rightSides.length > 0 && (
-              <div className="work-column-stack">
-                {rightSides.map((side, at) => sideColumn(side, at + 1))}
+            {spot.doors !== null && spot.doors !== undefined ? (
+              <DoorPanel
+                group={spot.doors}
+                hidden={(object) => hiddenKeys.has(matchKey(object))}
+                keptAll={decided === null}
+                onMerge={(plan) => spot.doors && props.onMergeDoors(spot.doors, plan)}
+                onKeepAll={() => spot.doors && props.onMergeDoors(spot.doors, null)}
+                place={walkPlace}
+                centre={walkCentre}
+                looking={doorLook}
+                onLookAt={setDoorLook}
+                pair={doorPair(spot.doors, props.onOpenMods)}
+                onLocate={(door) => locate([door.object], door.position ?? spot.position)}
+                notesOf={(door) => {
+                  const side = item.sides.find((candidate) =>
+                    candidate.parts.some((part) => matchKey(part.object) === matchKey(door.object)),
+                  );
+                  return side === undefined
+                    ? null
+                    : sideNotes(
+                        side,
+                        side.parts.filter(
+                          (part) => matchKey(part.object) === matchKey(door.object),
+                        ),
+                      );
+                }}
+              />
+            ) : (
+              <div className="work-columns">
+                {leftSide !== undefined && sideColumn(leftSide, 0)}
+                <div className="work-column work-common">
+                  <div className="work-column-head">
+                    <strong>{own.common}</strong>
+                  </div>
+                  <div className="work-common-choices">
+                    <button
+                      type="button"
+                      className="work-choice"
+                      aria-pressed={decided === null}
+                      onClick={() => props.onDecide(null)}
+                    >
+                      <kbd>0</kbd>
+                      <span className="work-choice-text">
+                        <span className="work-choice-verb">{t.workKeepVerb}</span>
+                        <strong className="work-choice-title">{t.patchKeepBoth}</strong>
+                      </span>
+                    </button>
+                    {props.ownChoice && (
+                      <button type="button" className="small quiet" onClick={props.onUndecide}>
+                        {t.workReset}
+                      </button>
+                    )}
+                  </div>
+                  {item.sides.every((side) => !side.hideable) && (
+                    <p className="work-note">{t.workBothNeeded}</p>
+                  )}
+                  {first !== undefined && second !== undefined && pairSpots > 1 && (
+                    <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
+                      <span>
+                        {pairSpots >= MANY
+                          ? t.workPairMany(first.plugin, second.plugin, pairSpots)
+                          : own.pairSpots(
+                              shortName(first.plugin),
+                              shortName(second.plugin),
+                              pairSpots,
+                            )}
+                      </span>
+                      <button type="button" className="small" onClick={props.onOpenPair}>
+                        {own.openThePair}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {rightSides.length > 0 && (
+                  <div className="work-column-stack">
+                    {rightSides.map((side, at) => sideColumn(side, at + 1))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
       <Stage
         {...props}
-        onArea={setArea}
-        previewObjects={previewObjects}
+        onArea={(found) => {
+          setArea(found);
+          props.onArea?.(found);
+        }}
+        onLayer={props.onLayer}
+        previewObjects={passageView?.previewObjects ?? previewObjects}
         tools={
           <>
             {viewTools}
             {pathsMode.tool}
+            {passageView?.tool}
           </>
         }
-        paint={paintReach}
+        frame={props.frame ?? null}
+        focusKeys={passageView?.focus ?? null}
+        plain={passageView?.plain ?? !marks}
+        paint={passageView === null ? paintReach : undefined}
         paths={shownPaths}
         lookAt={doorLook}
         legend={pathsMode.legend}
@@ -1951,7 +2012,9 @@ function Stage({
   paths = null,
   lookAt = null,
   legend,
-  view = null,
+  frame = null,
+  focusKeys = null,
+  plain,
   onLayer,
 }: Pick<
   SpotProps,
@@ -1967,17 +2030,12 @@ function Stage({
   | "choices"
 > & {
   onArea: (area: AreaObjects | null) => void;
-  /**
-   * A place larger than a spot, such as a passage (ADR 0072): where the
-   * camera looks and from how far, what is lit up, and whether the place
-   * is shown as the game would.
-   */
-  view?: {
-    centre: [number, number, number];
-    distance: number;
-    focus: Set<string>;
-    plain: boolean;
-  } | null;
+  /** Where the camera stays, framing a place larger than the spot (ADR 0072). */
+  frame?: StageFrame | null;
+  /** What is lit up instead of the spot's parts, such as a passage's. */
+  focusKeys?: Set<string> | null;
+  /** Whether the place is shown as the game would. */
+  plain: boolean;
   /** Told about the view's layer of objects, to measure what it shows. */
   onLayer?: (layer: AreaLayer | null) => void;
   /** Objects left out to look at, without deciding. */
@@ -2022,17 +2080,18 @@ function Stage({
     () => (world?.markers ?? []).filter((marker) => marker.origin !== "removed"),
     [world],
   );
-  const viewCentre = view?.centre ?? null;
-  const picked = useMemo<Picked>(
-    () => ({
-      type: "spot",
-      spot: viewCentre === null ? item.spot : { ...item.spot, position: viewCentre },
-    }),
-    [item.spot, viewCentre],
+  const viewCentre = frame?.centre ?? null;
+  // Framed, the camera stays on the frame whichever of its spots is open.
+  const framedPick = useMemo<Picked | null>(
+    () =>
+      frame === null ? null : { type: "spot", spot: { ...frame.spot, position: frame.centre } },
+    [frame],
   );
+  const spotPick = useMemo<Picked>(() => ({ type: "spot", spot: item.spot }), [item.spot]);
+  const picked = framedPick ?? spotPick;
   const parts = item.spot.parts ?? [];
   const looked = lookAt === null ? null : objectKey(lookAt.plugin, lookAt.localId);
-  const viewFocus = view?.focus ?? null;
+  const viewFocus = focusKeys;
   const focus = useMemo(
     () =>
       viewFocus !== null
@@ -2155,7 +2214,7 @@ function Stage({
         centre={viewCentre ?? item.spot.position ?? null}
         focus={focus}
         hidden={ghosts}
-        plain={view?.plain ?? !marks}
+        plain={plain}
         objectExtra={extra}
         onObject={openSpotOf}
         onArea={onArea}
@@ -2202,8 +2261,8 @@ function Stage({
       hidden={ghosts}
       objectExtra={extra}
       onObject={openSpotOf}
-      spotDistance={view?.distance ?? CLOSE}
-      plain={view?.plain ?? !marks}
+      spotDistance={frame?.distance ?? CLOSE}
+      plain={plain}
       onArea={onArea}
       onLayer={onLayer}
       tools={tools}
