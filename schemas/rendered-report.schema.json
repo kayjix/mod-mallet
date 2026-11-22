@@ -1088,6 +1088,123 @@
         "console"
       ]
     },
+    "MapPassage": {
+      "description": "A passage: where two mods build the same thing twice, their parts\nclose to and inside each other, as far as both reach (ADR 0072). The\nuser keeps one mod's version of the whole passage.",
+      "type": "object",
+      "properties": {
+        "centre": {
+          "description": "The point in its middle, in game units: east, north and height.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "console": {
+          "description": "The command of the game's console that takes the player there.",
+          "type": "string"
+        },
+        "duplicates": {
+          "description": "How many parts of the one have a twin of the other: the same model\nwithin a few centimetres.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "inside": {
+          "description": "How much of each side's room lies inside the other side's parts, in\nthousandths.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "location": {
+          "description": "Where it is.",
+          "$ref": "#/$defs/SpotLocation"
+        },
+        "max": {
+          "description": "The corner of that box with the largest coordinates.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "min": {
+          "description": "The corner of the box around all its parts with the smallest\ncoordinates, in game units.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "parts": {
+          "description": "Each plugin's parts in the passage, in the order of\n[`MapPassage::plugins`].",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/SpotPart"
+            }
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "plugins": {
+          "description": "The two plugins, by file name as the spots name them, in an order\nthat does not depend on the load order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "severity": {
+          "description": "How serious it is.",
+          "$ref": "#/$defs/PassageSeverity"
+        },
+        "spots": {
+          "description": "How many collision spots lie in it.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "volumes": {
+          "description": "The room each side's parts take, by the boxes of their models as\nplaced, in litres.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "plugins",
+        "location",
+        "console",
+        "centre",
+        "min",
+        "max",
+        "parts",
+        "spots",
+        "duplicates",
+        "inside",
+        "volumes",
+        "severity"
+      ]
+    },
     "MapSpot": {
       "description": "Where a collision of two mods' objects is.",
       "type": "object",
@@ -1668,6 +1785,26 @@
           "required": [
             "type"
           ]
+        }
+      ]
+    },
+    "PassageSeverity": {
+      "description": "How serious a passage is, the most serious first.",
+      "oneOf": [
+        {
+          "description": "The same models twice in the same place: the game loads both.",
+          "type": "string",
+          "const": "doubled"
+        },
+        {
+          "description": "Parts standing largely inside each other.",
+          "type": "string",
+          "const": "inside"
+        },
+        {
+          "description": "Parts crossing each other.",
+          "type": "string",
+          "const": "crossing"
         }
       ]
     },
@@ -2815,6 +2952,14 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "passages": {
+          "description": "Where two mods build the same thing twice, each passage to be\ndecided as a whole (ADR 0072): the most serious first.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MapPassage"
           }
         },
         "spots": {

@@ -31,6 +31,7 @@ import type {
   RenderedReport,
   SpotPart,
 } from "./generated/rendered-report";
+import { reportSpots } from "./health";
 import { InteriorView } from "./InteriorView";
 import { LocateButton } from "./locate";
 import { PlaceIcon, useWorldPicture } from "./MapView";
@@ -38,6 +39,8 @@ import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
 import { MoveControls, SpotMoves } from "./move-controls";
 import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
+import { usePassageTexts } from "./passage-texts";
+import { usePassageTitle } from "./passages";
 import {
   chooseFinding,
   chooseObject,
@@ -54,8 +57,18 @@ import {
 } from "./patch";
 import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
+import { CollisionsStep } from "./Review";
 import { ReachNote, usePaintReach, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
+import {
+  type Cluster,
+  collisionClusters,
+  type Decided,
+  decidedOf,
+  spotsInPassages,
+} from "./review-clusters";
+import { useReviewTexts } from "./review-texts";
+import type { StageSegment } from "./segments";
 import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
@@ -254,7 +267,15 @@ function useItems(report: RenderedReport): Item[] {
       seen.add(key);
       return [{ key, spot }];
     });
-    const passages = passagesOf(keyed);
+    // A spot in a passage the scan found (ADR 0072) belongs to it; others
+    // to their neighbours close by.
+    const inPassages = new Map<string, string>();
+    for (const [passage, members] of spotsInPassages(keyed, report.map.passages ?? [])) {
+      for (const member of members) {
+        inPassages.set(member.key, passage);
+      }
+    }
+    const passages = passagesOf(keyed.filter(({ key }) => !inPassages.has(key)));
     return keyed.map(({ key, spot }) => {
       const pair = pairs.get(spot.finding) ?? null;
       let region: Group;
@@ -295,7 +316,7 @@ function useItems(report: RenderedReport): Item[] {
               : (headlines.get(spot.finding) ?? spot.finding),
           aside: null,
         },
-        passage: passages.get(key) ?? key,
+        passage: inPassages.get(key) ?? passages.get(key) ?? key,
         text: [
           region.label,
           region.aside ?? "",
@@ -359,10 +380,13 @@ function grouped(
 export function Collisions({
   report,
   start,
+  game,
 }: {
   report: RenderedReport;
   /** The spot to open with, if any. */
   start: MapSpot | null;
+  /** The game, for what the window remembers of the objects it showed. */
+  game: string;
 }) {
   const {
     t,
@@ -376,6 +400,8 @@ export function Collisions({
     decide: decideDuel,
   } = useSession();
   const own = collisionsTexts[lang];
+  const p = usePassageTexts();
+  const passageTitle = usePassageTitle();
   const pinText = usePinTexts();
   // Spots pinned to solve later by hand (ADR 0050): a filter of their own.
   const pins = useMemo(() => pinsOf(choices), [choices]);
@@ -505,12 +531,26 @@ export function Collisions({
     }
     return found;
   }, [items]);
+  // The passages (ADR 0072), each decided as a whole on a stage of its
+  // own; the one opened, if any, instead of a spot.
+  const passageClusters = useMemo(
+    () =>
+      collisionClusters(reportSpots(report, ignored, choices), report.map.passages ?? []).filter(
+        (cluster) => cluster.passage !== undefined,
+      ),
+    [report, ignored, choices],
+  );
+  const [passageAt, setPassageAt] = useState<string | null>(null);
+  // The passages measured so far, for the suggestions by size.
+  const [survey, setSurvey] = useState<Map<string, StageSegment[]>>(new Map());
+  const openedPassage = passageClusters.find((cluster) => cluster.key === passageAt) ?? null;
   const startKey = start === null ? null : spotKey(start);
   const [currentKey, setCurrentKey] = useState<string | null>(startKey);
   // A spot handed over later (from the map or a comparison) is opened too.
   useEffect(() => {
     if (startKey !== null) {
       setCurrentKey(startKey);
+      setPassageAt(null);
       setTab("spots");
     }
   }, [startKey]);
@@ -554,6 +594,7 @@ export function Collisions({
   const go = (item: Item | null) => {
     if (item !== null) {
       setCurrentKey(item.key);
+      setPassageAt(null);
     }
   };
   const goOn = (next: PatchChoices) => {
@@ -632,6 +673,7 @@ export function Collisions({
   keys.current = (event) => {
     const target = event.target as HTMLElement | null;
     if (
+      openedPassage !== null ||
       tab !== "spots" ||
       event.altKey ||
       event.ctrlKey ||
@@ -792,6 +834,10 @@ export function Collisions({
     );
   }
   const passage = current === null ? [] : (passages.get(current.passage) ?? []);
+  const currentInPassage =
+    current === null
+      ? undefined
+      : passageClusters.find((cluster) => cluster.key === current.passage);
   return (
     <section className="work work-spots">
       <div className="work-bar">
@@ -901,53 +947,106 @@ export function Collisions({
             decision={decision}
             pins={pins}
             onPick={go}
+            passages={passageClusters.filter(
+              (cluster) =>
+                (!hideDecided || decidedOf(cluster.spots, choices).type !== "hidden") &&
+                (needle === "" ||
+                  [
+                    ...cluster.plugins,
+                    cluster.passage === undefined
+                      ? ""
+                      : passageTitle(cluster.passage.passage, report.map.worlds),
+                  ]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(needle)),
+            )}
+            passageAt={openedPassage?.key ?? null}
+            passageState={(cluster) => decidedOf(cluster.spots, choices)}
+            onPassage={setPassageAt}
+            worlds={report.map.worlds}
           />
         </div>
         <div className="work-stage">
-          {offNote}
-          {current === null ? (
-            <p className="empty">{t.workPickSpot}</p>
+          {openedPassage !== null ? (
+            <div className="work-passage">
+              <div className="work-passage-bar">
+                <button type="button" className="small quiet" onClick={() => setPassageAt(null)}>
+                  {p.back}
+                </button>
+              </div>
+              <CollisionsStep
+                report={report}
+                game={game}
+                survey={survey}
+                onSurvey={(key, found) => setSurvey((before) => new Map(before).set(key, found))}
+                clusters={passageClusters}
+                cursor={openedPassage.key}
+                onCursor={(key) => setPassageAt(key === "" ? null : key)}
+              />
+            </div>
           ) : (
-            <Spot
-              report={report}
-              item={current}
-              index={ordered.indexOf(current)}
-              total={ordered.length}
-              ordered={ordered}
-              passage={passage}
-              decided={decision(current)}
-              ownChoice={current.key in choices}
-              choices={choices}
-              hiddenObjects={hiddenObjects}
-              preview={preview}
-              marks={marks}
-              advance={advance}
-              onMarks={setMarks}
-              onAdvance={(next) => {
-                setAdvance(next);
-                remember("mallet.workAdvance2", next ? "on" : "off");
-              }}
-              onPreview={togglePreview}
-              onDecide={(plugin) => decide(current, plugin)}
-              onUndecide={() => undecide(current)}
-              onDecideMods={decideMods}
-              onOpenPair={() => {
-                setOpenedPair(current.mods.key);
-                changeTab("mods");
-              }}
-              onDecidePassage={decidePassage}
-              onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
-              onMergeDoors={(group, plan) => mergeDoors(current, group, plan)}
-              onPick={(spot) => {
-                const key = spotKey(spot);
-                if (key !== null && byKey.has(key)) {
-                  setCurrentKey(key);
-                }
-              }}
-              onPrevious={() => go(step(-1, shown))}
-              onNext={() => go(step(1, shown))}
-              onNextOpen={() => go(step(1, (item) => decision(item) === undefined))}
-            />
+            <>
+              {offNote}
+              {currentInPassage !== undefined && currentInPassage.passage !== undefined && (
+                <p className="work-passage-note">
+                  <span>
+                    {p.inPassage(passageTitle(currentInPassage.passage.passage, report.map.worlds))}
+                  </span>
+                  <button
+                    type="button"
+                    className="small primary"
+                    onClick={() => setPassageAt(currentInPassage.key)}
+                  >
+                    {p.openPassage}
+                  </button>
+                </p>
+              )}
+              {current === null ? (
+                <p className="empty">{t.workPickSpot}</p>
+              ) : (
+                <Spot
+                  report={report}
+                  item={current}
+                  index={ordered.indexOf(current)}
+                  total={ordered.length}
+                  ordered={ordered}
+                  passage={passage}
+                  decided={decision(current)}
+                  ownChoice={current.key in choices}
+                  choices={choices}
+                  hiddenObjects={hiddenObjects}
+                  preview={preview}
+                  marks={marks}
+                  advance={advance}
+                  onMarks={setMarks}
+                  onAdvance={(next) => {
+                    setAdvance(next);
+                    remember("mallet.workAdvance2", next ? "on" : "off");
+                  }}
+                  onPreview={togglePreview}
+                  onDecide={(plugin) => decide(current, plugin)}
+                  onUndecide={() => undecide(current)}
+                  onDecideMods={decideMods}
+                  onOpenPair={() => {
+                    setOpenedPair(current.mods.key);
+                    changeTab("mods");
+                  }}
+                  onDecidePassage={decidePassage}
+                  onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
+                  onMergeDoors={(group, plan) => mergeDoors(current, group, plan)}
+                  onPick={(spot) => {
+                    const key = spotKey(spot);
+                    if (key !== null && byKey.has(key)) {
+                      setCurrentKey(key);
+                    }
+                  }}
+                  onPrevious={() => go(step(-1, shown))}
+                  onNext={() => go(step(1, shown))}
+                  onNextOpen={() => go(step(1, (item) => decision(item) === undefined))}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
@@ -966,6 +1065,14 @@ interface WorkListProps {
   /** The spots pinned to solve later, by key. */
   pins: Set<string>;
   onPick: (item: Item) => void;
+  /** The passages (ADR 0072), shown above the spots. */
+  passages: Cluster[];
+  /** The passage opened, by key. */
+  passageAt: string | null;
+  passageState: (cluster: Cluster) => Decided;
+  onPassage: (key: string) => void;
+  /** The worlds of the map, to name a passage by the place it is nearest. */
+  worlds: RenderedReport["map"]["worlds"];
 }
 
 /** The spots by group; the group of the current spot is open, others open on a click. */
@@ -978,8 +1085,16 @@ function WorkList({
   decision,
   pins,
   onPick,
+  passages,
+  passageAt,
+  passageState,
+  onPassage,
+  worlds,
 }: WorkListProps) {
   const pinText = usePinTexts();
+  const p = usePassageTexts();
+  const r = useReviewTexts();
+  const passageTitle = usePassageTitle();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const currentGroup = current === null ? null : current[by === "region" ? "region" : "mods"].key;
   const list = useRef<HTMLDivElement>(null);
@@ -995,6 +1110,58 @@ function WorkList({
 
   return (
     <div className="work-list" ref={list}>
+      {passages.length > 0 && (
+        <section className="work-group work-passages">
+          <div className="work-group-head work-passages-head">
+            <span className="work-group-name">{p.listTitle(passages.length)}</span>
+            <span className="aside">
+              {passages.filter((cluster) => passageState(cluster).type !== "open").length}/
+              {passages.length}
+            </span>
+          </div>
+          <p className="aside work-passages-hint">{p.listHint}</p>
+          <ul className="work-items">
+            {passages.map((cluster) => {
+              const passage = cluster.passage?.passage;
+              const state = passageState(cluster);
+              return (
+                <li key={cluster.key}>
+                  <button
+                    type="button"
+                    className="work-item work-passage-item"
+                    aria-current={cluster.key === passageAt ? "true" : undefined}
+                    data-severity={passage?.severity}
+                    onClick={() => onPassage(cluster.key)}
+                  >
+                    <PlaceIcon shape="circle" origin="spot" kind={cluster.kind} />
+                    <span className="work-item-text">
+                      <span className="work-item-names">
+                        {passage === undefined ? cluster.key : passageTitle(passage, worlds)}
+                      </span>
+                      <span className="aside">
+                        {shortName(cluster.plugins[0])} ⟷ {shortName(cluster.plugins[1])}
+                        {passage !== undefined &&
+                          ` · ${passage.parts[0].length + passage.parts[1].length} · ${p.spots(cluster.spots.length)}`}
+                      </span>
+                    </span>
+                    <span
+                      className={`work-status ${state.type === "open" ? "open" : state.type === "kept" ? "kept" : "hidden"}`}
+                    >
+                      {state.type === "open"
+                        ? r.stateOpen
+                        : state.type === "kept"
+                          ? r.stateKept
+                          : state.type === "hidden"
+                            ? r.stateHidden(shortName(state.plugin))
+                            : r.stateMixed(state.open)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {groups.map(({ group, items }) => {
         const visible = items.filter(shown);
         if (visible.length === 0) {

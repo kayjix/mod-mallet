@@ -1,6 +1,6 @@
 # 0050 A guided review through the homes, collisions structure by structure
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0072](0072-passages-where-two-mods-build-the-same.md): passages come first
 - Date: 2026-11-19
 - Changes: ADR 0048 (every thing has one home: a second exception), ADR 0040
   (collisions decided spot by spot: also structure by structure)

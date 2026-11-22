@@ -3,7 +3,7 @@
 // how much room they take. Shared by the three-way stage and by the check
 // of every place in the background.
 
-import { type AreaLayer, objectKey } from "./area-layer";
+import { type AreaLayer, boxesMeet, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 
 /** One spot of a place, with the parts its structures start from. */
@@ -36,6 +36,9 @@ export const STRUCTURE_MARGIN = 4;
  */
 export const STRUCTURE_REACH = 2048;
 
+/** The start of the key of a group that no spot seeds, only a passage's part (ADR 0072). */
+const UNSEEDED = "unseeded:";
+
 /** The objects of `area` that a structure starts from. */
 function seedObjects(area: AreaObjects, seeds: ObjectRef[]): AreaObject[] {
   const wanted = new Set(seeds.map((seed) => objectKey(seed.plugin, seed.localId)));
@@ -47,7 +50,9 @@ function seedObjects(area: AreaObjects, seeds: ObjectRef[]): AreaObject[] {
 /**
  * The segments of the spots `groups` in the area `layer` shows: the
  * structures grown from each spot's parts within `reach` of `centre`,
- * joined where they share a part.
+ * joined where they share a part. Within a passage (ADR 0072), `within`
+ * holds its parts by {@link objectKey}: the structures keep only those,
+ * and the decor resting on them.
  */
 export function findSegments(
   layer: AreaLayer,
@@ -55,6 +60,7 @@ export function findSegments(
   groups: StageGroup[],
   centre: readonly number[],
   reach: number,
+  within: Set<string> | null = null,
 ): StageSegment[] {
   const near = { x: centre[0] ?? 0, y: centre[1] ?? 0, radius: reach };
   // What grows from each seed, once per seed.
@@ -81,14 +87,73 @@ export function findSegments(
     }
     return [...found.values()];
   };
+  const bounded = (parts: AreaObject[]) =>
+    within === null ? parts : inPassage(layer, parts, within);
   const perGroup = groups.map((group) => ({
     key: group.key,
-    parts: [grow(seedObjects(area, group.seeds[0])), grow(seedObjects(area, group.seeds[1]))] as [
-      AreaObject[],
-      AreaObject[],
-    ],
+    parts: [
+      bounded(grow(seedObjects(area, group.seeds[0]))),
+      bounded(grow(seedObjects(area, group.seeds[1]))),
+    ] as [AreaObject[], AreaObject[]],
   }));
-  return segmentsOf(perGroup).map((segment) => ({
+  if (within !== null) {
+    // The passage's parts that no spot's structure reached (a pile of
+    // ingots on a forge) grow on their own and join the segment they
+    // share a part with, or make one of their own.
+    const sides = [0, 1].map(
+      (side) =>
+        new Set(
+          groups
+            .flatMap((group) => group.seeds[side] ?? [])
+            .map((seed) => seed.plugin.toLowerCase()),
+        ),
+    );
+    const covered = new Set(
+      perGroup.flatMap((group) =>
+        [...group.parts[0], ...group.parts[1]].map((part) =>
+          objectKey(part.id.plugin, part.id.localId),
+        ),
+      ),
+    );
+    for (const object of area.objects) {
+      const key = objectKey(object.id.plugin, object.id.localId);
+      if (covered.has(key) || !isPassagePart(object, within)) {
+        continue;
+      }
+      const parts = bounded(growFrom(object));
+      for (const part of parts) {
+        covered.add(objectKey(part.id.plugin, part.id.localId));
+      }
+      const first =
+        sides[0]?.has(object.id.plugin.toLowerCase()) === true ||
+        sides[0]?.has(object.plugin.toLowerCase()) === true;
+      perGroup.push({
+        key: `${UNSEEDED}${key}`,
+        parts: first ? [parts, []] : [[], parts],
+      });
+    }
+  }
+  // What of the passage hangs on no spot's structure is one segment, not
+  // one per loose part.
+  const joined = segmentsOf(perGroup).map((segment) => ({
+    ...segment,
+    groups: segment.groups.filter((key) => !key.startsWith(UNSEEDED)),
+  }));
+  const seeded = joined.filter((segment) => segment.groups.length > 0);
+  const loose = joined.filter((segment) => segment.groups.length === 0);
+  const rest =
+    loose.length === 0
+      ? []
+      : [
+          {
+            groups: [],
+            parts: [
+              loose.flatMap((segment) => segment.parts[0]),
+              loose.flatMap((segment) => segment.parts[1]),
+            ] as [AreaObject[], AreaObject[]],
+          },
+        ];
+  return [...seeded, ...rest].map((segment) => ({
     ...segment,
     volumes: [volume(layer, segment.parts[0]), volume(layer, segment.parts[1])],
     decor: [...segment.parts[0], ...segment.parts[1]]
@@ -147,4 +212,33 @@ function segmentsOf(
     joined.set(at, segment);
   });
   return [...joined.values()];
+}
+
+/** Whether `object` is one of the passage's parts `within`, under either plugin it goes by. */
+export function isPassagePart(object: AreaObject, within: Set<string>): boolean {
+  return (
+    within.has(objectKey(object.id.plugin, object.id.localId)) ||
+    within.has(objectKey(object.plugin, object.id.localId))
+  );
+}
+
+/**
+ * Of a structure's `parts`, those of the passage `within` and the decor
+ * resting on them (ADR 0072): a passage hides the other side's version of
+ * what both build, and nothing beyond it.
+ */
+function inPassage(layer: AreaLayer, parts: AreaObject[], within: Set<string>): AreaObject[] {
+  const kept = parts.filter((part) => isPassagePart(part, within));
+  const boxes = kept.flatMap((part) => {
+    const box = layer.boxOf(part, null);
+    return box === null ? [] : [box];
+  });
+  const resting = parts.filter((part) => {
+    if (isPassagePart(part, within) || layer.isDecorPart(part) !== true) {
+      return false;
+    }
+    const box = layer.boxOf(part, null);
+    return box !== null && boxes.some((other) => boxesMeet(other, box, STRUCTURE_MARGIN));
+  });
+  return [...kept, ...resting];
 }

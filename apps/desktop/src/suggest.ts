@@ -3,6 +3,7 @@
 // keep the house. Apart from LOOT's word and the suggestions about whole
 // mods; this one only measures.
 
+import type { MapPassage } from "./generated/rendered-report";
 import type { StageSegment } from "./segments";
 
 /** From this ratio of room taken, the bigger side is clearly the one to keep. */
@@ -40,6 +41,39 @@ export function suggestionOf(segments: StageSegment[]): Suggestion | null {
   const volumes: [number, number] = [0, 1].map((side) =>
     segments.reduce((sum, segment) => sum + (segment.volumes[side] ?? 0), 0),
   ) as [number, number];
+  const metres = UNITS_PER_METRE ** 3;
+  return suggestionFrom(parts, [volumes[0] / metres, volumes[1] / metres], (losingSide) => {
+    const losing = segments.flatMap((segment) => segment.parts[losingSide]);
+    return losing.length === 1
+      ? (losing[0]?.name ?? losing[0]?.model.split(/[\\/]/).pop() ?? null)
+      : null;
+  });
+}
+
+/**
+ * The side clearly to keep in a passage (ADR 0072), by the same rule, from
+ * what the scan measured: its parts and the room their boxes take. Known
+ * before the passage is read in 3D.
+ */
+export function suggestionOfPassage(passage: MapPassage): Suggestion | null {
+  const parts: [number, number] = [passage.parts[0].length, passage.parts[1].length];
+  const litres = 1000;
+  return suggestionFrom(
+    parts,
+    [passage.volumes[0] / litres, passage.volumes[1] / litres],
+    (losingSide) => {
+      const losing = passage.parts[losingSide];
+      return losing.length === 1 ? (losing[0]?.name ?? null) : null;
+    },
+  );
+}
+
+/** The side to keep by parts and room (in cubic metres), if one is clear. */
+function suggestionFrom(
+  parts: [number, number],
+  volumes: [number, number],
+  single: (losingSide: 0 | 1) => string | null,
+): Suggestion | null {
   if (parts[0] === 0 || parts[1] === 0) {
     return null;
   }
@@ -49,17 +83,7 @@ export function suggestionOf(segments: StageSegment[]): Suggestion | null {
     const byParts =
       parts[side] >= PART_RATIO * parts[other] && volumes[side] >= SUPPORT_RATIO * volumes[other];
     if (byRoom || byParts) {
-      const losing = segments.flatMap((segment) => segment.parts[other]);
-      const metres = UNITS_PER_METRE ** 3;
-      return {
-        side,
-        parts,
-        volumes: [volumes[0] / metres, volumes[1] / metres],
-        single:
-          losing.length === 1
-            ? (losing[0]?.name ?? losing[0]?.model.split(/[\\/]/).pop() ?? null)
-            : null,
-      };
+      return { side, parts, volumes, single: single(other) };
     }
   }
   return null;

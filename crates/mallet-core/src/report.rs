@@ -330,6 +330,10 @@ pub struct WorldMap {
     pub worlds: Vec<MapWorld>,
     /// Every collision that a finding reports.
     pub spots: Vec<MapSpot>,
+    /// Where two mods build the same thing twice, each passage to be
+    /// decided as a whole (ADR 0072): the most serious first.
+    #[serde(default)]
+    pub passages: Vec<MapPassage>,
 }
 
 /// One worldspace on the map.
@@ -662,6 +666,58 @@ pub struct SpotPart {
     /// Whether hiding this one rather than the other is suggested: of two
     /// copies, the one from the plugin that places fewer objects.
     pub suggested: bool,
+}
+
+/// A passage: where two mods build the same thing twice, their parts
+/// close to and inside each other, as far as both reach (ADR 0072). The
+/// user keeps one mod's version of the whole passage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MapPassage {
+    /// The two plugins, by file name as the spots name them, in an order
+    /// that does not depend on the load order.
+    pub plugins: [String; 2],
+    /// Where it is.
+    pub location: SpotLocation,
+    /// The command of the game's console that takes the player there.
+    pub console: String,
+    /// The point in its middle, in game units: east, north and height.
+    pub centre: [i32; 3],
+    /// The corner of the box around all its parts with the smallest
+    /// coordinates, in game units.
+    pub min: [i32; 3],
+    /// The corner of that box with the largest coordinates.
+    pub max: [i32; 3],
+    /// Each plugin's parts in the passage, in the order of
+    /// [`MapPassage::plugins`].
+    pub parts: [Vec<SpotPart>; 2],
+    /// How many collision spots lie in it.
+    pub spots: u32,
+    /// How many parts of the one have a twin of the other: the same model
+    /// within a few centimetres.
+    pub duplicates: u32,
+    /// How much of each side's room lies inside the other side's parts, in
+    /// thousandths.
+    pub inside: [u32; 2],
+    /// The room each side's parts take, by the boxes of their models as
+    /// placed, in litres.
+    pub volumes: [u64; 2],
+    /// How serious it is.
+    pub severity: PassageSeverity,
+}
+
+/// How serious a passage is, the most serious first.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum PassageSeverity {
+    /// The same models twice in the same place: the game loads both.
+    Doubled,
+    /// Parts standing largely inside each other.
+    Inside,
+    /// Parts crossing each other.
+    Crossing,
 }
 
 /// Where a spot is: outside in a worldspace, or in a closed space.

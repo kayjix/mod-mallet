@@ -667,7 +667,7 @@ export default function App({ api, startLang }: AppProps) {
             (current === "collisions" || current === "assets" || current === "catalogue") ? (
             <NotDrawnHere page={current} />
           ) : current === "collisions" ? (
-            <Collisions report={report} start={workSpot} />
+            <Collisions report={report} start={workSpot} game={games.choice?.active ?? ""} />
           ) : current === "assets" ? (
             <CompareView report={report} start={compareAt} />
           ) : current === "catalogue" ? (

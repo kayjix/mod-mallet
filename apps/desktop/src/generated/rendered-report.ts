@@ -126,7 +126,7 @@ export type RecordChange =
        * The interior cell it stands in, by its editor ID; `None` outside.
        */
       cell?: string | null;
-      door: ObjectRef4;
+      door: ObjectRef5;
       /**
        * Which way the player is to face there, in thousandths of a
        * radian, if that changes.
@@ -143,17 +143,17 @@ export type RecordChange =
        * The plugin whose version of it the game uses.
        */
       plugin: string;
-      to: ObjectRef5;
+      to: ObjectRef6;
       type: "teleport";
     }
   | {
-      from: ObjectRef6;
-      navmesh: ObjectRef7;
+      from: ObjectRef7;
+      navmesh: ObjectRef8;
       /**
        * The plugin whose version of it the game uses.
        */
       plugin: string;
-      to: ObjectRef8;
+      to: ObjectRef9;
       /**
        * The triangle, by its number in the mesh.
        */
@@ -1318,6 +1318,11 @@ export interface WorldMap {
    */
   owners: string[];
   /**
+   * Where two mods build the same thing twice, each passage to be
+   * decided as a whole (ADR 0072): the most serious first.
+   */
+  passages?: MapPassage[];
+  /**
    * Every collision that a finding reports.
    */
   spots: MapSpot[];
@@ -1326,6 +1331,145 @@ export interface WorldMap {
    * with the most cells where several mods meet, then by objects.
    */
   worlds: MapWorld[];
+}
+/**
+ * A passage: where two mods build the same thing twice, their parts
+ * close to and inside each other, as far as both reach (ADR 0072). The
+ * user keeps one mod's version of the whole passage.
+ */
+export interface MapPassage {
+  /**
+   * The point in its middle, in game units: east, north and height.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  centre: [number, number, number];
+  /**
+   * The command of the game's console that takes the player there.
+   */
+  console: string;
+  /**
+   * How many parts of the one have a twin of the other: the same model
+   * within a few centimetres.
+   */
+  duplicates: number;
+  /**
+   * How much of each side's room lies inside the other side's parts, in
+   * thousandths.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  inside: [number, number];
+  /**
+   * Where it is.
+   */
+  location:
+    | {
+        type: "exterior";
+        /**
+         * The worldspace's internal name.
+         */
+        world: string;
+        /**
+         * The cell's column.
+         */
+        x: number;
+        /**
+         * The cell's row.
+         */
+        y: number;
+      }
+    | {
+        /**
+         * The cell's internal name.
+         */
+        cell: string;
+        type: "interior";
+      };
+  /**
+   * The corner of that box with the largest coordinates.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  max: [number, number, number];
+  /**
+   * The corner of the box around all its parts with the smallest
+   * coordinates, in game units.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  min: [number, number, number];
+  /**
+   * Each plugin's parts in the passage, in the order of
+   * [`MapPassage::plugins`].
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  parts: [SpotPart[], SpotPart[]];
+  /**
+   * The two plugins, by file name as the spots name them, in an order
+   * that does not depend on the load order.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  plugins: [string, string];
+  /**
+   * How serious it is.
+   */
+  severity: "doubled" | "inside" | "crossing";
+  /**
+   * How many collision spots lie in it.
+   */
+  spots: number;
+  /**
+   * The room each side's parts take, by the boxes of their models as
+   * placed, in litres.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  volumes: [number, number];
+}
+/**
+ * One object of a collision.
+ */
+export interface SpotPart {
+  /**
+   * Whether it can be hidden without harm: nothing refers to it from
+   * elsewhere, and the distant view is not built around it.
+   */
+  hideable: boolean;
+  /**
+   * The internal name of what it is.
+   */
+  name: string;
+  object: ObjectRef3;
+  /**
+   * Whether hiding this one rather than the other is suggested: of two
+   * copies, the one from the plugin that places fewer objects.
+   */
+  suggested: boolean;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef3 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
 }
 /**
  * Where a collision of two mods' objects is.
@@ -1438,7 +1582,7 @@ export interface StackedDoor {
    * The internal name of the door's base object.
    */
   name: string;
-  object: ObjectRef3;
+  object: ObjectRef4;
   /**
    * How far it stands from the first door, in game units.
    */
@@ -1505,7 +1649,7 @@ export interface DoorDestination {
  * that plugin. Unlike a form ID as the game shows it, this does not
  * depend on the load order.
  */
-export interface ObjectRef3 {
+export interface ObjectRef4 {
   /**
    * The object's number in that plugin.
    */
@@ -1528,27 +1672,12 @@ export interface DoorMerge {
    * The doors the patch hides.
    */
   hide: ObjectRef[];
-  keep: ObjectRef9;
+  keep: ObjectRef10;
   /**
    * Places only a hidden door led to: they can no longer be entered
    * here.
    */
   lost: DoorDestination[];
-}
-/**
- * A placed object, by the plugin that placed it first and its number in
- * that plugin. Unlike a form ID as the game shows it, this does not
- * depend on the load order.
- */
-export interface ObjectRef4 {
-  /**
-   * The object's number in that plugin.
-   */
-  localId: number;
-  /**
-   * The plugin's file name.
-   */
-  plugin: string;
 }
 /**
  * A placed object, by the plugin that placed it first and its number in
@@ -1624,26 +1753,6 @@ export interface ObjectRef9 {
    * The plugin's file name.
    */
   plugin: string;
-}
-/**
- * One object of a collision.
- */
-export interface SpotPart {
-  /**
-   * Whether it can be hidden without harm: nothing refers to it from
-   * elsewhere, and the distant view is not built around it.
-   */
-  hideable: boolean;
-  /**
-   * The internal name of what it is.
-   */
-  name: string;
-  object: ObjectRef10;
-  /**
-   * Whether hiding this one rather than the other is suggested: of two
-   * copies, the one from the plugin that places fewer objects.
-   */
-  suggested: boolean;
 }
 /**
  * A placed object, by the plugin that placed it first and its number in

@@ -1,6 +1,6 @@
 # 0040 Collisions as a worklist, decided spot by spot
 
-- Status: accepted; changed by [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects can be hidden on their own
+- Status: accepted; changed by [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects can be hidden on their own; [ADR 0072](0072-passages-where-two-mods-build-the-same.md): what a passage is
 - Date: 2026-11-17
 - Changes: ADR 0025 (what the patch hides is chosen per collision finding),
   ADR 0023 and ADR 0038 (the order in which a placed object is turned)

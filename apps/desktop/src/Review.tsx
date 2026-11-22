@@ -28,6 +28,8 @@ import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
+import { usePassageTexts } from "./passage-texts";
+import { PassageSummary } from "./passages";
 import {
   chooseObject,
   chooseSpot,
@@ -42,10 +44,16 @@ import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
-import { type Cluster, clustersOf, type Decided, decidedOf, openIn } from "./review-clusters";
+import {
+  type Cluster,
+  collisionClusters,
+  type Decided,
+  decidedOf,
+  openIn,
+} from "./review-clusters";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
-import { type Suggestion, suggestionOf } from "./suggest";
+import { type Suggestion, suggestionOf, suggestionOfPassage } from "./suggest";
 import { FindingRow } from "./Tasks";
 import {
   PathIcon,
@@ -175,7 +183,7 @@ export function Review({ report, game, onOpen }: ReviewProps) {
     [report, decisions],
   );
   const clusters = useMemo(
-    () => clustersOf(reportSpots(report, ignored, patchChoices)),
+    () => collisionClusters(reportSpots(report, ignored, patchChoices), report.map.passages ?? []),
     [report, ignored, patchChoices],
   );
   const openClusters = clusters.filter((cluster) => openIn(cluster) > 0).length;
@@ -420,7 +428,7 @@ function placeOf(
  * place; each segment can be decided on its own. Moving goes place by
  * place, decided ones included; deciding moves on to the next open place.
  */
-function CollisionsStep({
+export function CollisionsStep({
   report,
   game,
   survey,
@@ -439,6 +447,7 @@ function CollisionsStep({
 }) {
   const { api, lang, ignored, patchChoices, setPatchChoices, spots } = useSession();
   const r = useReviewTexts();
+  const p = usePassageTexts();
   const w = useWalkTexts();
   const [history, setHistory] = useState<PatchChoices[]>([]);
   // The places the bulk left open because characters walk on what would go.
@@ -646,7 +655,7 @@ function CollisionsStep({
     if (!moveOn) {
       return;
     }
-    const after = clustersOf(reportSpots(report, ignored, next));
+    const after = collisionClusters(reportSpots(report, ignored, next), report.map.passages ?? []);
     for (let step = 1; step <= clusters.length; step++) {
       const candidate = clusters[(at + step) % clusters.length];
       const now = after.find((other) => other.key === candidate?.key);
@@ -705,7 +714,10 @@ function CollisionsStep({
   // The suggested side of this place, by size (ADR 0050): from the stage's
   // segments, else from the check of every place.
   const measured = segments.length > 0 ? segments : (survey.get(cluster.key) ?? []);
-  const suggested = suggestionOf(measured);
+  const suggested =
+    measured.length === 0 && cluster.passage !== undefined
+      ? suggestionOfPassage(cluster.passage.passage)
+      : suggestionOf(measured);
   const roomText = (cubic: number) =>
     cubic < 10
       ? cubic.toLocaleString(lang, { maximumFractionDigits: cubic < 1 ? 2 : 1 })
@@ -783,7 +795,14 @@ function CollisionsStep({
       }
       await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
-    return findSegments(layer, area, groupsOf(candidate), candidate.centre, reachHere);
+    return findSegments(
+      layer,
+      area,
+      groupsOf(candidate),
+      candidate.centre,
+      reachHere,
+      candidate.passage?.keys ?? null,
+    );
   };
   /**
    * Takes every clear suggestion at once, as honestly as the keep buttons:
@@ -1042,7 +1061,11 @@ function CollisionsStep({
           {r.previousStructure}
         </button>
         <span className="review-structures-where">
-          <strong>{r.clusterOf(at + 1, clusters.length)}</strong>
+          <strong>
+            {cluster.passage === undefined
+              ? r.clusterOf(at + 1, clusters.length)
+              : p.passageOf(at + 1, clusters.length)}
+          </strong>
           <span className="aside">{r.reportCollisions(decidedPlaces, clusters.length)}</span>
         </span>
         <button
@@ -1067,11 +1090,15 @@ function CollisionsStep({
           {describe(placeDecided)}
         </span>
       </div>
+      {cluster.passage !== undefined && (
+        <PassageSummary passage={cluster.passage.passage} worlds={report.map.worlds} />
+      )}
       <CompareStage3D
         place={place}
         centre={cluster.centre}
         groups={groups}
         reach={reach}
+        within={cluster.passage?.keys ?? null}
         radius={radius}
         focus={focusKeys}
         names={names}
@@ -1160,7 +1187,7 @@ function CollisionsStep({
           onClick={() => keep(0, shownSegments, true)}
         >
           {placeKept === 0 ? "✓ " : ""}
-          {r.keepHere(names[0])}
+          {cluster.passage === undefined ? r.keepHere(names[0]) : p.keepVersion(names[0])}
           {suggested?.side === 0 && ` · ${r.suggestedTag}`}
         </button>
         <button
@@ -1171,7 +1198,7 @@ function CollisionsStep({
           onClick={() => keep(1, shownSegments, true)}
         >
           {placeKept === 1 ? "✓ " : ""}
-          {r.keepHere(names[1])}
+          {cluster.passage === undefined ? r.keepHere(names[1]) : p.keepVersion(names[1])}
           {suggested?.side === 1 && ` · ${r.suggestedTag}`}
         </button>
         <button
@@ -1232,7 +1259,9 @@ function CollisionsStep({
                 data-focus={focus === index}
               >
                 <span className="review-segment-name">
-                  {r.segmentName(index + 1, segment.groups.length)}
+                  {segment.groups.length === 0 && cluster.passage !== undefined
+                    ? p.looseParts(index + 1)
+                    : r.segmentName(index + 1, segment.groups.length)}
                 </span>
                 <span className="aside">
                   {r.segmentParts(
@@ -1332,7 +1361,7 @@ function CollisionsStep({
 /** The spots of a place, each with the parts its structures start from. */
 function groupsOf(cluster: Cluster): StageGroup[] {
   const sides = cluster.plugins;
-  return cluster.spots.map(({ item, key }) => {
+  return cluster.spots.map(({ item, key }): StageGroup => {
     const parts = item.spot.parts ?? [];
     return {
       key,

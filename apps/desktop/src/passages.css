@@ -1,0 +1,76 @@
+/* The passages (ADR 0072): above the spots in the worklist, summed up over
+   the three views, and the way from a spot to the passage it lies in. */
+
+.passage-summary {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--spot-touch);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.passage-summary[data-severity="doubled"] {
+  border-left-color: var(--spot-duplicate);
+}
+
+.passage-summary[data-severity="inside"] {
+  border-left-color: var(--spot-overlap);
+}
+
+.passage-summary p {
+  margin: 0;
+}
+
+.work-passages {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+.work-passages-head {
+  cursor: default;
+}
+
+.work-passages-hint {
+  margin: 0 8px 4px;
+  font-size: 0.8rem;
+}
+
+.work-passage-item[data-severity="doubled"] .work-item-names::before {
+  content: "◆ ";
+  color: var(--spot-duplicate);
+}
+
+.work-passage-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.work-stage:has(> .work-passage-note) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.work-stage:has(> .work-passage-note):has(> .still-loaded-note) {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.work-stage > .work-passage {
+  grid-row: 1 / -1;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.work-passage-bar {
+  display: flex;
+  gap: 8px;
+}

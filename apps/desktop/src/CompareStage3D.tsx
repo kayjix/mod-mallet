@@ -41,6 +41,12 @@ export interface CompareStage3DProps {
   groups: StageGroup[];
   /** How far from the point the structures reach, in game units. */
   reach?: number;
+  /**
+   * The parts of the passage shown (ADR 0072), by {@link objectKey}: the
+   * structures keep only those and the decor resting on them. None for a
+   * place of spots.
+   */
+  within?: Set<string> | null;
   /** How far around the point objects are read, in game units. */
   radius?: number;
   /** Objects to pick out and frame, by {@link objectKey}, such as one segment's. */
@@ -102,6 +108,7 @@ export function CompareStage3D({
   centre,
   groups,
   reach = STRUCTURE_REACH,
+  within = null,
   radius = RADIUS,
   focus = null,
   names,
@@ -173,6 +180,8 @@ export function CompareStage3D({
   toldSegments.current = onSegments;
   const reachNow = useRef(reach);
   reachNow.current = reach;
+  const withinNow = useRef(within);
+  withinNow.current = within;
   const groupsNow = useRef(groups);
   groupsNow.current = groups;
   const markingsNow = useRef(markings);
@@ -233,6 +242,7 @@ export function CompareStage3D({
       groupsNow.current,
       centreNow.current,
       reachNow.current,
+      withinNow.current,
     );
     const first = [
       ...new Map(

@@ -53,9 +53,9 @@ pub use path::GamePath;
 pub use progress::{Progress, ScanProgress, ScanStep};
 pub use report::{
     FilePreview, GameChoice, GameInfo, GameSupport, InstalledPatch, KnownGame, LoadedPlugin,
-    LocationOrigin, LocationRole, MapBounds, MapCell, MapImage, MapMarker, MapSpot, MapTerrain,
-    MapWorld, ModInfo, PlaceKind, PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotKind,
-    SpotLocation, SpotPart, WorldMap, WorldOrigin,
+    LocationOrigin, LocationRole, MapBounds, MapCell, MapImage, MapMarker, MapPassage, MapSpot,
+    MapTerrain, MapWorld, ModInfo, PassageSeverity, PlaceKind, PlaceOrigin, PreviewVersion,
+    ScanLocation, ScanReport, SpotKind, SpotLocation, SpotPart, WorldMap, WorldOrigin,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};
 pub use unreal::{PakFolder, UnrealPak};

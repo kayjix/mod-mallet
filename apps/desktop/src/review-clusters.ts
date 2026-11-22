@@ -2,6 +2,8 @@
 // mods that lie close together, such as the bridges at Markarth, decided
 // together, segment by segment where wanted.
 
+import { objectKey } from "./area-layer";
+import type { MapPassage, MapSpot } from "./generated/rendered-report";
 import type { CollisionSpot } from "./health";
 import type { WorkKind } from "./map-places";
 import { decisionAt, type PatchChoices, spotKey } from "./patch";
@@ -31,6 +33,11 @@ export interface Cluster {
   centre: [number, number, number];
   /** How far its spots lie from the middle, in game units. */
   radius: number;
+  /**
+   * Where it is a passage (ADR 0072): the passage, and its parts by
+   * {@link objectKey}. Its structures end where the passage ends.
+   */
+  passage?: { passage: MapPassage; keys: Set<string> };
 }
 
 /** What is decided for some spots: nothing yet, both kept, one plugin hidden, or not all alike. */
@@ -168,4 +175,85 @@ export function decidedOf(spots: ClusterSpot[], choices: PatchChoices): Decided 
 /** How many spots of a cluster are still open. */
 export function openIn(cluster: Cluster): number {
   return cluster.spots.filter(({ item }) => item.state === "open").length;
+}
+
+/** The parts of a passage by {@link objectKey}, both sides. */
+export function passageKeys(passage: MapPassage): Set<string> {
+  return new Set(
+    passage.parts.flat().map((part) => objectKey(part.object.plugin, part.object.localId)),
+  );
+}
+
+/** A passage's identity: its two plugins and its first part, none of which depend on the load order. */
+export function passageKey(passage: MapPassage): string {
+  const first = passage.parts.flat()[0]?.object;
+  return `passage|${passage.plugins.map((plugin) => plugin.toLowerCase()).join("+")}|${
+    first === undefined ? passage.console : objectKey(first.plugin, first.localId)
+  }`;
+}
+
+/**
+ * The spots of `spots` in each passage of `passages` (ADR 0072): those
+ * whose parts all belong to it. A spot lies in one passage at most.
+ */
+export function spotsInPassages<T extends { spot: MapSpot }>(
+  spots: T[],
+  passages: MapPassage[],
+): Map<string, T[]> {
+  const owner = new Map<string, string>();
+  for (const passage of passages) {
+    const key = passageKey(passage);
+    for (const part of passage.parts.flat()) {
+      owner.set(objectKey(part.object.plugin, part.object.localId), key);
+    }
+  }
+  const found = new Map<string, T[]>();
+  for (const item of spots) {
+    const parts = item.spot.parts ?? [];
+    const keys = new Set(
+      parts.map((part) => owner.get(objectKey(part.object.plugin, part.object.localId))),
+    );
+    const [only] = [...keys];
+    if (parts.length === 0 || keys.size !== 1 || only === undefined) {
+      continue;
+    }
+    found.set(only, [...(found.get(only) ?? []), item]);
+  }
+  return found;
+}
+
+/**
+ * The places to decide (ADR 0050, 0072): first the passages, where two
+ * mods build the same thing twice, the most serious first, each decided
+ * as a whole; then the remaining spots by {@link clustersOf}. A passage
+ * none of whose spots is left (all set aside) is left out.
+ */
+export function collisionClusters(spots: CollisionSpot[], passages: MapPassage[]): Cluster[] {
+  const inPassages = spotsInPassages(spots, passages);
+  const taken = new Set<CollisionSpot>([...inPassages.values()].flat());
+  const first: Cluster[] = passages.flatMap((passage) => {
+    const key = passageKey(passage);
+    const members = (inPassages.get(key) ?? [])
+      .map((item) => ({ item, key: spotKey(item.spot) ?? item.finding }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+    if (members.length === 0) {
+      return [];
+    }
+    const kind =
+      KIND_ORDER.find((candidate) => members.some((member) => member.item.kind === candidate)) ??
+      "touch";
+    const [low, high] = [passage.min, passage.max];
+    return [
+      {
+        key,
+        plugins: passage.plugins,
+        spots: members,
+        kind,
+        centre: passage.centre,
+        radius: Math.hypot((high[0] - low[0]) / 2, (high[1] - low[1]) / 2),
+        passage: { passage, keys: passageKeys(passage) },
+      },
+    ];
+  });
+  return [...first, ...clustersOf(spots.filter((item) => !taken.has(item)))];
 }

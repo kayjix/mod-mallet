@@ -28,12 +28,14 @@ use mallet_core::facts::models::{ModelFacts, ModelMesh};
 use mallet_core::facts::objects::{BaseObject, Place, PlacedObject};
 use mallet_core::facts::{PluginFacts, RecordId};
 use mallet_core::{
-    Finding, GamePath, MapSpot, ModRef, ObjectRef, Party, SpotKind, SpotLocation, SpotPart,
-    Subject, kinds,
+    Finding, GamePath, MapPassage, MapSpot, ModRef, ObjectRef, Party, SpotKind, SpotLocation,
+    SpotPart, Subject, kinds,
 };
 
 use crate::contact::{self, Placed};
 use crate::{Analysis, Context, examples};
+
+mod passages;
 
 /// How many examples a finding names.
 const EXAMPLE_LIMIT: usize = 5;
@@ -99,6 +101,8 @@ pub struct Collisions {
     pub findings: Vec<Finding>,
     /// Where each collision is, with the finding it belongs to.
     pub spots: Vec<MapSpot>,
+    /// Where two mods build the same thing twice (ADR 0072).
+    pub passages: Vec<MapPassage>,
 }
 
 /// One collision, before it is counted into its pair's finding.
@@ -141,7 +145,11 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
     let mut owners = Owners::new(context);
     let mut pairs: BTreeMap<(String, String, Clash), Vec<Found>> = BTreeMap::new();
 
-    for (a, b, clash) in candidates(&solids, &mut owners) {
+    let mut kept: Vec<(usize, usize, Clash)> = Vec::new();
+    for (first, second, clash) in candidates(&solids, &mut owners) {
+        let (Some(a), Some(b)) = (solids.get(first), solids.get(second)) else {
+            continue;
+        };
         if same_door_group(context, a, b) {
             // Stacked doors are a spot of their own (ADR 0067).
             continue;
@@ -160,6 +168,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
         if !keep {
             continue;
         }
+        kept.push((first, second, clash));
         let (first, second) = if a.owner() <= b.owner() {
             (a.owner(), b.owner())
         } else {
@@ -216,6 +225,7 @@ pub(crate) fn compute(context: &Context<'_>) -> Collisions {
             }));
         collisions.findings.push(finding);
     }
+    collisions.passages = passages::find(&solids, &kept, &owners, &names);
     collisions
 }
 
@@ -238,7 +248,10 @@ pub fn models_to_check(context: &Context<'_>) -> BTreeSet<String> {
     let solids = solids_of(context, &bases);
     let mut owners = Owners::new(context);
     let mut models = BTreeSet::new();
-    for (a, b, clash) in candidates(&solids, &mut owners) {
+    for (first, second, clash) in candidates(&solids, &mut owners) {
+        let (Some(a), Some(b)) = (solids.get(first), solids.get(second)) else {
+            continue;
+        };
         if clash != Clash::Duplicate {
             models.extend(a.base.model.iter().cloned());
             models.extend(b.base.model.iter().cloned());
@@ -270,10 +283,7 @@ fn solids_of<'a>(
 
 /// The pairs of solids of different plugins that do not know each other
 /// and whose boxes collide, with how.
-fn candidates<'s>(
-    solids: &'s [Solid<'s>],
-    owners: &mut Owners<'_>,
-) -> Vec<(&'s Solid<'s>, &'s Solid<'s>, Clash)> {
+fn candidates(solids: &[Solid<'_>], owners: &mut Owners<'_>) -> Vec<(usize, usize, Clash)> {
     let mut found = Vec::new();
     for (first, second) in neighbours(solids) {
         let (Some(a), Some(b)) = (solids.get(first), solids.get(second)) else {
@@ -288,7 +298,7 @@ fn candidates<'s>(
         if clash != Clash::Touch && !caused_by_moving(a, b) {
             continue;
         }
-        found.push((a, b, clash));
+        found.push((first, second, clash));
     }
     found
 }
@@ -474,23 +484,10 @@ fn clash(a: &Solid<'_>, b: &Solid<'_>) -> Option<Clash> {
 
 /// What is said about one collision: the objects and where they are.
 fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, &str>) -> Found {
-    let name_of = |id: &RecordId| {
-        names
-            .get(id)
-            .map_or_else(|| id.to_string(), |name| (*name).to_owned())
-    };
-    let (location, place) = match &a.object.place {
-        Place::Interior { cell } => {
-            let cell = name_of(cell);
-            (SpotLocation::Interior { cell: cell.clone() }, cell)
-        }
-        Place::Exterior { worldspace } => {
-            let world = name_of(worldspace);
-            let [x, y, _] = a.object.position;
-            let (x, y) = (cell_of(x), cell_of(y));
-            let place = format!("{world} {x}, {y}");
-            (SpotLocation::Exterior { world, x, y }, place)
-        }
+    let location = location_of(&a.object.place, a.object.position, names);
+    let place = match &location {
+        SpotLocation::Interior { cell } => cell.clone(),
+        SpotLocation::Exterior { world, x, y } => format!("{world} {x}, {y}"),
     };
     let objects = match clash {
         Clash::Duplicate => a.name(),
@@ -501,20 +498,7 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
             format!("{first} / {second}")
         }
     };
-    let part = |solid: &Solid<'_>| {
-        (
-            solid.owner().to_owned(),
-            SpotPart {
-                object: ObjectRef {
-                    plugin: solid.owner().to_owned(),
-                    local_id: solid.object.id.local_id,
-                },
-                name: solid.name(),
-                hideable: !solid.object.persistent && !solid.object.large,
-                suggested: false,
-            },
-        )
-    };
+    let part = |solid: &Solid<'_>| (solid.owner().to_owned(), spot_part(solid));
     Found {
         example: format!("{objects} ({place})"),
         objects,
@@ -527,6 +511,47 @@ fn found(a: &Solid<'_>, b: &Solid<'_>, clash: Clash, names: &HashMap<&RecordId, 
             Clash::Touch => SpotKind::Touch,
         },
         depth: None,
+    }
+}
+
+/// Where an object at `position` in `place` is, for a spot or a passage:
+/// the interior cell, or the worldspace and its cell.
+fn location_of(
+    place: &Place,
+    position: [i32; 3],
+    names: &HashMap<&RecordId, &str>,
+) -> SpotLocation {
+    let name_of = |id: &RecordId| {
+        names
+            .get(id)
+            .map_or_else(|| id.to_string(), |name| (*name).to_owned())
+    };
+    match place {
+        Place::Interior { cell } => SpotLocation::Interior {
+            cell: name_of(cell),
+        },
+        Place::Exterior { worldspace } => {
+            let [x, y, _] = position;
+            SpotLocation::Exterior {
+                world: name_of(worldspace),
+                x: cell_of(x),
+                y: cell_of(y),
+            }
+        }
+    }
+}
+
+/// One object of a spot or a passage, under the plugin it counts as
+/// (its plugin's name is spelt as the load order spells it by the caller).
+fn spot_part(solid: &Solid<'_>) -> SpotPart {
+    SpotPart {
+        object: ObjectRef {
+            plugin: solid.owner().to_owned(),
+            local_id: solid.object.id.local_id,
+        },
+        name: solid.name(),
+        hideable: !solid.object.persistent && !solid.object.large,
+        suggested: false,
     }
 }
 

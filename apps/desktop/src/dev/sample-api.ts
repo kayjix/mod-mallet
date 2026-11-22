@@ -18,6 +18,7 @@ import type {
   LoadedPlugin,
   MapCell,
   MapMarker,
+  MapPassage,
   MapSpot,
   MapTerrain,
   MapWorld,
@@ -913,6 +914,47 @@ function sampleMap(): RenderedReport["map"] {
       placed([8, 2, 0.5, 0.5], duplicate(8, 2, "UpperShelf02 / Divider", 0xb20)),
       placed([5, 3, 0.5, 0.5], doors(5, 3)),
     ],
+    // The docks of Old Town and Water Mod, built twice (ADR 0072): the two
+    // docks with their pillars, but not Water Mod's long pier beyond.
+    passages: [samplePassage(at(6, 1))],
+  };
+}
+
+/** The docks of the sample's duplicates as one passage, as the scan would find it. */
+function samplePassage(centre: [number, number, number]): MapPassage {
+  const part = (plugin: string, localId: number, name: string) => ({
+    object: { plugin, localId },
+    name,
+    hideable: true,
+    suggested: false,
+  });
+  const dock = (plugin: string, seed: number, also: number, first: number) => [
+    ...[-4, -3, -2, -1, 0, 1, 2, 3, 4].map((index) =>
+      part(
+        plugin,
+        index === 0 ? seed : index === 2 ? also : first + index + 4,
+        index === 0 ? "Dock" : index === 2 ? "Boat" : "Plank",
+      ),
+    ),
+    ...[-4, -2, 0, 2, 4].map((index) => part(plugin, first + 20 + index + 4, "Pillar")),
+  ];
+  const [x, y, z] = centre;
+  return {
+    plugins: ["Old Town.esp", "Water Mod.esp"],
+    location: { type: "exterior", world: "Tamriel", x: 6, y: 1 },
+    console: "cow Tamriel 6 1",
+    centre,
+    min: [x - 360, y - 80, z],
+    max: [x + 400, y + 80, z + 120],
+    parts: [
+      dock("Old Town.esp", 0xa10, 0xa20, 0x5000),
+      [...dock("Water Mod.esp", 0xa11, 0xa21, 0x6000), part("Water Mod.esp", 0x6101, "Pier")],
+    ],
+    spots: 2,
+    duplicates: 12,
+    inside: [870, 820],
+    volumes: [4200, 4500],
+    severity: "doubled",
   };
 }
 

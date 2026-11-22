@@ -132,6 +132,7 @@ pub fn world_map<'a>(context: &Context<'a>) -> WorldMap {
             .chain(&context.doors().spots)
             .cloned()
             .collect(),
+        passages: context.collisions().passages.clone(),
     }
 }
 
