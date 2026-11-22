@@ -71,7 +71,7 @@ not nice yet.
 7. **Keyboard:** the arrow keys move between rows across the page, Home and
    End to the first and last; the right arrow opens a row, the left one
    closes it.
-8. **The rows are part of the UI kit** (ADR 0077): `ui/rows.tsx` holds
+8. **The rows are part of the UI kit** ([ADR 0077](0077-one-ui-kit-for-every-page.md)): `ui/rows.tsx` holds
    `TaskRow`, `TaskGroup`, `TaskPart`, `SeverityMark`, `ModBadge` and
    `ModLine`, styled in `ui/rows.css`, with their pure helpers (initials,
    colour, arrow keys) in `ui/row-helpers.ts`. They know nothing about
