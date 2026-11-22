@@ -365,6 +365,7 @@ fn report(scanned_at: u64, versions: VersionSnapshot, mods: Vec<ModInfo>) -> Sca
             version: versions.game.clone(),
             extender_version: versions.extender.clone(),
             unreal_visuals: false,
+            lacks: Vec::new(),
         },
         extender_plugins_checked: 0,
         plugins_checked: 0,
