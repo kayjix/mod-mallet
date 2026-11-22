@@ -45,6 +45,27 @@ two places:
      near the other side, or through a collision) is one passage. One with
      fewer than two spots, fewer than two parts on a side or fewer than five
      parts in all is a single spot, not a passage.
+   - a side never grows into a wide flat part under the one it comes from
+     (a floor, a slab of ground, a road at least 7 m wide): it carries more
+     than this structure.
+   - *What is structurally part of a version comes along* (added
+     2026-11-22, after the stable at Markarth: hiding JK's version left
+     pieces of its roof in the air). Each side then takes, link by link,
+     the same mod's parts that are embedded in what it takes (a quarter or
+     more inside it) or rest on it (a point of the underside on or in it,
+     and its middle clearly higher: a roof on the walls, a trim in the
+     roof, a ridge on top), whether or not the other mod comes near them.
+     A part goes only when at least half of what holds it goes, so a roof
+     shared with the next building stays there. A part beside another at
+     the same height is not part of it (the next building's wall). Nothing
+     rests on a wide flat part at the bottom of the passage, and a part 7 m
+     long or more carries nothing an eighth of its length or less: a cliff
+     or a slab is the ground under barrels and stalls, not their structure.
+     A part held by a single other part is at most twice as long as it when
+     set into it, and at most half as long when only resting on it (a
+     barrel on a walkway comes along, a house on it does not). A part is at
+     most four times as long as what holds it (unless shorter than 7 m),
+     and nothing is taken farther than about 6 m from the passage's box.
 2. **Each passage is summed up**: the two plugins, each side's parts, the
    spots in it, the *twins* (parts with the same model as one of the other
    side within about 17 cm), how much of each side's room lies inside the
@@ -85,6 +106,14 @@ two places:
   box of about 43 × 50 × 22 m; the Markarth bridge is one of 63 parts of
   JK's Markarth Outskirts and 83 of Lux Via in about 51 × 25 × 17 m, with a
   second, smaller one of 20 and 10 parts at the town's gate.
+- With what is structurally part of a version taken along, the stable at
+  Markarth (Immersive Citizens against JK's Markarth Outskirts) grows from
+  57 of JK's parts to 85, the second half of the stable, its chimney, walls
+  and what stands inside among them. Some passages grow much more, as a
+  whole building of one mod now comes with its walls: at Nightgate Inn 243
+  of JK's parts against 6 of Cutting Room Floor, at the stable's other
+  neighbour (arnima) 194 against 6. The suggestion by size says to keep the
+  building there; a passage is still decided only by the user.
 - The scan measures with the boxes the base objects give (their bounds),
   the stage with the models' boxes. The two can differ a little; the stage
   keeps what the scan found and adds only decor.

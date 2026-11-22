@@ -47,6 +47,54 @@ const MIN_PARTS: usize = 5;
 /// A side grows to this many parts at most.
 const MOST: usize = 3000;
 
+/// A part rests on another when a point of its underside lies this close to
+/// the other's box, in game units (about 23 cm) ...
+const REST: f64 = 16.0;
+
+/// ... and its middle stands above the other's by at least this share of
+/// the other's height: a roof on a wall, not a wall beside a wall.
+const ABOVE: f64 = 0.25;
+
+/// A part is embedded in another when at least this share of it lies inside.
+const EMBEDDED: f64 = 0.25;
+
+/// A part that rests on or in another is at most this many times as long as
+/// it, unless it is shorter than [`LARGE`]: a road or a slab of ground of
+/// the same mod touches half a town (as the magic wand, ADR 0055).
+const LARGER: f64 = 4.0;
+
+/// About 7 m, in game units.
+const LARGE: f64 = 490.0;
+
+/// A part held by a single other part, set into it, is at most this many
+/// times as long as it; a roof on two walls is part of them ...
+const ALONE: f64 = 2.0;
+
+/// ... and resting on a single part (not set into it), at most this share
+/// of its length: a barrel on a walkway, not a house.
+const ALONE_ON: f64 = 0.5;
+
+/// A part at least [`LARGE`] long and this many times as long as another
+/// carries none of it: a cliff or a slab under barrels and stalls is the
+/// ground they stand on, not the structure they belong to.
+const DWARF: f64 = 8.0;
+
+/// Nothing rests on a flat part this wide (a floor, a slab of ground, a
+/// road): it carries the town, not one structure ...
+const GROUND_WIDE: f64 = 490.0;
+
+/// ... flat being at most this share of its width tall ...
+const GROUND_FLAT: f64 = 1.0 / 6.0;
+
+/// ... and lying at the bottom of the passage, within this height of its
+/// lowest point, in game units (about 1.5 m). A flat roof up high carries
+/// what sits on it.
+const GROUND_LEVEL: f64 = 105.0;
+
+/// What a passage takes along lies within this distance of its parts' box,
+/// in game units (about 6 m).
+const ATTACH_MARGIN: f64 = 420.0;
+
 /// Points sampled along each side of a box to tell how close it comes to
 /// another.
 const NEAR_SAMPLES: u32 = 5;
@@ -79,6 +127,7 @@ pub(super) fn find(
     for ((first, second, place), seeds) in &groups {
         let members = grow(solids, &grid, [first, second], place, seeds);
         for component in components(solids, &members, seeds) {
+            let component = attach(solids, &grid, [first, second], place, component);
             if let Some(passage) = passage_of(solids, &component, seeds, owners, names) {
                 passages.push(passage);
             }
@@ -241,6 +290,7 @@ fn grow(
                     };
                     if &other.object.place == place
                         && from.boxes_meet_within(other, TOUCHING)
+                        && !other.ground_under(from)
                         && within_reach(other)
                     {
                         found.insert(candidate);
@@ -362,6 +412,103 @@ fn components(
         }
     }
     joined.into_values().collect()
+}
+
+/// A component with what is structurally part of each side's version: the
+/// same mod's parts that rest on or are embedded in what the side already
+/// takes, link by link (a roof on the walls, a trim in the roof). The
+/// other side need not come near them: when a version goes, nothing of it
+/// is to hang in the air. Parts beside (the next building's wall), below (a
+/// floor, the ground) or far from the passage are not taken.
+fn attach(
+    solids: &[Solid<'_>],
+    grid: &Grid<'_>,
+    owners: [&str; 2],
+    place: &Place,
+    component: [Vec<usize>; 2],
+) -> [Vec<usize>; 2] {
+    let mut low = Vector::new(f64::MAX, f64::MAX, f64::MAX);
+    let mut high = Vector::new(f64::MIN, f64::MIN, f64::MIN);
+    for solid in component.iter().flatten().filter_map(|&at| solids.get(at)) {
+        low = low.min(solid.world_min);
+        high = high.max(solid.world_max);
+    }
+    let near_passage = |solid: &Solid<'_>| {
+        let centre = solid.centre();
+        centre.x >= low.x - ATTACH_MARGIN
+            && centre.x <= high.x + ATTACH_MARGIN
+            && centre.y >= low.y - ATTACH_MARGIN
+            && centre.y <= high.y + ATTACH_MARGIN
+    };
+    let mut taken: BTreeSet<usize> = component.iter().flatten().copied().collect();
+    let mut sides = component;
+    for (side, owner) in sides.iter_mut().zip(owners) {
+        // Until nothing more comes along: a part goes with the side when
+        // at least half of what holds it goes too, so that a roof shared
+        // with the next building stays on that building.
+        loop {
+            let mut candidates: BTreeSet<usize> = BTreeSet::new();
+            for holder in side.iter().filter_map(|&at| solids.get(at)) {
+                candidates.extend(grid.around(holder, owner, solids));
+            }
+            let mut grew = false;
+            for candidate in candidates {
+                if side.len() >= MOST || taken.contains(&candidate) {
+                    continue;
+                }
+                let Some(part) = solids.get(candidate) else {
+                    continue;
+                };
+                if &part.object.place != place || !near_passage(part) {
+                    continue;
+                }
+                let holders: Vec<usize> = grid
+                    .around(part, owner, solids)
+                    .into_iter()
+                    .filter(|&other| {
+                        other != candidate
+                            && solids.get(other).is_some_and(|holder| {
+                                &holder.object.place == place
+                                    && part.part_of(holder, low.z + GROUND_LEVEL)
+                            })
+                    })
+                    .collect();
+                let held: Vec<&Solid<'_>> = holders
+                    .iter()
+                    .filter(|at| taken.contains(at))
+                    .filter_map(|&at| solids.get(at))
+                    .collect();
+                let longest = held
+                    .iter()
+                    .map(|holder| holder.longest_side())
+                    .fold(0.0, f64::max);
+                if !held.is_empty()
+                    && held.len() * 2 >= holders.len()
+                    && part.longest_side() <= LARGE.max(LARGER * longest)
+                    && (held.len() >= 2
+                        || part.longest_side()
+                            <= longest
+                                * if held
+                                    .iter()
+                                    .any(|holder| part.share_in(holder, TOUCHING) >= EMBEDDED)
+                                {
+                                    ALONE
+                                } else {
+                                    ALONE_ON
+                                })
+                {
+                    taken.insert(candidate);
+                    side.push(candidate);
+                    grew = true;
+                }
+            }
+            if !grew {
+                break;
+            }
+        }
+        side.sort_unstable();
+    }
+    sides
 }
 
 /// The passage of one component, if it is more than a single spot.
@@ -550,6 +697,94 @@ fn whole(coordinate: f64) -> i32 {
 }
 
 impl Solid<'_> {
+    /// The middle of the turned box, in the world.
+    fn centre(&self) -> Vector {
+        self.to_world(self.min.plus(self.max).scaled(0.5))
+    }
+
+    /// Whether this part is wide and flat and lies under `part`: a floor, a
+    /// slab of ground or a road it stands on, which a passage does not
+    /// grow into, as it carries more than this one structure.
+    fn ground_under(&self, part: &Self) -> bool {
+        self.wide_and_flat() && self.world_max.z <= part.world_min.z + REST
+    }
+
+    /// Whether this part is so much larger than `part` that it is the
+    /// ground `part` stands on rather than what it belongs to.
+    fn dwarfs(&self, part: &Self) -> bool {
+        let longest = self.longest_side();
+        longest >= LARGE && longest >= DWARF * part.longest_side()
+    }
+
+    /// Whether the box is at least [`GROUND_WIDE`] wide and at most
+    /// [`GROUND_FLAT`] of that tall.
+    fn wide_and_flat(&self) -> bool {
+        let size = self.world_max.minus(self.world_min);
+        let wide = size.x.max(size.y);
+        wide >= GROUND_WIDE && size.z <= wide * GROUND_FLAT
+    }
+
+    /// Whether this part is structurally part of `holder`: it is embedded
+    /// in it, or it rests on it from above. A part beside it at the same
+    /// height is neither, and nothing rests on a floor or the ground (flat
+    /// parts no higher than `ground`).
+    fn part_of(&self, holder: &Self, ground: f64) -> bool {
+        if !self.boxes_meet_within(holder, TOUCHING) || holder.dwarfs(self) {
+            return false;
+        }
+        self.share_in(holder, TOUCHING) >= EMBEDDED || self.rests_on(holder, ground)
+    }
+
+    /// How much of this part lies inside `other` grown by `margin`, from 0
+    /// to 1, measured at points spread through its box.
+    fn share_in(&self, other: &Self, margin: f64) -> f64 {
+        let size = self.max.minus(self.min);
+        let step = |index: u32| (f64::from(index) + 0.5) / f64::from(INSIDE_SAMPLES);
+        let mut inside = 0u32;
+        for i in 0..INSIDE_SAMPLES {
+            for j in 0..INSIDE_SAMPLES {
+                for k in 0..INSIDE_SAMPLES {
+                    let local = Vector::new(
+                        self.min.x + size.x * step(i),
+                        self.min.y + size.y * step(j),
+                        self.min.z + size.z * step(k),
+                    );
+                    if other.contains_within(self.to_world(local), margin) {
+                        inside += 1;
+                    }
+                }
+            }
+        }
+        f64::from(inside) / f64::from(INSIDE_SAMPLES.pow(3))
+    }
+
+    /// Whether this part rests on `holder`: a point of its underside lies on
+    /// or in it, and its middle stands clearly higher. A wide flat holder
+    /// lying no higher than `ground` (a floor, a slab of ground, a road)
+    /// carries nothing.
+    fn rests_on(&self, holder: &Self, ground: f64) -> bool {
+        let holder_size = holder.world_max.minus(holder.world_min);
+        if holder.wide_and_flat() && holder.world_min.z <= ground {
+            return false;
+        }
+        if self.centre().z < holder.centre().z + ABOVE * holder_size.z {
+            return false;
+        }
+        let size = self.max.minus(self.min);
+        let last = f64::from(NEAR_SAMPLES - 1);
+        let step = |index: u32| f64::from(index) / last;
+        (0..NEAR_SAMPLES).any(|i| {
+            (0..NEAR_SAMPLES).any(|j| {
+                let local = Vector::new(
+                    self.min.x + size.x * step(i),
+                    self.min.y + size.y * step(j),
+                    self.min.z,
+                );
+                holder.contains_within(self.to_world(local), REST)
+            })
+        })
+    }
+
     /// Whether the boxes around the two turned objects come within
     /// `margin` of each other.
     fn boxes_meet_within(&self, other: &Self, margin: f64) -> bool {
@@ -616,6 +851,22 @@ mod tests {
     const PLANK_TWIN: u32 = 0x12;
     /// A rock.
     const ROCK: u32 = 0x13;
+    /// A stable's wall along x: 6 m long, 3 m tall.
+    const WALL: u32 = 0x20;
+    /// A stable's wall along y: 4 m long.
+    const SIDE: u32 = 0x21;
+    /// A roof over the stable.
+    const ROOF: u32 = 0x22;
+    /// A trim set into the roof's edge.
+    const TRIM: u32 = 0x23;
+    /// A ridge piece sitting on the roof.
+    const RIDGE: u32 = 0x24;
+    /// A slab of ground under the stable and the house beside it.
+    const FLOOR: u32 = 0x25;
+    /// The other mod's lean-to along a wall, half as tall.
+    const LEAN: u32 = 0x26;
+    /// The other mod's lean-to along a side.
+    const LEAN_SIDE: u32 = 0x27;
 
     fn id(plugin: &str, local_id: u32) -> RecordId {
         RecordId {
@@ -625,6 +876,16 @@ mod tests {
     }
 
     fn base(local_id: u32, model: &str, natural: bool) -> BaseObject {
+        sized(local_id, model, natural, [-100, -50, 0], [100, 50, 20])
+    }
+
+    fn sized(
+        local_id: u32,
+        model: &str,
+        natural: bool,
+        min: [i32; 3],
+        max: [i32; 3],
+    ) -> BaseObject {
         BaseObject {
             id: id("Skyrim.esm", local_id),
             editor_id: Some(format!("Base{local_id:X}")),
@@ -633,10 +894,7 @@ mod tests {
             kind: BaseKind::Static,
             solid: true,
             natural,
-            bounds: Bounds {
-                min: [-100, -50, 0],
-                max: [100, 50, 20],
-            },
+            bounds: Bounds { min, max },
         }
     }
 
@@ -688,6 +946,62 @@ mod tests {
                     base(BOARD, "meshes/board.nif", false),
                     base(PLANK_TWIN, "meshes/plank.nif", false),
                     base(ROCK, "meshes/rock.nif", true),
+                    sized(
+                        WALL,
+                        "meshes/wall.nif",
+                        false,
+                        [-300, -10, 0],
+                        [300, 10, 300],
+                    ),
+                    sized(
+                        SIDE,
+                        "meshes/side.nif",
+                        false,
+                        [-10, -200, 0],
+                        [10, 200, 300],
+                    ),
+                    sized(
+                        ROOF,
+                        "meshes/roof.nif",
+                        false,
+                        [-320, -220, 0],
+                        [320, 220, 40],
+                    ),
+                    sized(
+                        TRIM,
+                        "meshes/trim.nif",
+                        false,
+                        [-300, -15, -10],
+                        [300, 15, 15],
+                    ),
+                    sized(
+                        RIDGE,
+                        "meshes/ridge.nif",
+                        false,
+                        [-50, -50, 0],
+                        [50, 50, 60],
+                    ),
+                    sized(
+                        FLOOR,
+                        "meshes/floor.nif",
+                        false,
+                        [-700, -300, -20],
+                        [700, 300, 0],
+                    ),
+                    sized(
+                        LEAN,
+                        "meshes/lean.nif",
+                        false,
+                        [-300, -10, 0],
+                        [300, 10, 150],
+                    ),
+                    sized(
+                        LEAN_SIDE,
+                        "meshes/leanside.nif",
+                        false,
+                        [-10, -200, 0],
+                        [10, 200, 150],
+                    ),
                 ],
                 place_names: vec![PlaceName {
                     id: world(),
@@ -825,5 +1139,79 @@ mod tests {
             panic!("expected one passage, got {found:?}");
         };
         assert_eq!(ids(&passage.parts[0]), vec![0x800, 0x801, 0x802]);
+    }
+
+    /// A stable of the first mod at the origin: four walls, a roof on them,
+    /// a trim set into the roof's edge and a ridge piece on top, on a slab
+    /// of ground; a house of the same mod 3 m to the east on the same slab;
+    /// and the second mod's lean-to set into two of the stable's walls,
+    /// half as tall, so that it comes nowhere near the roof.
+    fn stable() -> Vec<PlacedObject> {
+        let first = "Forge.esp";
+        let mut objects = vec![
+            placed(first, 0x800, WALL, [0, -200, 0]),
+            placed(first, 0x801, WALL, [0, 200, 0]),
+            placed(first, 0x802, SIDE, [-300, 0, 0]),
+            placed(first, 0x803, SIDE, [300, 0, 0]),
+            placed(first, 0x804, ROOF, [0, 0, 300]),
+            placed(first, 0x805, TRIM, [0, -200, 320]),
+            placed(first, 0x806, RIDGE, [0, 0, 340]),
+            placed(first, 0x807, FLOOR, [400, 0, 0]),
+            // The house beside it, 3 m away.
+            placed(first, 0x810, WALL, [810, -200, 0]),
+            placed(first, 0x811, WALL, [810, 200, 0]),
+            placed(first, 0x812, SIDE, [510, 0, 0]),
+            placed(first, 0x813, SIDE, [1110, 0, 0]),
+            placed(first, 0x814, ROOF, [810, 0, 300]),
+        ];
+        objects.extend([
+            placed("Temple.esp", 0x900, LEAN, [0, -190, 0]),
+            placed("Temple.esp", 0x901, LEAN_SIDE, [-290, 0, 0]),
+        ]);
+        objects
+    }
+
+    #[test]
+    fn hiding_a_stable_takes_its_roof_along_but_not_the_house_beside_it() {
+        let found = passages(stable());
+
+        let [passage] = found.as_slice() else {
+            panic!("expected one passage, got {found:?}");
+        };
+        // The four walls collide or come near the lean-to; the roof, the
+        // trim in it and the ridge on it rest on them and come along. The
+        // slab of ground below and the house beside it stay.
+        assert_eq!(
+            ids(&passage.parts[0]),
+            vec![0x800, 0x801, 0x802, 0x803, 0x804, 0x805, 0x806]
+        );
+        assert_eq!(ids(&passage.parts[1]), vec![0x900, 0x901]);
+        assert_eq!(passage.spots, 2);
+    }
+
+    #[test]
+    fn a_house_that_touches_the_stable_stays_unless_it_rests_on_it() {
+        // The house moved up against the stable: its side wall stands
+        // beside the stable's, at the same height. Beside is not part of.
+        let mut objects: Vec<PlacedObject> = stable()
+            .into_iter()
+            .map(|mut object| {
+                if (0x810..=0x814).contains(&object.id.local_id) {
+                    object.position[0] -= 180;
+                }
+                object
+            })
+            .collect();
+        objects.retain(|object| object.id.local_id != 0x812);
+        let found = passages(objects);
+
+        let [passage] = found.as_slice() else {
+            panic!("expected one passage, got {found:?}");
+        };
+        assert!(
+            ids(&passage.parts[0]).iter().all(|id| *id < 0x810),
+            "{:x?}",
+            ids(&passage.parts[0])
+        );
     }
 }
