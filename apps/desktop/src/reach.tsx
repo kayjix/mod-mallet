@@ -9,6 +9,8 @@ import { FollowHiding } from "./action-places";
 import type { ObjectRef } from "./generated/rendered-report";
 import type { ReachChange, Route, WalkwayReach } from "./generated/walkway-reach";
 import { reachTexts } from "./reach-texts";
+import { Note } from "./spot-notes";
+import { spotNotesTexts } from "./spot-notes-texts";
 import "./reach.css";
 
 /** How many changes a note lists before it counts the rest. */
@@ -104,7 +106,9 @@ export function ReachNote({
    */
   follow?: { place: string; centre: [number, number] | null; hidden: ObjectRef[] } | null;
 }) {
-  const r = reachTexts[useSession().lang];
+  const { lang } = useSession();
+  const r = reachTexts[lang];
+  const n = spotNotesTexts[lang];
   const sentence = useReachSentence();
   if (reach === undefined || reach === null || reach.checked === 0) {
     return null;
@@ -122,12 +126,21 @@ export function ReachNote({
       />
     );
   if (reach.changes.length === 0) {
-    return <p className="reach-note reach-fine">{r.allReached(reach.checked)}</p>;
+    const all = r.allReached(reach.checked);
+    return (
+      <Note tone="ok" summary={n.reachAll(reach.checked)} hint={all}>
+        <p className="reach-note reach-fine">{all}</p>
+      </Note>
+    );
   }
   const listed = reach.changes.slice(0, LISTED);
   const rest = reach.changes.length - listed.length;
   return (
-    <>
+    <Note
+      tone="bad"
+      summary={n.reachChanges(reach.changes.length)}
+      hint={reach.changes.map(sentence).join("\n")}
+    >
       <div className="reach-note">
         <ul>
           {listed.map((change) => (
@@ -143,7 +156,7 @@ export function ReachNote({
         <p className="reach-legend">{r.legend}</p>
       </div>
       {offers}
-    </>
+    </Note>
   );
 }
 

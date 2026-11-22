@@ -1,7 +1,8 @@
 // Locating objects in the 3D view: a small button next to wherever objects
 // are named or chosen. Pressed, those exact objects glow in the view for a
-// few seconds and the camera turns to them, so that one can tell which
-// ones a choice or a pick means.
+// few seconds where they stand; the camera stays where the user put it,
+// and an arrow at the edge of the view points to objects out of sight. So
+// one can tell which ones a choice or a pick means without losing one's view.
 //
 // The cards and lists stand beside the view, not inside it. The view that
 // is open registers itself here (`registerLocator`), and a button asks
@@ -12,7 +13,7 @@ import { useSyncExternalStore } from "react";
 import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
 
-/** What a view does to locate objects: glow them, turn the camera to them. */
+/** What a view does to locate objects: glow them, and point to them when out of sight. */
 export type Locator = (
   objects: readonly { plugin: string; localId: number }[],
   /** Where they stand if the view does not hold them yet (east, north, height, game units). */

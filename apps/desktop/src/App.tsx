@@ -25,7 +25,7 @@ import { LoadingMallet, LoadingScreen } from "./LoadingMallet";
 import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
-import { NavBar } from "./nav-bar";
+import { NavSteps } from "./nav-bar";
 import { Overview, openFileDuels } from "./Overview";
 import { reportFile } from "./PairReport";
 import { PatchView } from "./PatchView";
@@ -672,6 +672,17 @@ export default function App({ api, startLang }: AppProps) {
           toolbox={toolbox}
           t={t}
           j={j}
+          steps={
+            <NavSteps
+              lang={lang}
+              canBack={history.at > 0}
+              canForward={history.at < history.places.length - 1}
+              onBack={goBack}
+              onForward={goForward}
+              from={place.from ?? null}
+              onReturn={openPatch}
+            />
+          }
           gameCard={
             <GameCard
               games={games}
@@ -697,15 +708,6 @@ export default function App({ api, startLang }: AppProps) {
           }
         />
         <main className="content" data-view={current}>
-          <NavBar
-            lang={lang}
-            canBack={history.at > 0}
-            canForward={history.at < history.places.length - 1}
-            onBack={goBack}
-            onForward={goForward}
-            from={place.from ?? null}
-            onReturn={openPatch}
-          />
           {/* The sidebar says where the user is; only the first run needs a title. */}
           {current === "places" && (
             <header className="pagehead">
@@ -853,6 +855,8 @@ interface SidebarProps {
   j: JourneyTexts;
   /** The game in use, with scanning. */
   gameCard: ReactNode;
+  /** Back and forward (ADR 0070), above the toolbox. */
+  steps: ReactNode;
 }
 
 /**
@@ -872,6 +876,7 @@ function Sidebar({
   t,
   j,
   gameCard,
+  steps,
 }: SidebarProps) {
   const reviewTexts = useReviewTexts();
   const { decisions, lang } = useSession();
@@ -947,7 +952,10 @@ function Sidebar({
       </div>
       {gameCard}
       <nav>{game.map(navButton)}</nav>
-      <nav className="nav-bottom">{beside.map(navButton)}</nav>
+      <div className="nav-bottom">
+        {steps}
+        <nav>{beside.map(navButton)}</nav>
+      </div>
       <div className="sidebar-foot">
         <ManagerStatus
           toolbox={toolbox}

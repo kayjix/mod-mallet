@@ -37,8 +37,6 @@ export interface DoorTexts {
   viaMoves: string;
   /** The paths are re-attached in a later version. */
   pathsLater: string;
-  /** Characters reach the kept door. */
-  keptReached: string;
   /** No path leads through the kept door. */
   keptNotOnPaths: string;
   /** In the list of moves: a door led to another door. */
@@ -110,7 +108,6 @@ export const doorTexts: Record<Lang, DoorTexts> = {
       "The patch hides the other doors. Leading the doors on the other side to the kept one goes into the plugin Mod Mallet - Moves: write and install it on the patch page.",
     pathsLater:
       "Re-attaching the paths of the characters comes with the repair of the paths in a later version. Until then they walk to where the hidden door stood, right beside the kept one.",
-    keptReached: "Characters reach the kept door: their paths lead through it.",
     keptNotOnPaths:
       "No path of the characters leads through the kept door yet; they use the paths of the hidden one, beside it.",
     ledTo: (door) => `leads to the door ${door}`,
@@ -169,7 +166,6 @@ export const doorTexts: Record<Lang, DoorTexts> = {
       "Der Patch blendet die anderen Türen aus. Die Türen auf der anderen Seite zur behaltenen zu führen, kommt in das Plugin Mod Mallet - Moves: Schreibe und installiere es auf der Patch-Seite.",
     pathsLater:
       "Die Wege der Figuren neu anzuschließen, kommt mit der Reparatur der Wege in einer späteren Version. Bis dahin gehen sie dorthin, wo die ausgeblendete Tür stand, direkt neben der behaltenen.",
-    keptReached: "Figuren erreichen die behaltene Tür: Ihre Wege führen durch sie.",
     keptNotOnPaths:
       "Noch führt kein Weg der Figuren durch die behaltene Tür; sie nehmen die Wege der ausgeblendeten, direkt daneben.",
     ledTo: (door) => `führt zur Tür ${door}`,

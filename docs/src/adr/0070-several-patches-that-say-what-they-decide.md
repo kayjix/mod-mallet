@@ -169,11 +169,15 @@ for it.
 
 - The window keeps a **history** of where the user went: the page and
   what it opened at (a spot, a pair, a duel, a mod, a patch and its entry).
-  Back and forward buttons sit at the top of every page; the mouse's back
-  and forward buttons and Alt+← / Alt+→ do the same.
-- A page opened from an entry of a patch shows a bar at the top, "← Back to
-  patch «name»: entry", which returns to the patch with the entry in view
-  and marked.
+  Back and forward buttons sit in the sidebar, just above the toolbox; the
+  mouse's back and forward buttons and Alt+← / Alt+→ do the same.
+- A page opened from an entry of a patch shows "← Back to patch «name»:
+  entry" below them, which returns to the patch with the entry in view and
+  marked.
+- *Amended 2026-11-22:* the buttons first sat in a bar of their own at the
+  top of every page. That bar pushed every page down and took height from
+  the 3D view in Map collisions, so they moved into the sidebar, where they
+  take no height from any page.
 
 ## Consequences
 

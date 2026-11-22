@@ -12,6 +12,7 @@ import type { Api } from "./api";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { Mat4, Vec3 } from "./gl";
+import { LOCATE_MS } from "./locate-frame";
 import { CELL } from "./map-places";
 import { MeshPool, normalsOf, POOL_LOCATIONS, Sight } from "./mesh-pool";
 import { type Move, movedMatrix } from "./moves";
@@ -711,8 +712,8 @@ const WAND_STEPS: Record<number, { alike: "model" | "family" | "kind"; gap: numb
 /** How far from the picked object the magic wand reaches at most, in game units (about 30 m). */
 const WAND_REACH = 2048;
 
-/** How long a located object glows, in milliseconds. */
-const PULSE_MS = 3000;
+/** How long a located object glows, in milliseconds: as long as its arrow points. */
+const PULSE_MS = LOCATE_MS;
 
 /** How many parts the magic wand chains at most. */
 const WAND_MOST = 300;

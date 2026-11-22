@@ -138,3 +138,60 @@
   margin: 0;
   font-weight: 600;
 }
+
+/* The panel's first line: how many doors, what keeping the one looked at
+   means, and keeping all of them. */
+.door-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.door-head .door-outcome {
+  font-weight: 400;
+}
+
+.door-head-buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Compact cards: the checks as short words in a row, the full sentence in
+   the tooltip; the notes as badges. */
+.door-checks:not([data-full]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.door-card .work-choice {
+  padding: 4px 10px;
+}
+
+.door-what {
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Four doors and more: the cards in a row, kept short. */
+.door-panel[data-doors="3"] .door-leads,
+.door-panel[data-doors="4"] .door-leads,
+.door-panel[data-doors="5"] .door-leads,
+.door-panel[data-doors="6"] .door-leads {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.door-panel:not([data-doors="2"]) .door-cards {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.door-card .door-plan {
+  padding: 6px 8px;
+}

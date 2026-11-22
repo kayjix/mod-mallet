@@ -33,7 +33,7 @@ import { InfoTip } from "./info-tip";
 import { LoadingMallet } from "./LoadingMallet";
 import { LandLayer } from "./land-layer";
 import { registerLocator } from "./locate";
-import { framedDistance, framing } from "./locate-frame";
+import { edgePointer, framing, LOCATE_MS, paintEdgePointer } from "./locate-frame";
 import { LodLayer } from "./lod-layer";
 import {
   CELL,
@@ -124,6 +124,11 @@ const MAX_PITCH = 1.55;
 const PIN = 0.9;
 /** How close to a pin a click has to land, in pixels. */
 const HIT = 11;
+/**
+ * The least height of the view, in pixels: where panels above it take much
+ * of a small window, it shrinks this far rather than leave the window.
+ */
+const LEAST_HEIGHT = 280;
 /** How close the camera has to be, in cells, for the objects themselves. */
 const NEAR = 8;
 /** How far around the point the objects are read, in cells: at least, and at most. */
@@ -515,6 +520,9 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
+  // Objects located from a card beside the view: where they stand and
+  // until when an arrow at the edge points to them while out of sight.
+  const located = useRef<{ at: [number, number, number]; until: number } | null>(null);
   // Where and how high they stand, for the level of detail (ADR 0074).
   const tops = useRef<RealTops | null>(null);
   // The repair of paths shown, taken out and laid new (ADR 0058).
@@ -699,7 +707,7 @@ export function MapView3D({
       const top = element.getBoundingClientRect().top;
       setSize({
         width: Math.max(320, Math.floor(element.clientWidth)),
-        height: Math.max(420, Math.floor(window.innerHeight - top - 24)),
+        height: Math.max(LEAST_HEIGHT, Math.floor(window.innerHeight - top - 24)),
       });
     };
     const observer = new ResizeObserver(measure);
@@ -1015,6 +1023,15 @@ export function MapView3D({
             picked: pickedKeyNow.current,
           })
         : [];
+    // Located objects out of sight: an arrow at the edge points to them.
+    const shownLocated = located.current;
+    if (shownLocated !== null && performance.now() < shownLocated.until) {
+      const [x, y, z] = shownLocated.at;
+      const pointer = edgePointer(matrix, [x / CELL, y / CELL, (z / CELL) * raise], width, height);
+      if (pointer !== null) {
+        paintEdgePointer(context, pointer, style.getPropertyValue("--spot-focus") || "#ffd54a");
+      }
+    }
   }, [terrain, mesh]);
 
   const redraw = useCallback(() => {
@@ -1507,57 +1524,43 @@ export function MapView3D({
     });
   }, [picked, fly, spotDistance]);
 
-  // Objects located from a card beside the view glow, and the camera turns
-  // to them; where the view does not hold them yet, it goes to where they
-  // stand and tries again as they come in.
+  // Objects located from a card beside the view glow where they stand; the
+  // camera stays where the user put it. Out of sight, an arrow at the edge
+  // of the view points to them. Where the view does not hold them yet, it
+  // points to where they stand and tries again as they come in.
   useEffect(() => {
     const timers: number[] = [];
+    const point = (at: readonly number[]) => {
+      located.current = {
+        at: [at[0] ?? 0, at[1] ?? 0, at[2] ?? 0],
+        until: performance.now() + LOCATE_MS,
+      };
+      redraw();
+      timers.push(window.setTimeout(() => redraw(), LOCATE_MS + 50));
+    };
     const stop = registerLocator((objects, at) => {
       for (const timer of timers.splice(0)) {
         window.clearTimeout(timer);
       }
-      const turn = (found: AreaObject[]) => {
-        const frame = framing(found.map((object) => object.position));
-        if (frame === null) {
-          return;
-        }
-        const raise = state.current.exaggeration;
-        fly({
-          ...camera.current,
-          target: [
-            frame.target[0] / CELL,
-            frame.target[1] / CELL,
-            (frame.target[2] / CELL) * raise,
-          ],
-          distance: framedDistance(frame.radius / CELL, camera.current.distance, 0.08),
-        });
-      };
       const found = area.current?.pulse(objects) ?? [];
-      if (found.length > 0) {
-        turn(found);
+      const frame = framing(found.map((object) => object.position));
+      if (frame !== null) {
+        point(frame.target);
         return;
       }
       if (at === undefined || at === null || at.length < 3) {
         return;
       }
-      fly({
-        ...camera.current,
-        target: [
-          (at[0] ?? 0) / CELL,
-          (at[1] ?? 0) / CELL,
-          ((at[2] ?? 0) / CELL) * state.current.exaggeration,
-        ],
-        distance: Math.min(camera.current.distance, spotDistance),
-      });
+      point(at);
       for (let tries = 1; tries <= 5; tries += 1) {
         timers.push(
           window.setTimeout(() => {
-            const later = area.current?.pulse(objects) ?? [];
-            if (later.length > 0) {
-              turn(later);
+            const later = framing((area.current?.pulse(objects) ?? []).map((o) => o.position));
+            if (later !== null) {
               for (const timer of timers.splice(0)) {
                 window.clearTimeout(timer);
               }
+              point(later.target);
             }
           }, tries * 700),
         );
@@ -1569,7 +1572,7 @@ export function MapView3D({
         window.clearTimeout(timer);
       }
     };
-  }, [fly, spotDistance]);
+  }, [redraw]);
 
   const pickAt = (clientX: number, clientY: number): Picked | null => {
     const rect = overlay.current?.getBoundingClientRect();

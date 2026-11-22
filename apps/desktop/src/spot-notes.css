@@ -1,0 +1,105 @@
+/* The notes of a spot panel as small badges in their card. */
+
+.note-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.note-row:empty {
+  display: none;
+}
+
+/* In full, the notes stand one below the other. */
+.note-row[data-full] {
+  display: grid;
+  gap: 4px;
+  align-items: start;
+}
+
+.note-row[data-full] > * {
+  margin: 0;
+}
+
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--note-tone, var(--border));
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.note-badge[data-tone="warn"] {
+  --note-tone: #f0e442;
+}
+
+.note-badge[data-tone="ok"] {
+  --note-tone: var(--ok);
+}
+
+.note-badge[data-tone="bad"] {
+  --note-tone: var(--warning);
+}
+
+.note-badge[data-tone="info"] {
+  --note-tone: var(--brand);
+}
+
+.note-badge[aria-expanded="true"] {
+  background: var(--sunken);
+}
+
+.note-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--note-tone, var(--muted));
+}
+
+.note-badge .path-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* A badge opened on its own: the note below the row. */
+.note-open {
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.note-row > .note-open > * {
+  margin: 0;
+}
+
+/* The repair of the paths among the badges: its button and colours inline. */
+.note-row .repair-paths {
+  margin: 0;
+}
+
+.note-row:not([data-full]) .repair-paths,
+.note-row:not([data-full]) .repair-paths-row {
+  display: contents;
+}
+
+.note-row:not([data-full]) .repair-legend {
+  font-size: 0.75rem;
+}
+
+.note-row .walk-warning {
+  margin: 0;
+}

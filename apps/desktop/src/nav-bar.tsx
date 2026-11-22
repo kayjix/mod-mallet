@@ -1,6 +1,7 @@
 // The way back (ADR 0070): back and forward through the places the user
-// went, on every page, and back to the entry of a patch a page was opened
-// from.
+// went, and back to the entry of a patch a page was opened from. They sit
+// in the sidebar, above the toolbox, so that they take no height from the
+// pages.
 
 import type { PatchAt } from "./Actions";
 import type { Lang } from "./i18n";
@@ -28,7 +29,7 @@ const navTexts: Record<Lang, NavTexts> = {
   },
 };
 
-interface NavBarProps {
+interface NavStepsProps {
   lang: Lang;
   canBack: boolean;
   canForward: boolean;
@@ -39,8 +40,8 @@ interface NavBarProps {
   onReturn: (at: PatchAt) => void;
 }
 
-/** Back and forward, and the way back to a patch's entry. */
-export function NavBar({
+/** Back and forward, and the way back to a patch's entry, as a small row of the sidebar. */
+export function NavSteps({
   lang,
   canBack,
   canForward,
@@ -48,38 +49,42 @@ export function NavBar({
   onForward,
   from,
   onReturn,
-}: NavBarProps) {
+}: NavStepsProps) {
   const t = navTexts[lang];
-  if (!canBack && !canForward && from === null) {
-    return null;
-  }
   return (
-    <nav className="nav-bar" aria-label={t.back}>
-      <button
-        type="button"
-        className="nav-step"
-        disabled={!canBack}
-        title={`${t.back}. ${t.keys}`}
-        aria-label={t.back}
-        onClick={onBack}
-      >
-        ←
-      </button>
-      <button
-        type="button"
-        className="nav-step"
-        disabled={!canForward}
-        title={`${t.forward}. ${t.keys}`}
-        aria-label={t.forward}
-        onClick={onForward}
-      >
-        →
-      </button>
+    <div className="nav-steps">
+      <div className="nav-steps-row">
+        <button
+          type="button"
+          className="nav-step"
+          disabled={!canBack}
+          title={`${t.back}. ${t.keys}`}
+          aria-label={t.back}
+          onClick={onBack}
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          className="nav-step"
+          disabled={!canForward}
+          title={`${t.forward}. ${t.keys}`}
+          aria-label={t.forward}
+          onClick={onForward}
+        >
+          →
+        </button>
+      </div>
       {from !== null && (
-        <button type="button" className="nav-return" onClick={() => onReturn(from)}>
+        <button
+          type="button"
+          className="nav-return"
+          title={t.backTo(from.label)}
+          onClick={() => onReturn(from)}
+        >
           ← {t.backTo(from.label)}
         </button>
       )}
-    </nav>
+    </div>
   );
 }

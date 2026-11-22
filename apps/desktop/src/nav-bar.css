@@ -1,31 +1,47 @@
-/* The way back (ADR 0070): back and forward, and back to a patch's entry. */
+/* The way back (ADR 0070): back and forward, and back to a patch's entry,
+   in the sidebar above the toolbox. */
 
-/* It stays at the top while the page scrolls, so the way back is always in reach. */
-.nav-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+.nav-steps {
+  display: grid;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+
+.nav-steps-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: -20px -28px 10px;
-  padding: 8px 28px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  gap: 4px;
 }
 
-.nav-bar .nav-step {
-  min-width: 32px;
-  padding: 2px 8px;
-  font-size: 1rem;
-  line-height: 1.4;
+.nav-steps button {
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 6px;
+  background: none;
+  color: var(--side-muted);
 }
 
-.nav-bar .nav-return {
-  margin-left: 6px;
-  border-color: var(--accent);
+.nav-steps button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 6%);
+  color: var(--side-text);
+}
+
+.nav-steps button:disabled {
+  opacity: 0.35;
+}
+
+.nav-steps .nav-step {
+  min-width: 34px;
+  padding: 0 8px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.nav-steps .nav-return {
   overflow: hidden;
-  max-width: 70%;
+  padding: 2px 8px;
+  border-color: var(--accent);
+  color: var(--side-text);
+  font-size: 0.78rem;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -19,7 +19,7 @@ import { InfoTip } from "./info-tip";
 import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
 import { registerLocator } from "./locate";
-import { framedDistance, framing } from "./locate-frame";
+import { edgePointer, framing, LOCATE_MS, paintEdgePointer } from "./locate-frame";
 import { CELL } from "./map-places";
 import { moveKeysOf, moveOf } from "./moves";
 import { matchKey } from "./patch";
@@ -70,6 +70,8 @@ interface Camera {
 const FIELD_OF_VIEW = (45 * Math.PI) / 180;
 const MIN_PITCH = -0.3;
 const MAX_PITCH = 1.55;
+/** The least height of the view, in pixels: it shrinks this far rather than leave the window. */
+const LEAST_HEIGHT = 280;
 /** The closest the camera comes, in cells: about 20 game units. */
 const MIN_DISTANCE = 0.005;
 /** How far from the point the camera starts, in cells: about 1200 game units. */
@@ -178,6 +180,9 @@ export function InteriorView({
   hiddenNow.current = hidden;
   const pickedKeyNow = useRef<string | null>(null);
   pickedKeyNow.current = picked === null ? null : matchKey(picked.id);
+  // Objects located from a card beside the view: where they stand and
+  // until when an arrow at the edge points to them while out of sight.
+  const located = useRef<{ at: [number, number, number]; until: number } | null>(null);
   const drawActions = (matrix: Mat4, width: number, tall: number) => {
     const element = overlay.current;
     const context = element?.getContext("2d") ?? null;
@@ -214,6 +219,16 @@ export function InteriorView({
             },
           )
         : [];
+    // Located objects out of sight: an arrow at the edge points to them.
+    const shownLocated = located.current;
+    if (shownLocated !== null && performance.now() < shownLocated.until) {
+      const [x, y, z] = shownLocated.at;
+      const pointer = edgePointer(matrix, [x / CELL, y / CELL, z / CELL], width, tall);
+      if (pointer !== null) {
+        const focus = getComputedStyle(element).getPropertyValue("--spot-focus");
+        paintEdgePointer(context, pointer, focus || "#ffd54a");
+      }
+    }
   };
   const drawActionsNow = useRef(drawActions);
   drawActionsNow.current = drawActions;
@@ -294,7 +309,7 @@ export function InteriorView({
     }
     const measure = () => {
       const top = element.getBoundingClientRect().top;
-      setHeight(Math.max(360, Math.floor(window.innerHeight - top - 24)));
+      setHeight(Math.max(LEAST_HEIGHT, Math.floor(window.innerHeight - top - 24)));
       redrawNow.current();
     };
     const observer = new ResizeObserver(measure);
@@ -403,24 +418,31 @@ export function InteriorView({
   useEffect(() => {
     redraw();
   }, [actionsShown, picked, redraw]);
-  // Objects located from a card beside the view glow, and the camera turns to them.
-  useEffect(
-    () =>
-      registerLocator((objects) => {
-        const found = layer.current?.pulse(objects) ?? [];
-        const frame = framing(found.map((object) => object.position));
-        if (frame === null) {
-          return;
-        }
-        camera.current = {
-          ...camera.current,
-          target: [frame.target[0] / CELL, frame.target[1] / CELL, frame.target[2] / CELL],
-          distance: framedDistance(frame.radius / CELL, camera.current.distance, 0.03),
-        };
-        redrawNow.current();
-      }),
-    [],
-  );
+  // Objects located from a card beside the view glow where they stand; the
+  // camera stays where the user put it. Out of sight, an arrow at the edge
+  // of the view points to them.
+  useEffect(() => {
+    let timer: number | null = null;
+    const stop = registerLocator((objects) => {
+      const found = layer.current?.pulse(objects) ?? [];
+      const frame = framing(found.map((object) => object.position));
+      if (frame === null) {
+        return;
+      }
+      located.current = { at: frame.target, until: performance.now() + LOCATE_MS };
+      redrawNow.current();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => redrawNow.current(), LOCATE_MS + 50);
+    });
+    return () => {
+      stop();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, []);
 
   /** The object drawn at a point of the screen, if any. */
   const objectAt = (clientX: number, clientY: number): AreaObject | null => {

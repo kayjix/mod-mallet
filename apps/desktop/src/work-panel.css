@@ -6,6 +6,11 @@
 
 .work-decision {
   container-type: inline-size;
+  /* The 3D view below keeps most of the window: in a small one, or with
+     every note in full, the panel scrolls instead of pushing it out. */
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .work-nav {
@@ -128,8 +133,21 @@
   margin-left: 6px;
 }
 
-/* A narrower window: the two mods side by side, what concerns both below. */
+/* A narrower window: the middle column slimmer, so that the panel stays
+   low and the 3D view keeps its height. */
 @container (max-width: 820px) {
+  .work-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .work-column {
+    padding: 6px 8px;
+  }
+}
+
+/* Narrower still: the two mods side by side, what concerns both below. */
+@container (max-width: 600px) {
   .work-columns {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }

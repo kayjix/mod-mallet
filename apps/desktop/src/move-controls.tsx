@@ -27,6 +27,8 @@ import {
 import { useMovesTexts } from "./moves-texts";
 import { AnchorReasons } from "./object-actions";
 import { chooseSpot, decisionAt, keyOf, matchKey, type PatchChoices } from "./patch";
+import { Note } from "./spot-notes";
+import { spotNotesTexts } from "./spot-notes-texts";
 import { walkedOn } from "./walkways";
 import "./moves.css";
 
@@ -449,11 +451,15 @@ export function MoveControls({
 
 /** In a collision's spot panel: which of its parts are moved, and how to move one. */
 export function SpotMoves({ parts }: { parts: SpotPart[] }) {
-  const { patchChoices: choices, setPatchChoices } = useSession();
+  const { patchChoices: choices, setPatchChoices, lang } = useSession();
   const m = useMovesTexts();
   const moved = parts.filter((part) => moveOf(choices, part.object) !== null);
   if (moved.length === 0) {
-    return <p className="aside move-spot">{m.spotHint}</p>;
+    return (
+      <Note tone="info" summary={spotNotesTexts[lang].moveInstead} hint={m.spotHint}>
+        <p className="aside move-spot">{m.spotHint}</p>
+      </Note>
+    );
   }
   return (
     <p className="aside move-spot" data-moved>

@@ -17,6 +17,8 @@ import { ReachNote, useReach } from "./reach";
 import { reachTexts } from "./reach-texts";
 import { repairTexts } from "./repair-paths-texts";
 import "./repair-paths.css";
+import { Note } from "./spot-notes";
+import { spotNotesTexts } from "./spot-notes-texts";
 
 /** The prefix of a repair among the patch choices. */
 export const REPAIR = "repair:";
@@ -119,6 +121,7 @@ interface RepairPathsProps {
 export function RepairPaths({ place, centre, objects, onShow }: RepairPathsProps) {
   const { api, lang, patchChoices, setPatchChoices } = useSession();
   const t = repairTexts[lang];
+  const n = spotNotesTexts[lang];
   const [state, setState] = useState<"idle" | "working" | "failed" | WalkwayRepair>("idle");
   const signature = `${place}|${objects.map((object) => `${object.plugin}:${object.localId}`).join(",")}`;
   const [shownFor, setShownFor] = useState(signature);
@@ -204,17 +207,21 @@ export function RepairPaths({ place, centre, objects, onShow }: RepairPathsProps
           {t.legendAdded}
         </span>
       </div>
-      <p>{t.summary(removed, added)}</p>
-      {repair.bareObjects > 0 && added > 0 && (
-        <p className="aside">{t.around(repair.bareObjects)}</p>
-      )}
-      {water > 0 && <p className="aside">{t.water(water)}</p>}
-      {repair.lostDoors.length > 0 && (
-        <p className="aside">{t.lostDoors(repair.lostDoors.length)}</p>
-      )}
-      {repair.navmeshes.some((mesh) => !mesh.writable) && <p className="aside">{t.notWritable}</p>}
+      <Note tone="info" summary={n.repaired} hint={t.summary(removed, added)}>
+        <p>{t.summary(removed, added)}</p>
+        {repair.bareObjects > 0 && added > 0 && (
+          <p className="aside">{t.around(repair.bareObjects)}</p>
+        )}
+        {water > 0 && <p className="aside">{t.water(water)}</p>}
+        {repair.lostDoors.length > 0 && (
+          <p className="aside">{t.lostDoors(repair.lostDoors.length)}</p>
+        )}
+        {repair.navmeshes.some((mesh) => !mesh.writable) && (
+          <p className="aside">{t.notWritable}</p>
+        )}
+        {chosen && <p className="aside">{t.chosen}</p>}
+      </Note>
       <RepairedReach place={place} centre={centre} objects={objects} />
-      {chosen && <p className="aside">{t.chosen}</p>}
     </div>
   );
 }

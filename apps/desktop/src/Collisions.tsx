@@ -34,7 +34,7 @@ import type {
 } from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { InteriorView } from "./InteriorView";
-import { LocateButton } from "./locate";
+import { LocateButton, locate } from "./locate";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
@@ -73,6 +73,8 @@ import {
 } from "./review-clusters";
 import { useReviewTexts } from "./review-texts";
 import type { StageSegment } from "./segments";
+import { Note, NoteRow, NotesInFull } from "./spot-notes";
+import { spotNotesTexts } from "./spot-notes-texts";
 import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
@@ -153,10 +155,6 @@ const CLOSE = 0.9;
 
 /** From this many spots on, a pair of mods is better decided as a whole. */
 const MANY = 20;
-
-/** How long a located door blinks, and how fast, in milliseconds. */
-const LOCATE = 3000;
-const BLINK = 250;
 
 /** Reads a remembered setting; only a convenience. */
 function remembered<T>(name: string, fallback: T, read: (value: string) => T | null): T {
@@ -489,6 +487,11 @@ export function Collisions({
   );
   const [advance, setAdvance] = useState(() =>
     remembered("mallet.workAdvance2", false, (value) => value === "on"),
+  );
+  // The spot's notes in full, or as badges in their cards (the default),
+  // which leaves the 3D view its height.
+  const [notesInFull, setNotesInFull] = useState(() =>
+    remembered("mallet.workNotes", false, (value) => value === "on"),
   );
   // Tinted parts and ghosts, or the place as the game would show it.
   const [marks, setMarks] = useState(true);
@@ -1045,6 +1048,11 @@ export function Collisions({
                     setAdvance(next);
                     remember("mallet.workAdvance2", next ? "on" : "off");
                   }}
+                  notesInFull={notesInFull}
+                  onNotesInFull={(next) => {
+                    setNotesInFull(next);
+                    remember("mallet.workNotes", next ? "on" : "off");
+                  }}
                   onPreview={togglePreview}
                   onDecide={(plugin) => decide(current, plugin)}
                   onUndecide={() => undecide(current)}
@@ -1326,6 +1334,9 @@ interface SpotProps {
   advance: boolean;
   onMarks: (marks: boolean) => void;
   onAdvance: (advance: boolean) => void;
+  /** Whether the notes are shown in full rather than as badges in their cards. */
+  notesInFull: boolean;
+  onNotesInFull: (inFull: boolean) => void;
   onPreview: (plugin: string) => void;
   onDecide: (plugin: string | null) => void;
   onUndecide: () => void;
@@ -1355,27 +1366,8 @@ function Spot(props: SpotProps) {
   const depth = spot.depth ?? null;
   // One door of stacked doors looked at alone in the view (ADR 0067).
   const [doorLook, setDoorLook] = useState<ObjectRef | null>(null);
-  // One door made to blink for a moment, the view turned to it.
-  const [locating, setLocating] = useState<{
-    object: ObjectRef;
-    position: [number, number, number];
-  } | null>(null);
-  const [blink, setBlink] = useState(true);
-  useEffect(() => {
-    if (locating === null) {
-      return;
-    }
-    setBlink(true);
-    const timer = setInterval(() => setBlink((on) => !on), BLINK);
-    const end = setTimeout(() => setLocating(null), LOCATE);
-    return () => {
-      clearInterval(timer);
-      clearTimeout(end);
-    };
-  }, [locating]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new spot looks at all again.
   useEffect(() => {
-    setLocating(null);
     setDoorLook(null);
   }, [item.key]);
   // What the patch hides, from the one source of every choice.
@@ -1468,7 +1460,7 @@ function Spot(props: SpotProps) {
     walkQueries,
   );
   /** The parts of a side characters walk on, and how many pieces of path lie on them. */
-  const walkedOf = (side: Side) => {
+  const walkedOf = (side: Pick<Side, "parts">) => {
     const parts = side.parts.filter(
       (part) => (walked?.get(objectKey(part.object.plugin, part.object.localId)) ?? 0) > 0,
     );
@@ -1507,6 +1499,40 @@ function Spot(props: SpotProps) {
     () => withPaths(pathsMode.overlay, repairShown),
     [pathsMode.overlay, repairShown],
   );
+  const n = spotNotesTexts[lang];
+  /**
+   * What hiding `parts` of a side does to the characters' paths (ADR 0051,
+   * 0058, 0059): badges in the side's card, or the notes in full.
+   */
+  const sideNotes = (side: Side, parts: Side["parts"]) => {
+    const { parts: walkedParts, pieces } = walkedOf({ parts });
+    if (!side.hideable || walkedParts.length === 0) {
+      return null;
+    }
+    const names = [...new Set(walkedParts.map((part) => part.name))].join(", ");
+    const warning = w.spotWarning(names, shortName(side.plugin), pieces);
+    return (
+      <>
+        <Note tone="warn" icon={<PathIcon />} summary={n.walked} hint={warning}>
+          <p className="walk-warning">
+            <PathIcon />
+            <span>{warning}</span>
+          </p>
+        </Note>
+        <SideReach
+          place={walkPlace}
+          centre={walkCentre}
+          objects={walkedParts.map((part) => part.object)}
+        />
+        <RepairPaths
+          place={walkPlace}
+          centre={walkCentre}
+          objects={parts.map((part) => part.object)}
+          onShow={setRepairShown}
+        />
+      </>
+    );
+  };
 
   /** One mod's column: hiding its part here, in the passage and around, and what ties it. */
   const sideColumn = (side: Side, at: number) => {
@@ -1557,7 +1583,10 @@ function Spot(props: SpotProps) {
             </span>
           </button>
         </div>
-        <SpotMoves parts={side.parts} />
+        <NoteRow>
+          {sideNotes(side, side.parts)}
+          <SpotMoves parts={side.parts} />
+        </NoteRow>
         {!side.hideable && (
           <div className="needed-parts">
             <span className="work-column-label">{t.anchorWhy}</span>
@@ -1661,7 +1690,7 @@ function Spot(props: SpotProps) {
   );
 
   return (
-    <>
+    <NotesInFull value={props.notesInFull}>
       <div className="work-decision">
         <div className="work-nav">
           <span className="work-kind" data-kind={item.kind} title={t.spotKindHints[item.kind]}>
@@ -1696,6 +1725,14 @@ function Spot(props: SpotProps) {
               />
               {t.workAfterDecide}
             </label>
+            <label className="control-check aside" title={n.showNotesHint}>
+              <input
+                type="checkbox"
+                checked={props.notesInFull}
+                onChange={(event) => props.onNotesInFull(event.target.checked)}
+              />
+              {n.showNotes}
+            </label>
             <PinButton keys={decided === undefined ? [item.key] : []} />
             {spot.location.type === "exterior" && (
               <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
@@ -1716,12 +1753,18 @@ function Spot(props: SpotProps) {
             looking={doorLook}
             onLookAt={setDoorLook}
             pair={doorPair(spot.doors, props.onOpenMods)}
-            onLocate={(door) =>
-              setLocating({
-                object: door.object,
-                position: door.position ?? spot.position ?? [0, 0, 0],
-              })
-            }
+            onLocate={(door) => locate([door.object], door.position ?? spot.position)}
+            notesOf={(door) => {
+              const side = item.sides.find((candidate) =>
+                candidate.parts.some((part) => matchKey(part.object) === matchKey(door.object)),
+              );
+              return side === undefined
+                ? null
+                : sideNotes(
+                    side,
+                    side.parts.filter((part) => matchKey(part.object) === matchKey(door.object)),
+                  );
+            }}
           />
         ) : (
           <div className="work-columns">
@@ -1772,31 +1815,6 @@ function Spot(props: SpotProps) {
             )}
           </div>
         )}
-        {item.sides
-          .filter((side) => side.hideable && walkedOf(side).parts.length > 0)
-          .map((side) => {
-            const { parts, pieces } = walkedOf(side);
-            const names = [...new Set(parts.map((part) => part.name))].join(", ");
-            return (
-              <div key={side.plugin}>
-                <p className="walk-warning">
-                  <PathIcon />
-                  <span>{w.spotWarning(names, shortName(side.plugin), pieces)}</span>
-                </p>
-                <SideReach
-                  place={walkPlace}
-                  centre={walkCentre}
-                  objects={parts.map((part) => part.object)}
-                />
-                <RepairPaths
-                  place={walkPlace}
-                  centre={walkCentre}
-                  objects={side.parts.map((part) => part.object)}
-                  onShow={setRepairShown}
-                />
-              </div>
-            );
-          })}
       </div>
       <Stage
         {...props}
@@ -1811,10 +1829,9 @@ function Spot(props: SpotProps) {
         paint={paintReach}
         paths={shownPaths}
         lookAt={doorLook}
-        locate={locating === null ? null : { ...locating, on: blink }}
         legend={pathsMode.legend}
       />
-    </>
+    </NotesInFull>
   );
 }
 
@@ -1895,7 +1912,6 @@ function Stage({
   paint,
   paths = null,
   lookAt = null,
-  locate = null,
   legend,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
@@ -1909,8 +1925,6 @@ function Stage({
   paths?: PathsOverlay | null;
   /** One part looked at alone: lit up, the spot's other parts as ghosts. */
   lookAt?: ObjectRef | null;
-  /** One part made to blink, the view turned to it: lit while `on`. */
-  locate?: { object: ObjectRef; position: [number, number, number]; on: boolean } | null;
   /** Shown over the view, such as the legend of the paths mode (ADR 0071). */
   legend?: ReactNode;
 }) {
@@ -1943,31 +1957,15 @@ function Stage({
     () => (world?.markers ?? []).filter((marker) => marker.origin !== "removed"),
     [world],
   );
-  // A part located is flown to: the spot, centred on it.
-  const locatedAt = locate?.position ?? null;
-  const picked = useMemo<Picked>(
-    () => ({
-      type: "spot",
-      spot: locatedAt === null ? item.spot : { ...item.spot, position: locatedAt },
-    }),
-    [item.spot, locatedAt],
-  );
+  const picked = useMemo<Picked>(() => ({ type: "spot", spot: item.spot }), [item.spot]);
   const parts = item.spot.parts ?? [];
-  const blinking =
-    locate === null
-      ? null
-      : locate.on
-        ? objectKey(locate.object.plugin, locate.object.localId)
-        : "";
   const looked = lookAt === null ? null : objectKey(lookAt.plugin, lookAt.localId);
   const focus = useMemo(
     () =>
-      blinking !== null
-        ? new Set(blinking === "" ? [] : [blinking])
-        : looked === null
-          ? new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId)))
-          : new Set([looked]),
-    [parts, looked, blinking],
+      looked === null
+        ? new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId)))
+        : new Set([looked]),
+    [parts, looked],
   );
   const ghosts = useMemo(() => {
     const keys = new Set(hiddenObjects.map((object) => objectKey(object.plugin, object.localId)));
@@ -2079,7 +2077,7 @@ function Stage({
       <InteriorView
         key={location.cell}
         cell={location.cell}
-        centre={locatedAt ?? item.spot.position ?? null}
+        centre={item.spot.position ?? null}
         focus={focus}
         hidden={ghosts}
         plain={!marks}

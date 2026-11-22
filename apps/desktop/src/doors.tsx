@@ -3,7 +3,7 @@
 // of them means. The collisions' page and the guided review show it; the
 // choice itself is the patch's, as for any other spot.
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import "./doors.css";
 import { useSession } from "./Actions";
 import { type DoorTexts, doorTexts } from "./door-texts";
@@ -29,6 +29,8 @@ import {
   spotKey,
 } from "./patch";
 import { ReachNote, useReach } from "./reach";
+import { Note, NoteRow, useNotesInFull } from "./spot-notes";
+import { spotNotesTexts } from "./spot-notes-texts";
 
 /** Game units in a centimetre. */
 const UNITS_PER_CENTIMETRE = 0.7;
@@ -74,7 +76,7 @@ interface DoorPanelProps {
   looking?: ObjectRef | null;
   /** Looks at one door alone in the 3D view, or at all again with null. */
   onLookAt?: (object: ObjectRef | null) => void;
-  /** Makes one door blink for a moment in the 3D view and turns the view to it. */
+  /** Makes one door blink for a moment in the 3D view, the camera left where it is. */
   onLocate?: (door: StackedDoor) => void;
   /** The pair of mods whose doors these are, to open all their collisions. */
   pair?: { first: string; second: string; onOpen: () => void } | null;
@@ -82,9 +84,15 @@ interface DoorPanelProps {
   place: string | null;
   /** Outside: where the doors stand; null inside. */
   centre: [number, number] | null;
+  /** More notes about hiding one door, shown in its card (see `spot-notes.tsx`). */
+  notesOf?: (door: StackedDoor) => ReactNode;
 }
 
-/** The doors of a spot side by side, and what keeping one of them means. */
+/**
+ * The doors of a spot side by side, and what keeping one of them means:
+ * where it then leads in the panel's first line, the rest in each door's
+ * card.
+ */
 export function DoorPanel({
   group,
   hidden,
@@ -97,6 +105,7 @@ export function DoorPanel({
   pair = null,
   place,
   centre,
+  notesOf,
 }: DoorPanelProps) {
   const { lang } = useSession();
   const d = doorTexts[lang];
@@ -115,135 +124,178 @@ export function DoorPanel({
     );
   const nameOf = (object: ObjectRef) => d.doorOf(modOf(object));
   return (
-    <div className="door-panel">
-      <p className="door-intro">
-        {d.intro(group.doors.length)}
-        {group.flicker && <> {d.flicker}</>}
-      </p>
+    <div className="door-panel" data-doors={group.doors.length}>
+      <div className="door-head">
+        <span className="door-intro">
+          {d.intro(group.doors.length)}
+          {group.flicker && <> {d.flicker}</>}
+        </span>
+        {plan !== undefined && kept !== undefined && (
+          <span className="door-outcome">
+            <strong>{d.ifKept(nameOf(kept.object))}</strong> {outcome(d, group, plan, kept)}
+          </span>
+        )}
+        <span className="door-head-buttons">
+          <button type="button" className="small" aria-pressed={keptAll} onClick={onKeepAll}>
+            {keptAll ? d.keptAll : d.keepAll}
+          </button>
+          {pair !== null && (
+            <button type="button" className="small quiet" onClick={pair.onOpen}>
+              {d.pairLink(short(pair.first), short(pair.second))}
+            </button>
+          )}
+        </span>
+      </div>
       {group.apart === true && <p className="door-apart">{d.apart}</p>}
       {group.doors.every((door) => hidden(door.object)) && (
         <p className="door-apart door-lost">{d.wayLost}</p>
       )}
       <div className="door-cards">
-        {group.doors.map((door, index) => (
-          <DoorCard
-            key={`${door.object.plugin}:${door.object.localId}`}
-            door={door}
-            first={index === 0}
-            apart={group.apart === true}
-            merged={merged !== null && sameObject(merged, door.object)}
-            gone={merged !== null && !sameObject(merged, door.object)}
-            looking={looking !== null && sameObject(looking, door.object)}
-            onHover={(hovering) => setHovered(hovering ? index : null)}
-            onLook={
-              onLookAt === undefined
-                ? undefined
-                : () =>
-                    onLookAt(
-                      looking !== null && sameObject(looking, door.object) ? null : door.object,
-                    )
-            }
-            onLocate={onLocate === undefined ? undefined : () => onLocate(door)}
-            onMerge={() => {
-              const chosen = group.plans[index];
-              if (chosen !== undefined) {
-                onMerge(chosen);
+        {group.doors.map((door, index) => {
+          const itsPlan = group.plans[index];
+          return (
+            <DoorCard
+              key={`${door.object.plugin}:${door.object.localId}`}
+              door={door}
+              first={index === 0}
+              apart={group.apart === true}
+              merged={merged !== null && sameObject(merged, door.object)}
+              gone={merged !== null && !sameObject(merged, door.object)}
+              looking={looking !== null && sameObject(looking, door.object)}
+              onHover={(hovering) => setHovered(hovering ? index : null)}
+              onLook={
+                onLookAt === undefined
+                  ? undefined
+                  : () =>
+                      onLookAt(
+                        looking !== null && sameObject(looking, door.object) ? null : door.object,
+                      )
               }
-            }}
-          />
-        ))}
-      </div>
-      <div className="door-plan">
-        {plan !== undefined && kept !== undefined && (
-          <>
-            <strong>{d.ifKept(nameOf(kept.object))}</strong>
-            <p className="door-outcome">{outcome(d, group, plan, kept)}</p>
-            <ul>
-              {group.apart !== true &&
-                plan.hide
-                  .filter((object) => {
-                    const door = group.doors.find((candidate) =>
-                      sameObject(candidate.object, object),
-                    );
-                    return door !== undefined && (door.walkable || door.references > 0);
-                  })
-                  .map((object) => (
-                    <li key={`users:${object.plugin}:${object.localId}`}>
-                      {d.usersMove(nameOf(object), nameOf(plan.keep))}
-                    </li>
-                  ))}
-              {plan.changes.map((change) => {
-                if (
-                  change.type !== "teleport" ||
-                  change.from === undefined ||
-                  change.from === null
-                ) {
-                  return null;
+              onLocate={onLocate === undefined ? undefined : () => onLocate(door)}
+              onMerge={() => {
+                if (itsPlan !== undefined) {
+                  onMerge(itsPlan);
                 }
-                const from = change.from;
-                const across = group.doors.find((door) => sameObject(door.object, from));
-                const there =
-                  across?.leadsTo !== null && across?.leadsTo !== undefined
-                    ? placeName(across.leadsTo.location)
-                    : change.door.plugin;
-                return (
-                  <li key={`${change.door.plugin}:${change.door.localId}`}>
-                    {d.otherSide(there, modOf(plan.keep))}
-                    {change.arrival !== null && change.arrival !== undefined && (
-                      <> {d.arrivalMoves}</>
-                    )}
-                  </li>
-                );
-              })}
-              {plan.changes.some((change) => change.type === "navmesh-door") && (
-                <li>
-                  {d.paths(
-                    plan.changes.filter((change) => change.type === "navmesh-door").length,
-                    nameOf(plan.keep),
+              }}
+              notes={
+                <>
+                  {itsPlan !== undefined && (
+                    <PlanNotes
+                      group={group}
+                      plan={itsPlan}
+                      nameOf={nameOf}
+                      modOf={modOf}
+                      place={place}
+                      centre={centre}
+                    />
                   )}
-                </li>
-              )}
-              {plan.lost.map((lost) => (
-                <li key={`lost:${placeName(lost.location)}`} className="door-lost">
-                  {d.lost(
-                    placeName(lost.location),
-                    nameOf(
-                      group.doors.find(
-                        (door) =>
-                          door.leadsTo !== null &&
-                          door.leadsTo !== undefined &&
-                          placeName(door.leadsTo.location) === placeName(lost.location),
-                      )?.object ?? plan.keep,
-                    ),
-                  )}
+                  {notesOf?.(door)}
+                </>
+              }
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** What else keeping one door changes, and what hiding the others does to the ways. */
+function PlanNotes({
+  group,
+  plan,
+  nameOf,
+  modOf,
+  place,
+  centre,
+}: {
+  group: DoorGroup;
+  plan: DoorMerge;
+  nameOf: (object: ObjectRef) => string;
+  modOf: (object: ObjectRef) => string;
+  place: string | null;
+  centre: [number, number] | null;
+}) {
+  const { lang } = useSession();
+  const d = doorTexts[lang];
+  const n = spotNotesTexts[lang];
+  const full = useNotesInFull();
+  const changes: { key: string; text: string; lost?: boolean }[] = [];
+  if (group.apart !== true) {
+    for (const object of plan.hide) {
+      const door = group.doors.find((candidate) => sameObject(candidate.object, object));
+      if (door !== undefined && (door.walkable || door.references > 0)) {
+        changes.push({
+          key: `users:${object.plugin}:${object.localId}`,
+          text: d.usersMove(nameOf(object), nameOf(plan.keep)),
+        });
+      }
+    }
+  }
+  for (const change of plan.changes) {
+    if (change.type !== "teleport" || change.from === undefined || change.from === null) {
+      continue;
+    }
+    const from = change.from;
+    const across = group.doors.find((door) => sameObject(door.object, from));
+    const there =
+      across?.leadsTo !== null && across?.leadsTo !== undefined
+        ? placeName(across.leadsTo.location)
+        : change.door.plugin;
+    const arrival = change.arrival !== null && change.arrival !== undefined;
+    changes.push({
+      key: `${change.door.plugin}:${change.door.localId}`,
+      text: `${d.otherSide(there, modOf(plan.keep))}${arrival ? ` ${d.arrivalMoves}` : ""}`,
+    });
+  }
+  const navmeshDoors = plan.changes.filter((change) => change.type === "navmesh-door").length;
+  if (navmeshDoors > 0) {
+    changes.push({ key: "paths", text: d.paths(navmeshDoors, nameOf(plan.keep)) });
+  }
+  for (const lost of plan.lost) {
+    changes.push({
+      key: `lost:${placeName(lost.location)}`,
+      lost: true,
+      text: d.lost(
+        placeName(lost.location),
+        nameOf(
+          group.doors.find(
+            (door) =>
+              door.leadsTo !== null &&
+              door.leadsTo !== undefined &&
+              placeName(door.leadsTo.location) === placeName(lost.location),
+          )?.object ?? plan.keep,
+        ),
+      ),
+    });
+  }
+  const lost = changes.filter((change) => change.lost).length;
+  return (
+    <>
+      {changes.length > 0 && (
+        <Note
+          tone={lost > 0 ? "bad" : "info"}
+          summary={lost > 0 ? n.doorLost(lost) : n.doorChanges(changes.length)}
+          hint={changes.map((change) => change.text).join("\n")}
+        >
+          <div className="door-plan">
+            <ul>
+              {changes.map((change) => (
+                <li key={change.key} className={change.lost ? "door-lost" : undefined}>
+                  {change.text}
                 </li>
               ))}
             </ul>
-            <p className="door-reached" data-ok={kept.walkable}>
-              {kept.walkable ? d.keptReached : d.keptNotOnPaths}
-            </p>
-            <DoorReach place={place} centre={centre} hide={plan.hide} />
-            {plan.changes.length === 0 && plan.lost.length === 0 && (
-              <p className="aside">{d.nothingElse}</p>
-            )}
             {plan.changes.some((change) => change.type === "teleport") && (
               <p className="aside">{d.viaMoves}</p>
             )}
-            {plan.changes.some((change) => change.type === "navmesh-door") && (
-              <p className="aside">{d.pathsLater}</p>
-            )}
-          </>
-        )}
-        <button type="button" className="small" aria-pressed={keptAll} onClick={onKeepAll}>
-          {keptAll ? d.keptAll : d.keepAll}
-        </button>
-        {pair !== null && (
-          <button type="button" className="small quiet" onClick={pair.onOpen}>
-            {d.pairLink(short(pair.first), short(pair.second))}
-          </button>
-        )}
-      </div>
-    </div>
+            {navmeshDoors > 0 && <p className="aside">{d.pathsLater}</p>}
+          </div>
+        </Note>
+      )}
+      {full && changes.length === 0 && <p className="aside">{d.nothingElse}</p>}
+      <DoorReach place={place} centre={centre} hide={plan.hide} />
+    </>
   );
 }
 
@@ -311,9 +363,11 @@ interface DoorCardProps {
   onHover: (hovering: boolean) => void;
   /** Looks at it alone in the 3D view, or at all again. */
   onLook: (() => void) | undefined;
-  /** Makes it blink in the 3D view, the view turned to it. */
+  /** Makes it blink in the 3D view, the camera left where it is. */
   onLocate: (() => void) | undefined;
   onMerge: () => void;
+  /** What keeping it, or hiding it, means besides: badges, or in full. */
+  notes: ReactNode;
 }
 
 /** One door: which, where it leads, whether characters walk through it. */
@@ -328,10 +382,18 @@ function DoorCard({
   onLook,
   onLocate,
   onMerge,
+  notes,
 }: DoorCardProps) {
   const { lang } = useSession();
   const d = doorTexts[lang];
-  const check = (ok: boolean, yes: string, no: string) => <li data-ok={ok}>{ok ? yes : no}</li>;
+  const n = spotNotesTexts[lang];
+  const full = useNotesInFull();
+  // In full, a sentence a line; otherwise short words, the sentence in the tooltip.
+  const check = (ok: boolean, yes: string, no: string, words: [string, string]) => (
+    <li data-ok={ok} title={full ? undefined : ok ? yes : no}>
+      {full ? (ok ? yes : no) : ok ? words[0] : words[1]}
+    </li>
+  );
   const leadsTo = door.leadsTo ?? null;
   const changedBy = door.plugin.toLowerCase() !== door.object.plugin.toLowerCase();
   return (
@@ -379,7 +441,7 @@ function DoorCard({
           </button>
         )}
       </div>
-      <div className="aside">
+      <div className="aside door-what">
         {door.name}
         {changedBy && <> · {d.changedBy(short(door.plugin))}</>}
         {door.front && <> · {d.front}</>}
@@ -392,13 +454,21 @@ function DoorCard({
             ? d.broken
             : d.opensOnly}
       </p>
-      <ul className="door-checks">
-        {leadsTo !== null && check(door.leadsBack, d.leadsBack, d.leadsElsewhere)}
-        {check(door.walkable, d.walkable, d.notWalkable)}
+      <ul className="door-checks" data-full={full || undefined}>
+        {leadsTo !== null &&
+          check(door.leadsBack, d.leadsBack, d.leadsElsewhere, [n.leadsBack, n.leadsElsewhere])}
+        {check(door.walkable, d.walkable, `${d.notWalkable}. ${d.keptNotOnPaths}`, [
+          n.walkable,
+          n.notWalkable,
+        ])}
         {leadsTo !== null &&
           door.walkable &&
-          check(door.otherSideWalkable, d.otherSideWalkable, d.otherSideNotWalkable)}
+          check(door.otherSideWalkable, d.otherSideWalkable, d.otherSideNotWalkable, [
+            n.otherSide,
+            n.otherSideNot,
+          ])}
       </ul>
+      <NoteRow>{notes}</NoteRow>
       <button
         type="button"
         className="work-choice"

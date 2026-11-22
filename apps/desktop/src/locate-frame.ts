@@ -1,9 +1,14 @@
-// Where the camera of a 3D view goes to show some located objects (see
-// `locate.tsx`). Pure, so that a script can test it without a view.
+// Where located objects are on the screen of a 3D view (see `locate.tsx`).
+// The camera stays where the user put it; objects out of sight get an
+// arrow at the edge of the view that points to them. Pure, so that a
+// script can test it without a view.
+
+/** How long located objects glow, and an arrow points to them, in milliseconds. */
+export const LOCATE_MS = 3000;
 
 /** The point and the reach of a group of objects, in game units. */
 export interface Framing {
-  /** Where the camera looks: the middle of the objects. */
+  /** The middle of the objects. */
   target: [number, number, number];
   /** How far the objects reach from it, sideways and up. */
   radius: number;
@@ -29,14 +34,74 @@ export function framing(positions: readonly (readonly number[])[]): Framing | nu
   return { target, radius };
 }
 
+/** An arrow at the edge of a view: where it sits, in pixels, and where it points. */
+export interface EdgePointer {
+  x: number;
+  y: number;
+  /** The direction it points, in radians: 0 to the right, π/2 down. */
+  angle: number;
+}
+
 /**
- * How far the camera stands from located objects, in the unit of
- * `radius`: far enough to see all of them with some room around, but a
- * camera already about right is left where it is, so that the view does
- * not jump between two objects side by side. `least` is the closest the
- * camera should come, as objects have a size of their own.
+ * The arrow at the edge of a `width` by `height` view that points to a
+ * `point` out of sight, `margin` pixels inside the edge; null where the
+ * point is in sight. `matrix` is the view's column-major matrix from the
+ * point's space to the screen. A point behind the camera is pointed to
+ * on the side it lies.
  */
-export function framedDistance(radius: number, current: number, least: number): number {
-  const wanted = Math.max(least, radius * 2.6);
-  return current >= wanted * 0.6 && current <= wanted * 1.8 ? current : wanted;
+export function edgePointer(
+  matrix: ArrayLike<number>,
+  point: readonly [number, number, number],
+  width: number,
+  height: number,
+  margin = 28,
+): EdgePointer | null {
+  const [px, py, pz] = point;
+  const m = (index: number) => matrix[index] ?? 0;
+  const x = m(0) * px + m(4) * py + m(8) * pz + m(12);
+  const y = m(1) * px + m(5) * py + m(9) * pz + m(13);
+  const w = m(3) * px + m(7) * py + m(11) * pz + m(15);
+  const size = Math.max(Math.abs(w), 1e-6);
+  const nx = x / size;
+  const ny = y / size;
+  if (w > 1e-6 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1) {
+    return null;
+  }
+  // Behind the camera and straight ahead or behind: down, where one turns.
+  const dx = Math.abs(nx) + Math.abs(ny) < 1e-9 ? 0 : nx * (width / 2);
+  const dy = Math.abs(nx) + Math.abs(ny) < 1e-9 ? height / 2 : (0 - ny) * (height / 2);
+  const halfWidth = Math.max(1, width / 2 - margin);
+  const halfHeight = Math.max(1, height / 2 - margin);
+  const scale = Math.min(
+    dx === 0 ? Number.POSITIVE_INFINITY : halfWidth / Math.abs(dx),
+    dy === 0 ? Number.POSITIVE_INFINITY : halfHeight / Math.abs(dy),
+  );
+  return {
+    x: width / 2 + dx * scale,
+    y: height / 2 + dy * scale,
+    angle: Math.atan2(dy, dx),
+  };
+}
+
+/** Draws an `EdgePointer` on a 2D canvas: a filled arrow with a dark rim, in `colour`. */
+export function paintEdgePointer(
+  context: CanvasRenderingContext2D,
+  pointer: EdgePointer,
+  colour: string,
+) {
+  context.save();
+  context.translate(pointer.x, pointer.y);
+  context.rotate(pointer.angle);
+  context.beginPath();
+  context.moveTo(16, 0);
+  context.lineTo(-8, -12);
+  context.lineTo(-3, 0);
+  context.lineTo(-8, 12);
+  context.closePath();
+  context.fillStyle = colour;
+  context.strokeStyle = "rgb(0 0 0 / 70%)";
+  context.lineWidth = 2;
+  context.fill();
+  context.stroke();
+  context.restore();
 }
