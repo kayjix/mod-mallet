@@ -47,7 +47,14 @@ calls, not on the triangles.
    only when it changed. Picking reads the look of the view clicked.
 6. Textures are decoded away from the page's own thread
    (`createImageBitmap`), where the browser can.
-7. In a development build, `__malletBench()` in the console measures what
+7. **Finding a comparison's structures does not keep the page busy.**
+   Growing a structure rules out parts too far apart by their spheres
+   before the box test, with a bound that never changes the answer; each
+   part's facts and box are worked out once while the objects stay; what
+   of a structure lies in a passage is worked out once per structure, not
+   once per spot. While models arrive, the comparison waits at least four
+   times as long as its last try took before it tries again.
+8. In a development build, `__malletBench()` in the console measures what
    a frame of each open view costs (JavaScript, card, draw calls, uploads);
    a built app does so when `mallet.renderStats` is `1` in its local
    storage. The settings' About page names the graphics card that draws
@@ -58,6 +65,14 @@ calls, not on the triangles.
 - With the heavy place, a frame of the comparison takes 1.7 ms in
   JavaScript and 2.3 ms on the card: 483 draw calls and no uploads. The
   single map view went from 1 257 calls to 164.
+- On the user's setup, at JK's Sky Haven Temple against JKs Skyrim, the
+  comparison drew a frame with 522 calls in 1.9 ms of JavaScript and
+  2.9 ms on the card, and the single map view at the forge with 844 calls
+  in 2.8 ms and 2.0 ms. Before, the comparison never finished loading
+  there: finding its structures ran again with every model that arrived
+  and kept the page busy for more than fourteen minutes. Now the place is
+  loaded in about nine seconds, a try takes at most half a second, and the
+  structures found are the same (205 and 188 parts).
 - Pictures stay the same: drawn both ways, the comparison differed in 18
   of 493 500 pixels, all of objects smaller than a pixel and a half.
 - The number of calls now grows with the number of materials, not of
