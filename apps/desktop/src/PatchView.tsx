@@ -3,6 +3,7 @@ import { ActionResult, type PatchAt, useAction, useSession } from "./Actions";
 import type { BookPatch, PatchBook } from "./generated/patch-book";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
 import { InfoTip } from "./info-tip";
+import { MovesPanel } from "./move-controls";
 import { PairReport } from "./PairReport";
 import { choicesOf, matchKey, objectsOf, openSpots, type Pair, pairsOf, spotsByKey } from "./patch";
 import {
@@ -34,6 +35,7 @@ import {
   type TouchedMod,
 } from "./patch-entries";
 import { type PatchTexts, patchTexts } from "./patch-texts";
+import { PathsPanel } from "./repair-paths";
 import { NOTHING_WAITS } from "./switched-off";
 import { switchedOffTexts } from "./switched-off-texts";
 import "./patches.css";
@@ -288,11 +290,16 @@ function TopNotes({
           </button>
         </section>
       )}
-      {(paused.decisions > 0 || paused.stillLoaded.length > 0) && (
+      {(paused.decisions > 0 || paused.installed > 0 || paused.stillLoaded.length > 0) && (
         <div className="patch-paused" role="note">
           {paused.decisions > 0 && (
             <p>
               {off.waiting(paused.decisions, paused.mods)} <InfoTip text={off.waitingNote} />
+            </p>
+          )}
+          {paused.installed > 0 && (
+            <p>
+              {off.installed(paused.installed, paused.installedPlugins)} {off.installedNote}
             </p>
           )}
           {paused.stillLoaded.length > 0 && <p>{off.stillLoaded(paused.stillLoaded)}</p>}
@@ -396,7 +403,8 @@ function PatchDetail({
   const active = activePatch(book)?.id === patch.id;
   const state = stateOf(report, patch);
   const mod = patchMod(report, patch.name);
-  const hidden = objectsOf(pairs, tickedOf(patch));
+  const ticked = useMemo(() => tickedOf(patch), [patch]);
+  const hidden = objectsOf(pairs, ticked);
   const installed = new Set(installedObjectsOf(report, patch.name).map(matchKey));
   const missing =
     state === "in-game" ? hidden.filter((object) => !installed.has(matchKey(object))).length : 0;
@@ -647,6 +655,8 @@ function PatchDetail({
         onMove={(keys, to, copy) => change(withMoved(book, patch.id, to, keys, copy))}
         onGo={(target, item) => goTo(target, here(item.key, item.text))}
       />
+      <MovesPanel inPatch={{ choices: ticked, note: p.inPatchNote }} />
+      <PathsPanel hidden={hidden} inPatch={{ choices: ticked, note: p.inPatchNote }} />
     </article>
   );
 }

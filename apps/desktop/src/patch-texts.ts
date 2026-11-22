@@ -101,6 +101,7 @@ export interface PatchTexts {
   open: (spots: number, pairs: number) => string;
   toCollisions: string;
   emptyBook: string;
+  inPatchNote: string;
   patchLabel: (name: string) => string;
 }
 
@@ -259,6 +260,8 @@ const en: PatchTexts = {
     `The old mod “${mod}” is still on. Its moves and paths are part of your patch now; once that is installed, switch the old mod off so that nothing is done twice.`,
   switchOldOff: "Switch the old mod off",
   emptyBook: "No patch yet. Start one, or load one somebody shared.",
+  inPatchNote:
+    "These come with this patch: installing it brings them into the game, with no mod of their own.",
   patchLabel: (name) => `patch “${name}”`,
   open: (spots, pairs) =>
     `Not decided yet: ${plural(spots, "place", "places")} in ${plural(pairs, "pair", "pairs")} of mods.`,
@@ -420,6 +423,8 @@ const de: PatchTexts = {
     `Die alte Mod „${mod}“ ist noch eingeschaltet. Ihre Verschiebungen und Wege gehören jetzt zu deinem Patch; sobald der installiert ist, schalte die alte Mod aus, damit nichts doppelt geschieht.`,
   switchOldOff: "Alte Mod ausschalten",
   emptyBook: "Noch kein Patch. Beginne einen, oder lade einen, den jemand geteilt hat.",
+  inPatchNote:
+    "Diese kommen mit diesem Patch: Installierst du ihn, sind sie im Spiel, ohne eigene Mod.",
   patchLabel: (name) => `Patch „${name}“`,
   open: (spots, pairs) =>
     `Noch nicht entschieden: ${spots === 1 ? "1 Stelle" : `${spots} Stellen`} in ${pairs === 1 ? "1 Mod-Paar" : `${pairs} Mod-Paaren`}.`,

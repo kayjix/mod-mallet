@@ -281,8 +281,22 @@ function RepairedReach({ place, centre, objects }: Omit<RepairPathsProps, "onSho
  * carries them into the game (ADR 0058). `hidden` is every object the
  * patch hides: each place is repaired with all of those that stand there.
  */
-export function PathsPanel({ hidden }: { hidden: ObjectRef[] }) {
-  const { t: app, api, lang, patchChoices: choices, setPatchChoices } = useSession();
+/**
+ * The repaired paths. On the patch page (ADR 0070) it lists those of one
+ * patch, given as `inPatch`, whose archive brings them: it then writes and
+ * installs nothing of its own.
+ */
+export function PathsPanel({
+  hidden,
+  inPatch,
+}: {
+  hidden: ObjectRef[];
+  inPatch?: { choices: PatchChoices; note: string };
+}) {
+  const session = useSession();
+  const { t: app, api, lang, setPatchChoices } = session;
+  const everything = session.patchChoices;
+  const choices = inPatch?.choices ?? everything;
   const t = repairTexts[lang];
   const action = useAction();
   const navmeshes = repairedNavmeshes(choices);
@@ -316,22 +330,26 @@ export function PathsPanel({ hidden }: { hidden: ObjectRef[] }) {
       <div className="patch-bar">
         <strong>{t.panelSummary(navmeshes.length)}</strong>
         <span className="spacer" />
-        <button type="button" disabled={repairs.places.length === 0 || busy} onClick={create}>
-          {busy ? t.writing : t.write}
-        </button>
-        <button
-          type="button"
-          className="primary"
-          disabled={!upToDate || action.busy || (written?.result.navmeshes.length ?? 0) === 0}
-          title={t.installHint}
-          onClick={() => action.run({ type: "repair-paths", repairs })}
-        >
-          {t.install}
-        </button>
+        {inPatch === undefined && (
+          <>
+            <button type="button" disabled={repairs.places.length === 0 || busy} onClick={create}>
+              {busy ? t.writing : t.write}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={!upToDate || action.busy || (written?.result.navmeshes.length ?? 0) === 0}
+              title={t.installHint}
+              onClick={() => action.run({ type: "repair-paths", repairs })}
+            >
+              {t.install}
+            </button>
+          </>
+        )}
         <button
           type="button"
           disabled={navmeshes.length === 0}
-          onClick={() => setPatchChoices(chooseRepair(choices, navmeshes, null))}
+          onClick={() => setPatchChoices(chooseRepair(everything, navmeshes, null))}
         >
           {t.dropAll}
         </button>
@@ -374,6 +392,7 @@ export function PathsPanel({ hidden }: { hidden: ObjectRef[] }) {
       )}
       {error !== null && <p className="failure">{error}</p>}
       <ActionResult state={action} />
+      {inPatch !== undefined && <p className="aside">{inPatch.note}</p>}
       <p className="aside">{t.limits}</p>
     </section>
   );

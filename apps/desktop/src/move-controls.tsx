@@ -477,8 +477,20 @@ export function SpotMoves({ parts }: { parts: SpotPart[] }) {
 }
 
 /** On the patch page: the moved objects, and the plugin that carries them into the game. */
-export function MovesPanel() {
-  const { t, api, lang, patchChoices: choices, setPatchChoices, spots } = useSession();
+/**
+ * The moves, and the doors that merged doors lead elsewhere. On the patch
+ * page (ADR 0070) it lists those of one patch, given as `inPatch`, whose
+ * archive brings them: it then writes and installs nothing of its own.
+ */
+export function MovesPanel({
+  inPatch,
+}: {
+  inPatch?: { choices: PatchChoices; note: string };
+} = {}) {
+  const session = useSession();
+  const { t, api, lang, setPatchChoices, spots } = session;
+  const everything = session.patchChoices;
+  const choices = inPatch?.choices ?? everything;
   const d = doorTexts[lang];
   const hex = (object: ObjectRef) => object.localId.toString(16).padStart(6, "0").toUpperCase();
   const m = useMovesTexts();
@@ -517,25 +529,29 @@ export function MovesPanel() {
       <div className="patch-bar">
         <strong>{m.summary(all.length)}</strong>
         <span className="spacer" />
-        <button type="button" disabled={all.length === 0 || busy} onClick={create}>
-          {busy ? m.creating : m.create}
-        </button>
-        <button
-          type="button"
-          className="primary"
-          disabled={!upToDate || action.busy || (written?.result.moved ?? 0) === 0}
-          title={m.installHint}
-          onClick={() => action.run({ type: "move-objects", moves: { moves: all } })}
-        >
-          {m.install}
-        </button>
+        {inPatch === undefined && (
+          <>
+            <button type="button" disabled={all.length === 0 || busy} onClick={create}>
+              {busy ? m.creating : m.create}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={!upToDate || action.busy || (written?.result.moved ?? 0) === 0}
+              title={m.installHint}
+              onClick={() => action.run({ type: "move-objects", moves: { moves: all } })}
+            >
+              {m.install}
+            </button>
+          </>
+        )}
         <button
           type="button"
           disabled={moves.size === 0}
           onClick={() =>
             setPatchChoices(
               withMoves(
-                choices,
+                everything,
                 [...moves.values()].map(({ object }) => ({ object, move: null })),
               ),
             )
@@ -594,6 +610,7 @@ export function MovesPanel() {
       )}
       {error !== null && <p className="failure">{error}</p>}
       <ActionResult state={action} />
+      {inPatch !== undefined && <p className="aside">{inPatch.note}</p>}
       <p className="aside">{m.limits}</p>
     </section>
   );

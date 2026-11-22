@@ -9,7 +9,7 @@ import { placeName } from "./doors";
 import type { BookPatch } from "./generated/patch-book";
 import type { MapSpot, ObjectRef, RenderedReport, SpotPart } from "./generated/rendered-report";
 import { CM_PER_UNIT, isMoveKey, movesOf } from "./moves";
-import { matchKey, type Pair, type PatchChoices } from "./patch";
+import { keptBy, matchKey, type Pair, type PatchChoices } from "./patch";
 import { DUEL, pluginsOf } from "./patch-book";
 import type { PatchTexts } from "./patch-texts";
 import { REPAIR } from "./repair-paths";
@@ -178,6 +178,19 @@ export function entriesOf(patch: BookPatch, context: EntryContext): Entry[] {
       }
       const spotParts = spot.parts ?? [];
       const plugins = [...new Set(spotParts.map((part) => part.object.plugin))];
+      // Stacked doors merged into one (ADR 0067): one door kept, the rest hidden.
+      const keeps = keptBy(value);
+      if (keeps !== null) {
+        const door = spotParts.find((part) => matchKey(part.object) === matchKey(keeps));
+        entries.push({
+          ...base,
+          group: "moves",
+          text: p.doorMerged(modOf(keeps.plugin), nameOf(keeps, door, p)),
+          where: placeName(spot.location),
+          target: { kind: "spot", spot },
+        });
+        continue;
+      }
       const text =
         value === null
           ? p.bothKept(modOf(plugins[0] ?? ""), modOf(plugins[1] ?? ""))
@@ -228,7 +241,7 @@ export function entriesOf(patch: BookPatch, context: EntryContext): Entry[] {
       entries.push({
         ...base,
         group: "moves",
-        text: move.door ? p.doorMerged(mod, name) : p.moved(mod, name, centimetres, move.rz),
+        text: p.moved(mod, name, centimetres, move.rz),
         where: known === undefined ? move.cell : placeName(known.spot.location),
         target: known === undefined ? null : { kind: "spot", spot: known.spot },
       });

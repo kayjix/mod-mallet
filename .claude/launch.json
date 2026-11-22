@@ -12,12 +12,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace", "apps/desktop", "--", "--port", "1430"],
       "port": 1430
-    },
-    {
-      "name": "desktop-frontend-1470",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace", "apps/desktop", "--", "--port", "1470"],
-      "port": 1470
     }
   ]
 }

@@ -11,8 +11,15 @@
 // in the order of the book; on the same key the later one wins, so the
 // user's own decisions win over loaded ones.
 
+import { withDoorMoves } from "./doors";
 import type { BookPatch, PatchBook } from "./generated/patch-book";
-import type { ObjectRef, Patch, PatchManifest, RenderedReport } from "./generated/rendered-report";
+import type {
+  MapSpot,
+  ObjectRef,
+  Patch,
+  PatchManifest,
+  RenderedReport,
+} from "./generated/rendered-report";
 import { objectMovesOf } from "./moves";
 import {
   decisionAt,
@@ -404,7 +411,13 @@ export function writtenPatch(
     report.installedPatch,
   ).active;
   const hidden = objectsOf(pairs, active);
-  const moves = objectMovesOf(active);
+  // With the doors that merged doors lead elsewhere (ADR 0067), which the
+  // door decisions of its spots say.
+  const spots = new Map<string, MapSpot[]>();
+  for (const spot of report.map.spots) {
+    spots.set(spot.finding, [...(spots.get(spot.finding) ?? []), spot]);
+  }
+  const moves = withDoorMoves(objectMovesOf(active), active, spots);
   const repairs = repairsOf(active, hidden);
   const plugins = [...pluginsOf(ticked).values()].sort((a, b) => a.localeCompare(b));
   const mods = [
