@@ -178,6 +178,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
             <Note
               tone="ok"
               role="status"
+              compact
               actions={
                 <UndoButton
                   onClick={() => {
@@ -327,6 +328,7 @@ function TopNotes({
       )}
       {firstOpen !== undefined && (
         <Note
+          compact
           actions={
             <button type="button" className="small" onClick={() => session.decideSpot(firstOpen)}>
               {p.toCollisions}
@@ -340,6 +342,7 @@ function TopNotes({
         const objects = installed.patch.parts.flatMap((part) => part.objects);
         return (
           <Note
+            compact
             key={installed.patch.name}
             actions={
               <button
@@ -368,6 +371,7 @@ function TopNotes({
       {oldMods.map((info) => (
         <Note
           tone="warning"
+          compact
           key={info.mod.id}
           actions={
             <button

@@ -207,12 +207,15 @@ export function Chip({
 export function Note({
   tone = "info",
   role = "note",
+  compact = false,
   actions,
   className,
   children,
 }: {
   tone?: Tone;
   role?: "note" | "status" | "alert" | "alertdialog";
+  /** One line with its buttons beside it, where room is short. */
+  compact?: boolean;
   /** Buttons that do something about it, below the text. */
   actions?: ReactNode;
   className?: string;
@@ -224,6 +227,7 @@ export function Note({
     <div
       className={className === undefined ? "note" : `note ${className}`}
       data-tone={tone}
+      data-compact={compact ? "" : undefined}
       role={role}
     >
       <ToneIcon tone={tone} />

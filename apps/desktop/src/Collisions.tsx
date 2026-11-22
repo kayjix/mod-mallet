@@ -954,6 +954,7 @@ export function Collisions({
   const offNote = offHere !== undefined && (
     <NoteBox
       tone="warning"
+      compact
       className="still-loaded-note"
       actions={
         offFinding !== undefined && (
@@ -1164,6 +1165,7 @@ export function Collisions({
             currentInPassage !== undefined &&
             currentInPassage.passage !== undefined && (
               <NoteBox
+                compact
                 className="work-passage-note"
                 actions={
                   <button
@@ -1988,7 +1990,7 @@ function Spot(props: SpotProps & SpotFrameProps) {
                     )}
                   </div>
                   {item.sides.every((side) => !side.hideable) && (
-                    <NoteBox>
+                    <NoteBox compact>
                       <p>{t.workBothNeeded}</p>
                     </NoteBox>
                   )}
