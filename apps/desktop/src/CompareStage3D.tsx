@@ -21,7 +21,7 @@ import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
-import { watchView } from "./render-stats";
+import { noteSegments, watchView } from "./render-stats";
 import { useReviewTexts } from "./review-texts";
 import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
 import { drawPathSign, PathIcon, useWalkTexts } from "./walkways";
@@ -157,11 +157,14 @@ export function CompareStage3D({
     framed: "no" | "rough" | "done";
     done: number;
     at: number;
+    /** How long the last try took, in milliseconds. */
+    took: number;
   }>({
     signature: "",
     framed: "no",
     done: -1,
     at: 0,
+    took: 0,
   });
   /** Whether the user moved the camera, which framing then leaves alone. */
   const moved = useRef(false);
@@ -227,15 +230,18 @@ export function CompareStage3D({
     const progress = current.progress;
     const complete = progress.done === progress.total;
     // Finding the segments costs; while models still arrive it rests a
-    // moment between two tries.
+    // moment between two tries, and longer where a try takes long, so
+    // that the page is not kept busy by it (ADR 0075).
     if (
       progress.done === known.current.done ||
-      (!complete && known.current.done >= 0 && Date.now() - known.current.at < FIND_EVERY)
+      (!complete &&
+        known.current.done >= 0 &&
+        Date.now() - known.current.at < Math.max(FIND_EVERY, known.current.took * 4))
     ) {
       return;
     }
     known.current.done = progress.done;
-    known.current.at = Date.now();
+    const started = performance.now();
 
     const segments = findSegments(
       current,
@@ -245,6 +251,9 @@ export function CompareStage3D({
       reachNow.current,
       withinNow.current,
     );
+    known.current.took = performance.now() - started;
+    noteSegments(known.current.took);
+    known.current.at = Date.now();
     const first = [
       ...new Map(
         segments
@@ -489,7 +498,7 @@ export function CompareStage3D({
     const gl = canvas.current?.getContext("webgl2") ?? null;
     setState("loading");
     structures.current = [new Set(), new Set()];
-    known.current = { signature: "", framed: "no", done: -1, at: 0 };
+    known.current = { signature: "", framed: "no", done: -1, at: 0, took: 0 };
     moved.current = false;
     setCounts([0, 0]);
     camera.current = {

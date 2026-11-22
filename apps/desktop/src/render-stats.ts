@@ -32,6 +32,16 @@ const watched = new Set<Watched>();
 /** How many meshes were read into the views, and how many milliseconds that took in all. */
 const meshes = { count: 0, ms: 0 };
 
+/** How often the segments of a comparison were found, how long that took in all and at most. */
+const segments = { count: 0, ms: 0, longest: 0 };
+
+/** Counts one finding of a comparison's segments, which took `ms` milliseconds. */
+export function noteSegments(ms: number) {
+  segments.count += 1;
+  segments.ms += ms;
+  segments.longest = Math.max(segments.longest, ms);
+}
+
 /** Counts one mesh read into a view, which took `ms` milliseconds. */
 export function noteMeshes(ms: number) {
   meshes.count += 1;
@@ -224,6 +234,7 @@ if (WATCHING && typeof window !== "undefined") {
   global.__malletCounts = () => ({
     views: [...watched].map(({ view, counts }) => ({ view, ...counts })),
     meshes: { ...meshes, ms: Math.round(meshes.ms) },
+    segments: { ...segments, ms: Math.round(segments.ms), longest: Math.round(segments.longest) },
   });
   // A picture of each view as a PNG address, to compare two ways of drawing pixel by pixel.
   global.__malletSnapshot = () =>

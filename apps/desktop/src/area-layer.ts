@@ -601,6 +601,28 @@ export function overlapDepth(a: PlacedBox, b: PlacedBox): number {
   );
 }
 
+/**
+ * Whether two placed boxes meet within `margin`, exactly as
+ * {@link boxesMeet} tells, after a quick test that rules out boxes too far
+ * apart for it: most parts of a place are far from each other.
+ *
+ * Where no axis of `a` separates them, the middles are at most
+ * `ra + √3·rb + √3·margin` apart (`ra`, `rb` half their diagonals): the
+ * reach of `b` along three axes at right angles is at most `√3·rb` in
+ * all; and the same the other way round.
+ */
+export function boxesTouch(a: PlacedBox, b: PlacedBox, margin: number): boolean {
+  const dx = b.centre[0] - a.centre[0];
+  const dy = b.centre[1] - a.centre[1];
+  const dz = b.centre[2] - a.centre[2];
+  const ra = outerRadius(a);
+  const rb = outerRadius(b);
+  // A little over √3, for rounding.
+  const root3 = 1.7321;
+  const reach = Math.min(ra + root3 * rb, root3 * ra + rb) + root3 * margin;
+  return dx * dx + dy * dy + dz * dz <= reach * reach && boxesMeet(a, b, margin);
+}
+
 /** Half the diagonal of a placed box: no point of it is farther from its middle. */
 function outerRadius(box: PlacedBox): number {
   return Math.hypot(...box.half);
@@ -755,6 +777,15 @@ interface Seen {
   models: Map<Model, boolean>;
 }
 
+/** What growing a structure asks of an object, see `AreaLayer.factsOf`. */
+interface Facts {
+  owner: string;
+  plugin: string;
+  kind: "nature" | "clutter" | "built";
+  box: PlacedBox;
+  decor: boolean;
+}
+
 /** The longest side of a placed object's model, as its matrix scales it. */
 function scaleOf(matrix: Float32Array): number {
   const column = (index: number) =>
@@ -804,6 +835,16 @@ export class AreaLayer {
   private pulseTimer: ReturnType<typeof setInterval> | null = null;
   /** Where moved objects stand now, by key (ADR 0060). */
   private moves = new Map<string, Move>();
+  /** What growing a structure asks of each object, until the objects change. */
+  private facts: { version: number; known: Map<Instance, Facts> } = {
+    version: -1,
+    known: new Map(),
+  };
+  /** The boxes of objects where they stand unmoved, until the objects or models change. */
+  private unmoved: { version: number; known: Map<AreaObject, PlacedBox> } = {
+    version: -1,
+    known: new Map(),
+  };
   /** The objects shown, as last set. */
   area: AreaObjects | null = null;
 
@@ -951,7 +992,19 @@ export class AreaLayer {
     if (model === undefined || !Array.isArray(model.surfaces)) {
       return null;
     }
-    return placedBox(model.box, movedMatrix(placement(object), move));
+    if (move !== null) {
+      return placedBox(model.box, movedMatrix(placement(object), move));
+    }
+    // Where an object stands unmoved is asked often while structures grow.
+    if (this.unmoved.version !== this.changes) {
+      this.unmoved = { version: this.changes, known: new Map() };
+    }
+    let box = this.unmoved.known.get(object);
+    if (box === undefined) {
+      box = placedBox(model.box, placement(object));
+      this.unmoved.known.set(object, box);
+    }
+    return box;
   }
 
   /** The objects shown within `radius` game units of `point`, as their positions say. */
@@ -1199,7 +1252,7 @@ export class AreaLayer {
       }
       const decor = isDecor(part.object.model, part.kind);
       const held = holders.some((box) =>
-        decor ? boxesMeet(box, part.box, CONTENT_MARGIN) : holds(box, part.box.centre),
+        decor ? boxesTouch(box, part.box, CONTENT_MARGIN) : holds(box, part.box.centre),
       );
       return held ? [part.object] : [];
     });
@@ -1299,27 +1352,22 @@ export class AreaLayer {
     // Decor counts also where the mod's version of another mod's object
     // wins (a book it moved onto its shelf); what it grows through is its own.
     const leaves: { object: AreaObject; box: PlacedBox }[] = [];
-    const candidates = this.instances
-      .filter((instance) => {
-        const other = instance.object;
-        return isNear(other) && (ownerOf(other) === owner || other.plugin.toLowerCase() === owner);
-      })
-      .flatMap((instance) => {
-        const model = this.models.get(instance.object.model);
-        if (model === undefined || !Array.isArray(model.surfaces)) {
-          return [];
+    const candidates: { object: AreaObject; box: PlacedBox }[] = [];
+    for (const instance of this.instances) {
+      const other = instance.object;
+      const facts = this.factsOf(instance);
+      if (facts === null || !isNear(other) || (facts.owner !== owner && facts.plugin !== owner)) {
+        continue;
+      }
+      const { kind, box } = facts;
+      if (!isStart(other) && (kind !== grows || facts.owner !== owner)) {
+        if (grows === "built" && facts.decor) {
+          leaves.push({ object: other, box });
         }
-        const kind = kindOf(instance.object.model, sizeOf(model.box, instance.object.scale));
-        const box = placedBox(model.box, instance.matrix);
-        const own = ownerOf(instance.object) === owner;
-        if (!isStart(instance.object) && (kind !== grows || !own)) {
-          if (grows === "built" && isDecor(instance.object.model, kind)) {
-            leaves.push({ object: instance.object, box });
-          }
-          return [];
-        }
-        return [{ object: instance.object, box }];
-      });
+        continue;
+      }
+      candidates.push({ object: other, box });
+    }
     const start = candidates.find(
       (candidate) =>
         candidate.object.id.plugin === object.id.plugin &&
@@ -1329,23 +1377,57 @@ export class AreaLayer {
       return [object];
     }
     const found = [start];
-    const left = new Set(candidates.filter((candidate) => candidate !== start));
-    for (let index = 0; index < found.length; index += 1) {
+    let left = candidates.filter((candidate) => candidate !== start);
+    for (let index = 0; index < found.length && left.length > 0; index += 1) {
       const from = found[index];
       if (from === undefined) {
         break;
       }
-      for (const other of [...left]) {
-        if (boxesMeet(from.box, other.box, margin)) {
+      const still: typeof left = [];
+      for (const other of left) {
+        if (boxesTouch(from.box, other.box, margin)) {
           found.push(other);
-          left.delete(other);
+        } else {
+          still.push(other);
         }
       }
+      left = still;
     }
     const touching = leaves.filter((leaf) =>
-      found.some((part) => boxesMeet(part.box, leaf.box, margin)),
+      found.some((part) => boxesTouch(part.box, leaf.box, margin)),
     );
     return [...found, ...touching].map((candidate) => candidate.object);
+  }
+
+  /**
+   * What growing a structure asks of an object, worked out once while
+   * the objects stay where they are: the mod it belongs to, its plugin,
+   * what kind of part it is, its box as placed and whether it is decor;
+   * null until its model is read.
+   */
+  private factsOf(instance: Instance): Facts | null {
+    if (this.facts.version !== this.changes) {
+      this.facts = { version: this.changes, known: new Map() };
+    }
+    const known = this.facts.known.get(instance);
+    if (known !== undefined) {
+      return known;
+    }
+    const { object } = instance;
+    const model = this.models.get(object.model);
+    if (model === undefined || !Array.isArray(model.surfaces)) {
+      return null;
+    }
+    const kind = kindOf(object.model, sizeOf(model.box, object.scale));
+    const made: Facts = {
+      owner: ownerOf(object),
+      plugin: object.plugin.toLowerCase(),
+      kind,
+      box: placedBox(model.box, instance.matrix),
+      decor: isDecor(object.model, kind),
+    };
+    this.facts.known.set(instance, made);
+    return made;
   }
 
   /**

@@ -3,7 +3,7 @@
 // how much room they take. Shared by the three-way stage and by the check
 // of every place in the background.
 
-import { type AreaLayer, boxesMeet, objectKey } from "./area-layer";
+import { type AreaLayer, boxesTouch, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 
 /** One spot of a place, with the parts its structures start from. */
@@ -87,8 +87,21 @@ export function findSegments(
     }
     return [...found.values()];
   };
-  const bounded = (parts: AreaObject[]) =>
-    within === null ? parts : inPassage(layer, parts, within);
+  // The same structure is grown from many spots; what of it lies in the
+  // passage is worked out once for each list of parts.
+  const inside = new Map<string, AreaObject[]>();
+  const bounded = (parts: AreaObject[]) => {
+    if (within === null) {
+      return parts;
+    }
+    const key = parts.map((part) => objectKey(part.id.plugin, part.id.localId)).join(",");
+    let kept = inside.get(key);
+    if (kept === undefined) {
+      kept = inPassage(layer, parts, within);
+      inside.set(key, kept);
+    }
+    return kept;
+  };
   const perGroup = groups.map((group) => ({
     key: group.key,
     parts: [
@@ -238,7 +251,7 @@ function inPassage(layer: AreaLayer, parts: AreaObject[], within: Set<string>): 
       return false;
     }
     const box = layer.boxOf(part, null);
-    return box !== null && boxes.some((other) => boxesMeet(other, box, STRUCTURE_MARGIN));
+    return box !== null && boxes.some((other) => boxesTouch(other, box, STRUCTURE_MARGIN));
   });
   return [...kept, ...resting];
 }
