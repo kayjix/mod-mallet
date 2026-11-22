@@ -1,12 +1,9 @@
-/* Which patch the decisions go to (ADR 0070), in the sidebar. */
+/* Which patch the decisions go to (ADR 0070), at the sidebar's foot: a
+   side card like the mod manager's below it. */
 
 .editing-chip {
   display: grid;
   gap: 3px;
-  margin: 0 8px 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--accent);
-  border-radius: 8px;
 }
 
 .editing-chip-label {
@@ -29,7 +26,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 6px;
+  border-radius: var(--radius-small);
   background: var(--side-bg);
   color: var(--side-text);
   font-size: 0.82rem;

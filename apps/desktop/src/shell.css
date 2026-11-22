@@ -8,15 +8,19 @@
   min-height: 100vh;
 }
 
+/* In a low window the pages scroll; the foot with the boxes stays in view. */
 .sidebar {
   position: sticky;
   top: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px 12px;
+  overflow-y: auto;
+  padding: 16px 12px 0;
   background: var(--side-bg);
   color: var(--side-text);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 20%) transparent;
 }
 
 .brand {
@@ -132,18 +136,22 @@
   font-weight: 500;
 }
 
-.manager-status {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+/* A box at the sidebar's foot: which patch decisions go to, the mod manager. */
+.side-card {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: rgb(255 255 255 / 4%);
   color: var(--side-text);
   font-size: 0.82rem;
   text-align: left;
+}
+
+.manager-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   cursor: pointer;
 }
 
@@ -270,9 +278,13 @@
 }
 
 .sidebar-foot {
+  position: sticky;
+  bottom: 0;
   display: grid;
   gap: 8px;
-  padding: 8px;
+  margin: 0 -12px;
+  padding: 8px 20px 16px;
+  background: var(--side-bg);
   font-size: 0.85rem;
 }
 
@@ -296,6 +308,10 @@
   .sidebar {
     position: static;
     height: auto;
+    padding-bottom: 16px;
+  }
+  .sidebar-foot {
+    position: static;
   }
   .sidebar nav {
     grid-template-columns: repeat(4, 1fr);

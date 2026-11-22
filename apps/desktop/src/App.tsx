@@ -892,9 +892,9 @@ interface SidebarProps {
   j: JourneyTexts;
   /** The game in use, with scanning. */
   gameCard: ReactNode;
-  /** Back and forward (ADR 0070), above the toolbox. */
-  /** Which patch decisions go to, on the pages where something is decided (ADR 0070). */
+  /** Which patch decisions go to, on the pages where something is decided (ADR 0070), at the foot. */
   editing: ReactNode;
+  /** Back and forward (ADR 0070), above the toolbox. */
   steps: ReactNode;
 }
 
@@ -993,11 +993,11 @@ function Sidebar({
       {gameCard}
       <nav>{game.map(navButton)}</nav>
       <div className="nav-bottom">
-        {editing}
         {steps}
         <nav>{beside.map(navButton)}</nav>
       </div>
       <div className="sidebar-foot">
+        {editing}
         <ManagerStatus
           toolbox={toolbox}
           link={link}
@@ -1144,7 +1144,7 @@ function ManagerStatus({ toolbox, link, disabled, onOpen, t }: ManagerStatusProp
   return (
     <button
       type="button"
-      className="manager-status"
+      className="manager-status side-card"
       data-tone={tone}
       title={link?.message}
       disabled={disabled}

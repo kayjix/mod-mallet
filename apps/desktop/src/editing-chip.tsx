@@ -1,4 +1,4 @@
-// Which patch the decisions go to (ADR 0070), shown in the sidebar on every
+// Which patch the decisions go to (ADR 0070), shown at the sidebar's foot on every
 // page where something is decided, with a quick switch to another of the
 // user's own patches or to a new one.
 
@@ -20,7 +20,7 @@ export function EditingChip() {
   }
   const own = book.patches.filter((patch) => !isForeign(patch));
   return (
-    <div className="editing-chip" title={p.chipHint}>
+    <div className="editing-chip side-card" title={p.chipHint}>
       <button
         type="button"
         className="editing-chip-label"
