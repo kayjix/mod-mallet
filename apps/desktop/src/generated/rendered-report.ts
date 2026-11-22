@@ -102,6 +102,10 @@ export type ArgValue = string | number;
  */
 export type GamePath = string;
 /**
+ * A part of Mod Mallet that does not apply to a game.
+ */
+export type GameLack = "catalogue" | "patches" | "written-plugins" | "walkways";
+/**
  * A change to a record that merging doors needs. Mod Mallet writes such
  * changes as overrides in a plugin of its own (ADR 0060); the record is
  * copied from the version the game uses and only the named field changes.
@@ -1254,6 +1258,11 @@ export interface GameInfo {
    * Identifier of the game adapter, for example `skyrimse`.
    */
   id: string;
+  /**
+   * The parts of Mod Mallet that do not apply to this game, so that the
+   * window can say why instead of showing them empty (ADR 0078).
+   */
+  lacks?: GameLack[];
   /**
    * The game's name.
    */

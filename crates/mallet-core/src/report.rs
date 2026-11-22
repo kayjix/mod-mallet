@@ -31,6 +31,31 @@ pub struct GameInfo {
     /// (ADR 0065).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unreal_visuals: bool,
+    /// The parts of Mod Mallet that do not apply to this game, so that the
+    /// window can say why instead of showing them empty (ADR 0078).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lacks: Vec<GameLack>,
+}
+
+/// A part of Mod Mallet that does not apply to a game.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum GameLack {
+    /// The catalogue: it knows the item records of the Skyrim games only.
+    Catalogue,
+    /// Mod Mallet's patches: they are read by Base Object Swapper, which
+    /// the game does not have.
+    Patches,
+    /// The plugins Mod Mallet writes, of moves, paths and doors: written
+    /// for Skyrim Special Edition's format only.
+    WrittenPlugins,
+    /// The paths characters walk, and what can still be reached: the game
+    /// keeps them in a form Mod Mallet does not read, path grids in
+    /// Oblivion and an older layout of navigation meshes in Fallout 3 and
+    /// New Vegas.
+    Walkways,
 }
 
 /// What a place the scan looked at is for.

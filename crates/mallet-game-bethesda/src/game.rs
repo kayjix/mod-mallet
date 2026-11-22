@@ -10,7 +10,7 @@
 //! Everything here is a constant. Finding a game on this machine is
 //! [`crate::locate`]'s work.
 
-use mallet_core::{GameSupport, PakFolder};
+use mallet_core::{GameLack, GameSupport, PakFolder};
 
 /// A game this adapter knows. Skyrim Special Edition, the first game Mod
 /// Mallet read, is the one assumed where nothing else is said.
@@ -746,6 +746,20 @@ impl Game {
         matches!(self.family(), Family::Skyrim | Family::Fallout4)
     }
 
+    /// The parts of Mod Mallet that do not apply to the game, for the
+    /// window to say so (ADR 0078).
+    pub fn lacks(self) -> Vec<GameLack> {
+        [
+            (GameLack::Catalogue, self.family() != Family::Skyrim),
+            (GameLack::Patches, !self.has_object_swapper()),
+            (GameLack::WrittenPlugins, !self.writes_plugins()),
+            (GameLack::Walkways, !self.reads_walkways()),
+        ]
+        .into_iter()
+        .filter_map(|(lack, applies)| applies.then_some(lack))
+        .collect()
+    }
+
     /// Whether the game keeps each character's face in a mesh of its
     /// own, named after the character (`facegendata/facegeom`). Only then
     /// can a face be compared with the record it belongs to.
@@ -858,6 +872,23 @@ mod tests {
         assert!(game.editor().is_none());
         assert_eq!(game.related_art(), ["enderal"]);
         assert_eq!(Game::from_id("EnderalSpecialEdition"), Some(game));
+    }
+
+    #[test]
+    fn what_does_not_apply_follows_from_the_table() {
+        assert_eq!(Game::SkyrimSe.lacks(), Vec::new());
+        assert_eq!(Game::EnderalSe.lacks(), Vec::new());
+        assert_eq!(
+            Game::Fallout4.lacks(),
+            [
+                GameLack::Catalogue,
+                GameLack::Patches,
+                GameLack::WrittenPlugins
+            ]
+        );
+        assert!(Game::Oblivion.lacks().contains(&GameLack::Walkways));
+        assert!(Game::FalloutNv.lacks().contains(&GameLack::Walkways));
+        assert!(!Game::SkyrimVr.lacks().contains(&GameLack::Patches));
     }
 
     #[test]

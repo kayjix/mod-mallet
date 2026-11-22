@@ -416,6 +416,7 @@ fn scan_with(
             version: snapshot.game.clone(),
             extender_version: snapshot.extender.clone(),
             unreal_visuals: !game.draws_its_data(),
+            lacks: game.lacks(),
         },
         // The plugins read from their files, or else those the log names.
         extender_plugins_checked: match read_plugins(&facts) {

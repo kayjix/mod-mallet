@@ -236,6 +236,7 @@ mod tests {
                 version: Some("1.7.104".to_owned()),
                 extender_version: Some("2.3.1".to_owned()),
                 unreal_visuals: false,
+                lacks: Vec::new(),
             },
             extender_plugins_checked: 46,
             plugins_checked: 300,

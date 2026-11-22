@@ -27,6 +27,7 @@ import { CompareView } from "./Compare";
 import { catalogueTexts } from "./catalogue-texts";
 import type { DependencyTarget } from "./dependencies";
 import { EditingChip } from "./editing-chip";
+import { GameLacks } from "./game-lacks";
 import { type Games, useGames } from "./games";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedLink } from "./generated/rendered-link";
@@ -593,6 +594,7 @@ export default function App({ api, startLang }: AppProps) {
       api: sessionApi,
       lang,
       game,
+      lacks: report?.game.lacks ?? [],
       t,
       rescan: scan,
       linkChanged: refreshLink,
@@ -826,8 +828,12 @@ export default function App({ api, startLang }: AppProps) {
             <Collisions report={report} start={workSpot} />
           ) : current === "assets" ? (
             <CompareView report={report} start={compareAt} />
+          ) : current === "catalogue" && (report.game.lacks ?? []).includes("catalogue") ? (
+            <GameLacks lack="catalogue" />
           ) : current === "catalogue" ? (
             <CatalogueView scannedAt={report.scannedAt} />
+          ) : current === "patch" && (report.game.lacks ?? []).includes("patches") ? (
+            <GameLacks lack="patches" />
           ) : current === "patch" ? (
             <PatchView report={report} />
           ) : current === "map" ? (

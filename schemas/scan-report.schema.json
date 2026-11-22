@@ -773,6 +773,13 @@
           "description": "Identifier of the game adapter, for example `skyrimse`.",
           "type": "string"
         },
+        "lacks": {
+          "description": "The parts of Mod Mallet that do not apply to this game, so that the\nwindow can say why instead of showing them empty (ADR 0078).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GameLack"
+          }
+        },
         "name": {
           "description": "The game's name.",
           "type": "string"
@@ -792,6 +799,31 @@
       "required": [
         "id",
         "name"
+      ]
+    },
+    "GameLack": {
+      "description": "A part of Mod Mallet that does not apply to a game.",
+      "oneOf": [
+        {
+          "description": "The catalogue: it knows the item records of the Skyrim games only.",
+          "type": "string",
+          "const": "catalogue"
+        },
+        {
+          "description": "Mod Mallet's patches: they are read by Base Object Swapper, which\nthe game does not have.",
+          "type": "string",
+          "const": "patches"
+        },
+        {
+          "description": "The plugins Mod Mallet writes, of moves, paths and doors: written\nfor Skyrim Special Edition's format only.",
+          "type": "string",
+          "const": "written-plugins"
+        },
+        {
+          "description": "The paths characters walk, and what can still be reached: the game\nkeeps them in a form Mod Mallet does not read, path grids in\nOblivion and an older layout of navigation meshes in Fallout 3 and\nNew Vegas.",
+          "type": "string",
+          "const": "walkways"
+        }
       ]
     },
     "GamePath": {

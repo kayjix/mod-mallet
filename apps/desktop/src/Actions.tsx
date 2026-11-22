@@ -3,7 +3,7 @@ import type { Api } from "./api";
 import type { DependencyTarget } from "./dependencies";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
-import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
+import type { Action, GameLack, MapSpot, ModInfo } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { Lang, Texts } from "./i18n";
 import type { PatchChoices } from "./patch";
@@ -19,6 +19,8 @@ export interface Session {
   lang: Lang;
   /** The game in use, by its identity; empty until known. */
   game: string;
+  /** The parts of Mod Mallet that do not apply to the game in use (ADR 0078). */
+  lacks: GameLack[];
   t: Texts;
   /** Scans again, for after an action was finished in the mod manager. */
   rescan: () => void;

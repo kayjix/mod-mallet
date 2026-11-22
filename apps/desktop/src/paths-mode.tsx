@@ -7,6 +7,7 @@
 
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
+import { useGameLack } from "./game-lacks";
 import type { ActionPlace, AreaObjects } from "./generated/area-objects";
 import type { AreaPaths } from "./generated/area-paths";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
@@ -439,6 +440,7 @@ export function usePathsMode(input: {
 }): PathsMode {
   const { lang, patchChoices } = useSession();
   const p = pathsModeTexts[lang];
+  const notRead = useGameLack("walkways");
   const [on, setOn] = useSwitch("mod-mallet.paths-mode");
   const [actions, setActions] = useSwitch("mod-mallet.paths-mode.actions");
   const [pointed, setPointed] = useState<number | null>(null);
@@ -496,7 +498,9 @@ export function usePathsMode(input: {
   let legend: ReactNode = null;
   if (on) {
     let body: ReactNode;
-    if (paths === "far") {
+    if (notRead !== null) {
+      body = <p className="aside">{notRead}</p>;
+    } else if (paths === "far") {
       body = <p className="aside">{p.tooFar}</p>;
     } else if (paths === undefined) {
       body = <p className="aside">{p.reading}</p>;
