@@ -166,6 +166,67 @@ pub fn reachability(
     Reachability { checked, reaches }
 }
 
+/// How far from a spot the nearest ground characters reach is looked for,
+/// in game units: about 30 metres.
+pub const GROUND_WITHIN: f64 = 2048.0;
+
+/// Whether characters reach a spot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpotState {
+    /// A path characters reach leads to it.
+    Reached,
+    /// It stands on paths no way leads to from the rest of the world.
+    CutOff,
+    /// No path is near enough to use it from.
+    OffPaths,
+}
+
+/// Whether characters reach one spot, and the nearest ground they reach.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpotReach {
+    /// Whether they reach it.
+    pub state: SpotState,
+    /// How far it stands from the nearest path characters reach, in game
+    /// units, if one lies within [`GROUND_WITHIN`].
+    pub off: Option<f64>,
+    /// The nearest point on paths characters reach, within
+    /// [`GROUND_WITHIN`].
+    pub ground: Option<[f64; 3]>,
+}
+
+/// Whether characters reach each of `spots`, over the paths `shapes` of
+/// one worldspace or interior cell, with `destinations` for the doors
+/// that lead through. A spot is reached where it stands within [`SNAP`] of
+/// a triangle a way leads to from where the paths lead on into the rest
+/// of the world, or, where nothing leads out, from their largest part.
+pub fn reach_spots(
+    shapes: &[NavmeshShape],
+    destinations: &[PlacedDestination],
+    spots: &[[f64; 3]],
+) -> Vec<SpotReach> {
+    let graph = Graph::new(shapes, destinations);
+    let mut out = graph.exits.clone();
+    if !out.iter().any(|exit| *exit)
+        && let Some(key) = graph.largest_kept(&graph)
+    {
+        set(&mut out, graph.node(&key));
+    }
+    let paths = graph.paths(&sources(&out), &[]);
+    spots
+        .iter()
+        .map(|&at| {
+            let ground = graph.nearest_reached(&paths, at);
+            let off = ground.map(|point| distance(point, at));
+            let state = match graph.snap_anywhere(at) {
+                Some((node, _)) if paths.reached(node) => SpotState::Reached,
+                Some(_) => SpotState::CutOff,
+                None => SpotState::OffPaths,
+            };
+            SpotReach { state, off, ground }
+        })
+        .collect()
+}
+
 /// The destinations near what changed that could be reached before, the
 /// nearest first, with where each lies on the paths before and after.
 fn place(
@@ -584,6 +645,39 @@ impl<'a> Graph<'a> {
             .min_by(|a, b| a.1.total_cmp(&b.1))
     }
 
+    /// The triangle nearest to `at` on which characters can stand, in any
+    /// place, within [`SNAP`], with how far it is.
+    fn snap_anywhere(&self, at: [f64; 3]) -> Option<(usize, f64)> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter(|(node, _)| {
+                self.ways.get(*node).is_some_and(|ways| !ways.is_empty())
+                    || self.exits.get(*node).copied().unwrap_or(false)
+            })
+            .filter_map(|(node, (_, _, corners))| {
+                let distance = triangle_distance(corners, at);
+                (distance <= SNAP).then_some((node, distance))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+    }
+
+    /// The point nearest to `at` on a triangle that `paths` reach, within
+    /// [`GROUND_WITHIN`].
+    fn nearest_reached(&self, paths: &Paths, at: [f64; 3]) -> Option<[f64; 3]> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter(|(node, _)| paths.reached(*node))
+            .filter_map(|(_, (_, _, corners))| {
+                let point = nearest_on_triangle(corners, at)?;
+                let away = distance(point, at);
+                (away <= GROUND_WITHIN).then_some((point, away))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(point, _)| point)
+    }
+
     /// The largest part of this graph, by triangles, and of it a triangle
     /// that `other` has as well and that leads somewhere there.
     fn largest_kept(&self, other: &Graph<'_>) -> Option<(&'a RecordId, u32)> {
@@ -804,6 +898,49 @@ fn triangle_distance(corners: &[[f64; 3]; 3], at: [f64; 3]) -> f64 {
         .into_iter()
         .map(|(from, to)| segment_distance(from, to, at))
         .fold(f64::INFINITY, f64::min)
+}
+
+/// The point of a triangle nearest to `at`: straight above or below it
+/// where it lies over the triangle seen from above, else the nearest point
+/// of its edges. `None` for a triangle without a real shape.
+fn nearest_on_triangle(corners: &[[f64; 3]; 3], at: [f64; 3]) -> Option<[f64; 3]> {
+    let [a, b, c] = *corners;
+    if corners.iter().flatten().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+    if det.abs() > 1e-9 {
+        let first = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
+        let second = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
+        let third = 1.0 - first - second;
+        if first >= 0.0 && second >= 0.0 && third >= 0.0 {
+            return Some([at[0], at[1], first * a[2] + second * b[2] + third * c[2]]);
+        }
+    }
+    [(a, b), (b, c), (c, a)]
+        .into_iter()
+        .map(|(from, to)| segment_point(from, to, at))
+        .min_by(|p, q| distance(*p, at).total_cmp(&distance(*q, at)))
+}
+
+/// The point of the segment from `from` to `to` nearest to `at`.
+fn segment_point(from: [f64; 3], to: [f64; 3], at: [f64; 3]) -> [f64; 3] {
+    let along = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+    let length = along[0] * along[0] + along[1] * along[1] + along[2] * along[2];
+    let share = if length > 0.0 {
+        (((at[0] - from[0]) * along[0]
+            + (at[1] - from[1]) * along[1]
+            + (at[2] - from[2]) * along[2])
+            / length)
+            .clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    [
+        from[0] + along[0] * share,
+        from[1] + along[1] * share,
+        from[2] + along[2] * share,
+    ]
 }
 
 fn segment_distance(from: [f64; 3], to: [f64; 3], at: [f64; 3]) -> f64 {
@@ -1207,6 +1344,48 @@ mod tests {
             })
     }
 
+    #[test]
+    fn spots_are_reached_cut_off_or_off_the_paths_with_ground_nearby() {
+        // A jetty whose bridge is hidden: the bank still leads out.
+        let paths = cut(&[jetty()], &[hidden(0, &[1])]);
+        let middle = |x: i32| [f64::from(x * SIDE + SIDE / 2), f64::from(SIDE / 2), 0.0];
+        let found = reach_spots(
+            &paths,
+            &[],
+            &[
+                middle(0),
+                middle(3),
+                // High above the bank, as on a deck.
+                [f64::from(SIDE / 2), f64::from(SIDE / 2), 400.0],
+                // Far out to sea.
+                [9000.0, 9000.0, 0.0],
+            ],
+        );
+        let states: Vec<SpotState> = found.iter().map(|spot| spot.state).collect();
+        assert_eq!(
+            states,
+            vec![
+                SpotState::Reached,
+                SpotState::CutOff,
+                SpotState::OffPaths,
+                SpotState::OffPaths
+            ]
+        );
+        // The ground below the deck is the bank; the cut-off jetty's
+        // nearest reachable ground is the edge of the bank.
+        assert_eq!(
+            found[2].ground,
+            Some([f64::from(SIDE / 2), f64::from(SIDE / 2), 0.0])
+        );
+        assert_eq!(found[2].off, Some(400.0));
+        let jetty_ground = found[1].ground.unwrap();
+        assert!(
+            (jetty_ground[0] - f64::from(SIDE)).abs() < 1e-6,
+            "{jetty_ground:?}"
+        );
+        assert_eq!(found[3].ground, None);
+    }
+
     proptest! {
         #[test]
         fn never_panics(
@@ -1232,6 +1411,8 @@ mod tests {
             let cut_before = cut(&before, &carried);
             let _ = reachability(&before, &cut_before, &destinations);
             let _ = reachability(&before, &[after], &destinations);
+            let points: Vec<[f64; 3]> = destinations.iter().map(position).collect();
+            let _ = reach_spots(&cut_before, &destinations, &points);
         }
     }
 }

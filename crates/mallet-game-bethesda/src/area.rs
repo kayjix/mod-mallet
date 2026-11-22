@@ -112,6 +112,8 @@ pub struct AreaReader {
     last: Option<Pass>,
     /// The interior cells of every plugin by editor ID, once listed.
     interiors: Option<HashMap<String, interior::Interior>>,
+    /// The furniture and idle markers of every plugin, once read (ADR 0069).
+    actions: Option<HashMap<RecordId, crate::action_places::ActionBase>>,
 }
 
 impl AreaReader {
@@ -132,6 +134,7 @@ impl AreaReader {
             models: None,
             last: None,
             interiors: None,
+            actions: None,
         }
     }
 
@@ -142,6 +145,15 @@ impl AreaReader {
             self.models = Some(read_models(&self.plugins));
         }
         self.models.as_ref()?.get(id)
+    }
+
+    /// What characters do at a base object, if it is furniture or an idle
+    /// marker (ADR 0069). The first call reads those of every plugin.
+    pub fn action_base(&mut self, id: &RecordId) -> Option<&crate::action_places::ActionBase> {
+        if self.actions.is_none() {
+            self.actions = Some(crate::action_places::read(&self.plugins));
+        }
+        self.actions.as_ref()?.get(id)
     }
 
     /// The objects in the worldspace named `world` (its internal name, such

@@ -16,6 +16,7 @@
 //! without touching the analyses.
 
 pub mod action;
+pub mod action_places;
 pub mod anchors;
 pub mod cache;
 pub mod catalogue;

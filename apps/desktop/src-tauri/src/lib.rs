@@ -564,6 +564,29 @@ fn walkway_reach(
     ))
 }
 
+/// Whether characters can reach places where they do something, where
+/// they stand or would stand after a move (ADR 0069): in a worldspace near
+/// the point `x`, `y`, or, without a point, in an interior cell by its
+/// editor ID. With `hidden`, as if the patch hid those objects.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn spots_reach(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    spots: Vec<mallet_core::action_places::SpotAsked>,
+    hidden: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::action_places::SpotsReach>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::spots_reach(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &spots,
+        &hidden,
+    ))
+}
+
 /// Every thing of the setup worth looking at, for the assets page. The
 /// first call for a setup reads every plugin and takes a few seconds.
 #[tauri::command(async)]
@@ -868,6 +891,7 @@ pub fn run() -> tauri::Result<()> {
             object_anchors,
             hidden_walkways,
             walkway_reach,
+            spots_reach,
             walkway_repair,
             walkway_repair_reach,
             area_mesh,

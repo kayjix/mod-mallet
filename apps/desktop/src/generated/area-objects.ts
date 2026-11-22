@@ -7,6 +7,11 @@
  */
 export interface AreaObjects {
   /**
+   * The places where characters do something, drawn or not (ADR 0069),
+   * in no particular order.
+   */
+  actions?: ActionPlace[];
+  /**
    * The point, in game units; for an interior cell, the middle of what
    * is placed in it.
    *
@@ -29,6 +34,67 @@ export interface AreaObjects {
   world: string;
 }
 /**
+ * One place where characters do something.
+ */
+export interface ActionPlace {
+  /**
+   * The internal name of what is placed, such as `WallLeanMarker`.
+   */
+  base?: string | null;
+  /**
+   * Whether the game draws it: a chair or a forge is seen, a marker to
+   * lean or sit on the ground is not.
+   */
+  drawn: boolean;
+  /**
+   * Whether it is an idle marker rather than furniture.
+   */
+  idleMarker: boolean;
+  /**
+   * What characters do there.
+   */
+  kind:
+    "sit" | "lean" | "sleep" | "chop-wood" | "mine" | "smith" | "craft" | "cook" | "pray" | "work" | "stand" | "other";
+  /**
+   * The name players see, where there is one.
+   */
+  name?: string | null;
+  object: ObjectRef;
+  /**
+   * The plugin whose version the game uses.
+   */
+  plugin: string;
+  /**
+   * Where, in game units.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  position: [number, number, number];
+  /**
+   * Turned about the x, y and z axes, in radians; the turn about z is
+   * the way characters face there.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  rotation: [number, number, number];
+}
+/**
+ * The placed object: the plugin that placed it first and its number
+ * there.
+ */
+export interface ObjectRef {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
  * One object near the point.
  */
 export interface AreaObject {
@@ -38,7 +104,7 @@ export interface AreaObject {
    * not offered for hiding.
    */
   anchored?: boolean;
-  id: ObjectRef;
+  id: ObjectRef1;
   /**
    * Its model, below the data directory.
    */
@@ -73,7 +139,7 @@ export interface AreaObject {
 /**
  * The reference: the plugin that placed it first and its number there.
  */
-export interface ObjectRef {
+export interface ObjectRef1 {
   /**
    * The object's number in that plugin.
    */

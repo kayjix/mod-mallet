@@ -6,6 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use mallet_core::ObjectRef;
+use mallet_core::action_places::ActionPlace;
 use mallet_core::encoding::base64;
 use mallet_core::mesh::{
     AreaLand, AreaObject, AreaObjects, LandCell, LandQuarter, LandTextureLayer, LodMesh,
@@ -97,6 +98,7 @@ pub fn area_objects(
     let reader = reader(options)?;
     let mut reader = reader.lock().ok()?;
     let placed = reader.objects(world, centre, radius);
+    let actions = action_places(&mut reader, &placed);
     let objects = drawable(&mut reader, placed);
     tracing::info!(
         world,
@@ -109,6 +111,7 @@ pub fn area_objects(
         centre,
         radius,
         objects,
+        actions,
     })
 }
 
@@ -125,6 +128,7 @@ pub fn interior_objects(options: &ScanOptions, cell: &str) -> Option<AreaObjects
         tracing::info!(cell, "interior cell not found or empty");
         return None;
     }
+    let actions = action_places(&mut reader, &placed);
     let objects = drawable(&mut reader, placed);
     let (centre, radius) = frame(&objects);
     tracing::info!(
@@ -138,6 +142,7 @@ pub fn interior_objects(options: &ScanOptions, cell: &str) -> Option<AreaObjects
         centre,
         radius,
         objects,
+        actions,
     })
 }
 
@@ -163,6 +168,35 @@ fn frame(objects: &[AreaObject]) -> ([f32; 2], f32) {
         [f32::midpoint(west, east), f32::midpoint(south, north)],
         ((east - west).max(north - south) / 2.0).max(256.0),
     )
+}
+
+/// The places among `placed` where characters do something (ADR 0069):
+/// furniture and idle markers, drawn or not.
+fn action_places(
+    reader: &mut mallet_game_bethesda::area::AreaReader,
+    placed: &[mallet_game_bethesda::area::AreaObject],
+) -> Vec<ActionPlace> {
+    placed
+        .iter()
+        .filter_map(|object| {
+            let base = reader.action_base(&object.base)?.clone();
+            let drawn = reader.base(&object.base).is_some();
+            Some(ActionPlace {
+                object: ObjectRef {
+                    plugin: object.id.plugin.clone(),
+                    local_id: object.id.local_id,
+                },
+                plugin: object.plugin.clone(),
+                kind: base.kind,
+                idle_marker: base.idle_marker,
+                drawn,
+                name: base.name,
+                base: base.editor_id,
+                position: object.position,
+                rotation: object.rotation,
+            })
+        })
+        .collect()
 }
 
 /// The placed objects that can be drawn, with their models.

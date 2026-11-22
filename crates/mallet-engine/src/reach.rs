@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashSet};
 use mallet_analysis::reachability::{self, Outcome, Route as FoundRoute};
 use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::ObjectRef;
+use mallet_core::action_places::{SpotAsked, SpotReach, SpotState, SpotsReach};
 use mallet_core::anchors::AnchorKind;
 use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
@@ -88,20 +89,9 @@ pub fn walkway_reach_after(
         placed,
         near,
         mut destinations,
-    } = look(options, place, centre, objects)?;
+    } = look(options, place, centre, objects, &[])?;
 
-    // The models of the objects, from the files the game uses.
-    let library = library(options)?;
-    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
-    for model in placed.iter().filter_map(|(_, model)| model.as_ref()) {
-        if !meshes.contains_key(model)
-            && let Some(mesh) = library
-                .read(model)
-                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
-        {
-            meshes.insert(model.clone(), mesh);
-        }
-    }
+    let meshes = meshes_of(options, &placed)?;
     let hidden: Vec<Hidden<'_>> = placed
         .iter()
         .map(|(object, model)| Hidden {
@@ -156,6 +146,103 @@ pub fn walkway_reach_after(
         after: kind,
         checked: u32::try_from(found.checked).unwrap_or(u32::MAX),
         changes,
+    })
+}
+
+/// The models of `placed`, from the files the game uses.
+fn meshes_of(
+    options: &ScanOptions,
+    placed: &[(PlacedObject, Option<String>)],
+) -> Option<BTreeMap<String, ModelMesh>> {
+    let library = library(options)?;
+    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
+    for model in placed.iter().filter_map(|(_, model)| model.as_ref()) {
+        if !meshes.contains_key(model)
+            && let Some(mesh) = library
+                .read(model)
+                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
+        {
+            meshes.insert(model.clone(), mesh);
+        }
+    }
+    Some(meshes)
+}
+
+/// Whether characters can reach `spots`, places where they do something
+/// such as a marker to lean on, where they stand or would stand after a
+/// move (ADR 0069): in the worldspace `place` near `centre`, or, without a
+/// centre, in the interior cell `place`. With `hidden`, the paths over
+/// those objects are cut out first (ADR 0052), as if the patch hid them.
+/// `None` if the setup cannot be read.
+pub fn spots_reach(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    spots: &[SpotAsked],
+    hidden: &[ObjectRef],
+) -> Option<SpotsReach> {
+    let started = std::time::Instant::now();
+    #[allow(clippy::cast_precision_loss)]
+    let flat: Vec<[f32; 2]> = spots
+        .iter()
+        .map(|spot| [spot.at[0] as f32, spot.at[1] as f32])
+        .collect();
+    let Looked {
+        placed,
+        near,
+        destinations,
+        ..
+    } = look(options, place, centre, hidden, &flat)?;
+    let meshes = meshes_of(options, &placed)?;
+    let hidden_objects: Vec<Hidden<'_>> = placed
+        .iter()
+        .map(|(object, model)| Hidden {
+            object,
+            mesh: model.as_ref().and_then(|model| meshes.get(model)),
+            bounds: None,
+        })
+        .collect();
+    let carried = walkways::carried(&hidden_objects, &near);
+    let cut;
+    let shapes: &[NavmeshShape] = if carried.is_empty() {
+        &near.navmeshes
+    } else {
+        cut = reachability::cut(&near.navmeshes, &carried);
+        &cut
+    };
+    let points: Vec<[f64; 3]> = spots.iter().map(|spot| spot.at.map(f64::from)).collect();
+    let known = shapes.iter().any(|shape| shape.used);
+    let found = reachability::reach_spots(shapes, &destinations, &points);
+    let spots: Vec<SpotReach> = spots
+        .iter()
+        .zip(found)
+        .map(|(spot, found)| SpotReach {
+            object: spot.object.clone(),
+            at: spot.at,
+            state: if known {
+                match found.state {
+                    reachability::SpotState::Reached => SpotState::Reached,
+                    reachability::SpotState::CutOff => SpotState::CutOff,
+                    reachability::SpotState::OffPaths => SpotState::OffPaths,
+                }
+            } else {
+                SpotState::Unknown
+            },
+            metres_off: found.off.map(metres),
+            ground: found.ground.map(|point| point.map(whole_f64)),
+        })
+        .collect();
+    tracing::info!(
+        place,
+        spots = spots.len(),
+        hidden = placed.len(),
+        carried = carried.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "checked whether characters reach places where they do something"
+    );
+    Some(SpotsReach {
+        place: place.to_owned(),
+        spots,
     })
 }
 
@@ -236,6 +323,7 @@ fn look(
     place: &str,
     centre: Option<[f32; 2]>,
     objects: &[ObjectRef],
+    spots: &[[f32; 2]],
 ) -> Option<Looked> {
     let wanted: HashSet<RecordId> = objects.iter().map(record_id).collect();
     let reader = reader(options)?;
@@ -275,8 +363,16 @@ fn look(
                 }
             }
         }
+        for [x, y] in spots {
+            let (x, y) = (cell_of(*x), cell_of(*y));
+            for dx in -MARGIN..=MARGIN {
+                for dy in -MARGIN..=MARGIN {
+                    cells.insert((x + dx, y + dy));
+                }
+            }
+        }
     }
-    let (near, destinations) = if placed.is_empty() {
+    let (near, destinations) = if placed.is_empty() && spots.is_empty() {
         (NearHidden::default(), Vec::new())
     } else {
         reader.navmeshes_with_destinations(&around)
@@ -390,6 +486,13 @@ fn metres(length: f64) -> u32 {
 fn whole_f64(value: f64) -> i32 {
     // Bounded before converting; positions of the games are far inside.
     value.round().clamp(-1.0e9, 1.0e9) as i32
+}
+
+/// The cell a coordinate in game units lies in.
+#[allow(clippy::cast_possible_truncation)]
+fn cell_of(coordinate: f32) -> i32 {
+    // Worldspaces lie within a few hundred cells of their origin.
+    (coordinate / 4096.0).floor().clamp(-32_768.0, 32_767.0) as i32
 }
 
 /// A number rounded to whole units.

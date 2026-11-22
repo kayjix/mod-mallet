@@ -25,6 +25,7 @@
 //! * [`ingest`] reads the load order, the data directory, the archives,
 //!   the plugins, and the meshes that exist both loose and in an archive.
 
+pub mod action_places;
 pub mod anchors;
 mod archive;
 mod archive_meshes;

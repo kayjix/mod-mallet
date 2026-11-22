@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SpotsReach",
+  "description": "Whether characters can reach places where they do something, with the\npaths as they are or with objects hidden (ADR 0069).",
+  "type": "object",
+  "properties": {
+    "place": {
+      "description": "The worldspace or interior cell asked about.",
+      "type": "string"
+    },
+    "spots": {
+      "description": "Each spot asked about, in the order asked.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpotReach"
+      }
+    }
+  },
+  "required": [
+    "place",
+    "spots"
+  ],
+  "$defs": {
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "SpotReach": {
+      "description": "Whether characters can reach one spot.",
+      "type": "object",
+      "properties": {
+        "at": {
+          "description": "Where, in whole game units.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "ground": {
+          "description": "The nearest point on paths characters can reach, within about 30\nmetres, in whole game units: where the spot could be moved to.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "metresOff": {
+          "description": "How far the spot stands from the nearest path characters can\nreach, in whole metres; `None` if none is near.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "object": {
+          "description": "The object asked about.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "state": {
+          "description": "Whether they can.",
+          "$ref": "#/$defs/SpotState"
+        }
+      },
+      "required": [
+        "object",
+        "at",
+        "state"
+      ]
+    },
+    "SpotState": {
+      "description": "Whether characters can reach a spot.",
+      "oneOf": [
+        {
+          "description": "A path characters reach leads to it.",
+          "type": "string",
+          "const": "reached"
+        },
+        {
+          "description": "It stands on paths, but no way leads there from the rest of the\nworld.",
+          "type": "string",
+          "const": "cut-off"
+        },
+        {
+          "description": "No path is near enough to use it from.",
+          "type": "string",
+          "const": "off-paths"
+        },
+        {
+          "description": "The paths there could not be read.",
+          "type": "string",
+          "const": "unknown"
+        }
+      ]
+    }
+  }
+}

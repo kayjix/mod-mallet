@@ -4,6 +4,14 @@
   "description": "Everything placed around a point of a worldspace, as the game shows\nit, for looking at the place closely (ADR 0038); or everything placed\nin one interior cell (ADR 0042).",
   "type": "object",
   "properties": {
+    "actions": {
+      "description": "The places where characters do something, drawn or not (ADR 0069),\nin no particular order.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ActionPlace"
+      }
+    },
     "centre": {
       "description": "The point, in game units; for an interior cell, the middle of what\nis placed in it.",
       "type": "array",
@@ -38,6 +46,140 @@
     "objects"
   ],
   "$defs": {
+    "ActionKind": {
+      "description": "What characters do at a place.",
+      "oneOf": [
+        {
+          "description": "Sit: a chair, a bench, a stool, a spot on the ground.",
+          "type": "string",
+          "const": "sit"
+        },
+        {
+          "description": "Lean against a wall, a railing or a counter.",
+          "type": "string",
+          "const": "lean"
+        },
+        {
+          "description": "Sleep: a bed or a bedroll.",
+          "type": "string",
+          "const": "sleep"
+        },
+        {
+          "description": "Chop wood at a chopping block.",
+          "type": "string",
+          "const": "chop-wood"
+        },
+        {
+          "description": "Mine ore with a pickaxe.",
+          "type": "string",
+          "const": "mine"
+        },
+        {
+          "description": "Work at a forge, an anvil, a smelter, a tanning rack, a grindstone\nor a workbench.",
+          "type": "string",
+          "const": "smith"
+        },
+        {
+          "description": "Mix potions or enchant at a table.",
+          "type": "string",
+          "const": "craft"
+        },
+        {
+          "description": "Cook at a pot, a spit or an oven, or churn butter.",
+          "type": "string",
+          "const": "cook"
+        },
+        {
+          "description": "Pray or kneel.",
+          "type": "string",
+          "const": "pray"
+        },
+        {
+          "description": "Other work: sweep, rake, farm, hammer, wash.",
+          "type": "string",
+          "const": "work"
+        },
+        {
+          "description": "Stand and do something not told apart: a spot of an idle marker.",
+          "type": "string",
+          "const": "stand"
+        },
+        {
+          "description": "Other furniture.",
+          "type": "string",
+          "const": "other"
+        }
+      ]
+    },
+    "ActionPlace": {
+      "description": "One place where characters do something.",
+      "type": "object",
+      "properties": {
+        "base": {
+          "description": "The internal name of what is placed, such as `WallLeanMarker`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "drawn": {
+          "description": "Whether the game draws it: a chair or a forge is seen, a marker to\nlean or sit on the ground is not.",
+          "type": "boolean"
+        },
+        "idleMarker": {
+          "description": "Whether it is an idle marker rather than furniture.",
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "What characters do there.",
+          "$ref": "#/$defs/ActionKind"
+        },
+        "name": {
+          "description": "The name players see, where there is one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object": {
+          "description": "The placed object: the plugin that placed it first and its number\nthere.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "plugin": {
+          "description": "The plugin whose version the game uses.",
+          "type": "string"
+        },
+        "position": {
+          "description": "Where, in game units.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "rotation": {
+          "description": "Turned about the x, y and z axes, in radians; the turn about z is\nthe way characters face there.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "required": [
+        "object",
+        "plugin",
+        "kind",
+        "idleMarker",
+        "drawn",
+        "position",
+        "rotation"
+      ]
+    },
     "AreaObject": {
       "description": "One object near the point.",
       "type": "object",

@@ -115,6 +115,10 @@ pub struct AreaObjects {
     pub radius: f32,
     /// The objects, with a model, in no particular order.
     pub objects: Vec<AreaObject>,
+    /// The places where characters do something, drawn or not (ADR 0069),
+    /// in no particular order.
+    #[serde(default)]
+    pub actions: Vec<crate::action_places::ActionPlace>,
 }
 
 /// One object near the point.
