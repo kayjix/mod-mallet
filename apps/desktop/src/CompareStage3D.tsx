@@ -3,7 +3,7 @@
 // only the second. A structure is the parts of one mod that hang together
 // (`AreaLayer.connected`), starting from the parts of a collision spot.
 
-import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
 import {
   type ActionHit,
@@ -13,10 +13,13 @@ import {
   useActionIconsShown,
 } from "./action-places";
 import { AreaLayer, isFlora, LOOK, type Look, objectKey } from "./area-layer";
+import { useCollisionStepTexts } from "./collision-step-texts";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
 import { InfoTip } from "./info-tip";
 import { LandLayer } from "./land-layer";
+import { registerLocator } from "./locate";
+import { edgePointer, LOCATE_MS, paintEdgePointer } from "./locate-frame";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
@@ -79,6 +82,18 @@ export interface CompareStage3DProps {
   height?: number;
   /** The repair of paths to show in the views (ADR 0058), if any. */
   paths?: PathsOverlay | null;
+  /** More tools for the bar over the views, after the view's own (such as pinning and undo). */
+  tools?: ReactNode;
+  /**
+   * Objects to show, by {@link objectKey}, with what they are: they keep
+   * their looks, everything else is dimmed, and the camera frames them,
+   * from above where there are many (ADR 0080).
+   */
+  highlight?: { keys: string[]; label: string } | null;
+  /** Shows everything again, from the note over the views. */
+  onClearHighlight?: () => void;
+  /** Objects lit up while the pointer is on them in a list beside the views, by {@link objectKey}. */
+  hover?: string[] | null;
 }
 
 /** How long finding the segments rests between two tries while models arrive, in milliseconds. */
@@ -128,6 +143,10 @@ export function CompareStage3D({
   onPick,
   height = 420,
   paths = null,
+  tools = null,
+  highlight = null,
+  onClearHighlight,
+  hover = null,
 }: CompareStage3DProps) {
   const seeds: [ObjectRef[], ObjectRef[]] = [
     groups.flatMap((group) => group.seeds[0]),
@@ -135,6 +154,7 @@ export function CompareStage3D({
   ];
   const { api } = useSession();
   const r = useReviewTexts();
+  const c = useCollisionStepTexts();
   const w = useWalkTexts();
   const canvas = useRef<HTMLCanvasElement>(null);
   const layer = useRef<AreaLayer | null>(null);
@@ -215,6 +235,12 @@ export function CompareStage3D({
   const actionHits = useRef<ActionHit[]>([]);
   const seedsNow = useRef(seeds);
   seedsNow.current = seeds;
+  const highlightKey = highlight === null ? "" : highlight.keys.join(",");
+  const highlightNow = useRef<Set<string> | null>(null);
+  highlightNow.current = highlight === null ? null : new Set(highlight.keys);
+  // Objects located from a list beside the views: where they stand, for
+  // the arrow at the edge of a view while they are out of sight.
+  const located = useRef<{ at: Vec3; until: number } | null>(null);
 
   /** How an object looks in view `index`: now, only the first, only the second. */
   const lookIn = (index: 0 | 1 | 2) =>
@@ -224,6 +250,7 @@ export function CompareStage3D({
       markingsNow.current,
       hiddenNow.current,
       treesNow.current ? null : flora.current,
+      highlightNow.current,
     );
   const lookNow = useRef(lookIn);
   lookNow.current = lookIn;
@@ -352,6 +379,28 @@ export function CompareStage3D({
           ),
         );
         context.restore();
+      }
+    }
+    // Located objects out of sight: an arrow at the edge of each view points to them.
+    const shownLocated = located.current;
+    if (shownLocated !== null && performance.now() < shownLocated.until) {
+      const target: Vec3 = [
+        shownLocated.at[0] / CELL,
+        shownLocated.at[1] / CELL,
+        shownLocated.at[2] / CELL,
+      ];
+      const pointer = edgePointer(matrix, target, third, tall);
+      if (pointer !== null) {
+        const colour =
+          getComputedStyle(element).getPropertyValue("--spot-focus").trim() || "#ffd54a";
+        for (const index of [0, 1, 2] as const) {
+          context.save();
+          context.beginPath();
+          context.rect(third * index, 0, third, tall);
+          context.clip();
+          paintEdgePointer(context, { ...pointer, x: pointer.x + third * index }, colour);
+          context.restore();
+        }
       }
     }
     const walkedHere = walkedNow.current;
@@ -561,7 +610,7 @@ export function CompareStage3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.
   useEffect(() => {
     redraw();
-  }, [markings, trees, hidden, walked, height, actionsShown, redraw]);
+  }, [markings, trees, hidden, walked, height, actionsShown, highlightKey, redraw]);
 
   // The canvas follows the width of its frame.
   useEffect(() => {
@@ -709,19 +758,66 @@ export function CompareStage3D({
   }, []);
 
   const focusKey = focus === null ? "" : focus.join(",");
+  const hoverKey = hover === null ? "" : hover.join(",");
   // biome-ignore lint/correctness/useExhaustiveDependencies: the keys belong to the mod shown.
   useEffect(() => {
     const picked = focusKey === "" ? null : focusKey.split(",");
-    layer.current?.select(picked ?? others.find((other) => other.plugin === shown)?.keys ?? []);
-    const current = layer.current;
-    if (picked !== null && current !== null) {
-      const box = boxOf(current, [new Set(picked), new Set()]);
-      if (box !== null) {
-        camera.current = framing(box, camera.current, aspectNow.current);
-      }
-    }
+    const pointed = hoverKey === "" ? null : hoverKey.split(",");
+    layer.current?.select(
+      pointed ?? picked ?? others.find((other) => other.plugin === shown)?.keys ?? [],
+    );
     redraw();
-  }, [shown, focusKey, redraw]);
+  }, [shown, focusKey, hoverKey, redraw]);
+  // A segment picked out is framed.
+  useEffect(() => {
+    const current = layer.current;
+    if (focusKey === "" || current === null) {
+      return;
+    }
+    const box = boxOf(current, [new Set(focusKey.split(",")), new Set()]);
+    if (box !== null) {
+      camera.current = framing(box, camera.current, aspectNow.current);
+      redraw();
+    }
+  }, [focusKey, redraw]);
+  // Objects shown with the rest dimmed are framed: from above where there
+  // are many, so that a whole group can be seen at once.
+  useEffect(() => {
+    const current = layer.current;
+    if (highlightKey === "" || current === null) {
+      return;
+    }
+    const keys = new Set(highlightKey.split(","));
+    const box = boxOf(current, [keys, new Set()], NEAR_ROOM);
+    if (box !== null) {
+      const framed = framing(box, camera.current, aspectNow.current);
+      camera.current = keys.size > GROUP ? { ...framed, pitch: ABOVE_PITCH } : framed;
+      redraw();
+    }
+  }, [highlightKey, redraw]);
+  // Objects located from a list beside the views glow where they stand;
+  // the camera stays where the user put it (ADR 0055).
+  useEffect(() => {
+    let timer: number | undefined;
+    const stop = registerLocator((objects, at) => {
+      const found = layer.current?.pulse(objects) ?? [];
+      const middle = found.length > 0 ? middleOf(found.map((object) => object.position)) : at;
+      window.clearTimeout(timer);
+      located.current =
+        middle == null || middle.length < 3
+          ? null
+          : {
+              at: [middle[0] ?? 0, middle[1] ?? 0, middle[2] ?? 0],
+              until: performance.now() + LOCATE_MS,
+            };
+      redrawNow.current();
+      timer = window.setTimeout(() => redrawNow.current(), LOCATE_MS + 50);
+    });
+    return () => {
+      stop();
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   const fit = () => {
     const current = layer.current;
@@ -741,6 +837,7 @@ export function CompareStage3D({
             <MarkingsTool legend={null} />
             <TreesTool />
             <ActionsTool />
+            {tools !== null && <span className="view-tool stage3-own-tools">{tools}</span>}
           </>
         }
         camera={
@@ -782,6 +879,16 @@ export function CompareStage3D({
         {(failed || state !== "shown") && (
           <p className="stage3-state">{failed || state === "missing" ? r.missing : r.loading}</p>
         )}
+        {highlight !== null && (
+          <p className="stage3-showing" role="status">
+            <span>{c.showing(highlight.label)}</span>
+            {onClearHighlight !== undefined && (
+              <button type="button" className="small" onClick={onClearHighlight}>
+                {c.showAll}
+              </button>
+            )}
+          </p>
+        )}
       </div>
       <div className="stage3-controls">
         <span className="stage3-swatch" data-side="0">
@@ -790,37 +897,32 @@ export function CompareStage3D({
         <span className="stage3-swatch" data-side="1">
           {r.parts(names[1], counts[1])}
         </span>
+        {markings && (
+          <span className="stage3-legend aside">
+            <span className="stage3-key" data-key="hidden" /> {c.legendHidden}
+          </span>
+        )}
+        {markings && walked != null && walked.size > 0 && (
+          <span className="stage3-legend aside">
+            <PathIcon /> {w.legend}
+          </span>
+        )}
+        {others.length > 0 && <span className="aside">{c.alsoHere}</span>}
+        {others.map((other) => (
+          <button
+            type="button"
+            key={other.plugin}
+            className="small stage3-other"
+            aria-pressed={shown === other.plugin}
+            title={r.othersShow(shortName(other.plugin))}
+            onClick={() => setShown(shown === other.plugin ? null : other.plugin)}
+          >
+            {r.othersCount(shortName(other.plugin), other.keys.length)}
+          </button>
+        ))}
         <span className="spacer" />
-        <InfoTip text={r.stageHint} />
+        <InfoTip text={`${r.stageHint} · ${r.pickHint}`} />
       </div>
-      {markings && (
-        <p className="stage3-legend aside">
-          <span className="stage3-key" data-key="hidden" /> {r.legendHidden}
-          {walked != null && walked.size > 0 && (
-            <>
-              {" · "}
-              <PathIcon /> {w.legend}
-            </>
-          )}
-        </p>
-      )}
-      {others.length > 0 && (
-        <div className="stage3-others">
-          <span className="aside">{r.othersHere(others.length)}</span>
-          {others.map((other) => (
-            <button
-              type="button"
-              key={other.plugin}
-              className="small stage3-other"
-              aria-pressed={shown === other.plugin}
-              title={r.othersShow(shortName(other.plugin))}
-              onClick={() => setShown(shown === other.plugin ? null : other.plugin)}
-            >
-              {r.othersCount(shortName(other.plugin), other.keys.length)}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -897,6 +999,25 @@ function lookFor(
   marks: boolean,
   hidden: Set<string>,
   flora: Set<string> | null,
+  shownApart: Set<string> | null = null,
+): (key: string) => Look {
+  const plain = lookPlain(index, [first, second], marks, hidden, flora);
+  if (shownApart === null) {
+    return plain;
+  }
+  return (key) => {
+    const look = plain(key);
+    return shownApart.has(key) || look === LOOK.gone ? look : LOOK.dim;
+  };
+}
+
+/** How an object looks in view `index` with nothing shown apart (see {@link lookFor}). */
+function lookPlain(
+  index: 0 | 1 | 2,
+  [first, second]: [Set<string>, Set<string>],
+  marks: boolean,
+  hidden: Set<string>,
+  flora: Set<string> | null,
 ): (key: string) => Look {
   return (key) => {
     const inFirst = first.has(key);
@@ -931,7 +1052,11 @@ const ROOM = 850;
  * The box around both structures' parts, from where their models' middles
  * stand, widened by some room around them; none before they are known.
  */
-function boxOf(layer: AreaLayer, [first, second]: [Set<string>, Set<string>]): Box | null {
+function boxOf(
+  layer: AreaLayer,
+  [first, second]: [Set<string>, Set<string>],
+  room = ROOM,
+): Box | null {
   const low: Vec3 = [Infinity, Infinity, Infinity];
   const high: Vec3 = [-Infinity, -Infinity, -Infinity];
   for (const { object, centre } of layer.shown) {
@@ -948,9 +1073,29 @@ function boxOf(layer: AreaLayer, [first, second]: [Set<string>, Set<string>]): B
     return null;
   }
   return [
-    [low[0] - ROOM, low[1] - ROOM, low[2] - 120],
-    [high[0] + ROOM, high[1] + ROOM, high[2] + 120],
+    [low[0] - room, low[1] - room, low[2] - 120],
+    [high[0] + room, high[1] + room, high[2] + 120],
   ];
+}
+
+/** The room left around objects shown apart, in game units (about 4 m). */
+const NEAR_ROOM = 280;
+
+/** From how many objects shown apart on the camera looks at them from above. */
+const GROUP = 24;
+
+/** The angle the camera looks down at a group shown apart from: nearly straight down. */
+const ABOVE_PITCH = 1.3;
+
+/** The middle of some positions in game units; null for none. */
+function middleOf(positions: readonly (readonly number[])[]): number[] | null {
+  if (positions.length === 0) {
+    return null;
+  }
+  return [0, 1, 2].map(
+    (axis) =>
+      positions.reduce((sum, position) => sum + (position[axis] ?? 0), 0) / positions.length,
+  );
 }
 
 /**

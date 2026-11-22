@@ -441,10 +441,13 @@ function grouped(
 export function Collisions({
   report,
   start,
+  startPassage = null,
 }: {
   report: RenderedReport;
   /** The spot to open with, if any. */
   start: MapSpot | null;
+  /** The passage to open with, by its key, if any; `start` is one of its spots. */
+  startPassage?: string | null;
 }) {
   const {
     t,
@@ -634,6 +637,13 @@ export function Collisions({
       setTab("spots");
     }
   }, [startKey]);
+  // A passage handed over (from the guided review) is opened in the view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a passage handed over opens.
+  useEffect(() => {
+    if (startPassage !== null) {
+      openPassage(startPassage);
+    }
+  }, [startPassage, startKey]);
   // So is a pair handed over later.
   useEffect(() => {
     if (focusPair !== null) {

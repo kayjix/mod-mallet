@@ -1,0 +1,129 @@
+/* One mod's parts at a place, to pick from (ADR 0080). */
+
+.part-list {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.part-list-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 28px;
+}
+
+.part-list-rows {
+  display: grid;
+  gap: 1px;
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.part-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 2px;
+  border-radius: 6px;
+}
+
+.part-row:hover {
+  background: var(--sunken);
+}
+
+.part-row[data-picked] {
+  background: color-mix(in srgb, var(--side-colour) 22%, transparent);
+}
+
+/* A name with only some of its parts picked: a stripe, not the whole row. */
+.part-row[data-picked="some"] {
+  background: none;
+  box-shadow: inset 3px 0 0 var(--side-colour);
+}
+
+.part-list[data-side="0"] {
+  --side-colour: #0072b2;
+}
+
+.part-list[data-side="1"] {
+  --side-colour: #e69f00;
+}
+
+.part-row-open {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.part-row-pick {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+.part-row[data-member] .part-row-pick {
+  padding-left: 14px;
+}
+
+.part-row-pick[aria-pressed="true"] {
+  font-weight: 600;
+}
+
+.part-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-row[data-hidden] .part-row-name {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.part-row-count {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.part-row-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.part-row-hidden {
+  color: var(--spot-ghost);
+  font-weight: 600;
+}
+
+.part-row-eye {
+  padding: 2px 6px;
+}
+
+.part-row-eye .eye {
+  width: 16px;
+  height: 16px;
+}

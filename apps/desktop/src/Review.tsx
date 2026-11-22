@@ -3,6 +3,7 @@
 // and writes the same choices the homes write.
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSession } from "./Actions";
 import { AreaLayer, isGamePlugin, LOOK, objectKey } from "./area-layer";
 import { isCollision, stepOf } from "./arrange";
@@ -12,6 +13,7 @@ import {
   type StagePlace,
   type StageSegment,
 } from "./CompareStage3D";
+import { useCollisionStepTexts } from "./collision-step-texts";
 import { DuelLine } from "./Duels";
 import { DoorPanel, mergeChoices } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
@@ -24,11 +26,14 @@ import type {
   RenderedReport,
 } from "./generated/rendered-report";
 import { reportSpots } from "./health";
+import { InfoTip } from "./info-tip";
 import { CELL } from "./map-places";
 import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
+import { stillColliding } from "./part-groups";
+import { type ListedPart, PartList } from "./part-list";
 import { usePassageTexts } from "./passage-texts";
 import { PassageSummary } from "./passages";
 import {
@@ -55,16 +60,10 @@ import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
 import { type Suggestion, suggestionOf, suggestionOfPassage } from "./suggest";
 import { FindingRow } from "./Tasks";
-import {
-  PathIcon,
-  PathMark,
-  useWalkedOn,
-  useWalkTexts,
-  type WalkQuery,
-  walkedOn,
-} from "./walkways";
+import { Eye } from "./view-tools";
+import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery, walkedOn } from "./walkways";
 import "./review.css";
-import { Note, UndoButton } from "./ui/kit";
+import { Chip, Note, UndoButton } from "./ui/kit";
 
 /** The steps, in their order. */
 export const REVIEW_STEPS: ReviewStep[] = [
@@ -103,6 +102,13 @@ const LIMIT = 12;
 interface Stored {
   step: ReviewStep;
   seen: ReviewStep[];
+  /** The place the collisions step shows, so that coming back finds it again. */
+  place?: string | null;
+  /**
+   * Parts of a mod given up that the user said to leave as they are
+   * where they still collide (ADR 0080), by {@link objectKey}.
+   */
+  accepted?: string[];
 }
 
 const storageKey = (game: string) => `mallet.review.${game}`;
@@ -117,7 +123,11 @@ export function storedReview(game: string): Stored | null {
     const value = JSON.parse(text) as Partial<Stored>;
     const step = REVIEW_STEPS.find((candidate) => candidate === value.step);
     const seen = (value.seen ?? []).filter((candidate) => REVIEW_STEPS.includes(candidate));
-    return step === undefined ? null : { step, seen };
+    const place = typeof value.place === "string" ? value.place : null;
+    const accepted = Array.isArray(value.accepted)
+      ? value.accepted.filter((key): key is string => typeof key === "string")
+      : [];
+    return step === undefined ? null : { step, seen, place, accepted };
   } catch {
     return null;
   }
@@ -169,8 +179,13 @@ export function Review({ report, game, onOpen }: ReviewProps) {
     () => storedReview(game) ?? { step: "install", seen: [] },
   );
   useEffect(() => remember(game, stored), [game, stored]);
-  // The place the collisions step shows, kept here so that the report can lead there.
-  const [clusterAt, setClusterAt] = useState<string | null>(null);
+  // The place the collisions step shows, kept here so that the report can
+  // lead there, and remembered so that coming back from another page finds it.
+  const clusterAt = stored.place ?? null;
+  const setClusterAt = (place: string) => setStored((before) => ({ ...before, place }));
+  const accepted = useMemo(() => new Set(stored.accepted ?? []), [stored.accepted]);
+  // Where the collisions step puts its buttons for every place: in the bar of the steps.
+  const [bar, setBar] = useState<HTMLElement | null>(null);
   // The segments of the places measured so far, by place, for the suggestions by size.
   const [survey, setSurvey] = useState<Map<string, StageSegment[]>>(new Map());
   const index = REVIEW_STEPS.indexOf(stored.step);
@@ -196,43 +211,42 @@ export function Review({ report, game, onOpen }: ReviewProps) {
     collisions: openClusters,
     report: null,
   };
-  const go = (step: ReviewStep) => setStored({ ...stored, step });
+  const go = (step: ReviewStep) => setStored((before) => ({ ...before, step }));
   const next = () => {
     const seen = stored.seen.includes(stored.step) ? stored.seen : [...stored.seen, stored.step];
-    setStored({ step: following ?? stored.step, seen });
+    setStored({ ...stored, step: following ?? stored.step, seen });
   };
 
   return (
     <section className="review">
-      <ol className="review-steps">
-        {REVIEW_STEPS.map((step, at) => {
-          const count = open[step];
-          const done = count === 0 || (count === null && stored.seen.includes(step));
-          return (
-            <li key={step}>
-              <button
-                type="button"
-                className="review-step"
-                aria-current={step === stored.step ? "step" : undefined}
-                data-done={done}
-                onClick={() => go(step)}
-              >
-                <span className="review-step-number">{done ? "✓" : at + 1}</span>
-                <span className="review-step-title">{r.step[step].title}</span>
-                {count !== null && count > 0 && (
-                  <span className="review-step-count">{r.open(count)}</span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      <div className="review-steps-bar">
+        <ol className="review-steps">
+          {REVIEW_STEPS.map((step, at) => {
+            const count = open[step];
+            const done = count === 0 || (count === null && stored.seen.includes(step));
+            return (
+              <li key={step}>
+                <button
+                  type="button"
+                  className="review-step"
+                  aria-current={step === stored.step ? "step" : undefined}
+                  data-done={done}
+                  onClick={() => go(step)}
+                >
+                  <span className="review-step-number">{done ? "✓" : at + 1}</span>
+                  <span className="review-step-title">{r.step[step].title}</span>
+                  {count !== null && count > 0 && (
+                    <span className="review-step-count">{r.open(count)}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        {stored.step === "collisions" && <div ref={setBar} className="review-steps-tools" />}
+      </div>
 
-      <article className="panel review-body">
-        <div className="review-body-head">
-          <span className="aside">{r.stepOf(index + 1, REVIEW_STEPS.length)}</span>
-          <h3>{r.step[stored.step].title}</h3>
-        </div>
+      <article className="panel review-body" aria-label={r.step[stored.step].title}>
         {stored.step === "install" && (
           <InstallStep report={report} findings={install} onOpen={onOpen} />
         )}
@@ -251,6 +265,14 @@ export function Review({ report, game, onOpen }: ReviewProps) {
           <CollisionsStep
             report={report}
             game={game}
+            bar={bar}
+            accepted={accepted}
+            onAccept={(keys) =>
+              setStored((before) => ({
+                ...before,
+                accepted: [...new Set([...(before.accepted ?? []), ...keys])],
+              }))
+            }
             survey={survey}
             onSurvey={(key, found) => setSurvey((before) => new Map(before).set(key, found))}
             clusters={clusters}
@@ -432,6 +454,9 @@ function placeOf(
 export function CollisionsStep({
   report,
   game,
+  bar,
+  accepted,
+  onAccept,
   survey,
   onSurvey,
   clusters,
@@ -440,14 +465,22 @@ export function CollisionsStep({
 }: {
   report: RenderedReport;
   game: string;
+  /** Where the buttons for every place go, if not above the place. */
+  bar: HTMLElement | null;
+  /** Parts left where they still collide on purpose, by {@link objectKey}. */
+  accepted: Set<string>;
+  /** Leaves these parts as they are where they still collide. */
+  onAccept: (keys: string[]) => void;
   survey: Map<string, StageSegment[]>;
   onSurvey: (key: string, segments: StageSegment[]) => void;
   clusters: Cluster[];
   cursor: string | null;
   onCursor: (key: string) => void;
 }) {
-  const { api, lang, ignored, patchChoices, setPatchChoices, spots } = useSession();
+  const { api, lang, ignored, patchChoices, setPatchChoices, spots, decidePassage, decideSpot } =
+    useSession();
   const r = useReviewTexts();
+  const c = useCollisionStepTexts();
   const p = usePassageTexts();
   const w = useWalkTexts();
   const [history, setHistory] = useState<PatchChoices[]>([]);
@@ -469,15 +502,39 @@ export function CollisionsStep({
   const [focus, setFocus] = useState<number | null>(null);
   // What the last click in the views did.
   const [note, setNote] = useState<string | null>(null);
+  // Parts shown in the views with the rest dimmed (ADR 0080): what a
+  // button names, such as the parts a choice hides.
+  const [shownApart, setShownApart] = useState<{
+    id: string;
+    keys: string[];
+    label: string;
+  } | null>(null);
+  // The parts the pointer is on in a list, lit up in the views.
+  const [pointed, setPointed] = useState<string[] | null>(null);
+  // The parts picked in the lists, by key.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // Whether each side's list of single parts is open.
+  const [singles, setSingles] = useState<[boolean, boolean]>([false, false]);
   const found = clusters.findIndex((cluster) => cluster.key === cursor);
   const at = Math.max(0, found >= 0 ? found : clusters.findIndex((cluster) => openIn(cluster) > 0));
   const cluster = clusters[at];
   const currentKey = cluster?.key ?? null;
+  // The place shown is held on to, so that deciding parts of it by hand
+  // does not move on to the next open one; only deciding it all does.
+  useEffect(() => {
+    if (currentKey !== null && currentKey !== cursor) {
+      onCursor(currentKey);
+    }
+  }, [currentKey, cursor, onCursor]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the structures belong to the place.
   useEffect(() => {
     setSegments([]);
     setFocus(null);
     setNote(null);
+    setShownApart(null);
+    setPointed(null);
+    setPicked(new Set());
+    setSingles([false, false]);
   }, [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
   // One door of stacked doors looked at alone (ADR 0067): the others as ghosts.
@@ -651,11 +708,81 @@ export function CollisionsStep({
       game: by("game"),
     };
   };
-  /** Keeps the choices; deciding the whole place moves on to the next open one. */
+  const keyOfPart = (part: Part) => objectKey(part.id.plugin, part.id.localId);
+  /**
+   * What of a mod given up still collides with the other here after
+   * `choices` (ADR 0080): parts the game needs or characters walk on,
+   * tied ones and parts kept by hand. At its spots, where a part of the
+   * other mod is left too; in a passage, every part left in the sections
+   * given up and among the passage's other parts. Parts the user said to
+   * leave as they are no longer count.
+   */
+  const leftoversIn = (choices: PatchChoices) => {
+    const hiddenThen = hiddenKeysOf(spots, choices);
+    for (const side of [0, 1] as const) {
+      const loser = sides[side];
+      const givenUp = (decided: Decided) =>
+        decided.type === "hidden" && decided.plugin.toLowerCase() === loser.toLowerCase();
+      const decidedSpots = cluster.spots.filter((spot) => givenUp(decidedOf([spot], choices)));
+      if (decidedSpots.length === 0) {
+        continue;
+      }
+      const found = new Map<string, Part>();
+      const atSpots = new Set(
+        stillColliding(
+          decidedSpots.map(({ key, item }) => ({
+            key,
+            parts: (item.spot.parts ?? []).map((part) => ({
+              key: objectKey(part.object.plugin, part.object.localId),
+              plugin: part.object.plugin,
+            })),
+          })),
+          loser,
+          hiddenThen,
+        ).parts,
+      );
+      for (const { item } of decidedSpots) {
+        for (const part of item.spot.parts ?? []) {
+          const key = objectKey(part.object.plugin, part.object.localId);
+          if (atSpots.has(key)) {
+            found.set(key, {
+              id: part.object,
+              game: isGameObject({ id: part.object }),
+              name: part.name,
+              hideable: part.hideable,
+            });
+          }
+        }
+      }
+      if (cluster.passage !== undefined) {
+        for (const segment of shownSegments) {
+          const given =
+            segment.groups.length === 0 || givenUp(decidedOf(spotsOf(segment), choices));
+          for (const part of given ? partsOf([segment], side) : []) {
+            const key = keyOfPart(part);
+            if (!hiddenThen.has(key)) {
+              found.set(key, part);
+            }
+          }
+        }
+      }
+      for (const key of accepted) {
+        found.delete(key);
+      }
+      if (found.size > 0) {
+        return { loser, side, parts: [...found.values()] };
+      }
+    }
+    return null;
+  };
+  /**
+   * Keeps the choices; deciding the whole place moves on to the next open
+   * one, unless parts of the mod given up still collide here.
+   */
   const apply = (next: PatchChoices, moveOn: boolean) => {
     setHistory([...history, patchChoices]);
     setPatchChoices(next);
-    if (!moveOn) {
+    if (!moveOn || leftoversIn(next) !== null) {
       return;
     }
     const after = collisionClusters(reportSpots(report, ignored, next), report.map.passages ?? []);
@@ -710,9 +837,6 @@ export function CollisionsStep({
       : [...focused.parts[0], ...focused.parts[1]].map((part) =>
           objectKey(part.id.plugin, part.id.localId),
         );
-  const gameParts = [...partsOf(shownSegments, 0), ...partsOf(shownSegments, 1)].filter(
-    (part) => part.game,
-  ).length;
   const placeKept = keptSideOf(placeDecided);
   // The suggested side of this place, by size (ADR 0050): from the stage's
   // segments, else from the check of every place.
@@ -915,14 +1039,6 @@ export function CollisionsStep({
       ),
     );
   };
-  /** What a side brings to the comparison: one item, or parts in segments. */
-  const levelOf = (side: 0 | 1) => {
-    const parts = partsOf(shownSegments, side);
-    const segmentCount = shownSegments.filter((segment) => segment.parts[side].length > 0).length;
-    return parts.length === 1
-      ? r.levelItem(names[side], parts[0]?.name ?? "")
-      : r.levelParts(names[side], parts.length, Math.max(1, segmentCount));
-  };
   /** Hides one object on its own, or shows it again (ADR 0040). */
   const toggle = (part: Part) => {
     const key = objectKey(part.id.plugin, part.id.localId);
@@ -931,26 +1047,6 @@ export function CollisionsStep({
         ? revealObjects(patchChoices, spots, [part.id])
         : chooseObject(patchChoices, part.id, true),
       false,
-    );
-  };
-  /** One object of a segment: hidden or kept, or why it stays. */
-  const partToggle = (part: Part) => {
-    const isHidden = hidden.has(objectKey(part.id.plugin, part.id.localId));
-    const fate = fateOf(part);
-    if (fate === "game") {
-      return <span className="aside">{r.partGame}</span>;
-    }
-    if (fate === "locked" && !isHidden) {
-      return <span className="aside">{r.partLocked}</span>;
-    }
-    return (
-      <button type="button" className="small" aria-pressed={isHidden} onClick={() => toggle(part)}>
-        {isHidden
-          ? r.partShow
-          : fate === "careful" || fate === "walked"
-            ? r.partHideAnyway
-            : r.partHide}
-      </button>
     );
   };
   /** An object clicked in the views: of the two mods, it is hidden or shown again. */
@@ -1012,47 +1108,118 @@ export function CollisionsStep({
   /** Whether keeping `side` can hide anything of the other side at all. */
   const canGo = (effect: (typeof effects)[number]) =>
     effect.go.length + effect.careful.length + effect.walked.length > 0;
+  /** Shows `parts` in the views with the rest dimmed, or everything again for the same button. */
+  const showApart = (id: string, parts: Part[], label: string) =>
+    setShownApart((before) =>
+      before?.id === id || parts.length === 0 ? null : { id, keys: parts.map(keyOfPart), label },
+    );
+  /** A part as the lists show it. */
+  const listed = (part: Part): ListedPart => {
+    const key = keyOfPart(part);
+    const fate = fateOf(part);
+    const isHidden = hidden.has(key);
+    return {
+      key,
+      id: part.id,
+      name: part.name,
+      hidden: isHidden,
+      stays: fate === "game" ? "game" : fate === "locked" && !isHidden ? "locked" : null,
+      walked: walked?.get(key) ?? 0,
+    };
+  };
+  const hideParts = (chosen: ListedPart[]) => {
+    let next = patchChoices;
+    for (const part of chosen) {
+      next = chooseObject(next, part.id, true);
+    }
+    apply(next, false);
+  };
+  const showParts = (chosen: ListedPart[]) =>
+    apply(
+      revealObjects(
+        patchChoices,
+        spots,
+        chosen.map((part) => part.id),
+      ),
+      false,
+    );
+  const partList = (parts: Part[], side: 0 | 1) => (
+    <PartList
+      parts={parts.map(listed)}
+      side={side}
+      picked={picked}
+      onPicked={setPicked}
+      onHide={hideParts}
+      onShow={showParts}
+      onHover={setPointed}
+    />
+  );
+  const leftovers = leftoversIn(patchChoices);
+  const stagePlaceName =
+    stagePlace === null
+      ? null
+      : stagePlace.place.type === "exterior"
+        ? stagePlace.place.world
+        : stagePlace.place.cell;
+  const stageCentre: [number, number] | null =
+    stagePlace === null || stagePlace.place.type === "interior"
+      ? null
+      : [cluster.centre[0], cluster.centre[1]];
+  const decor = new Set(shownSegments.flatMap((segment) => segment.decor));
+  const openInMap = () => {
+    if (cluster.passage !== undefined) {
+      decidePassage(first.item.spot, cluster.key);
+    } else {
+      decideSpot(first.item.spot);
+    }
+  };
+
+  const barTools = (
+    <div className="review-bar-tools">
+      {measuring !== null ? (
+        <>
+          <span className="aside">{r.measuring(measuring.done, measuring.total)}</span>
+          <button
+            type="button"
+            className="small quiet"
+            onClick={() => {
+              stopMeasuring.current = true;
+            }}
+          >
+            {r.measureStop}
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="small"
+          title={c.measureTip}
+          disabled={unmeasured === 0}
+          onClick={() => {
+            measureAll().catch(() => setMeasuring(null));
+          }}
+        >
+          {c.measure(unmeasured)}
+        </button>
+      )}
+      <button
+        type="button"
+        className={clear.length > 0 ? "small primary" : "small"}
+        title={c.takeTip}
+        disabled={clear.length === 0 || measuring !== null}
+        onClick={() => {
+          takeAll().catch(() => {});
+        }}
+      >
+        {c.take(clear.length)}
+      </button>
+      <InfoTip text={`${c.measureTip} ${c.takeTip}`} />
+    </div>
+  );
 
   return (
     <div className="review-collision">
-      <div className="review-suggest-bar">
-        {measuring !== null ? (
-          <>
-            <span>{r.measuring(measuring.done, measuring.total)}</span>
-            <button
-              type="button"
-              className="small quiet"
-              onClick={() => {
-                stopMeasuring.current = true;
-              }}
-            >
-              {r.measureStop}
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="small"
-            disabled={unmeasured === 0}
-            onClick={() => {
-              measureAll().catch(() => setMeasuring(null));
-            }}
-          >
-            {r.measureAll(unmeasured)}
-          </button>
-        )}
-        <button
-          type="button"
-          className="small primary"
-          disabled={clear.length === 0 || measuring !== null}
-          onClick={() => {
-            takeAll().catch(() => {});
-          }}
-        >
-          {r.takeAll(clear.length)}
-        </button>
-        <span className="aside">{r.suggestHint}</span>
-      </div>
+      {bar !== null ? createPortal(barTools, bar) : barTools}
       <nav className="review-structures" aria-label={r.clusterOf(at + 1, clusters.length)}>
         <button
           type="button"
@@ -1069,7 +1236,7 @@ export function CollisionsStep({
               ? r.clusterOf(at + 1, clusters.length)
               : p.passageOf(at + 1, clusters.length)}
           </strong>
-          <span className="aside">{r.reportCollisions(decidedPlaces, clusters.length)}</span>
+          <span className="aside">· {r.reportCollisions(decidedPlaces, clusters.length)}</span>
         </span>
         <button
           type="button"
@@ -1088,10 +1255,13 @@ export function CollisionsStep({
           {r.clusterSpots(cluster.spots.length, shownSegments.length)} ·{" "}
           <code>{first.item.spot.console}</code>
         </span>
-        <span className="spacer" />
         <span className="review-state" data-decided={placeDecided.type !== "open"}>
           {describe(placeDecided)}
         </span>
+        <span className="spacer" />
+        <button type="button" className="small quiet" title={c.openInMapTip} onClick={openInMap}>
+          {c.openInMap} ↗
+        </button>
       </div>
       {cluster.passage !== undefined && (
         <PassageSummary passage={cluster.passage.passage} worlds={report.map.worlds} />
@@ -1119,6 +1289,17 @@ export function CollisionsStep({
         }}
         onPick={pick}
         paths={repairShown}
+        highlight={shownApart}
+        onClearHighlight={() => setShownApart(null)}
+        hover={pointed ?? (picked.size > 0 ? [...picked] : null)}
+        tools={
+          <>
+            <PinButton
+              keys={cluster.spots.filter(({ item }) => item.state === "open").map(({ key }) => key)}
+            />
+            {undo}
+          </>
+        }
       />
       {cluster.spots.map(({ key, item }) => {
         const group = item.spot.doors;
@@ -1154,17 +1335,8 @@ export function CollisionsStep({
           />
         );
       })}
-      {suggested !== null && (
-        <p className="review-suggest">
-          <span className="suggested-mark">{r.suggestedTag}</span> {suggestReason(suggested)}
-        </p>
-      )}
-      <p className="review-compared">
-        <strong>{r.compared}</strong> {levelOf(0)} ⟷ {levelOf(1)}
-        <span className="aside"> · {r.pickHint}</span>
-      </p>
       {note !== null && (
-        <Note role="status">
+        <Note role="status" compact>
           <p>{note}</p>
         </Note>
       )}
@@ -1193,30 +1365,40 @@ export function CollisionsStep({
           })}
         </div>
       )}
-      {gameParts > 0 && <p className="aside">{r.gameParts(gameParts)}</p>}
+      <div className="review-sides">
+        {([0, 1] as const).map((side) => (
+          <SideColumn
+            key={`${cluster.key}:${side}`}
+            side={side}
+            name={names[side]}
+            other={names[side === 0 ? 1 : 0]}
+            keepLabel={
+              cluster.passage === undefined ? r.keepHere(names[side]) : p.keepVersion(names[side])
+            }
+            kept={placeKept === side}
+            suggested={suggested?.side === side ? suggestReason(suggested) : null}
+            asked={asked}
+            canKeep={asked && canGo(effects[side])}
+            onKeep={() => keep(side, shownSegments, true)}
+            effect={effects[side]}
+            anchors={anchors?.byPart ?? new Map()}
+            walked={walked}
+            walkPlace={stagePlaceName}
+            walkCentre={stageCentre}
+            decor={decor}
+            onAnyway={() => keep(side, shownSegments, true, true)}
+            onRepairShown={setRepairShown}
+            shownApart={shownApart?.id ?? null}
+            onShowApart={showApart}
+            singles={singles[side]}
+            onSingles={() =>
+              setSingles(side === 0 ? [!singles[0], singles[1]] : [singles[0], !singles[1]])
+            }
+            list={partList(partsOf(shownSegments, side), side)}
+          />
+        ))}
+      </div>
       <div className="review-choices">
-        <button
-          type="button"
-          className="primary"
-          aria-pressed={placeKept === 0}
-          disabled={!asked || !canGo(effects[0])}
-          onClick={() => keep(0, shownSegments, true)}
-        >
-          {placeKept === 0 ? "✓ " : ""}
-          {cluster.passage === undefined ? r.keepHere(names[0]) : p.keepVersion(names[0])}
-          {suggested?.side === 0 && ` · ${r.suggestedTag}`}
-        </button>
-        <button
-          type="button"
-          className="primary"
-          aria-pressed={placeKept === 1}
-          disabled={!asked || !canGo(effects[1])}
-          onClick={() => keep(1, shownSegments, true)}
-        >
-          {placeKept === 1 ? "✓ " : ""}
-          {cluster.passage === undefined ? r.keepHere(names[1]) : p.keepVersion(names[1])}
-          {suggested?.side === 1 && ` · ${r.suggestedTag}`}
-        </button>
         <button
           type="button"
           aria-pressed={placeDecided.type === "kept"}
@@ -1225,43 +1407,67 @@ export function CollisionsStep({
           {placeDecided.type === "kept" ? "✓ " : ""}
           {r.keepBothHere}
         </button>
-        <span className="spacer" />
-        <PinButton
-          keys={cluster.spots.filter(({ item }) => item.state === "open").map(({ key }) => key)}
-        />
-        {undo}
+        {leftovers !== null && (
+          <Note
+            tone="warning"
+            compact
+            className="review-left"
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="small"
+                  title={c.leftKeepBothTip}
+                  onClick={() => onAccept(leftovers.parts.map(keyOfPart))}
+                >
+                  {c.leftKeepBoth}
+                </button>
+                {leftovers.parts.some((part) => {
+                  const fate = fateOf(part);
+                  return fate !== "game" && fate !== "locked";
+                }) ? (
+                  <button
+                    type="button"
+                    className="small"
+                    onClick={() =>
+                      hideParts(
+                        leftovers.parts
+                          .filter((part) => {
+                            const fate = fateOf(part);
+                            return fate !== "game" && fate !== "locked";
+                          })
+                          .map(listed),
+                      )
+                    }
+                  >
+                    {c.leftHide}
+                  </button>
+                ) : (
+                  <span className="aside">{c.leftNeeded}</span>
+                )}
+                <button
+                  type="button"
+                  className="small quiet"
+                  aria-pressed={shownApart?.id === "left"}
+                  onClick={() => {
+                    showApart(
+                      "left",
+                      leftovers.parts,
+                      c.leftParts(leftovers.parts.length, short(leftovers.loser)),
+                    );
+                    setPicked(new Set(leftovers.parts.map(keyOfPart)));
+                    setSingles(leftovers.side === 0 ? [true, singles[1]] : [singles[0], true]);
+                  }}
+                >
+                  <Eye open /> {c.leftOpen}
+                </button>
+              </>
+            }
+          >
+            <p>{c.left(leftovers.parts.length, short(leftovers.loser))}</p>
+          </Note>
+        )}
       </div>
-      {!asked ? (
-        <p className="aside">{r.checkingTies}</p>
-      ) : (
-        <div className="review-effects">
-          {([0, 1] as const).map((side) => (
-            <KeepEffect
-              key={side}
-              winner={names[side]}
-              loser={names[side === 0 ? 1 : 0]}
-              effect={effects[side]}
-              anchors={anchors.byPart}
-              walked={walked}
-              walkPlace={
-                stagePlace === null
-                  ? null
-                  : stagePlace.place.type === "exterior"
-                    ? stagePlace.place.world
-                    : stagePlace.place.cell
-              }
-              walkCentre={
-                stagePlace === null || stagePlace.place.type === "interior"
-                  ? null
-                  : [cluster.centre[0], cluster.centre[1]]
-              }
-              decor={new Set(shownSegments.flatMap((segment) => segment.decor))}
-              onAnyway={() => keep(side, shownSegments, true, true)}
-              onRepairShown={setRepairShown}
-            />
-          ))}
-        </div>
-      )}
       <section className="review-segments">
         <h4>{r.segmentsTitle}</h4>
         <ol>
@@ -1345,22 +1551,7 @@ export function CollisionsStep({
                         <strong className="stage3-swatch" data-side={side}>
                           {names[side]}
                         </strong>
-                        <ul>
-                          {partsOf([segment], side).map((part) => (
-                            <li key={objectKey(part.id.plugin, part.id.localId)}>
-                              <span>{part.name}</span>
-                              {(walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0) >
-                                0 && (
-                                <PathMark
-                                  triangles={
-                                    walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0
-                                  }
-                                />
-                              )}
-                              {partToggle(part)}
-                            </li>
-                          ))}
-                        </ul>
+                        {partList(partsOf([segment], side), side)}
                       </div>
                     ))}
                   </div>
@@ -1489,14 +1680,35 @@ function tiedTogether(
   }));
 }
 
+/** What keeping one side does to the other's parts, grouped by their fate. */
+interface Effect {
+  parts: Part[];
+  go: Part[];
+  careful: Part[];
+  walked: Part[];
+  locked: Part[];
+  game: Part[];
+}
+
+/** A note of a side's column that opens to say more: tied parts, parts that stay, and so on. */
+type Badge = "tied" | "walked" | "stay" | "resting" | "restingStays" | "game";
+
 /**
- * What keeping one side does to the other: how many of its parts can go,
- * which the game needs and why, with "hide anyway" for the careful ones,
- * and keeping both suggested where nothing can go.
+ * One mod's column (ADR 0080), in the mod's colour: keeping its version
+ * here, what that does to the other mod's parts in a few words with the
+ * way to see them, its notes as badges that open to say more, and its
+ * own parts to hide one by one.
  */
-function KeepEffect({
-  winner,
-  loser,
+function SideColumn({
+  side,
+  name,
+  other,
+  keepLabel,
+  kept,
+  suggested,
+  asked,
+  canKeep,
+  onKeep,
   effect,
   anchors,
   walked,
@@ -1505,17 +1717,25 @@ function KeepEffect({
   decor,
   onAnyway,
   onRepairShown,
+  shownApart,
+  onShowApart,
+  singles,
+  onSingles,
+  list,
 }: {
-  winner: string;
-  loser: string;
-  effect: {
-    parts: Part[];
-    go: Part[];
-    careful: Part[];
-    walked: Part[];
-    locked: Part[];
-    game: Part[];
-  };
+  side: 0 | 1;
+  name: string;
+  /** The other mod, whose parts keeping this one hides. */
+  other: string;
+  keepLabel: string;
+  kept: boolean;
+  /** Why keeping this side is suggested, if it is. */
+  suggested: string | null;
+  /** Whether what the game needs here is known. */
+  asked: boolean;
+  canKeep: boolean;
+  onKeep: () => void;
+  effect: Effect;
   anchors: Map<string, ObjectAnchors>;
   /** The pieces of path characters walk on, by part. */
   walked: Map<string, number> | null;
@@ -1527,7 +1747,18 @@ function KeepEffect({
   onAnyway: () => void;
   /** Told what the repair of the paths shows in the view (ADR 0058). */
   onRepairShown: (overlay: PathsOverlay | null) => void;
+  /** Which parts the views show apart now, by the button's id. */
+  shownApart: string | null;
+  onShowApart: (id: string, parts: Part[], label: string) => void;
+  /** Whether the list of this side's parts is open. */
+  singles: boolean;
+  onSingles: () => void;
+  list: ReactNode;
 }) {
+  const r = useReviewTexts();
+  const c = useCollisionStepTexts();
+  const w = useWalkTexts();
+  const [open, setOpen] = useState<Badge | null>(null);
   const isDecor = (part: Part) => decor.has(objectKey(part.id.plugin, part.id.localId));
   const resting = effect.go.filter(isDecor);
   const restingStays = [
@@ -1536,98 +1767,258 @@ function KeepEffect({
     ...effect.locked,
     ...effect.game,
   ].filter(isDecor);
-  const r = useReviewTexts();
-  const w = useWalkTexts();
   const pieces = effect.walked.reduce(
     (sum, part) => sum + (walked?.get(objectKey(part.id.plugin, part.id.localId)) ?? 0),
     0,
   );
   const anyway = effect.careful.length + effect.walked.length;
-  const staying = [...effect.careful, ...effect.locked];
   // Where characters could no longer go with those parts hidden (ADR 0059).
   const reach = useReach(
     walkPlace,
     walkCentre,
     effect.walked.map((part) => part.id),
   );
-  if (effect.parts.length === 0) {
-    return null;
-  }
   const nothing = effect.go.length + anyway === 0;
+  const badges: { id: Badge; parts: Part[]; text: string; tone: "warning" | "neutral" }[] = [
+    {
+      id: "tied" as const,
+      parts: effect.careful,
+      text: c.badgeTied(effect.careful.length),
+      tone: "warning" as const,
+    },
+    {
+      id: "walked" as const,
+      parts: effect.walked,
+      text: c.badgeWalked(effect.walked.length),
+      tone: "warning" as const,
+    },
+    {
+      id: "stay" as const,
+      parts: effect.locked,
+      text: c.badgeStay(effect.locked.length),
+      tone: "neutral" as const,
+    },
+    {
+      id: "resting" as const,
+      parts: resting,
+      text: c.badgeResting(resting.length),
+      tone: "neutral" as const,
+    },
+    {
+      id: "restingStays" as const,
+      parts: restingStays,
+      text: c.badgeRestingStays(restingStays.length),
+      tone: "neutral" as const,
+    },
+    {
+      id: "game" as const,
+      parts: effect.game,
+      text: c.badgeGame(effect.game.length),
+      tone: "neutral" as const,
+    },
+  ].filter((badge) => badge.parts.length > 0);
+  const opened = badges.find((badge) => badge.id === open);
+  const labelOf = (badge: Badge, parts: Part[]) =>
+    badge === "tied"
+      ? c.tiedParts(parts.length, other)
+      : badge === "walked"
+        ? c.walkedParts(parts.length, other)
+        : badge === "stay" || badge === "game" || badge === "restingStays"
+          ? c.stayingParts(parts.length, other)
+          : c.goingParts(parts.length, other);
+  const showWhich = (badge: Badge, parts: Part[]) => (
+    <button
+      type="button"
+      className="small quiet"
+      aria-pressed={shownApart === `${side}:${badge}`}
+      onClick={() => onShowApart(`${side}:${badge}`, parts, labelOf(badge, parts))}
+    >
+      <Eye open /> {c.showWhich}
+    </button>
+  );
+  const reasons = (parts: Part[]) => (
+    <ul className="review-side-reasons">
+      {tiedTogether(parts, anchors).map(({ key, names, tie }) => (
+        <li key={key}>
+          <strong>{names}</strong>
+          {tie === undefined ? (
+            <span className="aside"> {r.neededByGame}</span>
+          ) : (
+            <AnchorReasons anchors={tie} />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+  const hideAnywayButton = anyway > 0 && (
+    <button type="button" className="small" onClick={onAnyway}>
+      {effect.walked.length > 0
+        ? w.hideAnyway(other, anyway)
+        : r.hideAnyway(other, effect.careful.length)}
+    </button>
+  );
+
   return (
-    <div className="review-effect" data-nothing={nothing}>
-      <p>
-        <strong>{r.keepHere(winner)}:</strong>{" "}
-        {nothing
-          ? r.nothingCanGo(loser)
-          : r.keepEffect(loser, effect.go.length, effect.parts.length)}
-        {resting.length > 0 && ` ${r.restingGoes(counted(resting.map((part) => part.name)))}`}
-        {restingStays.length > 0 &&
-          ` ${r.restingStays(counted(restingStays.map((part) => part.name)))}`}
-        {effect.careful.length > 0 && ` ${r.carefulNote(effect.careful.length)}`}
-        {effect.locked.length > 0 && ` ${r.lockedNote(effect.locked.length)}`}
-        {effect.game.length > 0 && ` ${r.gameParts(effect.game.length)}`}
-      </p>
-      {staying.length > 0 && (
-        <details className="review-ties">
-          <summary className="more">{r.whyTheyStay(staying.length)}</summary>
-          <ul>
-            {tiedTogether(staying, anchors).map(({ key, names, tie }) => (
-              <li key={key}>
-                <strong>{names}</strong>
-                {tie === undefined ? (
-                  <span className="aside"> {r.neededByGame}</span>
-                ) : (
-                  <AnchorReasons anchors={tie} />
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {effect.walked.length > 0 && (
-        <p className="walk-warning">
-          <PathIcon />
-          <span>
-            {w.keepWarning(
-              loser,
-              counted(effect.walked.map((part) => part.name)),
-              effect.walked.length,
-              pieces,
+    <section className="review-side" data-side={side} data-kept={kept ? "" : undefined}>
+      <header className="review-side-head">
+        <strong className="stage3-swatch" data-side={side}>
+          {name}
+        </strong>
+        {suggested !== null && (
+          <Chip tone="info" title={suggested}>
+            {r.suggestedTag}
+          </Chip>
+        )}
+        {kept && (
+          <Chip tone="ok" icon>
+            {c.keptHere}
+          </Chip>
+        )}
+      </header>
+      <button
+        type="button"
+        className="primary review-side-keep"
+        aria-pressed={kept}
+        disabled={!canKeep}
+        title={suggested ?? undefined}
+        onClick={onKeep}
+      >
+        {kept ? "✓ " : ""}
+        {keepLabel}
+      </button>
+      {!asked ? (
+        <p className="aside">{r.checkingTies}</p>
+      ) : (
+        effect.parts.length > 0 && (
+          <>
+            <p className="review-side-effect">
+              {nothing ? (
+                <>
+                  <span>{c.effectNothing(other)}</span>
+                  <InfoTip text={c.effectNothingTip} />
+                </>
+              ) : (
+                <span>{c.effectGo(other, effect.go.length, effect.parts.length)}</span>
+              )}
+              {effect.go.length > 0 && (
+                <button
+                  type="button"
+                  className="small quiet"
+                  aria-pressed={shownApart === `${side}:go`}
+                  onClick={() =>
+                    onShowApart(`${side}:go`, effect.go, c.goingParts(effect.go.length, other))
+                  }
+                >
+                  <Eye open /> {c.showThese}
+                </button>
+              )}
+            </p>
+            {badges.length > 0 && (
+              <div className="review-side-badges">
+                {badges.map((badge) => (
+                  <button
+                    type="button"
+                    key={badge.id}
+                    className="review-side-badge"
+                    data-tone={badge.tone}
+                    aria-expanded={open === badge.id}
+                    onClick={() => setOpen(open === badge.id ? null : badge.id)}
+                  >
+                    {badge.id === "walked" && <PathIcon />}
+                    {badge.text}
+                    <span aria-hidden="true">{open === badge.id ? "▾" : "▸"}</span>
+                  </button>
+                ))}
+              </div>
             )}
-          </span>
-        </p>
+            {opened !== undefined && (
+              <div className="review-side-more">
+                {opened.id === "tied" && (
+                  <>
+                    <p>{c.tiedExplain}</p>
+                    {reasons(opened.parts)}
+                    <div className="review-side-actions">
+                      {showWhich("tied", opened.parts)}
+                      {hideAnywayButton}
+                    </div>
+                  </>
+                )}
+                {opened.id === "walked" && (
+                  <>
+                    <p className="walk-warning">
+                      <PathIcon />
+                      <span>
+                        {w.keepWarning(
+                          other,
+                          counted(effect.walked.map((part) => part.name)),
+                          effect.walked.length,
+                          pieces,
+                        )}
+                      </span>
+                    </p>
+                    <ReachNote
+                      reach={reach}
+                      follow={
+                        walkPlace === null
+                          ? null
+                          : {
+                              place: walkPlace,
+                              centre: walkCentre,
+                              hidden: effect.walked.map((part) => part.id),
+                            }
+                      }
+                    />
+                    {walkPlace !== null && (
+                      <RepairPaths
+                        place={walkPlace}
+                        centre={walkCentre}
+                        objects={[...effect.go, ...effect.walked].map((part) => part.id)}
+                        onShow={onRepairShown}
+                      />
+                    )}
+                    <div className="review-side-actions">
+                      {showWhich("walked", opened.parts)}
+                      {hideAnywayButton}
+                    </div>
+                  </>
+                )}
+                {opened.id === "stay" && (
+                  <>
+                    <p>{c.stayExplain}</p>
+                    {reasons(opened.parts)}
+                    <div className="review-side-actions">{showWhich("stay", opened.parts)}</div>
+                  </>
+                )}
+                {(opened.id === "resting" || opened.id === "restingStays") && (
+                  <>
+                    <p>
+                      {opened.id === "resting" ? c.restingExplain : c.restingStaysExplain}{" "}
+                      {counted(opened.parts.map((part) => part.name))}
+                    </p>
+                    <div className="review-side-actions">{showWhich(opened.id, opened.parts)}</div>
+                  </>
+                )}
+                {opened.id === "game" && (
+                  <>
+                    <p>{c.gameExplain}</p>
+                    <div className="review-side-actions">{showWhich("game", opened.parts)}</div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )
       )}
-      {effect.walked.length > 0 && (
-        <ReachNote
-          reach={reach}
-          follow={
-            walkPlace === null
-              ? null
-              : {
-                  place: walkPlace,
-                  centre: walkCentre,
-                  hidden: effect.walked.map((part) => part.id),
-                }
-          }
-        />
-      )}
-      {effect.walked.length > 0 && walkPlace !== null && (
-        <RepairPaths
-          place={walkPlace}
-          centre={walkCentre}
-          objects={[...effect.go, ...effect.walked].map((part) => part.id)}
-          onShow={onRepairShown}
-        />
-      )}
-      {anyway > 0 && (
-        <button type="button" className="small" onClick={onAnyway}>
-          {effect.walked.length > 0
-            ? w.hideAnyway(loser, anyway)
-            : r.hideAnyway(loser, effect.careful.length)}
-        </button>
-      )}
-    </div>
+      <button
+        type="button"
+        className="small quiet review-side-singles"
+        aria-expanded={singles}
+        onClick={onSingles}
+      >
+        <span aria-hidden="true">{singles ? "▾" : "▸"}</span> {c.hideSingles(name)}
+      </button>
+      {singles && list}
+    </section>
   );
 }
 

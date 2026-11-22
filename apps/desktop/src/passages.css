@@ -2,8 +2,10 @@
    the three views, and the way from a spot to the passage it lies in. */
 
 .passage-summary {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-left: 4px solid var(--spot-touch);

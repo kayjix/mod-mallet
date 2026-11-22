@@ -94,6 +94,7 @@
   - [0077 One UI kit for every page](adr/0077-one-ui-kit-for-every-page.md)
   - [0078 Other games closer to Skyrim](adr/0078-other-games-closer-to-skyrim.md)
   - [0079 Version changes are read from the files, and compared with the last scan](adr/0079-version-changes.md)
+  - [0080 The collisions step is decided by side, with the pictures](adr/0080-collisions-decided-by-side-with-the-pictures.md)
   - [Template](adr/template.md)
 
 # Reference

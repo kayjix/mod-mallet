@@ -122,7 +122,10 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
-  if (v_look > 7.5) {
+  if (v_look > 8.5) {
+    // In the background while other objects are shown: dark and grey.
+    shaded = vec3(dot(shaded, vec3(0.3, 0.59, 0.11))) * 0.35 + vec3(0.02);
+  } else if (v_look > 7.5) {
     // Located: glows in its own colour, drawn even where it is hidden.
     float glow = 0.5 + 0.5 * sin(u_pulse);
     shaded = mix(shaded, min(shaded * 2.2, vec3(1.0)), glow);
@@ -740,6 +743,8 @@ export const LOOK = {
   chainedGhost: 7,
   /** Located for a moment: glowing, even where it is hidden. */
   pulse: 8,
+  /** In the background while other objects are shown: dark and grey. */
+  dim: 9,
 } as const;
 export type Look = (typeof LOOK)[keyof typeof LOOK];
 

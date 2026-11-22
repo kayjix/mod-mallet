@@ -104,6 +104,8 @@ interface Place {
   focus?: MapSpot | null;
   /** The spot the collisions' worklist opens. */
   workSpot?: MapSpot | null;
+  /** The passage the collisions open, by its key, with `workSpot` one of its spots. */
+  workPassage?: string | null;
   /** The duel the assets page opens. */
   compareAt?: string | null;
   /** The pair of mods the collisions open. */
@@ -293,6 +295,7 @@ export default function App({ api, startLang }: AppProps) {
   const view = place.view;
   const focus = place.focus ?? null;
   const workSpot = place.workSpot ?? null;
+  const workPassage = place.workPassage ?? null;
   const compareAt = place.compareAt ?? null;
   const pairAt = place.pairAt ?? null;
   const mapMod = place.mapMod ?? null;
@@ -560,6 +563,12 @@ export default function App({ api, startLang }: AppProps) {
     [navigate],
   );
 
+  const decidePassage = useCallback(
+    (spot: MapSpot, passage: string) =>
+      navigate({ view: "collisions", workSpot: spot, workPassage: passage }),
+    [navigate],
+  );
+
   const openPair = useCallback(
     (first: string, second: string, from?: PatchAt) =>
       navigate({ view: "collisions", pairAt: [first, second], from: from ?? null }),
@@ -604,6 +613,7 @@ export default function App({ api, startLang }: AppProps) {
       spots: spotsByFinding(report),
       showOnMap,
       decideSpot,
+      decidePassage,
       patchChoices: split.active,
       setPatchChoices: setActiveChoices,
       waiting: split.waiting,
@@ -640,6 +650,7 @@ export default function App({ api, startLang }: AppProps) {
       report,
       showOnMap,
       decideSpot,
+      decidePassage,
       split,
       setActiveChoices,
       go,
@@ -825,7 +836,7 @@ export default function App({ api, startLang }: AppProps) {
             (current === "collisions" || current === "assets" || current === "catalogue") ? (
             <NotDrawnHere page={current} />
           ) : current === "collisions" ? (
-            <Collisions report={report} start={workSpot} />
+            <Collisions report={report} start={workSpot} startPassage={workPassage} />
           ) : current === "assets" ? (
             <CompareView report={report} start={compareAt} />
           ) : current === "catalogue" && (report.game.lacks ?? []).includes("catalogue") ? (

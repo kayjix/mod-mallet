@@ -41,6 +41,11 @@ export interface Session {
   showOnMap: (spot: MapSpot, from?: PatchAt) => void;
   /** Switches to the collisions' worklist and opens a spot there. */
   decideSpot: (spot: MapSpot, from?: PatchAt) => void;
+  /**
+   * Switches to the collisions and opens the passage (ADR 0072) with this
+   * key in its one view, at its spot `spot` (ADR 0080).
+   */
+  decidePassage: (spot: MapSpot, passage: string) => void;
   /** What the patch is to hide, per collision; shared by all views. */
   patchChoices: PatchChoices;
   /** Replaces the patch's choice. */

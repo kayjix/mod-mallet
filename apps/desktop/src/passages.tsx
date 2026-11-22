@@ -3,6 +3,7 @@
 // the place they are nearest and summed up, to be decided as a whole.
 
 import type { MapPassage, RenderedReport } from "./generated/rendered-report";
+import { InfoTip } from "./info-tip";
 import { nearest } from "./map-places";
 import { usePassageTexts } from "./passage-texts";
 import "./passages.css";
@@ -32,7 +33,11 @@ export function usePassageTitle(): (
   return (passage, worlds) => p.title(p.kind[passage.severity], passagePlace(passage, worlds));
 }
 
-/** What a passage is about: its sides, its twins, how far they stand in each other, and why one has to go. */
+/**
+ * What a passage is about, in one line: what and where, its sides, its
+ * twins and how far they stand in each other; why one has to go behind
+ * its ⓘ, the pictures beside it show the rest (ADR 0080).
+ */
 export function PassageSummary({
   passage,
   worlds,
@@ -58,8 +63,7 @@ export function PassageSummary({
     <div className="passage-summary" data-severity={passage.severity}>
       <strong className="passage-title">{title(passage, worlds)}</strong>
       <span className="aside">{facts.join(" · ")}</span>
-      <p>{p.why[passage.severity]}</p>
-      <p className="aside">{p.bounded}</p>
+      <InfoTip text={`${p.why[passage.severity]} ${p.bounded}`} />
     </div>
   );
 }

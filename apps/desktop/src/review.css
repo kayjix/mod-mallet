@@ -464,3 +464,230 @@
   margin: 0;
   font-size: 0.88rem;
 }
+
+/* ---- the collisions step laid out by side (ADR 0080) ------------------------ */
+
+/* The steps, and on the right the buttons for every place. */
+.review-steps-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.review-steps-bar .review-steps {
+  flex: 1 1 auto;
+}
+
+.review-steps-tools {
+  margin-left: auto;
+}
+
+.review-steps-tools:empty {
+  display: none;
+}
+
+.review-bar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+/* ‹ Previous · Passage 4 of 90 · 9 of 90 decided · Next ›, on one line. */
+.review-structures-where {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.review-collision-head {
+  align-items: center;
+}
+
+/* The views' own bar: pinning and undo at its end. */
+.stage3-own-tools {
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Swatches, what the marks mean and the other mods built here: one line. */
+.stage3-controls .stage3-legend {
+  display: inline-flex;
+}
+
+.stage3-controls .stage3-other {
+  font-size: 0.82rem;
+}
+
+/* What the views show apart, over them, with the way back to everything. */
+.stage3-showing {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 72%);
+  color: #f1f3f5;
+  font-size: 0.85rem;
+  transform: translateX(-50%);
+}
+
+.stage3-showing span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A column per mod, in the mod's colour of the views. */
+.review-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.review-side {
+  --side-colour: #0072b2;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--side-colour);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.review-side[data-side="1"] {
+  --side-colour: #e69f00;
+}
+
+.review-side[data-kept] {
+  box-shadow: 0 0 0 1px var(--ok);
+}
+
+.review-side-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.review-side-head > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-side-keep {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.review-side-keep[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.review-side-effect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.review-side-effect button {
+  font-weight: 400;
+}
+
+.review-side-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.review-side-badge {
+  --tone: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  color: var(--tone);
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.review-side-badge[data-tone="warning"] {
+  --tone: var(--warning);
+}
+
+.review-side-badge[aria-expanded="true"] {
+  border-color: var(--tone);
+}
+
+.review-side-badge .path-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.review-side-more {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--sunken);
+}
+
+.review-side-more p {
+  margin: 0;
+}
+
+.review-side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-side-reasons {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  margin: 0;
+  padding-left: 18px;
+  overflow: auto;
+}
+
+.review-side-singles {
+  justify-self: start;
+}
+
+.review-choices .review-left {
+  flex: 1 1 320px;
+}
+
+.review-choices {
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .review-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

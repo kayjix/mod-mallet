@@ -10,7 +10,6 @@ export type ReviewStep = "install" | "order" | "assets" | "map" | "collisions" |
 export interface ReviewTexts {
   nav: string;
   step: Record<ReviewStep, { title: string }>;
-  stepOf: (index: number, total: number) => string;
   open: (count: number) => string;
   continueAt: (step: string) => string;
   start: string;
@@ -25,12 +24,9 @@ export interface ReviewTexts {
   keepBoth: string;
   allDecided: string;
   parts: (name: string, count: number) => string;
-  gameParts: (count: number) => string;
   /** The stage. */
   viewNow: string;
   viewOnly: (name: string) => string;
-  legendHidden: string;
-  othersHere: (count: number) => string;
   othersShow: (name: string) => string;
   othersCount: (name: string, count: number) => string;
   /** Moving through the structures, and through the steps. */
@@ -55,11 +51,8 @@ export interface ReviewTexts {
     single: string | null,
   ) => string;
   segmentSuggested: (name: string) => string;
-  suggestHint: string;
-  measureAll: (count: number) => string;
   measuring: (done: number, total: number) => string;
   measureStop: string;
-  takeAll: (count: number) => string;
   takeAllDone: (
     taken: number,
     doubtful: number,
@@ -67,16 +60,8 @@ export interface ReviewTexts {
     asking: number,
     walked: number,
   ) => string;
-  compared: string;
-  levelItem: (mod: string, name: string) => string;
-  levelParts: (mod: string, parts: number, segments: number) => string;
   pickHint: string;
   partsTitle: (count: number) => string;
-  partHide: string;
-  partShow: string;
-  partHideAnyway: string;
-  partGame: string;
-  partLocked: string;
   singlyHidden: (count: number) => string;
   withExceptions: (count: number) => string;
   pickedHidden: (name: string) => string;
@@ -84,13 +69,6 @@ export interface ReviewTexts {
   pickedStays: (name: string) => string;
   pickedOther: (name: string, mod: string) => string;
   checkingTies: string;
-  keepEffect: (loser: string, go: number, total: number) => string;
-  nothingCanGo: (loser: string) => string;
-  carefulNote: (count: number) => string;
-  restingGoes: (names: string) => string;
-  restingStays: (names: string) => string;
-  lockedNote: (count: number) => string;
-  whyTheyStay: (count: number) => string;
   neededByGame: string;
   hideAnyway: (loser: string, count: number) => string;
   keepBothHere: string;
@@ -135,7 +113,6 @@ const en: ReviewTexts = {
       title: "Report",
     },
   },
-  stepOf: (index, total) => `Step ${index} of ${total}`,
   open: (count) => `${count} open`,
   continueAt: (step) => `Continue: ${step}`,
   start: "Go through it",
@@ -151,15 +128,8 @@ const en: ReviewTexts = {
   keepBoth: "Keep both",
   allDecided: "Every collision is decided.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "part" : "parts"}`,
-  gameParts: (count) =>
-    count === 1
-      ? "1 part belongs to the game and stays"
-      : `${count} parts belong to the game and stay`,
   viewNow: "Now",
   viewOnly: (name) => `Only ${name}`,
-  legendHidden: "red: already hidden, by this or your other decisions",
-  othersHere: (count) =>
-    count === 1 ? "One more mod built here:" : `${count} more mods built here:`,
   othersShow: (name) => `Pick out what ${name} places here`,
   othersCount: (name, count) => `${name} (${count})`,
   previousStructure: "‹ Previous place",
@@ -182,33 +152,16 @@ const en: ReviewTexts = {
         : `${loser} only ${loserParts} (about ${loserRoom} m³)`
     }. Keeping ${winner}'s is suggested.`,
   segmentSuggested: (name) => `suggested: ${name}`,
-  suggestHint:
-    "A suggestion where one side takes at least 20 times the room of the other, measured by its parts.",
-  measureAll: (count) =>
-    count === 1 ? "Measure the 1 open place" : `Measure the ${count} open places`,
   measuring: (done, total) => `Measuring places… ${done} of ${total}`,
   measureStop: "Stop",
-  takeAll: (count) =>
-    count === 1
-      ? "Take the clear suggestion (1 place)"
-      : `Take every clear suggestion (${count} places)`,
   takeAllDone: (taken, doubtful, stuck, asking, walked) =>
     `${taken} ${taken === 1 ? "place" : "places"} decided as suggested. Left to go through: ${doubtful} without a clear suggestion${
       asking > 0
         ? `, ${asking} where only parts tied into the game could go (you decide those)`
         : ""
     }${walked > 0 ? `, ${walked} where characters walk on what would go` : ""}${stuck > 0 ? `, ${stuck} where nothing can go` : ""}. Undo takes the whole batch back.`,
-  compared: "Compared:",
-  levelItem: (mod, name) => `${mod}: a single item, ${name}`,
-  levelParts: (mod, parts, segments) =>
-    `${mod}: ${parts} parts in ${segments} ${segments === 1 ? "section" : "sections"}`,
   pickHint: "click an object in the views to hide it or show it again",
   partsTitle: (count) => `The ${count} objects one by one`,
-  partHide: "Hide",
-  partShow: "Show again",
-  partHideAnyway: "Hide anyway",
-  partGame: "the game's own, stays",
-  partLocked: "the game needs it, stays",
   singlyHidden: (count) => (count === 1 ? "1 hidden on its own" : `${count} hidden on their own`),
   withExceptions: (count) => (count === 1 ? "(1 exception)" : `(${count} exceptions)`),
   pickedHidden: (name) => `${name} is hidden now.`,
@@ -216,21 +169,6 @@ const en: ReviewTexts = {
   pickedStays: (name) => `${name} stays: the game needs it.`,
   pickedOther: (name, mod) => `${name} belongs to ${mod}, not to the two mods compared here.`,
   checkingTies: "Looking at what the game needs here…",
-  keepEffect: (loser, go, total) =>
-    go === total
-      ? `all ${total} ${total === 1 ? "part" : "parts"} of ${loser} can go.`
-      : `${go} of ${total} parts of ${loser} can go.`,
-  nothingCanGo: (loser) =>
-    `nothing of ${loser} can go here: the game needs these parts. "Keep both here" settles the place without hiding anything.`,
-  restingGoes: (names) => `What stands on it goes with it: ${names}.`,
-  restingStays: (names) => `Standing on it, but staying (then in the air): ${names}.`,
-  carefulNote: (count) =>
-    count === 1
-      ? "1 part is tied into the game: hiding it is possible, but may break something."
-      : `${count} parts are tied into the game: hiding them is possible, but may break something.`,
-  lockedNote: (count) =>
-    count === 1 ? "1 part stays: the game needs it." : `${count} parts stay: the game needs them.`,
-  whyTheyStay: (count) => (count === 1 ? "Why 1 part stays" : `Why ${count} parts stay`),
   neededByGame: "the scan marks it as needed by the game",
   hideAnyway: (loser, count) =>
     count === 1
@@ -278,7 +216,6 @@ const de: ReviewTexts = {
       title: "Bericht",
     },
   },
-  stepOf: (index, total) => `Schritt ${index} von ${total}`,
   open: (count) => `${count} offen`,
   continueAt: (step) => `Weiter: ${step}`,
   start: "Durchgehen",
@@ -294,15 +231,8 @@ const de: ReviewTexts = {
   keepBoth: "Beide behalten",
   allDecided: "Jede Kollision ist entschieden.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "Teil" : "Teile"}`,
-  gameParts: (count) =>
-    count === 1
-      ? "1 Teil gehört zum Spiel und bleibt"
-      : `${count} Teile gehören zum Spiel und bleiben`,
   viewNow: "Jetzt",
   viewOnly: (name) => `Nur ${name}`,
-  legendHidden: "rot: schon ausgeblendet, durch diese oder deine anderen Entscheidungen",
-  othersHere: (count) =>
-    count === 1 ? "Ein weiterer Mod baut hier:" : `${count} weitere Mods bauen hier:`,
   othersShow: (name) => `Hervorheben, was ${name} hier platziert`,
   othersCount: (name, count) => `${name} (${count})`,
   previousStructure: "‹ Vorheriger Bereich",
@@ -326,33 +256,16 @@ const de: ReviewTexts = {
         : `${loser} nur ${loserParts} (etwa ${loserRoom} m³)`
     }. Vorschlag: ${winner} behalten.`,
   segmentSuggested: (name) => `Vorschlag: ${name}`,
-  suggestHint:
-    "Ein Vorschlag, wo eine Seite mindestens 20-mal so viel Raum einnimmt wie die andere, gemessen an ihren Teilen.",
-  measureAll: (count) =>
-    count === 1 ? "Den 1 offenen Bereich ausmessen" : `Die ${count} offenen Bereiche ausmessen`,
   measuring: (done, total) => `Messe Bereiche … ${done} von ${total}`,
   measureStop: "Anhalten",
-  takeAll: (count) =>
-    count === 1
-      ? "Den klaren Vorschlag übernehmen (1 Bereich)"
-      : `Alle klaren Vorschläge übernehmen (${count} Bereiche)`,
   takeAllDone: (taken, doubtful, stuck, asking, walked) =>
     `${taken} ${taken === 1 ? "Bereich" : "Bereiche"} nach Vorschlag entschieden. Zum Durchgehen bleiben ${doubtful} ohne klaren Vorschlag${
       asking > 0
         ? `, ${asking}, in denen nur ins Spiel Eingebundenes weg könnte (das entscheidest du)`
         : ""
     }${walked > 0 ? `, ${walked}, in denen Figuren auf dem laufen, was weg würde` : ""}${stuck > 0 ? `, ${stuck}, in denen nichts weg kann` : ""}. Rückgängig nimmt alle auf einmal zurück.`,
-  compared: "Verglichen:",
-  levelItem: (mod, name) => `${mod}: ein einzelnes Teil, ${name}`,
-  levelParts: (mod, parts, segments) =>
-    `${mod}: ${parts} Teile in ${segments} ${segments === 1 ? "Abschnitt" : "Abschnitten"}`,
   pickHint: "ein Objekt in den Ansichten anklicken blendet es aus oder wieder ein",
   partsTitle: (count) => `Die ${count} Objekte einzeln`,
-  partHide: "Ausblenden",
-  partShow: "Wieder zeigen",
-  partHideAnyway: "Trotzdem ausblenden",
-  partGame: "gehört zum Spiel, bleibt",
-  partLocked: "das Spiel braucht es, bleibt",
   singlyHidden: (count) =>
     count === 1 ? "1 einzeln ausgeblendet" : `${count} einzeln ausgeblendet`,
   withExceptions: (count) => (count === 1 ? "(1 Ausnahme)" : `(${count} Ausnahmen)`),
@@ -361,23 +274,6 @@ const de: ReviewTexts = {
   pickedStays: (name) => `${name} bleibt: das Spiel braucht es.`,
   pickedOther: (name, mod) => `${name} gehört zu ${mod}, nicht zu den beiden verglichenen Mods.`,
   checkingTies: "Prüfe, was das Spiel hier braucht …",
-  keepEffect: (loser, go, total) =>
-    go === total
-      ? `alle ${total} ${total === 1 ? "Teil" : "Teile"} von ${loser} können weg.`
-      : `${go} von ${total} Teilen von ${loser} können weg.`,
-  nothingCanGo: (loser) =>
-    `von ${loser} kann hier nichts weg: das Spiel braucht diese Teile. „Hier beide behalten“ entscheidet die Stelle, ohne etwas auszublenden.`,
-  restingGoes: (names) => `Was darauf steht, geht mit: ${names}.`,
-  restingStays: (names) => `Steht darauf, bleibt aber (dann in der Luft): ${names}.`,
-  carefulNote: (count) =>
-    count === 1
-      ? "1 Teil ist ins Spiel eingebunden: ausblenden geht, kann aber etwas stören."
-      : `${count} Teile sind ins Spiel eingebunden: ausblenden geht, kann aber etwas stören.`,
-  lockedNote: (count) =>
-    count === 1
-      ? "1 Teil bleibt: das Spiel braucht es."
-      : `${count} Teile bleiben: das Spiel braucht sie.`,
-  whyTheyStay: (count) => (count === 1 ? "Warum 1 Teil bleibt" : `Warum ${count} Teile bleiben`),
   neededByGame: "der Scan kennzeichnet es als vom Spiel gebraucht",
   hideAnyway: (loser, count) =>
     count === 1
