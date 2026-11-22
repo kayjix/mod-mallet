@@ -9,6 +9,14 @@ export interface SpotNotesTexts {
   showNotesHint: string;
   /** A badge's tooltip ends with how to open it. */
   openHint: string;
+  /** Or, where the badge shows something in the view, with that. */
+  showHint: string;
+  /** The line over the view while the ways without one side's part are drawn (ADR 0059). */
+  routesPreview: (name: string) => string;
+  routesHidden: (name: string) => string;
+  routesKey: string;
+  routesNone: string;
+  routesCount: (changed: number, lost: number) => string;
   /** Characters walk on the part a choice would hide. */
   walked: string;
   /** Hiding leaves every place nearby reachable. */
@@ -38,6 +46,13 @@ export const spotNotesTexts: Record<Lang, SpotNotesTexts> = {
     showNotesHint:
       "Show every note in full: whether characters walk on a part, which places they still reach once it is hidden, and what keeping a door changes. Off, each note is a small badge in its card; point at one to read it, click it to open it.",
     openHint: "Click to read it in full.",
+    showHint: "Click to see it in the view: it is looked at without this part.",
+    routesPreview: (name) => `Preview without ${name}'s part`,
+    routesHidden: (name) => `Without ${name}'s part, as the patch hides it`,
+    routesKey: "dashed = how characters walk now, green = the way they'd take instead",
+    routesNone: "red = no way left",
+    routesCount: (changed, lost) =>
+      `${changed} ${changed === 1 ? "route changes" : "routes change"}, ${lost} ${lost === 1 ? "place" : "places"} lost`,
     walked: "Characters walk here",
     reachAll: (checked) =>
       checked === 1 ? "Its 1 place stays in reach" : `All ${checked} places stay in reach`,
@@ -58,6 +73,13 @@ export const spotNotesTexts: Record<Lang, SpotNotesTexts> = {
     showNotesHint:
       "Jeden Hinweis ganz zeigen: ob Figuren über ein Teil laufen, welche Orte sie noch erreichen, wenn es ausgeblendet ist, und was das Behalten einer Tür ändert. Aus, ist jeder Hinweis ein kleines Abzeichen in seiner Karte; zeig darauf, um ihn zu lesen, klick, um ihn zu öffnen.",
     openHint: "Klicken, um ihn ganz zu lesen.",
+    showHint: "Klicken, um es in der Ansicht zu sehen: ohne dieses Teil betrachtet.",
+    routesPreview: (name) => `Vorschau ohne das Teil von ${name}`,
+    routesHidden: (name) => `Ohne das Teil von ${name}, wie der Patch es ausblendet`,
+    routesKey: "gestrichelt = wie Figuren jetzt laufen, grün = der Weg, den sie stattdessen nähmen",
+    routesNone: "rot = kein Weg mehr",
+    routesCount: (changed, lost) =>
+      `${changed} ${changed === 1 ? "Weg ändert sich" : "Wege ändern sich"}, ${lost} ${lost === 1 ? "Ort" : "Orte"} verloren`,
     walked: "Hier laufen Figuren",
     reachAll: (checked) =>
       checked === 1 ? "Sein 1 Ort bleibt erreichbar" : `Alle ${checked} Orte bleiben erreichbar`,

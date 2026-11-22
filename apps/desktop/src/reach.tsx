@@ -98,8 +98,13 @@ export function useReachSentence(): (change: ReachChange) => string {
 export function ReachNote({
   reach,
   follow,
+  onShow,
+  shown,
 }: {
   reach: WalkwayReach | null | undefined;
+  /** Shows the ways that change in the 3D view; the badge then switches them. */
+  onShow?: () => void;
+  shown?: boolean;
   /**
    * Where the objects are hidden, to offer moving or hiding the places
    * where characters do something that stood on them (ADR 0069).
@@ -138,6 +143,8 @@ export function ReachNote({
   return (
     <Note
       tone="bad"
+      onShow={onShow}
+      shown={shown}
       summary={n.reachChanges(reach.changes.length)}
       hint={reach.changes.map(sentence).join("\n")}
     >

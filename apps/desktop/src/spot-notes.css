@@ -53,6 +53,7 @@
   --note-tone: var(--brand);
 }
 
+.note-badge[aria-pressed="true"],
 .note-badge[aria-expanded="true"] {
   background: var(--sunken);
 }

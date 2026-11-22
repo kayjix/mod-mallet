@@ -1655,6 +1655,30 @@ function Spot(props: SpotProps & SpotFrameProps) {
     leftWalked === undefined ? [] : walkedOf(leftWalked).parts.map((part) => part.object),
   );
   const paintReach = usePaintReach(leftReach);
+  const n = spotNotesTexts[lang];
+  // What the lines the view then draws mean, in one line over the view.
+  const routesLegend =
+    leftWalked === undefined ||
+    leftReach === undefined ||
+    leftReach === null ||
+    leftReach.changes.length === 0
+      ? null
+      : (() => {
+          const lost = leftReach.changes.filter((change) => change.outcome !== "longer").length;
+          const name = shortName(leftWalked.plugin);
+          return (
+            <p className="routes-legend" role="note">
+              <strong>
+                {preview.has(leftWalked.plugin) ? n.routesPreview(name) : n.routesHidden(name)}
+              </strong>
+              {": "}
+              {n.routesKey}
+              {lost > 0 && <>, {n.routesNone}</>}
+              {" · "}
+              {n.routesCount(leftReach.changes.length, lost)}
+            </p>
+          );
+        })();
   // The paths mode (ADR 0071): where characters walk around the spot.
   const listedSpots = useMemo(() => props.ordered.map((entry) => entry.spot), [props.ordered]);
   const pathsMode = usePathsMode({
@@ -1668,7 +1692,6 @@ function Spot(props: SpotProps & SpotFrameProps) {
     () => withPaths(pathsMode.overlay, repairShown),
     [pathsMode.overlay, repairShown],
   );
-  const n = spotNotesTexts[lang];
   /**
    * What hiding `parts` of a side does to the characters' paths (ADR 0051,
    * 0058, 0059): badges in the side's card, or the notes in full.
@@ -1682,7 +1705,14 @@ function Spot(props: SpotProps & SpotFrameProps) {
     const warning = w.spotWarning(names, shortName(side.plugin), pieces);
     return (
       <>
-        <Note tone="warn" icon={<PathIcon />} summary={n.walked} hint={warning}>
+        <Note
+          tone="warn"
+          icon={<PathIcon />}
+          summary={n.walked}
+          hint={warning}
+          onShow={() => props.onPreview(side.plugin)}
+          shown={preview.has(side.plugin)}
+        >
           <p className="walk-warning">
             <PathIcon />
             <span>{warning}</span>
@@ -1692,6 +1722,8 @@ function Spot(props: SpotProps & SpotFrameProps) {
           place={walkPlace}
           centre={walkCentre}
           objects={walkedParts.map((part) => part.object)}
+          onShow={() => props.onPreview(side.plugin)}
+          shown={preview.has(side.plugin)}
         />
         <RepairPaths
           place={walkPlace}
@@ -2019,7 +2051,12 @@ function Spot(props: SpotProps & SpotFrameProps) {
         paint={passageView === null ? paintReach : undefined}
         paths={shownPaths}
         lookAt={doorLook}
-        legend={pathsMode.legend}
+        legend={
+          <>
+            {passageView === null && routesLegend}
+            {pathsMode.legend}
+          </>
+        }
       />
     </NotesInFull>
   );
@@ -2030,9 +2067,14 @@ function SideReach(props: {
   place: string | null;
   centre: [number, number] | null;
   objects: ObjectRef[];
+  /** Looks at the place without the side's part, which draws the ways that change. */
+  onShow?: () => void;
+  shown?: boolean;
 }) {
   return (
     <ReachNote
+      onShow={props.onShow}
+      shown={props.shown}
       reach={useReach(props.place, props.centre, props.objects)}
       follow={
         props.place === null

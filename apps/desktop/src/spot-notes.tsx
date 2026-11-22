@@ -29,6 +29,8 @@ export function Note({
   summary,
   hint,
   children,
+  onShow,
+  shown = false,
 }: {
   tone: NoteTone;
   icon?: ReactNode;
@@ -36,12 +38,34 @@ export function Note({
   /** The note in plain words, for the badge's tooltip. */
   hint: string;
   children: ReactNode;
+  /**
+   * Shows what the note is about in the 3D view, such as the ways that
+   * change: the badge then switches that on and off instead of opening.
+   */
+  onShow?: () => void;
+  /** Whether that is shown. */
+  shown?: boolean;
 }) {
   const full = useNotesInFull();
   const { lang } = useSession();
   const [open, setOpen] = useState(false);
   if (full) {
     return <>{children}</>;
+  }
+  if (onShow !== undefined) {
+    return (
+      <button
+        type="button"
+        className="note-badge"
+        data-tone={tone}
+        aria-pressed={shown}
+        title={`${hint}\n${spotNotesTexts[lang].showHint}`}
+        onClick={onShow}
+      >
+        {icon ?? <span className="note-dot" aria-hidden="true" />}
+        <span className="note-summary">{summary}</span>
+      </button>
+    );
   }
   return (
     <>
