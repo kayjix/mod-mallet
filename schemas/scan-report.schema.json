@@ -2540,6 +2540,21 @@
           "description": "The plugin whose version of the door the game uses, as the load\norder spells it.",
           "type": "string"
         },
+        "position": {
+          "description": "Where it stands, in game units, to turn the view to it.",
+          "type": "array",
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
         "references": {
           "description": "How many doors lead to this one and how many paths name it.",
           "type": "integer",

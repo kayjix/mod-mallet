@@ -11,12 +11,23 @@ import type {
   DoorGroup,
   DoorMerge,
   MapSpot,
+  ObjectMove,
   ObjectRef,
-  RecordChange,
   StackedDoor,
 } from "./generated/rendered-report";
-import { type Move, moveOf, withMoves } from "./moves";
-import { chooseObject, chooseSpot, matchKey, type PatchChoices } from "./patch";
+import {
+  chooseObject,
+  chooseSpot,
+  decisionAt,
+  forgetObjects,
+  hiddenKeysOf,
+  keepChoice,
+  keptBy,
+  matchKey,
+  type PatchChoices,
+  revealObjects,
+  spotKey,
+} from "./patch";
 import { ReachNote, useReach } from "./reach";
 
 /** Game units in a centimetre. */
@@ -63,6 +74,10 @@ interface DoorPanelProps {
   looking?: ObjectRef | null;
   /** Looks at one door alone in the 3D view, or at all again with null. */
   onLookAt?: (object: ObjectRef | null) => void;
+  /** Makes one door blink for a moment in the 3D view and turns the view to it. */
+  onLocate?: (door: StackedDoor) => void;
+  /** The pair of mods whose doors these are, to open all their collisions. */
+  pair?: { first: string; second: string; onOpen: () => void } | null;
   /** The worldspace or interior cell the doors are in, to ask where characters still go. */
   place: string | null;
   /** Outside: where the doors stand; null inside. */
@@ -78,6 +93,8 @@ export function DoorPanel({
   keptAll,
   looking = null,
   onLookAt,
+  onLocate,
+  pair = null,
   place,
   centre,
 }: DoorPanelProps) {
@@ -104,6 +121,9 @@ export function DoorPanel({
         {group.flicker && <> {d.flicker}</>}
       </p>
       {group.apart === true && <p className="door-apart">{d.apart}</p>}
+      {group.doors.every((door) => hidden(door.object)) && (
+        <p className="door-apart door-lost">{d.wayLost}</p>
+      )}
       <div className="door-cards">
         {group.doors.map((door, index) => (
           <DoorCard
@@ -123,6 +143,7 @@ export function DoorPanel({
                       looking !== null && sameObject(looking, door.object) ? null : door.object,
                     )
             }
+            onLocate={onLocate === undefined ? undefined : () => onLocate(door)}
             onMerge={() => {
               const chosen = group.plans[index];
               if (chosen !== undefined) {
@@ -216,6 +237,11 @@ export function DoorPanel({
         <button type="button" className="small" aria-pressed={keptAll} onClick={onKeepAll}>
           {keptAll ? d.keptAll : d.keepAll}
         </button>
+        {pair !== null && (
+          <button type="button" className="small quiet" onClick={pair.onOpen}>
+            {d.pairLink(short(pair.first), short(pair.second))}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -285,6 +311,8 @@ interface DoorCardProps {
   onHover: (hovering: boolean) => void;
   /** Looks at it alone in the 3D view, or at all again. */
   onLook: (() => void) | undefined;
+  /** Makes it blink in the 3D view, the view turned to it. */
+  onLocate: (() => void) | undefined;
   onMerge: () => void;
 }
 
@@ -298,6 +326,7 @@ function DoorCard({
   looking,
   onHover,
   onLook,
+  onLocate,
   onMerge,
 }: DoorCardProps) {
   const { lang } = useSession();
@@ -319,6 +348,20 @@ function DoorCard({
           <span className="suggested-mark" title={d.suggestedHint}>
             {d.suggested}
           </span>
+        )}
+        {onLocate !== undefined && (
+          <button
+            type="button"
+            className="small quiet door-locate"
+            title={d.locate}
+            aria-label={d.locate}
+            onClick={onLocate}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <circle cx="12" cy="12" r="7" />
+              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+            </svg>
+          </button>
         )}
         {onLook !== undefined && (
           <button
@@ -377,92 +420,107 @@ function DoorCard({
 }
 
 /**
- * The patch's choices with a group merged into the door `plan` keeps, or,
- * with `plan` null, with every door kept. The other doors are hidden as
- * the spot's own choice where they are one plugin's, else each on its
- * own; `hiddenObjects` are the objects hidden on their own so far, and the
- * kept door is shown again if it is among them. The doors on the other
- * side are led to the kept door through the plugin of moves (ADR 0060).
+ * The patch's choices with a group merged into the door `plan` keeps: the
+ * spot's choice keeps that door and hides the others ({@link keepChoice}),
+ * and the kept door is shown again however it was hidden. With `plan`
+ * null every door stays: the spot keeps all, and every hiding of its doors
+ * goes, whatever its source. `spots` are the collisions' spots, by finding.
  */
 export function mergeChoices(
   choices: PatchChoices,
   key: string,
   group: DoorGroup,
   plan: DoorMerge | null,
-  hiddenObjects: ObjectRef[],
+  spots: Map<string, MapSpot[]>,
 ): PatchChoices {
-  let next = withDoorTargets(choices, group, plan);
   if (plan === null) {
-    return chooseSpot(next, key, null);
+    const doors = group.doors.map((door) => door.object);
+    return chooseSpot(forgetObjects(revealObjects(choices, spots, doors), doors), key, null);
   }
-  if (hiddenObjects.some((object) => matchKey(object) === matchKey(plan.keep))) {
-    next = chooseObject(next, plan.keep, false);
-  }
-  const plugins = new Set(plan.hide.map((object) => object.plugin.toLowerCase()));
-  const [only] = [...plugins];
-  if (plugins.size === 1 && only !== undefined && !plugins.has(plan.keep.plugin.toLowerCase())) {
-    const plugin = plan.hide[0]?.plugin ?? only;
-    return chooseSpot(next, key, plugin);
-  }
-  next = chooseSpot(next, key, null);
-  for (const object of plan.hide) {
-    next = chooseObject(next, object, true);
-  }
-  return next;
+  const next = forgetObjects(revealObjects(choices, spots, [plan.keep]), [plan.keep, ...plan.hide]);
+  return chooseSpot(next, key, keepChoice(plan.keep));
 }
 
 /**
- * The choices with the teleports of `plan` among the moves, and those any
- * other plan of the group would set taken out. A move of the same door
- * keeps its offset and turn.
+ * The choices with the door `object` of a group hidden, as the object card
+ * or the magic wand hides it: where one door is then left, the group is
+ * merged into it; otherwise the door is hidden on its own.
  */
-function withDoorTargets(
+export function hideDoor(
   choices: PatchChoices,
+  key: string,
   group: DoorGroup,
-  plan: DoorMerge | null,
+  object: ObjectRef,
+  spots: Map<string, MapSpot[]>,
 ): PatchChoices {
-  const teleports = (changes: RecordChange[]) =>
-    changes.flatMap((change) => (change.type === "teleport" ? [change] : []));
-  const cleared = teleports(group.plans.flatMap((each) => each.changes)).flatMap((change) => {
-    const before = moveOf(choices, change.door);
-    return before?.door ? [{ object: change.door, move: { ...before, door: null } }] : [];
-  });
-  const next = withMoves(choices, cleared);
-  if (plan === null) {
-    return next;
-  }
-  return withMoves(
-    next,
-    teleports(plan.changes).map((change) => {
-      const before: Move = moveOf(next, change.door) ?? {
-        dx: 0,
-        dy: 0,
-        dz: 0,
-        rz: 0,
-        at: change.at,
-        cell: change.cell ?? null,
-      };
-      return {
-        object: change.door,
-        move: {
-          ...before,
-          door: { door: change.to, arrival: change.arrival ?? null, facing: change.facing ?? null },
-        },
-      };
-    }),
+  const hidden = hiddenKeysOf(spots, choices);
+  const left = group.doors.filter(
+    (door) => !sameObject(door.object, object) && !hidden.has(matchKey(door.object)),
   );
+  const [only] = left;
+  const plan =
+    left.length === 1 && only !== undefined
+      ? group.plans.find((candidate) => sameObject(candidate.keep, only.object))
+      : undefined;
+  return plan === undefined
+    ? chooseObject(choices, object, true)
+    : mergeChoices(choices, key, group, plan, spots);
 }
 
-/** Whether a door is hidden: by the spot's choice or on its own. */
-export function doorHidden(
-  object: ObjectRef,
-  decided: string | null | undefined,
-  hiddenObjects: ObjectRef[],
-): boolean {
-  return (
-    (decided !== null &&
-      decided !== undefined &&
-      decided.toLowerCase() === object.plugin.toLowerCase()) ||
-    hiddenObjects.some((hidden) => matchKey(hidden) === matchKey(object))
-  );
+/** The plan a spot's doors are merged by, if its choice keeps one of them. */
+export function mergedBy(group: DoorGroup, decided: string | null | undefined): DoorMerge | null {
+  const kept = keptBy(decided);
+  return kept === null ? null : (group.plans.find((plan) => sameObject(plan.keep, kept)) ?? null);
+}
+
+/**
+ * The moves of `moves` with the teleports of the merged doors added: for
+ * each spot of doors whose choice keeps one of them, the doors its plan
+ * leads elsewhere (ADR 0067). A door that is moved as well keeps its move.
+ * They go into the plugin of moves (ADR 0060).
+ */
+export function withDoorMoves(
+  moves: ObjectMove[],
+  choices: PatchChoices,
+  spots: Map<string, MapSpot[]>,
+): ObjectMove[] {
+  const all = new Map(moves.map((each) => [matchKey(each.object), each]));
+  const seen = new Set<string>();
+  for (const [finding, list] of spots) {
+    for (const spot of list) {
+      const key = spotKey(spot);
+      if (spot.doors === null || spot.doors === undefined || key === null || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const plan = mergedBy(spot.doors, decisionAt(choices, finding, key, spot.parts ?? []));
+      for (const change of plan?.changes ?? []) {
+        if (change.type !== "teleport") {
+          continue;
+        }
+        const before = all.get(matchKey(change.door));
+        all.set(matchKey(change.door), {
+          object: change.door,
+          cell: before?.cell ?? change.cell ?? null,
+          from: before?.from ?? change.at,
+          offset: before?.offset ?? [0, 0, 0],
+          turn: before?.turn ?? 0,
+          teleport: {
+            door: change.to,
+            arrival: change.arrival ?? null,
+            facing: change.facing ?? null,
+          },
+        });
+      }
+    }
+  }
+  return [...all.values()].sort((a, b) => matchKey(a.object).localeCompare(matchKey(b.object)));
+}
+
+/** How the worklist names a spot's choice that keeps one door, if it is one. */
+export function keptLabel(decided: string | null | undefined): string | null {
+  const kept = keptBy(decided);
+  return kept === null
+    ? null
+    : `${short(kept.plugin)} ${kept.localId.toString(16).toUpperCase().padStart(6, "0")}`;
 }

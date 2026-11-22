@@ -308,20 +308,23 @@ fn stack(a: &PlacedDoor, b: &PlacedDoor, doors: &Doors<'_>) -> bool {
     if distance > NEAR || !a.visible || !b.visible {
         return false;
     }
-    let same_destination = same_destination(a, b, doors);
+    // The same door placed twice in the same place, turned the same way: a
+    // true copy, the kind that flickers.
+    let copy = a.base == b.base && distance <= COPY && turned_the_same(a, b);
+    // A mod is taken to be coherent within itself: its doors side by side
+    // or turned apart are one thing, such as the leaves of a cabinet, a
+    // gate of two wings or a door behind a door. Only its copies count,
+    // and not two that each lead somewhere and back, a ladder up and one
+    // down.
     if a.id.plugin == b.id.plugin && a.plugin == b.plugin {
-        // One plugin's doors side by side are mostly meant so: a gate of
-        // two wings, a door behind a door. Only copies count.
-        let leads_to_same_door = matches!(
-            (&a.teleport, &b.teleport),
-            (Some(first), Some(second)) if first.door == second.door
-        );
-        // Two doors that each lead to a door that leads back are two ways,
-        // such as a ladder up and one down.
-        let two_ways = !leads_to_same_door && leads_back(a, doors) && leads_back(b, doors);
-        return leads_to_same_door || (a.base == b.base && distance <= COPY && !two_ways);
+        return copy && !(leads_back(a, doors) && leads_back(b, doors));
     }
-    if same_destination {
+    // Doors that only open, a wardrobe's or a cellar's, stack only as
+    // copies too: two of them in the same place are rarely two mods' doors.
+    if a.teleport.is_none() && b.teleport.is_none() {
+        return copy;
+    }
+    if same_destination(a, b, doors) {
         return true;
     }
     let turned_alike = {
@@ -349,6 +352,14 @@ fn stack(a: &PlacedDoor, b: &PlacedDoor, doors: &Doors<'_>) -> bool {
         _ => SIDEWAYS_UNKNOWN,
     };
     sideways <= sideways_limit && depth <= STACK_DEPTH
+}
+
+/// Whether two doors are turned the same way about every axis.
+fn turned_the_same(a: &PlacedDoor, b: &PlacedDoor) -> bool {
+    a.rotation.iter().zip(b.rotation).all(|(first, second)| {
+        let difference = (i64::from(*first) - i64::from(second)).rem_euclid(FULL_TURN);
+        difference.min(FULL_TURN - difference) <= SAME_TURN
+    })
 }
 
 /// Whether the door on the other side of `door` leads back to it.
@@ -424,6 +435,7 @@ fn describe(
                 other_side_walkable: other_side.is_some_and(|other| doors.walkable(&other.id)),
                 references: references(door, doors),
                 front: fronts.front == Some(index),
+                position: door.position,
                 offset: whole(distance(door.position, first.position)),
                 suggested: false,
             }
@@ -1081,6 +1093,73 @@ mod tests {
         let found = groups(&facts);
         let group = found.spots.first().unwrap().doors.as_ref().unwrap();
         assert!(group.flicker);
+    }
+
+    #[test]
+    fn the_leaves_of_one_mods_cabinet_are_no_group() {
+        // Four leaves of one cabinet: the same door, at its middle, turned
+        // a quarter further each.
+        let leaf = |local_id: u32, position: [i32; 3], turn: i32| {
+            let mut leaf = door("college.esp", local_id, room(0xE05), position, None);
+            leaf.rotation = [0, 0, turn];
+            leaf
+        };
+        let facts = Facts {
+            doors: DoorFacts {
+                doors: vec![
+                    leaf(0x5F4, [0, 0, 0], 0),
+                    leaf(0x5F5, [2, 0, 0], 1571),
+                    leaf(0x5F6, [0, 3, 0], 3142),
+                    leaf(0x5F7, [1, 1, 0], 4712),
+                ],
+                ..DoorFacts::default()
+            },
+            ..Facts::default()
+        };
+        assert_eq!(groups(&facts).spots.len(), 0);
+    }
+
+    #[test]
+    fn two_mods_load_doors_seven_centimetres_apart_are_a_group() {
+        let facts = Facts {
+            doors: DoorFacts {
+                doors: vec![
+                    door(
+                        "town.esp",
+                        0x800,
+                        outside(),
+                        [0, 0, 0],
+                        Some(("town.esp", 0x900, [0, 100, 0])),
+                    ),
+                    door(
+                        "inn.esp",
+                        0x800,
+                        outside(),
+                        [0, 5, 0],
+                        Some(("inn.esp", 0x900, [0, 100, 0])),
+                    ),
+                    door(
+                        "town.esp",
+                        0x900,
+                        room(0xE00),
+                        [0, 0, 0],
+                        Some(("town.esp", 0x800, [0, -100, 0])),
+                    ),
+                    door(
+                        "inn.esp",
+                        0x900,
+                        room(0xE01),
+                        [0, 0, 0],
+                        Some(("inn.esp", 0x800, [0, -100, 0])),
+                    ),
+                ],
+                ..DoorFacts::default()
+            },
+            ..Facts::default()
+        };
+        let found = groups(&facts);
+        assert_eq!(found.spots.len(), 1);
+        assert_eq!(found.members.len(), 2);
     }
 
     #[test]

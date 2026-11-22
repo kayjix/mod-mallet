@@ -20,7 +20,8 @@ import { ActionPlaceInfo } from "./action-places";
 import { objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
 import { collisionsTexts } from "./collisions-texts";
-import { DoorPanel, doorHidden, mergeChoices } from "./doors";
+import { doorTexts } from "./door-texts";
+import { DoorPanel, hideDoor, keptLabel, mergeChoices } from "./doors";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type {
   DoorGroup,
@@ -46,12 +47,14 @@ import {
   chooseObject,
   chooseSpot,
   decisionAt,
+  hiddenKeysOf,
   matchKey,
   objectsOf,
   type Pair,
   type PatchChoices,
   pairsOf,
   pinsOf,
+  revealObjects,
   spotKey,
   undecideSpot,
 } from "./patch";
@@ -149,6 +152,10 @@ const CLOSE = 0.9;
 
 /** From this many spots on, a pair of mods is better decided as a whole. */
 const MANY = 20;
+
+/** How long a located door blinks, and how fast, in milliseconds. */
+const LOCATE = 3000;
+const BLINK = 250;
 
 /** Reads a remembered setting; only a convenience. */
 function remembered<T>(name: string, fallback: T, read: (value: string) => T | null): T {
@@ -398,6 +405,7 @@ export function Collisions({
     pairAt,
     pinnedAsked,
     decide: decideDuel,
+    spots: spotsByFinding,
   } = useSession();
   const own = collisionsTexts[lang];
   const p = usePassageTexts();
@@ -624,12 +632,24 @@ export function Collisions({
     goOn(next);
   };
   const mergeDoors = (item: Item, group: DoorGroup, plan: DoorMerge | null) => {
-    const next = mergeChoices(choices, item.key, group, plan, hiddenObjects);
+    const next = mergeChoices(choices, item.key, group, plan, spotsByFinding);
     setPatchChoices(next);
     setPreview(new Set());
     if (item === current) {
       goOn(next);
     }
+  };
+  // A door hidden or shown again in the view, through the door decision.
+  const hideOrShowDoor = (item: Item, object: ObjectRef, hide: boolean) => {
+    const group = item.spot.doors;
+    if (group === null || group === undefined) {
+      return;
+    }
+    setPatchChoices(
+      hide
+        ? hideDoor(choices, item.key, group, object, spotsByFinding)
+        : revealObjects(choices, spotsByFinding, [object]),
+    );
   };
   const undecide = (item: Item) => setPatchChoices(undecideSpot(choices, item.key));
   const decideMods = (pairs: Pair[], plugin: string | null) => {
@@ -1032,9 +1052,14 @@ export function Collisions({
                     setOpenedPair(current.mods.key);
                     changeTab("mods");
                   }}
+                  onOpenMods={(key) => {
+                    setOpenedPair(key);
+                    changeTab("mods");
+                  }}
                   onDecidePassage={decidePassage}
                   onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
                   onMergeDoors={(group, plan) => mergeDoors(current, group, plan)}
+                  onDoor={(object, hide) => hideOrShowDoor(current, object, hide)}
                   onPick={(spot) => {
                     const key = spotKey(spot);
                     if (key !== null && byKey.has(key)) {
@@ -1257,9 +1282,14 @@ function WorkList({
 
 /** What is decided for a spot, as a small mark. */
 function Status({ decided }: { decided: string | null | undefined }) {
-  const { t } = useSession();
+  const { t, lang } = useSession();
   if (decided === undefined) {
     return <span className="work-status open">{t.workOpen}</span>;
+  }
+  // Merged doors: the one kept is named (ADR 0067).
+  const kept = keptLabel(decided);
+  if (kept !== null) {
+    return <span className="work-status hidden">{doorTexts[lang].statusKept(kept)}</span>;
   }
   if (decided === null) {
     return <span className="work-status kept">{t.workKept}</span>;
@@ -1301,10 +1331,14 @@ interface SpotProps {
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
   /** Opens the pair of this spot's two mods on the tab of the pairs. */
   onOpenPair: () => void;
+  /** Opens a pair of mods, by its key, on the tab of the pairs. */
+  onOpenMods: (key: string) => void;
   onDecidePassage: (passage: Item[], plugin: string, extra: ObjectRef[]) => void;
   onObject: (object: ObjectRef, hide: boolean) => void;
   /** Merges stacked doors into the one `plan` keeps (ADR 0067). */
   onMergeDoors: (group: DoorGroup, plan: DoorMerge | null) => void;
+  /** Hides a door of stacked doors, or shows it again, through the door decision. */
+  onDoor: (object: ObjectRef, hide: boolean) => void;
   onPick: (spot: MapSpot) => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -1313,15 +1347,41 @@ interface SpotProps {
 
 /** The spot looked at: what it is, what to do about it, and the place in 3D. */
 function Spot(props: SpotProps) {
-  const { t, lang, showOnMap } = useSession();
+  const { t, lang, showOnMap, spots: spotsByFinding } = useSession();
   const own = collisionsTexts[lang];
   const { item, passage, preview, decided, marks } = props;
   const { spot, pairs } = item;
   const depth = spot.depth ?? null;
   // One door of stacked doors looked at alone in the view (ADR 0067).
   const [doorLook, setDoorLook] = useState<ObjectRef | null>(null);
+  // One door made to blink for a moment, the view turned to it.
+  const [locating, setLocating] = useState<{
+    object: ObjectRef;
+    position: [number, number, number];
+  } | null>(null);
+  const [blink, setBlink] = useState(true);
+  useEffect(() => {
+    if (locating === null) {
+      return;
+    }
+    setBlink(true);
+    const timer = setInterval(() => setBlink((on) => !on), BLINK);
+    const end = setTimeout(() => setLocating(null), LOCATE);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(end);
+    };
+  }, [locating]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new spot looks at all again.
-  useEffect(() => setDoorLook(null), [item.key]);
+  useEffect(() => {
+    setLocating(null);
+    setDoorLook(null);
+  }, [item.key]);
+  // What the patch hides, from the one source of every choice.
+  const hiddenKeys = useMemo(
+    () => hiddenKeysOf(spotsByFinding, props.choices),
+    [spotsByFinding, props.choices],
+  );
   const pairSpots = spotsOf(pairs);
   const modSides = sidesOfMods(pairs);
   // The objects of the area, to hide a whole passage of one mod.
@@ -1633,7 +1693,7 @@ function Spot(props: SpotProps) {
         {spot.doors !== null && spot.doors !== undefined ? (
           <DoorPanel
             group={spot.doors}
-            hidden={(object) => doorHidden(object, decided, props.hiddenObjects)}
+            hidden={(object) => hiddenKeys.has(matchKey(object))}
             keptAll={decided === null}
             onMerge={(plan) => spot.doors && props.onMergeDoors(spot.doors, plan)}
             onKeepAll={() => spot.doors && props.onMergeDoors(spot.doors, null)}
@@ -1641,6 +1701,13 @@ function Spot(props: SpotProps) {
             centre={walkCentre}
             looking={doorLook}
             onLookAt={setDoorLook}
+            pair={doorPair(spot.doors, props.onOpenMods)}
+            onLocate={(door) =>
+              setLocating({
+                object: door.object,
+                position: door.position ?? spot.position ?? [0, 0, 0],
+              })
+            }
           />
         ) : (
           <div className="work-columns">
@@ -1725,6 +1792,7 @@ function Spot(props: SpotProps) {
         paint={paintReach}
         paths={repairShown}
         lookAt={doorLook}
+        locate={locating === null ? null : { ...locating, on: blink }}
       />
     </>
   );
@@ -1799,12 +1867,15 @@ function Stage({
   marks,
   onPick,
   onDecide,
+  onDoor,
+  choices,
   onArea,
   previewObjects,
   tools,
   paint,
   paths = null,
   lookAt = null,
+  locate = null,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
@@ -1817,6 +1888,8 @@ function Stage({
   paths?: PathsOverlay | null;
   /** One part looked at alone: lit up, the spot's other parts as ghosts. */
   lookAt?: ObjectRef | null;
+  /** One part made to blink, the view turned to it: lit while `on`. */
+  locate?: { object: ObjectRef; position: [number, number, number]; on: boolean } | null;
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -1847,15 +1920,31 @@ function Stage({
     () => (world?.markers ?? []).filter((marker) => marker.origin !== "removed"),
     [world],
   );
-  const picked = useMemo<Picked>(() => ({ type: "spot", spot: item.spot }), [item.spot]);
+  // A part located is flown to: the spot, centred on it.
+  const locatedAt = locate?.position ?? null;
+  const picked = useMemo<Picked>(
+    () => ({
+      type: "spot",
+      spot: locatedAt === null ? item.spot : { ...item.spot, position: locatedAt },
+    }),
+    [item.spot, locatedAt],
+  );
   const parts = item.spot.parts ?? [];
+  const blinking =
+    locate === null
+      ? null
+      : locate.on
+        ? objectKey(locate.object.plugin, locate.object.localId)
+        : "";
   const looked = lookAt === null ? null : objectKey(lookAt.plugin, lookAt.localId);
   const focus = useMemo(
     () =>
-      looked === null
-        ? new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId)))
-        : new Set([looked]),
-    [parts, looked],
+      blinking !== null
+        ? new Set(blinking === "" ? [] : [blinking])
+        : looked === null
+          ? new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId)))
+          : new Set([looked]),
+    [parts, looked, blinking],
   );
   const ghosts = useMemo(() => {
     const keys = new Set(hiddenObjects.map((object) => objectKey(object.plugin, object.localId)));
@@ -1880,7 +1969,11 @@ function Stage({
   }, [hiddenObjects, parts, preview, previewObjects, looked]);
 
   // An object of another collision picked in the view opens that collision.
-  const { spots: spotsByFinding } = useSession();
+  const { spots: spotsByFinding, lang } = useSession();
+  const hiddenKeys = useMemo(
+    () => hiddenKeysOf(spotsByFinding, choices),
+    [spotsByFinding, choices],
+  );
   const openSpotOf = (object: AreaObject | null) => {
     if (object === null) {
       return;
@@ -1902,6 +1995,9 @@ function Stage({
       (candidate) => objectKey(candidate.object.plugin, candidate.object.localId) === key,
     );
     if (part !== undefined) {
+      // A door of stacked doors goes through the door decision (ADR 0067).
+      const door = item.spot.doors !== null && item.spot.doors !== undefined;
+      const doorHidden = door && hiddenKeys.has(key);
       return (
         <>
           <ActionPlaceInfo
@@ -1910,16 +2006,23 @@ function Stage({
             interior={location.type === "interior"}
             around={tools.layer?.area?.objects}
           />
-          {part.hideable ? (
+          {doorHidden ? (
+            <p className="aside relief-object-action">
+              {doorTexts[lang].hiddenByDoors}{" "}
+              <button type="button" className="small" onClick={() => onDoor(part.object, false)}>
+                {doorTexts[lang].showAgain}
+              </button>
+            </p>
+          ) : part.hideable ? (
             <button
               type="button"
               className="small primary relief-object-action"
-              onClick={() => onDecide(part.object.plugin)}
+              onClick={() => (door ? onDoor(part.object, true) : onDecide(part.object.plugin))}
             >
               {t.workHideObject}
             </button>
           ) : (
-            <p className="aside relief-object-action">{t.workCannotHide}</p>
+            <p className="aside relief-object-action">t.workCannotHide</p>
           )}
           <PartsTogether tools={tools} />
           <MoveControls
@@ -1953,7 +2056,7 @@ function Stage({
       <InteriorView
         key={location.cell}
         cell={location.cell}
-        centre={item.spot.position ?? null}
+        centre={locatedAt ?? item.spot.position ?? null}
         focus={focus}
         hidden={ghosts}
         plain={!marks}
@@ -2191,4 +2294,26 @@ function ModPairs({ items, decision, sort, duels, focus, onDecideMods, onShow }:
       </ul>
     </section>
   );
+}
+
+/**
+ * The two mods whose doors stack, by the plugins whose versions the game
+ * uses, to open all their collisions; null where the doors are one mod's.
+ */
+function doorPair(
+  group: DoorGroup,
+  open: (key: string) => void,
+): { first: string; second: string; onOpen: () => void } | null {
+  const plugins = [...new Set(group.doors.map((door) => door.plugin))].sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase()),
+  );
+  const [first, second] = plugins;
+  if (plugins.length !== 2 || first === undefined || second === undefined) {
+    return null;
+  }
+  return {
+    first,
+    second,
+    onOpen: () => open(`${first.toLowerCase()}|${second.toLowerCase()}`),
+  };
 }

@@ -45,6 +45,17 @@ export interface DoorTexts {
   ledTo: (door: string) => string;
   /** Looks at one door alone in the 3D view. */
   lookAlone: string;
+  /** Makes one door blink in the 3D view. */
+  locate: string;
+  /** A door the door decision hides, in its card in the view. */
+  hiddenByDoors: string;
+  showAgain: string;
+  /** Every door of the spot is hidden. */
+  wayLost: string;
+  /** A spot's choice that keeps one door, in the worklist. */
+  statusKept: (door: string) => string;
+  /** The collisions of the mods whose doors these are. */
+  pairLink: (first: string, second: string) => string;
   /** The version the game uses is another plugin's. */
   changedBy: (plugin: string) => string;
   /** A door whose way leads to a door that is not there. */
@@ -104,6 +115,13 @@ export const doorTexts: Record<Lang, DoorTexts> = {
       "No path of the characters leads through the kept door yet; they use the paths of the hidden one, beside it.",
     ledTo: (door) => `leads to the door ${door}`,
     lookAlone: "Look at this door alone in the view; the others show as ghosts",
+    locate: "Show where this door is: it blinks in the view for a moment",
+    hiddenByDoors: "Hidden by the door decision here.",
+    showAgain: "Show again",
+    wayLost:
+      "Every door here is hidden, so the way in is lost. The check of the ways below shows where characters can no longer go; the repair of the paths is on the patch page.",
+    statusKept: (door) => `${door} kept`,
+    pairLink: (first, second) => `Everything ${first} and ${second} collide at`,
     changedBy: (plugin) => `as ${plugin} has it`,
     broken: "Leads to a door that is not there, so it only opens",
     apart:
@@ -156,6 +174,13 @@ export const doorTexts: Record<Lang, DoorTexts> = {
       "Noch führt kein Weg der Figuren durch die behaltene Tür; sie nehmen die Wege der ausgeblendeten, direkt daneben.",
     ledTo: (door) => `führt zur Tür ${door}`,
     lookAlone: "Nur diese Tür in der Ansicht zeigen; die anderen erscheinen als Geister",
+    locate: "Zeigen, wo diese Tür ist: Sie blinkt kurz in der Ansicht",
+    hiddenByDoors: "Von der Tür-Entscheidung hier ausgeblendet.",
+    showAgain: "Wieder zeigen",
+    wayLost:
+      "Alle Türen hier sind ausgeblendet, der Weg hinein ist also verloren. Die Prüfung der Wege unten zeigt, wohin Figuren nicht mehr kommen; die Reparatur der Wege steht auf der Patch-Seite.",
+    statusKept: (door) => `${door} behalten`,
+    pairLink: (first, second) => `Alles, wo ${first} und ${second} kollidieren`,
     changedBy: (plugin) => `wie ${plugin} sie hat`,
     broken: "Führt zu einer Tür, die es nicht gibt, und geht deshalb nur auf",
     apart:

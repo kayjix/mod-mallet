@@ -53,11 +53,15 @@ worklist never offered to hide them.
    apart, both seen, and either lead to the same door or room (outside:
    within about 7 m), or are turned alike (or turned round) with their
    openings over each other: sideways within the narrower door's half
-   width, at most about 70 cm in depth and 45 cm in height. Two doors of
-   the same plugin stack only as copies: they lead to the same door, or
-   are the same door within about 11 cm and not two working ways (both
+   width, at most about 70 cm in depth and 45 cm in height. A mod is
+   taken to be coherent within itself: two doors of the same plugin stack
+   only as copies, the same door within about 11 cm turned the same way
+   about every axis (within 15 degrees), and not two working ways (both
    with a door on the other side that leads back, as a ladder up and one
-   down). Doors that stack are joined into groups. A group of the game's
+   down). The leaves of a cabinet, a gate of two wings or a door behind a
+   door are one thing, not a stack. Doors that only open, without a
+   teleport, stack only as such copies as well, whichever plugins they are
+   of. Doors that stack are joined into groups. A group of the game's
    doors alone is not reported.
 4. **The finding is `doors.stacked`**, one per pair of plugins that placed
    the doors (both the same where one plugin stacks its own), with a spot
@@ -100,20 +104,31 @@ worklist never offered to hide them.
    Mallet - Moves.esp`, and not into one of their own: a door that is both
    moved and led elsewhere has to be one override, and two plugins of Mod
    Mallet that override the same door would undo each other. A move
-   therefore carries an optional door target (`ObjectMove::teleport`),
-   kept among the patch's choices with the move (`move:<plugin>|<id>`,
-   `door` in its JSON); merging sets the targets of the chosen plan and
-   takes out those of the group's other plans, keeping any offset or turn.
+   therefore carries an optional door target (`ObjectMove::teleport`).
+   The targets are not kept as choices of their own: they follow from the
+   spot's decision when the plugin is written, so there is one source.
    The hiding of the other doors stays the Base Object Swapper patch
    (ADR 0025). Both are written and installed on the patch page, on the
    user's click.
-8. **The door triangles wait for the navigation mesh writer.** Pointing
+8. **A merge is the spot's decision.** The spot's choice among the
+   patch's choices keeps one door and hides the others there
+   (`keep:<plugin>|<id>`, whichever plugins the others are of). Every
+   place that asks what is hidden reads it: the worklist, the object card
+   in the 3D view, the magic wand, the patch and the plugin of moves. The
+   object card of a door the decision hides says so and offers to show it
+   again; showing one door again sets the spot to keep all, and the other
+   doors it hid stay hidden on their own. Hiding a door in the card, or
+   with the wand, so that one door is left, merges into that one; parts of
+   a spot hidden on their own with one left over count as keeping it.
+   *Keep all* sets the spot to keep all and removes every hiding of its
+   doors, whatever its source.
+9. **The door triangles wait for the navigation mesh writer.** Pointing
    the door triangles of the paths at the kept door changes navigation
    meshes, which the writer and repair of ADR 0058 write. Until it lands,
    the plan names those changes as data (`RecordChange::NavmeshDoor`), the
    window says they come later, and characters still walk to where the
    hidden door stood, right beside the kept one.
-9. **The window.** The collisions' worklist has the kind *doors*; a spot
+10. **The window.** The collisions' worklist has the kind *doors*; a spot
    of doors shows them side by side with where each leads and *merge into
    this one*, and what keeping it means in sentences ("Characters who used
    the door of B now use the door of A"). It says whether the characters'
@@ -128,19 +143,23 @@ worklist never offered to hide them.
    The guided review shows the same for the doors among
    a structure's spots. Merging is the spot's choice where the other doors
    are one plugin's, otherwise each hidden on its own. The patch page
-   lists a led door among the moves ("leads to the door …").
+   lists a led door among the moves ("leads to the door …"). Beside the
+   eye, a mark makes the door blink in the view for three seconds and
+   turns the view to it. Where the doors are two mods', a button opens
+   all collisions of those two mods.
 
 ## Consequences
 
-- On the user's setup (Skyrim SE, about 170 mods), 13 groups between 11
+- On the user's setup (Skyrim SE, about 170 mods), 8 groups between 8
   pairs of plugins: among them Skyrim Sewers' door in the Markarth
   Warrens with a Creation Club door 6 cm in front of it that leads
   nowhere, Cutting Room Floor's Riften gate 44 cm behind JK's Skyrim's,
-  and Open Cities' iron gate in front of the game's Riften door it put
-  aside. Most of the others are copies of one door within a mod. 12 of
-  the 13 suggested merges need nothing but hiding. Before rules 2 and 3
-  were sharpened, 73 groups were found; most were the game's own (a
-  secret cabinet door and its panel) and doors swapped by enable parents.
+  and the College of Winterhold's doors of Immersive College of
+  Winterhold and JK's patch for it, 54 cm apart. The others are copies
+  of one door within a mod. 7 of the 8 suggested merges need nothing but
+  hiding. Before rules 2 and 3 were sharpened, 73 groups were found; most
+  were the game's own (a secret cabinet door and its panel), doors
+  swapped by enable parents and the four leaves of one mod's cabinet.
 - The first scan that reads the game's doors reads Skyrim.esm and its
   kin once more, about 16 seconds here; later scans take them from the
   cache.

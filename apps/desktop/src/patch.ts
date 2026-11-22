@@ -50,6 +50,28 @@ export interface Pair {
 const SPOT = "spot:";
 
 /**
+ * The prefix of a spot's choice that keeps one object there and hides the
+ * others, whichever plugin they are of: stacked doors merged into one
+ * (ADR 0067). The value names the kept object.
+ */
+const KEEP = "keep:";
+
+/** The choice of a spot that keeps `object` and hides the rest there. */
+export const keepChoice = (object: ObjectRef) => `${KEEP}${object.plugin}|${object.localId}`;
+
+/** The object a spot's choice keeps, if it is a {@link keepChoice}. */
+export function keptBy(decided: string | null | undefined): ObjectRef | null {
+  if (typeof decided !== "string" || !decided.startsWith(KEEP)) {
+    return null;
+  }
+  const bar = decided.lastIndexOf("|");
+  const localId = Number(decided.slice(bar + 1));
+  return bar > KEEP.length && Number.isInteger(localId)
+    ? { plugin: decided.slice(KEEP.length, bar), localId }
+    : null;
+}
+
+/**
  * The prefix of an object hidden on its own, outside any collision (or
  * besides it); the value is the plugin that placed it.
  */
@@ -82,6 +104,11 @@ export function chooseObject(
   const next = withoutObjectKeys(choices, new Set([matchKey(object)]));
   next[objectChoiceKey(object)] = hide ? object.plugin : null;
   return next;
+}
+
+/** The choices without any choice of these objects on their own, hidden or shown again. */
+export function forgetObjects(choices: PatchChoices, objects: ObjectRef[]): PatchChoices {
+  return withoutObjectKeys(choices, new Set(objects.map(matchKey)));
 }
 
 /** The choices without any key of these objects hidden on their own, in any spelling. */
@@ -262,9 +289,21 @@ export function decisionAt(
   }
   if (parts.length > 0) {
     const free = freeKeysOf(choices);
-    const hidden = parts.find((part) => free.has(matchKey(part.object)));
-    if (hidden !== undefined) {
-      return hidden.object.plugin;
+    const hidden = parts.filter((part) => free.has(matchKey(part.object)));
+    const shown = parts.filter((part) => !free.has(matchKey(part.object)));
+    const [first] = hidden;
+    // All parts of one plugin hidden: that plugin goes here.
+    if (
+      first !== undefined &&
+      hidden.every((part) => part.object.plugin === first.object.plugin) &&
+      shown.every((part) => part.object.plugin !== first.object.plugin)
+    ) {
+      return first.object.plugin;
+    }
+    // All parts but one hidden, of whichever plugins: that one is kept.
+    const [kept] = shown;
+    if (hidden.length > 0 && shown.length === 1 && kept !== undefined) {
+      return keepChoice(kept.object);
     }
   }
   return undefined;
@@ -301,6 +340,12 @@ export function undecideSpot(choices: PatchChoices, key: string): PatchChoices {
 
 /** The objects of a spot that hiding `plugin` there takes away. */
 export function hiddenAt(parts: SpotPart[], plugin: string | null): ObjectRef[] {
+  const kept = keptBy(plugin);
+  if (kept !== null) {
+    return parts
+      .filter((part) => part.hideable && matchKey(part.object) !== matchKey(kept))
+      .map((part) => part.object);
+  }
   return parts
     .filter((part) => part.hideable && plugin !== null && part.object.plugin === plugin)
     .map((part) => part.object);
@@ -380,7 +425,16 @@ function eachHidden(
     }
     for (const spot of pair.spots) {
       const plugin = spot.key in choices ? (choices[spot.key] ?? null) : whole;
-      if (plugin !== null) {
+      const kept = keptBy(plugin);
+      if (kept !== null) {
+        const byPlugin = new Map<string, ObjectRef[]>();
+        for (const object of hiddenAt(spot.parts, plugin)) {
+          byPlugin.set(object.plugin, [...(byPlugin.get(object.plugin) ?? []), object]);
+        }
+        for (const [loser, objects] of byPlugin) {
+          visit(loser, loser === kept.plugin ? null : kept.plugin, objects);
+        }
+      } else if (plugin !== null) {
         visit(plugin, against(plugin), hiddenAt(spot.parts, plugin));
       }
     }
@@ -485,8 +539,15 @@ export function revealObjects(
       if (key === null || typeof decided !== "string") {
         continue;
       }
-      if (hiddenAt(parts, decided).some((object) => wanted.has(matchKey(object)))) {
+      const hiddenHere = hiddenAt(parts, decided);
+      if (hiddenHere.some((object) => wanted.has(matchKey(object)))) {
         next[key] = null;
+        // A spot that kept one object: the others it hid stay hidden.
+        if (keptBy(decided) !== null) {
+          for (const object of hiddenHere.filter((other) => !wanted.has(matchKey(other)))) {
+            next[objectChoiceKey(object)] = object.plugin;
+          }
+        }
       }
     }
   }

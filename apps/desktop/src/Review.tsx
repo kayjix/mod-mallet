@@ -34,7 +34,6 @@ import { PassageSummary } from "./passages";
 import {
   chooseObject,
   chooseSpot,
-  freeObjects,
   hiddenKeysOf,
   matchKey,
   type PatchChoices,
@@ -1131,7 +1130,7 @@ export function CollisionsStep({
         }
         const at = placeOf(item.spot, report.map.worlds);
         const merge = (plan: DoorMerge | null) =>
-          apply(mergeChoices(patchChoices, key, group, plan, freeObjects(patchChoices)), false);
+          apply(mergeChoices(patchChoices, key, group, plan, spots), false);
         return (
           <DoorPanel
             key={key}

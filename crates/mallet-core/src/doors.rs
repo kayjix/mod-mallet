@@ -63,6 +63,9 @@ pub struct StackedDoor {
     pub references: u32,
     /// Whether the player sees this door in front of the others.
     pub front: bool,
+    /// Where it stands, in game units, to turn the view to it.
+    #[serde(default)]
+    pub position: [i32; 3],
     /// How far it stands from the first door, in game units.
     pub offset: u32,
     /// Whether keeping this one is suggested.

@@ -6,7 +6,7 @@ import { objectKey } from "./area-layer";
 import type { MapPassage, MapSpot } from "./generated/rendered-report";
 import type { CollisionSpot } from "./health";
 import type { WorkKind } from "./map-places";
-import { decisionAt, type PatchChoices, spotKey } from "./patch";
+import { decisionAt, hiddenAt, keptBy, type PatchChoices, spotKey } from "./patch";
 
 /** Spots of the same two mods this close belong to one cluster, in game units (about 30 m). */
 const CLUSTER_GAP = 2048;
@@ -152,9 +152,12 @@ export function clustersOf(spots: CollisionSpot[]): Cluster[] {
 
 /** What is decided for `spots`, all together. */
 export function decidedOf(spots: ClusterSpot[], choices: PatchChoices): Decided {
-  const values = spots.map(({ item }) =>
-    decisionAt(choices, item.finding, spotKey(item.spot), item.spot.parts ?? []),
-  );
+  const values = spots.map(({ item }) => {
+    const parts = item.spot.parts ?? [];
+    const value = decisionAt(choices, item.finding, spotKey(item.spot), parts);
+    // A spot that keeps one door counts by the plugin of the doors it hides.
+    return keptBy(value) === null ? value : (hiddenAt(parts, value ?? null)[0]?.plugin ?? null);
+  });
   const open = values.filter((value) => value === undefined).length;
   if (open === values.length) {
     return { type: "open" };

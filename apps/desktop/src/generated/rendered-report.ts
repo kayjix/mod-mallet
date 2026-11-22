@@ -1608,6 +1608,13 @@ export interface StackedDoor {
    */
   plugin: string;
   /**
+   * Where it stands, in game units, to turn the view to it.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  position?: [number, number, number];
+  /**
    * How many doors lead to this one and how many paths name it.
    */
   references: number;
