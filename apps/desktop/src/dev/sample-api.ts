@@ -31,6 +31,7 @@ import type {
 } from "../generated/rendered-report";
 import type { RenderedTool, RenderedToolbox, Tool } from "../generated/rendered-toolbox";
 import type { Lang } from "../i18n";
+import { heavyMesh, heavyObjects, heavyTexture, SAMPLE_HEAVY } from "./sample-heavy";
 import {
   houseBox,
   SAMPLE_LOD,
@@ -1471,6 +1472,11 @@ function sampleAnchors(object: ObjectRef): ObjectAnchors {
   }
 }
 
+/** The heavy scene's models and textures arrive quickly, so that measuring does not wait long. */
+function soon<T>(value: T): Promise<T> {
+  return new Promise((resolve) => setTimeout(() => resolve(value), 30));
+}
+
 /** Results arrive a little later, as they do from the real backend. */
 function later<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), 400));
@@ -1648,8 +1654,11 @@ export const sampleApi: Api = {
   areaLand: () => later(null),
   worldLand: () => later(null),
   interiorObjects: () => later(null),
-  areaMesh: (name) => later(sampleBox(name)),
-  areaTexture: () => later(null),
+  areaMesh: (name) => {
+    const heavy = SAMPLE_HEAVY ? heavyMesh(name) : null;
+    return heavy !== null ? soon(heavy) : later(sampleBox(name));
+  },
+  areaTexture: (path) => (SAMPLE_HEAVY ? soon(heavyTexture(path)) : later(null)),
   objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
   // The paths around the point (made up): the game's, a band Water Mod
   // changed, a few pieces Mod Mallet repaired, and the planks of the dock.
@@ -2286,6 +2295,9 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
     : [];
   if (SAMPLE_LOD) {
     objects.push(...sampleHouses(sampleTerrain(), cx, cy, radius));
+  }
+  if (SAMPLE_HEAVY) {
+    objects.push(...heavyObjects(cx, cy, ground));
   }
   return { world, centre: [cx, cy], radius, objects, actions };
 }

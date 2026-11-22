@@ -2,8 +2,10 @@
 // game and by mods, drawn with its own mesh where it stands. The parts of
 // a collision are tinted, a picked object is lit up.
 //
-// Each model is drawn once for all its objects (instancing): their
-// matrices and looks are kept in one buffer per model.
+// The meshes of all models are kept in one pool of buffers, and where the
+// objects stand and how they look in two small textures; the objects are
+// drawn with one call per material for all models using it, leaving out
+// what the camera does not see (ADR 0075).
 
 import { rememberActions } from "./action-places";
 import type { Api } from "./api";
@@ -11,29 +13,89 @@ import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { Mat4, Vec3 } from "./gl";
 import { CELL } from "./map-places";
+import { MeshPool, normalsOf, POOL_LOCATIONS, Sight } from "./mesh-pool";
 import { type Move, movedMatrix } from "./moves";
+import { noteMeshes } from "./render-stats";
 
 /** How many meshes are fetched at once. */
 const PARALLEL = 6;
 /** The largest side of an object's texture. */
 const TEXTURE_SIDE = 512;
+/** How many texels wide the textures of places and looks are. */
+const DATA_WIDTH = 1024;
+/** How many draws one call takes at most: their first objects fit in 64 vectors. */
+const CHUNK = 256;
+/** How many views can draw the same objects with looks of their own. */
+const VIEWS = 4;
+/** Objects less than this many pixels across are left out. */
+const LEAST_PIXELS = 1.5;
 
-const VERTEX = `#version 300 es
+/**
+ * Which object a point of a draw belongs to, and where it stands and how
+ * it looks: read from the textures of places and looks by the number of
+ * the draw within its call and of the object within the draw.
+ */
+const INSTANCE = `
+uniform highp sampler2D u_places;
+uniform highp sampler2D u_looks;
+uniform int u_view;
+uniform ivec4 u_bases[${CHUNK / 4}];
+int objectIndex() {
+  int draw = DRAW_ID;
+  return u_bases[draw / 4][draw % 4] + gl_InstanceID;
+}
+ivec2 dataAt(int texel) {
+  return ivec2(texel % ${DATA_WIDTH}, texel / ${DATA_WIDTH});
+}
+mat4 placeOf(int index) {
+  int at = index * 4;
+  return mat4(
+    texelFetch(u_places, dataAt(at), 0),
+    texelFetch(u_places, dataAt(at + 1), 0),
+    texelFetch(u_places, dataAt(at + 2), 0),
+    texelFetch(u_places, dataAt(at + 3), 0));
+}
+float lookOf(int index) {
+  return texelFetch(u_looks, dataAt(index), 0)[u_view];
+}
+/** Outside of what is seen: a point that is never drawn. */
+const vec4 NOWHERE = vec4(2.0, 2.0, 2.0, 1.0);
+`;
+
+/** The start of every vertex shader: with one call for many draws where the browser has it. */
+const head = (multi: boolean) =>
+  multi
+    ? `#version 300 es
+#extension GL_ANGLE_multi_draw : require
+#define DRAW_ID gl_DrawID
+`
+    : `#version 300 es
+#define DRAW_ID 0
+`;
+
+const VERTEX = `
 in vec3 a_position;
 in vec3 a_normal;
 in vec2 a_uv;
-in mat4 a_model;
-in float a_look;
 uniform mat4 u_matrix;
 uniform float u_exaggeration;
 out vec2 v_uv;
 out vec3 v_normal;
-out float v_look;
+flat out float v_look;
 void main() {
-  vec4 world = a_model * vec4(a_position, 1.0);
+  int index = objectIndex();
+  float look = lookOf(index);
+  v_look = look;
   v_uv = a_uv;
-  v_normal = mat3(a_model) * a_normal;
-  v_look = a_look;
+  if (look > 4.5 && look < 5.5) {
+    // Hidden, and shown as the game would show it: not at all.
+    v_normal = vec3(0.0, 0.0, 1.0);
+    gl_Position = NOWHERE;
+    return;
+  }
+  mat4 model = placeOf(index);
+  vec4 world = model * vec4(a_position, 1.0);
+  v_normal = mat3(model) * a_normal;
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
 
@@ -41,7 +103,7 @@ const FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 in vec3 v_normal;
-in float v_look;
+flat in float v_look;
 uniform sampler2D u_texture;
 uniform bool u_hasTexture;
 uniform bool u_alphaTest;
@@ -99,15 +161,11 @@ const PICK_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 flat in float v_id;
-flat in float v_gone;
 uniform sampler2D u_texture;
 uniform bool u_hasTexture;
 uniform bool u_alphaTest;
 out vec4 colour;
 void main() {
-  if (v_gone > 0.5) {
-    discard;
-  }
   if (u_alphaTest && u_hasTexture && texture(u_texture, v_uv).a < 0.5) {
     discard;
   }
@@ -115,22 +173,23 @@ void main() {
   colour = vec4(mod(id, 256.0), mod(floor(id / 256.0), 256.0), floor(id / 65536.0), 255.0) / 255.0;
 }`;
 
-const PICK_VERTEX = `#version 300 es
+const PICK_VERTEX = `
 in vec3 a_position;
 in vec2 a_uv;
-in mat4 a_model;
-in float a_look;
 uniform mat4 u_matrix;
 uniform float u_exaggeration;
-uniform float u_base;
 out vec2 v_uv;
 flat out float v_id;
-flat out float v_gone;
 void main() {
-  vec4 world = a_model * vec4(a_position, 1.0);
+  int index = objectIndex();
+  float look = lookOf(index);
   v_uv = a_uv;
-  v_id = u_base + float(gl_InstanceID) + 1.0;
-  v_gone = a_look > 4.5 && a_look < 5.5 ? 1.0 : 0.0;
+  v_id = float(index + 1);
+  if (look > 4.5 && look < 5.5) {
+    gl_Position = NOWHERE;
+    return;
+  }
+  vec4 world = placeOf(index) * vec4(a_position, 1.0);
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
 
@@ -140,15 +199,14 @@ void main() {
  * game has loaded a place it draws no level of detail, whether an object
  * there is shown or not.
  */
-const TOPS_VERTEX = `#version 300 es
+const TOPS_VERTEX = `
 in vec3 a_position;
 in vec2 a_uv;
-in mat4 a_model;
 uniform vec4 u_rect;
 uniform vec2 u_range;
 out vec2 v_uv;
 void main() {
-  vec4 world = a_model * vec4(a_position, 1.0);
+  vec4 world = placeOf(objectIndex()) * vec4(a_position, 1.0);
   v_uv = a_uv;
   vec2 at = (world.xy - u_rect.xy) / (u_rect.zw - u_rect.xy) * 2.0 - 1.0;
   float depth = clamp((u_range.y - world.z) / (u_range.y - u_range.x), 0.0, 1.0);
@@ -169,17 +227,19 @@ void main() {
   colour = vec4(1.0);
 }`;
 
-/** Where every attribute is, the same in all programs. */
-const LOCATIONS: [string, number][] = [
-  ["a_position", 0],
-  ["a_normal", 1],
-  ["a_uv", 2],
-  ["a_model", 3],
-  ["a_look", 7],
-];
+/** A program drawing from the pool, with its uniforms' locations looked up once. */
+interface Program {
+  program: WebGLProgram;
+  at: (name: string) => WebGLUniformLocation | null;
+}
 
-/** A program with the attributes at {@link LOCATIONS}. */
-function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
+/** A program with the attributes where the pool has them. */
+function linked(
+  gl: WebGL2RenderingContext,
+  multi: boolean,
+  vertex: string,
+  fragment: string,
+): Program {
   const shader = (type: number, source: string) => {
     const made = gl.createShader(type);
     if (made === null) {
@@ -193,11 +253,14 @@ function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): W
     return made;
   };
   const made = gl.createProgram();
-  const parts = [shader(gl.VERTEX_SHADER, vertex), shader(gl.FRAGMENT_SHADER, fragment)];
+  const parts = [
+    shader(gl.VERTEX_SHADER, head(multi) + INSTANCE + vertex),
+    shader(gl.FRAGMENT_SHADER, fragment),
+  ];
   for (const part of parts) {
     gl.attachShader(made, part);
   }
-  for (const [name, location] of LOCATIONS) {
+  for (const [name, location] of POOL_LOCATIONS) {
     gl.bindAttribLocation(made, location, name);
   }
   gl.linkProgram(made);
@@ -207,29 +270,94 @@ function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): W
   if (!gl.getProgramParameter(made, gl.LINK_STATUS)) {
     throw new Error(gl.getProgramInfoLog(made) ?? "program");
   }
-  return made;
+  const known = new Map<string, WebGLUniformLocation | null>();
+  return {
+    program: made,
+    at: (name) => {
+      if (!known.has(name)) {
+        known.set(name, gl.getUniformLocation(made, name));
+      }
+      return known.get(name) ?? null;
+    },
+  };
 }
 
+/** The browser's way to make many draws with one call (`WEBGL_multi_draw`). */
+interface MultiDraw {
+  multiDrawElementsInstancedWEBGL(
+    mode: number,
+    counts: Int32Array,
+    countsOffset: number,
+    type: number,
+    offsets: Int32Array,
+    offsetsOffset: number,
+    instanceCounts: Int32Array,
+    instanceCountsOffset: number,
+    drawCount: number,
+  ): void;
+}
+
+/** A part of a model drawn with one material: a range of the pool's indices. */
 interface Surface {
-  vao: WebGLVertexArrayObject;
-  buffers: WebGLBuffer[];
+  /** Where its indices start in the pool, and how many there are. */
+  first: number;
   count: number;
   texture: string | null;
   alphaTest: boolean;
 }
 
+/** The surfaces of all models drawn with one material, in the order drawn. */
+interface Batch {
+  texture: string | null;
+  alphaTest: boolean;
+  items: { surface: Surface; model: Model }[];
+}
+
 type Shared = WebGLTexture | "loading" | "missing";
 
-/** An object as drawn: its model matrix and whether it is part of a collision. */
+/** An object as drawn: its model matrix and how it looks in each view. */
 interface Instance {
   object: AreaObject;
+  /** Its key, see {@link objectKey}. */
+  key: string;
   matrix: Float32Array;
+  /** Whether it is drawn other than plainly in the first view. */
   marked: boolean;
+  /** How it looks in the first view. */
   look: Look;
+  /** How it looks in each view, the first one first. */
+  looks: Look[];
 }
 
 /** The key by which collisions name an object. */
 export const objectKey = (plugin: string, localId: number) => `${plugin.toLowerCase()}:${localId}`;
+
+/**
+ * A picture given by its address, decoded away from the page's own
+ * thread where the browser can (a PNG in a `data:` address, as the
+ * backend sends textures), else through an image element.
+ */
+async function picture(url: string): Promise<{ source: TexImageSource; close?: () => void }> {
+  const comma = url.indexOf(",");
+  const head = comma < 0 ? "" : url.slice(0, comma);
+  if (typeof createImageBitmap === "function" && /^data:image\/[\w+.-]+;base64$/.test(head))
+    try {
+      const type = head.slice(5, head.indexOf(";"));
+      const blob = new Blob([bytesOf(url.slice(comma + 1))], { type });
+      // As WebGL takes a picture by default: colours not multiplied by their alpha.
+      const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "none" });
+      return { source: bitmap, close: () => bitmap.close() };
+    } catch {
+      // Read the usual way below.
+    }
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("picture"));
+    image.src = url;
+  });
+  return { source: image };
+}
 
 function bytesOf(base64: string): ArrayBuffer {
   const text = atob(base64);
@@ -238,36 +366,6 @@ function bytesOf(base64: string): ArrayBuffer {
     bytes[index] = text.charCodeAt(index);
   }
   return bytes.buffer;
-}
-
-function normalsOf(positions: Float32Array, indices: Uint32Array): Float32Array {
-  const normals = new Float32Array(positions.length);
-  const p = (point: number, axis: number) => positions[point * 3 + axis] ?? 0;
-  for (let index = 0; index + 2 < indices.length; index += 3) {
-    const a = indices[index] ?? 0;
-    const b = indices[index + 1] ?? 0;
-    const c = indices[index + 2] ?? 0;
-    const u = [p(b, 0) - p(a, 0), p(b, 1) - p(a, 1), p(b, 2) - p(a, 2)];
-    const v = [p(c, 0) - p(a, 0), p(c, 1) - p(a, 1), p(c, 2) - p(a, 2)];
-    const n = [
-      (u[1] ?? 0) * (v[2] ?? 0) - (u[2] ?? 0) * (v[1] ?? 0),
-      (u[2] ?? 0) * (v[0] ?? 0) - (u[0] ?? 0) * (v[2] ?? 0),
-      (u[0] ?? 0) * (v[1] ?? 0) - (u[1] ?? 0) * (v[0] ?? 0),
-    ];
-    for (const point of [a, b, c]) {
-      for (let axis = 0; axis < 3; axis++) {
-        normals[point * 3 + axis] = (normals[point * 3 + axis] ?? 0) + (n[axis] ?? 0);
-      }
-    }
-  }
-  for (let point = 0; point < normals.length; point += 3) {
-    const length =
-      Math.hypot(normals[point] ?? 0, normals[point + 1] ?? 0, normals[point + 2] ?? 1) || 1;
-    for (let axis = 0; axis < 3; axis++) {
-      normals[point + axis] = (normals[point + axis] ?? 0) / length;
-    }
-  }
-  return normals;
 }
 
 /**
@@ -639,19 +737,56 @@ interface Model {
   radius: number;
   /** The box around its points, in its own units: lowest and highest corner. */
   box: [[number, number, number], [number, number, number]];
-  /** Its objects: one matrix and one look each, in one buffer. */
-  instances: WebGLBuffer | null;
-  /** What its buffer holds, to change the looks in place. */
-  data: Float32Array | null;
+  /** Where its objects start in the textures of places and looks, and how many there are. */
+  base: number;
   count: number;
-  /** Its objects, in the order of the buffer. */
-  own: Instance[];
+  /** The sphere around all its objects as placed, in game units: x, y, z and radius. */
+  bounds: [number, number, number, number];
+}
+
+/** The camera a frame is drawn with, and what it sees; reused while the matrix stays. */
+interface Seen {
+  matrix: Mat4;
+  exaggeration: number;
+  pixels: number;
+  least: number;
+  sight: Sight;
+  /** Whether each model is seen, by the frame it was last tested for. */
+  models: Map<Model, boolean>;
+}
+
+/** The longest side of a placed object's model, as its matrix scales it. */
+function scaleOf(matrix: Float32Array): number {
+  const column = (index: number) =>
+    Math.hypot(matrix[index * 4] ?? 0, matrix[index * 4 + 1] ?? 0, matrix[index * 4 + 2] ?? 0);
+  return Math.max(column(0), column(1), column(2));
 }
 
 export class AreaLayer {
-  private readonly program: WebGLProgram;
-  private readonly picking: WebGLProgram;
-  private readonly tops: WebGLProgram;
+  private readonly multi: MultiDraw | null;
+  private readonly program: Program;
+  private readonly picking: Program;
+  private readonly tops: Program;
+  private readonly pool: MeshPool;
+  /** Where each object stands: four texels of its matrix each, in the order of {@link order}. */
+  private readonly places: WebGLTexture;
+  /** How each object looks in each view: one texel each. */
+  private readonly looks: WebGLTexture;
+  private looksData = new Float32Array(0);
+  /** The objects in the order of the textures: those of one model one after the other. */
+  private order: Instance[] = [];
+  /** Where each model's objects start in {@link order}, and how many there are, by model. */
+  private spans = new Map<string, [number, number]>();
+  /** The surfaces by material, made anew when models arrive or the objects change. */
+  private batches: Batch[] | null = null;
+  private seen: Seen | null = null;
+  /** What {@link shown} last told, until something changes. */
+  private shownNow: ReturnType<AreaLayer["shownOf"]> | null = null;
+  // The lists handed to one call for many draws, reused from frame to frame.
+  private readonly counts = new Int32Array(CHUNK);
+  private readonly offsets = new Int32Array(CHUNK);
+  private readonly instanceCounts = new Int32Array(CHUNK);
+  private readonly bases = new Int32Array(CHUNK);
   /** Counts the changes to what is drawn where, see {@link version}. */
   private changes = 0;
   private readonly models = new Map<string, Model>();
@@ -677,9 +812,45 @@ export class AreaLayer {
     private readonly api: Api,
     private readonly changed: () => void,
   ) {
-    this.program = linked(gl, VERTEX, FRAGMENT);
-    this.picking = linked(gl, PICK_VERTEX, PICK_FRAGMENT);
-    this.tops = linked(gl, TOPS_VERTEX, TOPS_FRAGMENT);
+    // One call for many draws where the browser has it; one call each where not.
+    let multi = gl.getExtension("WEBGL_multi_draw") as MultiDraw | null;
+    const programs = (withMulti: boolean) => [
+      linked(gl, withMulti, VERTEX, FRAGMENT),
+      linked(gl, withMulti, PICK_VERTEX, PICK_FRAGMENT),
+      linked(gl, withMulti, TOPS_VERTEX, TOPS_FRAGMENT),
+    ];
+    let made: Program[];
+    try {
+      made = programs(multi !== null);
+    } catch (error) {
+      if (multi === null) {
+        throw error;
+      }
+      multi = null;
+      made = programs(false);
+    }
+    const [program, picking, tops] = made;
+    if (program === undefined || picking === undefined || tops === undefined) {
+      throw new Error("program");
+    }
+    this.multi = multi;
+    this.program = program;
+    this.picking = picking;
+    this.tops = tops;
+    this.pool = new MeshPool(gl);
+    const data = () => {
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array(4));
+      return texture;
+    };
+    this.places = data();
+    this.looks = data();
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
   /** Changes whenever an object is drawn elsewhere or a model or texture arrives. */
@@ -704,16 +875,25 @@ export class AreaLayer {
     return look;
   }
 
-  /** Shows `area`, each object drawn as `look` says by its key (see {@link objectKey}). */
+  /**
+   * Shows `area`, each object drawn as `look` says by its key (see
+   * {@link objectKey}) in every view, until a view is restyled.
+   */
   show(area: AreaObjects, look: (key: string) => Look) {
     this.area = area;
-    this.changes += 1;
     rememberActions(area);
     this.instances = area.objects.map((object) => {
       const key = objectKey(object.id.plugin, object.id.localId);
       const shown = look(key);
       const matrix = movedMatrix(placement(object), this.moves.get(key) ?? null);
-      return { object, matrix, marked: shown !== LOOK.plain, look: shown };
+      return {
+        object,
+        key,
+        matrix,
+        marked: shown !== LOOK.plain,
+        look: shown,
+        looks: new Array<Look>(VIEWS).fill(shown),
+      };
     });
     for (const model of new Set(area.objects.map((object) => object.model))) {
       if (!this.models.has(model) && !this.queue.includes(model)) {
@@ -728,9 +908,7 @@ export class AreaLayer {
       distance.set(model, Math.min(distance.get(model) ?? Infinity, away));
     }
     this.queue.sort((a, b) => (distance.get(a) ?? 0) - (distance.get(b) ?? 0));
-    for (const model of this.models.keys()) {
-      this.place(model);
-    }
+    this.arrange();
     this.pump();
   }
 
@@ -749,16 +927,18 @@ export class AreaLayer {
     if (changed.size === 0) {
       return;
     }
-    const models = new Set<string>();
+    let moved = false;
     for (const instance of this.instances) {
-      const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-      if (changed.has(key)) {
-        instance.matrix = movedMatrix(placement(instance.object), this.moves.get(key) ?? null);
-        models.add(instance.object.model);
+      if (changed.has(instance.key)) {
+        instance.matrix = movedMatrix(
+          placement(instance.object),
+          this.moves.get(instance.key) ?? null,
+        );
+        moved = true;
       }
     }
-    for (const model of models) {
-      this.place(model);
+    if (moved) {
+      this.writePlaces();
     }
   }
 
@@ -788,35 +968,144 @@ export class AreaLayer {
       );
   }
 
-  /** Draws the objects anew as `look` says. */
-  restyle(look: (key: string) => Look) {
+  /** Draws the objects anew as `look` says, in view `view` (the first one unless given). */
+  restyle(look: (key: string) => Look, view = 0) {
+    const slot = Math.min(VIEWS - 1, Math.max(0, Math.floor(view)));
     for (const instance of this.instances) {
-      instance.look = look(objectKey(instance.object.id.plugin, instance.object.id.localId));
-      instance.marked = instance.look !== LOOK.plain;
+      const next = look(instance.key);
+      instance.looks[slot] = next;
+      if (slot === 0 && next !== instance.look) {
+        instance.look = next;
+        instance.marked = next !== LOOK.plain;
+        this.shownNow = null;
+      }
     }
-    this.relookAll();
+    this.relook(slot);
   }
 
   /**
-   * Writes the looks anew into every model's buffer, in place where the
-   * model holds the same objects as when it was placed (a view drawn
-   * several times with other looks, many times a second).
+   * Writes the looks anew into their texture: of view `only`, or of
+   * every view; the texture is sent to the card only where a look changed
+   * (a view drawn several times with other looks, many times a second).
    */
-  private relookAll() {
+  private relook(only: number | null = null) {
     const { gl } = this;
-    for (const [name, model] of this.models) {
-      const { data, instances } = model;
-      if (data === null || instances === null || data.length !== model.own.length * 17) {
-        this.place(name);
+    const data = this.looksData;
+    let changed = false;
+    for (let index = 0; index < this.order.length; index++) {
+      const instance = this.order[index];
+      if (instance === undefined) {
         continue;
       }
-      model.own.forEach((instance, index) => {
-        const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-        data[index * 17 + 16] = this.lookOf(key, instance.look);
-      });
-      gl.bindBuffer(gl.ARRAY_BUFFER, instances);
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+      for (let slot = 0; slot < VIEWS; slot++) {
+        if (only !== null && slot !== only) {
+          continue;
+        }
+        const look = this.lookOf(instance.key, instance.looks[slot] ?? instance.look);
+        if (data[index * 4 + slot] !== look) {
+          data[index * 4 + slot] = look;
+          changed = true;
+        }
+      }
     }
+    if (changed && this.order.length > 0) {
+      gl.bindTexture(gl.TEXTURE_2D, this.looks);
+      const rows = data.length / 4 / DATA_WIDTH;
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, DATA_WIDTH, rows, gl.RGBA, gl.FLOAT, data);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+  }
+
+  /**
+   * Puts the objects in the order of their models, and their places and
+   * looks into the textures (when the objects shown change).
+   */
+  private arrange() {
+    const { gl } = this;
+    this.changes += 1;
+    this.shownNow = null;
+    this.batches = null;
+    const byModel = new Map<string, Instance[]>();
+    for (const instance of this.instances) {
+      const list = byModel.get(instance.object.model);
+      if (list === undefined) {
+        byModel.set(instance.object.model, [instance]);
+      } else {
+        list.push(instance);
+      }
+    }
+    for (const model of this.models.values()) {
+      model.count = 0;
+    }
+    this.order = [];
+    this.spans = new Map();
+    for (const [name, own] of byModel) {
+      this.spans.set(name, [this.order.length, own.length]);
+      const model = this.models.get(name);
+      if (model !== undefined) {
+        model.base = this.order.length;
+        model.count = own.length;
+      }
+      this.order.push(...own);
+    }
+    const rows = Math.max(1, Math.ceil(this.order.length / DATA_WIDTH));
+    this.looksData = new Float32Array(rows * DATA_WIDTH * 4).fill(-1);
+    gl.bindTexture(gl.TEXTURE_2D, this.looks);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, DATA_WIDTH, rows, 0, gl.RGBA, gl.FLOAT, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.relook();
+    this.writePlaces();
+  }
+
+  /** Writes where every object stands into its texture, and each model's sphere around them. */
+  private writePlaces() {
+    const { gl } = this;
+    this.changes += 1;
+    this.shownNow = null;
+    this.seen = null;
+    const rows = Math.max(1, Math.ceil((this.order.length * 4) / DATA_WIDTH));
+    const data = new Float32Array(rows * DATA_WIDTH * 4);
+    this.order.forEach((instance, index) => {
+      data.set(instance.matrix, index * 16);
+    });
+    gl.bindTexture(gl.TEXTURE_2D, this.places);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, DATA_WIDTH, rows, 0, gl.RGBA, gl.FLOAT, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    for (const model of this.models.values()) {
+      this.bound(model);
+    }
+  }
+
+  /** The sphere around all objects of a model as placed. */
+  private bound(model: Model) {
+    const [x, y, z] = model.centre;
+    const low = [Infinity, Infinity, Infinity];
+    const high = [-Infinity, -Infinity, -Infinity];
+    let reach = 0;
+    for (let index = model.base; index < model.base + model.count; index++) {
+      const m = this.order[index]?.matrix;
+      if (m === undefined) {
+        continue;
+      }
+      for (let row = 0; row < 3; row++) {
+        const at =
+          (m[row] ?? 0) * x + (m[4 + row] ?? 0) * y + (m[8 + row] ?? 0) * z + (m[12 + row] ?? 0);
+        low[row] = Math.min(low[row] ?? 0, at);
+        high[row] = Math.max(high[row] ?? 0, at);
+      }
+      reach = Math.max(reach, model.radius * scaleOf(m));
+    }
+    if (!Number.isFinite(low[0])) {
+      model.bounds = [0, 0, 0, 0];
+      return;
+    }
+    const middle = [0, 1, 2].map((axis) => ((low[axis] ?? 0) + (high[axis] ?? 0)) / 2);
+    const spread = Math.hypot(
+      (high[0] ?? 0) - (low[0] ?? 0),
+      (high[1] ?? 0) - (low[1] ?? 0),
+      (high[2] ?? 0) - (low[2] ?? 0),
+    );
+    model.bounds = [middle[0] ?? 0, middle[1] ?? 0, middle[2] ?? 0, spread / 2 + reach];
   }
 
   /**
@@ -829,7 +1118,7 @@ export class AreaLayer {
     if (!same) {
       this.chained = new Set();
     }
-    this.relookAll();
+    this.relook();
   }
 
   /**
@@ -938,21 +1227,21 @@ export class AreaLayer {
     this.stopPulse();
     if (found.length === 0) {
       if (before > 0) {
-        this.relookAll();
+        this.relook();
         this.changed();
       }
       return [];
     }
     this.pulsing = new Set(found.map((object) => objectKey(object.id.plugin, object.id.localId)));
     this.pulseStart = performance.now();
-    this.relookAll();
+    this.relook();
     this.changed();
     // The glow is drawn by the clock, so the view is drawn anew meanwhile.
     this.pulseTimer = setInterval(() => {
       if (this.disposed || performance.now() - this.pulseStart >= ms) {
         this.stopPulse();
         if (!this.disposed) {
-          this.relookAll();
+          this.relook();
         }
       }
       this.changed();
@@ -971,7 +1260,7 @@ export class AreaLayer {
   /** Lights `objects` faintly besides what is picked: what the magic wand took along. */
   showChain(objects: AreaObject[]) {
     this.chained = new Set(objects.map((part) => objectKey(part.id.plugin, part.id.localId)));
-    this.relookAll();
+    this.relook();
   }
 
   /**
@@ -1106,6 +1395,11 @@ export class AreaLayer {
     look: Look;
     centre: [number, number, number];
   }[] {
+    this.shownNow ??= this.shownOf();
+    return this.shownNow;
+  }
+
+  private shownOf() {
     return this.instances.map((instance) => {
       const [x, y, z] = this.models.get(instance.object.model)?.centre ?? [0, 0, 0];
       const m = instance.matrix;
@@ -1115,7 +1409,7 @@ export class AreaLayer {
         object: instance.object,
         marked: instance.marked,
         look: instance.look,
-        centre: [at(0), at(1), at(2)],
+        centre: [at(0), at(1), at(2)] as [number, number, number],
       };
     });
   }
@@ -1127,6 +1421,7 @@ export class AreaLayer {
         break;
       }
       this.running += 1;
+      const [base, count] = this.spans.get(name) ?? [0, 0];
       const model: Model = {
         surfaces: "loading",
         centre: [0, 0, 0],
@@ -1135,10 +1430,9 @@ export class AreaLayer {
           [0, 0, 0],
           [0, 0, 0],
         ],
-        instances: null,
-        data: null,
-        count: 0,
-        own: [],
+        base,
+        count,
+        bounds: [0, 0, 0, 0],
       };
       this.models.set(name, model);
       this.api
@@ -1149,7 +1443,11 @@ export class AreaLayer {
             return;
           }
           this.upload(mesh, model);
-          this.place(name);
+          this.bound(model);
+          this.changes += 1;
+          this.batches = null;
+          this.shownNow = null;
+          this.seen = null;
         })
         .catch(() => {
           model.surfaces = "missing";
@@ -1164,60 +1462,25 @@ export class AreaLayer {
     }
   }
 
-  /** Puts the matrices and looks of a model's objects into its buffer. */
-  private place(name: string) {
-    const model = this.models.get(name);
-    if (model === undefined || !Array.isArray(model.surfaces) || this.disposed) {
-      return;
-    }
-    const { gl } = this;
-    this.changes += 1;
-    const own = this.instances.filter((instance) => instance.object.model === name);
-    const data = new Float32Array(own.length * 17);
-    own.forEach((instance, index) => {
-      data.set(instance.matrix, index * 17);
-      const key = objectKey(instance.object.id.plugin, instance.object.id.localId);
-      data[index * 17 + 16] = this.lookOf(key, instance.look);
-    });
-    if (model.instances === null) {
-      model.instances = gl.createBuffer();
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, model.instances);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-    model.data = data;
-    model.count = own.length;
-    model.own = own;
-    const matrixAt = gl.getAttribLocation(this.program, "a_model");
-    const lookAt = gl.getAttribLocation(this.program, "a_look");
-    const stride = 17 * 4;
-    for (const surface of model.surfaces) {
-      gl.bindVertexArray(surface.vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, model.instances);
-      for (let column = 0; column < 4 && matrixAt >= 0; column++) {
-        gl.enableVertexAttribArray(matrixAt + column);
-        gl.vertexAttribPointer(matrixAt + column, 4, gl.FLOAT, false, stride, column * 16);
-        gl.vertexAttribDivisor(matrixAt + column, 1);
-      }
-      if (lookAt >= 0) {
-        gl.enableVertexAttribArray(lookAt);
-        gl.vertexAttribPointer(lookAt, 1, gl.FLOAT, false, stride, 64);
-        gl.vertexAttribDivisor(lookAt, 1);
-      }
-    }
-    gl.bindVertexArray(null);
-  }
-
+  /**
+   * Adds a model's mesh to the pool: its shapes ordered by material, so
+   * that shapes of the same material make one surface.
+   */
   private upload(mesh: LodMesh, model: Model) {
-    const { gl } = this;
+    const started = performance.now();
     let sum = [0, 0, 0];
     let points = 0;
     const low = [Infinity, Infinity, Infinity];
     const high = [-Infinity, -Infinity, -Infinity];
-    model.surfaces = mesh.shapes.flatMap((shape) => {
+    const materialOf = (shape: LodMesh["shapes"][number]) =>
+      `${shape.alphaTest ? 1 : 0}${shape.texture ?? ""}`;
+    const shapes = [...mesh.shapes].sort((a, b) => materialOf(a).localeCompare(materialOf(b)));
+    const surfaces: Surface[] = [];
+    for (const shape of shapes) {
       const positions = new Float32Array(bytesOf(shape.positions));
       const indices = new Uint32Array(bytesOf(shape.indices));
       if (positions.length === 0 || indices.length === 0) {
-        return [];
+        continue;
       }
       for (let index = 0; index + 2 < positions.length; index += 3) {
         sum = [
@@ -1236,38 +1499,26 @@ export class AreaLayer {
         shape.uvs === ""
           ? new Float32Array((positions.length / 3) * 2)
           : new Float32Array(bytesOf(shape.uvs));
-      const vao = gl.createVertexArray();
-      gl.bindVertexArray(vao);
-      const buffers: WebGLBuffer[] = [];
-      const attribute = (name: string, data: Float32Array, size: number) => {
-        const location = gl.getAttribLocation(this.program, name);
-        const buffer = gl.createBuffer();
-        buffers.push(buffer);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-        if (location >= 0) {
-          gl.enableVertexAttribArray(location);
-          gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-        }
-      };
-      attribute("a_position", positions, 3);
-      attribute("a_normal", normalsOf(positions, indices), 3);
-      attribute("a_uv", uvs, 2);
-      const elements = gl.createBuffer();
-      buffers.push(elements);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elements);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-      gl.bindVertexArray(null);
-      return [
-        {
-          vao,
-          buffers,
-          count: indices.length,
-          texture: shape.texture ?? null,
-          alphaTest: shape.alphaTest,
-        },
-      ];
-    });
+      const fitting =
+        uvs.length === (positions.length / 3) * 2
+          ? uvs
+          : new Float32Array((positions.length / 3) * 2);
+      const first = this.pool.add(positions, normalsOf(positions, indices), fitting, indices);
+      const texture = shape.texture ?? null;
+      const last = surfaces[surfaces.length - 1];
+      if (
+        last !== undefined &&
+        last.texture === texture &&
+        last.alphaTest === shape.alphaTest &&
+        last.first + last.count === first
+      ) {
+        last.count += indices.length;
+      } else {
+        surfaces.push({ first, count: indices.length, texture, alphaTest: shape.alphaTest });
+      }
+    }
+    model.surfaces = surfaces;
+    noteMeshes(performance.now() - started);
     if (points > 0) {
       model.centre = [(sum[0] ?? 0) / points, (sum[1] ?? 0) / points, (sum[2] ?? 0) / points];
       model.radius =
@@ -1302,68 +1553,215 @@ export class AreaLayer {
             this.changed();
             return;
           }
-          const image = new Image();
-          image.onload = () => {
+          return picture(url).then((image) => {
             if (this.disposed) {
+              image.close?.();
               return;
             }
             const { gl } = this;
             const made = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, made);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image.source);
             gl.generateMipmap(gl.TEXTURE_2D);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            image.close?.();
             this.textures.set(path, made);
             this.changes += 1;
             this.changed();
-          };
-          image.onerror = () => this.textures.set(path, "missing");
-          image.src = url;
+          });
         })
         .catch(() => this.textures.set(path, "missing"));
     }
     return "pending";
   }
 
-  /** Draws the objects with `matrix` (cells, heights as drawn). */
-  draw(matrix: Mat4, exaggeration: number, colours: { mark: Vec3; focus: Vec3; ghost: Vec3 }) {
-    if (this.disposed || this.instances.length === 0) {
-      return;
+  /** The surfaces of the models read, by material, in an order that binds each texture once. */
+  private batchesNow(): Batch[] {
+    if (this.batches !== null) {
+      return this.batches;
     }
-    const { gl } = this;
-    // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
-    gl.useProgram(this.program);
-    const at = (name: string) => gl.getUniformLocation(this.program, name);
-    gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
-    gl.uniform1f(at("u_exaggeration"), exaggeration);
-    gl.uniform3f(at("u_mark"), ...colours.mark);
-    gl.uniform3f(at("u_focus"), ...colours.focus);
-    gl.uniform3f(at("u_ghost"), ...colours.ghost);
-    // Two glows a second, from the moment the pulse began.
-    gl.uniform1f(at("u_pulse"), ((performance.now() - this.pulseStart) / 1000) * Math.PI * 4);
-    gl.uniform1i(at("u_texture"), 0);
-    const hasTexture = at("u_hasTexture");
-    const alphaTest = at("u_alphaTest");
-    gl.activeTexture(gl.TEXTURE0);
+    const byMaterial = new Map<string, Batch>();
     for (const model of this.models.values()) {
       if (!Array.isArray(model.surfaces) || model.count === 0) {
         continue;
       }
       for (const surface of model.surfaces) {
-        const texture = surface.texture === null ? null : this.texture(surface.texture);
-        if (texture === "pending") {
-          continue;
+        const key = `${surface.alphaTest ? 1 : 0}${surface.texture ?? ""}`;
+        let batch = byMaterial.get(key);
+        if (batch === undefined) {
+          batch = { texture: surface.texture, alphaTest: surface.alphaTest, items: [] };
+          byMaterial.set(key, batch);
         }
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(hasTexture, texture === null ? 0 : 1);
-        gl.uniform1i(alphaTest, surface.alphaTest ? 1 : 0);
-        gl.bindVertexArray(surface.vao);
-        gl.drawElementsInstanced(gl.TRIANGLES, surface.count, gl.UNSIGNED_INT, 0, model.count);
+        batch.items.push({ surface, model });
       }
     }
+    // Opaque surfaces first: the alpha tested ones then fail the depth test more often.
+    this.batches = [...byMaterial.values()].sort(
+      (a, b) => Number(a.alphaTest) - Number(b.alphaTest),
+    );
+    return this.batches;
+  }
+
+  /**
+   * What `matrix` sees, kept while the matrix stays (the views of a
+   * comparison draw the same objects with the same camera).
+   */
+  private seenWith(matrix: Mat4, exaggeration: number, least: number): Seen {
+    const pixels = this.gl.drawingBufferWidth;
+    const known = this.seen;
+    if (
+      known !== null &&
+      known.exaggeration === exaggeration &&
+      known.pixels === pixels &&
+      known.least === least &&
+      known.matrix.every((value, index) => value === matrix[index])
+    ) {
+      return known;
+    }
+    this.seen = {
+      matrix: new Float32Array(matrix),
+      exaggeration,
+      pixels,
+      least,
+      sight: new Sight(matrix, pixels),
+      models: new Map(),
+    };
+    return this.seen;
+  }
+
+  /** Whether any object of `model` is seen, as `seen` tells. */
+  private sees(seen: Seen, model: Model): boolean {
+    const known = seen.models.get(model);
+    if (known !== undefined) {
+      return known;
+    }
+    const [x, y, z, radius] = model.bounds;
+    const raise = seen.exaggeration;
+    const result = seen.sight.sees(
+      x / CELL,
+      y / CELL,
+      (z / CELL) * raise,
+      (radius / CELL) * Math.max(1, raise),
+      seen.least,
+    );
+    seen.models.set(model, result);
+    return result;
+  }
+
+  /**
+   * Draws the batches with `program` (bound, its uniforms set): every
+   * surface of a seen model, one call per material and up to {@link CHUNK}
+   * surfaces. Surfaces whose texture is still on its way are left out
+   * unless `waiting` is set, which draws them without it.
+   */
+  private drawBatches(program: Program, seen: Seen | null, waiting: boolean) {
+    const { gl, counts, offsets, instanceCounts, bases, multi } = this;
+    const baseAt = program.at("u_bases");
+    const hasTexture = program.at("u_hasTexture");
+    const alphaTest = program.at("u_alphaTest");
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.places);
+    gl.uniform1i(program.at("u_places"), 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.looks);
+    gl.uniform1i(program.at("u_looks"), 2);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(program.at("u_texture"), 0);
+    gl.bindVertexArray(this.pool.vao);
+    for (const batch of this.batchesNow()) {
+      let texture: WebGLTexture | null = null;
+      if (batch.texture !== null) {
+        const found = waiting ? this.textures.get(batch.texture) : this.texture(batch.texture);
+        if (found === "pending") {
+          continue;
+        }
+        texture = found === undefined || found === "loading" || found === "missing" ? null : found;
+      }
+      let drawn = 0;
+      const flush = () => {
+        if (drawn === 0) {
+          return;
+        }
+        if (multi !== null) {
+          gl.uniform4iv(baseAt, bases);
+          multi.multiDrawElementsInstancedWEBGL(
+            gl.TRIANGLES,
+            counts,
+            0,
+            gl.UNSIGNED_INT,
+            offsets,
+            0,
+            instanceCounts,
+            0,
+            drawn,
+          );
+        }
+        drawn = 0;
+      };
+      let bound = false;
+      for (const { surface, model } of batch.items) {
+        if (model.count === 0 || (seen !== null && !this.sees(seen, model))) {
+          continue;
+        }
+        if (!bound) {
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.uniform1i(hasTexture, texture === null ? 0 : 1);
+          gl.uniform1i(alphaTest, batch.alphaTest ? 1 : 0);
+          bound = true;
+        }
+        if (multi === null) {
+          gl.uniform4i(baseAt, model.base, 0, 0, 0);
+          gl.drawElementsInstanced(
+            gl.TRIANGLES,
+            surface.count,
+            gl.UNSIGNED_INT,
+            surface.first * 4,
+            model.count,
+          );
+          continue;
+        }
+        counts[drawn] = surface.count;
+        offsets[drawn] = surface.first * 4;
+        instanceCounts[drawn] = model.count;
+        bases[drawn] = model.base;
+        drawn += 1;
+        if (drawn === CHUNK) {
+          flush();
+        }
+      }
+      flush();
+    }
     gl.bindVertexArray(null);
+  }
+
+  /**
+   * Draws the objects with `matrix` (cells, heights as drawn), as they
+   * look in view `view` (see {@link restyle}).
+   */
+  draw(
+    matrix: Mat4,
+    exaggeration: number,
+    colours: { mark: Vec3; focus: Vec3; ghost: Vec3 },
+    view = 0,
+  ) {
+    if (this.disposed || this.instances.length === 0) {
+      return;
+    }
+    const { gl } = this;
+    const { program, at } = this.program;
+    // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
+    gl.uniform1f(at("u_exaggeration"), exaggeration);
+    gl.uniform1i(at("u_view"), Math.min(VIEWS - 1, Math.max(0, Math.floor(view))));
+    gl.uniform3f(at("u_mark"), ...colours.mark);
+    gl.uniform3f(at("u_focus"), ...colours.focus);
+    gl.uniform3f(at("u_ghost"), ...colours.ghost);
+    // Two glows a second, from the moment the pulse began.
+    gl.uniform1f(at("u_pulse"), ((performance.now() - this.pulseStart) / 1000) * Math.PI * 4);
+    this.drawBatches(this.program, this.seenWith(matrix, exaggeration, LEAST_PIXELS), false);
   }
 
   /**
@@ -1374,39 +1772,22 @@ export class AreaLayer {
    * {@link draw}.
    */
   drawTops(rect: [number, number, number, number], range: [number, number]) {
-    if (this.disposed) {
+    if (this.disposed || this.instances.length === 0) {
       return;
     }
     const { gl } = this;
+    const { program, at } = this.tops;
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
-    gl.useProgram(this.tops);
-    const at = (name: string) => gl.getUniformLocation(this.tops, name);
+    gl.useProgram(program);
     gl.uniform4f(at("u_rect"), ...rect);
     gl.uniform2f(at("u_range"), ...range);
-    gl.uniform1i(at("u_texture"), 0);
-    gl.activeTexture(gl.TEXTURE0);
-    for (const model of this.models.values()) {
-      if (!Array.isArray(model.surfaces) || model.count === 0) {
-        continue;
-      }
-      for (const surface of model.surfaces) {
-        const texture = surface.texture === null ? null : this.texture(surface.texture);
-        if (texture === "pending") {
-          continue;
-        }
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(at("u_hasTexture"), texture === null ? 0 : 1);
-        gl.uniform1i(at("u_alphaTest"), surface.alphaTest ? 1 : 0);
-        gl.bindVertexArray(surface.vao);
-        gl.drawElementsInstanced(gl.TRIANGLES, surface.count, gl.UNSIGNED_INT, 0, model.count);
-      }
-    }
-    gl.bindVertexArray(null);
+    this.drawBatches(this.tops, null, false);
   }
 
   /**
    * The object drawn at the point `x`, `y` of the drawing buffer (from
-   * the bottom left), as seen with `matrix`; none where no object is.
+   * the bottom left), as seen with `matrix` in view `view`; none where no
+   * object is.
    */
   pick(
     matrix: Mat4,
@@ -1415,6 +1796,7 @@ export class AreaLayer {
     y: number,
     width: number,
     height: number,
+    view = 0,
   ): AreaObject | null {
     if (this.disposed || this.instances.length === 0) {
       return null;
@@ -1434,31 +1816,13 @@ export class AreaLayer {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    const { program, at } = this.picking;
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
-    gl.useProgram(this.picking);
-    const at = (name: string) => gl.getUniformLocation(this.picking, name);
+    gl.useProgram(program);
     gl.uniformMatrix4fv(at("u_matrix"), false, matrix);
     gl.uniform1f(at("u_exaggeration"), exaggeration);
-    gl.uniform1i(at("u_texture"), 0);
-    gl.activeTexture(gl.TEXTURE0);
-    const order: Instance[] = [];
-    for (const model of this.models.values()) {
-      if (!Array.isArray(model.surfaces) || model.count === 0) {
-        continue;
-      }
-      gl.uniform1f(at("u_base"), order.length);
-      order.push(...model.own);
-      for (const surface of model.surfaces) {
-        const texture = surface.texture === null ? null : this.textures.get(surface.texture);
-        const ready = texture !== undefined && texture !== "loading" && texture !== "missing";
-        gl.bindTexture(gl.TEXTURE_2D, ready ? texture : null);
-        gl.uniform1i(at("u_hasTexture"), ready ? 1 : 0);
-        gl.uniform1i(at("u_alphaTest"), surface.alphaTest ? 1 : 0);
-        gl.bindVertexArray(surface.vao);
-        gl.drawElementsInstanced(gl.TRIANGLES, surface.count, gl.UNSIGNED_INT, 0, model.count);
-      }
-    }
-    gl.bindVertexArray(null);
+    gl.uniform1i(at("u_view"), Math.min(VIEWS - 1, Math.max(0, Math.floor(view))));
+    this.drawBatches(this.picking, null, true);
     const pixel = new Uint8Array(4);
     gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1466,7 +1830,7 @@ export class AreaLayer {
     gl.deleteRenderbuffer(colour);
     gl.deleteRenderbuffer(depth);
     const id = (pixel[0] ?? 0) + (pixel[1] ?? 0) * 256 + (pixel[2] ?? 0) * 65536;
-    return id === 0 ? null : (order[id - 1]?.object ?? null);
+    return id === 0 ? null : (this.order[id - 1]?.object ?? null);
   }
 
   /** Frees everything; the layer is not used again. */
@@ -1474,17 +1838,7 @@ export class AreaLayer {
     this.disposed = true;
     this.stopPulse();
     const { gl } = this;
-    for (const model of this.models.values()) {
-      if (Array.isArray(model.surfaces)) {
-        for (const surface of model.surfaces) {
-          gl.deleteVertexArray(surface.vao);
-          for (const buffer of surface.buffers) {
-            gl.deleteBuffer(buffer);
-          }
-        }
-      }
-      gl.deleteBuffer(model.instances);
-    }
+    this.pool.dispose();
     this.models.clear();
     for (const texture of this.textures.values()) {
       if (texture !== "loading" && texture !== "missing") {
@@ -1492,8 +1846,10 @@ export class AreaLayer {
       }
     }
     this.textures.clear();
-    gl.deleteProgram(this.program);
-    gl.deleteProgram(this.picking);
-    gl.deleteProgram(this.tops);
+    gl.deleteTexture(this.places);
+    gl.deleteTexture(this.looks);
+    gl.deleteProgram(this.program.program);
+    gl.deleteProgram(this.picking.program);
+    gl.deleteProgram(this.tops.program);
   }
 }

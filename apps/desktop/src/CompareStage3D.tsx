@@ -21,6 +21,7 @@ import { LandLayer } from "./land-layer";
 import { CELL } from "./map-places";
 import { isGameObject } from "./object-actions";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
+import { watchView } from "./render-stats";
 import { useReviewTexts } from "./review-texts";
 import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
 import { drawPathSign, PathIcon, useWalkTexts } from "./walkways";
@@ -412,8 +413,9 @@ export function CompareStage3D({
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       land.current?.draw(matrix, 1);
       if (current !== null) {
-        current.restyle(lookNow.current(index));
-        current.draw(matrix, 1, { mark: SECOND, focus: FIRST, ghost });
+        // Each view keeps its own looks: only what changed is sent to the card.
+        current.restyle(lookNow.current(index), index);
+        current.draw(matrix, 1, { mark: SECOND, focus: FIRST, ghost }, index);
       }
       pathsLayer.current?.draw(matrix, 1);
     }
@@ -428,6 +430,8 @@ export function CompareStage3D({
   }, [draw]);
   const redrawNow = useRef(redraw);
   redrawNow.current = redraw;
+  const drawNow = useRef(draw);
+  drawNow.current = draw;
 
   useEffect(() => {
     pathsLayer.current?.set(paths);
@@ -459,7 +463,9 @@ export function CompareStage3D({
     } catch {
       pathsLayer.current = null;
     }
+    const unwatch = watchView("compare", gl, () => drawNow.current());
     return () => {
+      unwatch();
       layer.current?.dispose();
       layer.current = null;
       pathsLayer.current?.dispose();
@@ -581,6 +587,7 @@ export function CompareStage3D({
       Math.floor(y),
       span,
       element.height,
+      index,
     );
     redraw();
     return found;

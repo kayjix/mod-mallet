@@ -24,6 +24,7 @@ import { CELL } from "./map-places";
 import { moveKeysOf, moveOf } from "./moves";
 import { matchKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
+import { watchView } from "./render-stats";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 export interface InteriorViewProps {
@@ -277,6 +278,8 @@ export function InteriorView({
   }, [draw]);
   const redrawNow = useRef(redraw);
   redrawNow.current = redraw;
+  const drawNow = useRef(draw);
+  drawNow.current = draw;
 
   useEffect(() => {
     pathsLayer.current?.set(paths);
@@ -323,7 +326,9 @@ export function InteriorView({
     } catch {
       pathsLayer.current = null;
     }
+    const unwatch = watchView("interior", gl, () => drawNow.current());
     return () => {
+      unwatch();
       layer.current?.dispose();
       layer.current = null;
       pathsLayer.current?.dispose();

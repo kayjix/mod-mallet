@@ -5,6 +5,7 @@ import type { RenderedPlaces } from "./generated/rendered-places";
 import { applyTheme, initialTheme, type Lang, languages, type Theme } from "./i18n";
 import { InfoTip } from "./info-tip";
 import { Places } from "./Places";
+import { graphicsCard } from "./render-stats";
 
 interface SettingsProps {
   places: RenderedPlaces | null;
@@ -47,6 +48,8 @@ export function SettingsView({
   const [tab, setTab] = useState<Tab>("general");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [logFile, setLogFile] = useState<string | null>(null);
+  // Asked once: a drawing context of its own tells which card draws.
+  const [card] = useState(graphicsCard);
 
   useEffect(() => {
     api
@@ -168,6 +171,7 @@ export function SettingsView({
                     : new Date(__MALLET_COMMIT_DATE__).toLocaleDateString(lang),
                 )}
               </p>
+              <p className="about-version">{t.aboutGraphics(card.renderer, card.software)}</p>
             </div>
           </div>
         </section>

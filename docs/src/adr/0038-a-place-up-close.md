@@ -1,6 +1,6 @@
 # 0038 A place up close: the objects themselves around a point
 
-- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): the order in which a placed object is turned
+- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): the order in which a placed object is turned; by [ADR 0075](0075-one-call-per-material-for-a-place-up-close.md): one call per material instead of one per model's shape
 - Date: 2026-11-17
 - Changes: ADR 0011 (no renderer of our own), for a small area around a point
 

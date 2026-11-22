@@ -76,6 +76,8 @@ export interface Texts {
   aboutText: string;
   /** The app's version, and which build of it this is (ADR 0057). */
   aboutVersion: (version: string, commit: string | null, date: string | null) => string;
+  /** Which graphics card draws the 3D views, and whether it is one at all. */
+  aboutGraphics: (renderer: string | null, software: boolean) => string;
   viewToolbox: string;
   viewSettings: string;
   restartVortex: string;
@@ -423,6 +425,12 @@ export const texts: Record<Lang, Texts> = {
       commit === null
         ? `Version ${version}, development build`
         : `Version ${version}, build ${commit}${date === null ? "" : ` of ${date}`}`,
+    aboutGraphics: (renderer, software) =>
+      renderer === null
+        ? "3D views: no graphics card found to draw them"
+        : software
+          ? `3D views drawn without the graphics card, slowly: ${renderer}`
+          : `3D views drawn by: ${renderer}`,
     viewToolbox: "Toolbox",
     viewSettings: "Settings",
     restartVortex: "Restart Vortex",
@@ -889,6 +897,12 @@ export const texts: Record<Lang, Texts> = {
       commit === null
         ? `Version ${version}, Entwicklungsstand`
         : `Version ${version}, Build ${commit}${date === null ? "" : ` vom ${date}`}`,
+    aboutGraphics: (renderer, software) =>
+      renderer === null
+        ? "3D-Ansichten: keine Grafikkarte gefunden, die sie zeichnet"
+        : software
+          ? `3D-Ansichten ohne Grafikkarte gezeichnet, langsam: ${renderer}`
+          : `3D-Ansichten gezeichnet von: ${renderer}`,
     viewToolbox: "Werkzeugkasten",
     viewSettings: "Einstellungen",
     restartVortex: "Vortex neu starten",

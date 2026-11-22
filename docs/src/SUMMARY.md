@@ -88,6 +88,7 @@
   - [0072 Passages where two mods build the same](adr/0072-passages-where-two-mods-build-the-same.md)
   - [0073 Switched-off mods are taken out through Vortex's plugin list](adr/0073-switched-off-mods-taken-out-through-vortex.md)
   - [0074 The level of detail makes room for the real objects](adr/0074-level-of-detail-makes-room-for-real-objects.md)
+  - [0075 A place up close is drawn with one call per material](adr/0075-one-call-per-material-for-a-place-up-close.md)
   - [Template](adr/template.md)
 
 # Reference

@@ -53,6 +53,7 @@ import { matchKey, pinsOf, spotKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { RealTops } from "./real-tops";
+import { watchView } from "./render-stats";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 interface MapView3DProps {
@@ -1025,6 +1026,8 @@ export function MapView3D({
       draw();
     });
   }, [draw]);
+  const drawNow = useRef(draw);
+  drawNow.current = draw;
 
   useEffect(() => {
     pathsLayer.current?.set(paths);
@@ -1173,6 +1176,7 @@ export function MapView3D({
       area.current = null;
     }
     tops.current = new RealTops(gl);
+    const unwatch = watchView("map", gl, () => drawNow.current());
     try {
       pathsLayer.current = new PathsLayer(gl);
       pathsLayer.current.set(pathsNow.current);
@@ -1222,6 +1226,7 @@ export function MapView3D({
       .catch(() => {});
     return () => {
       gone = true;
+      unwatch();
       lod.current?.dispose();
       lod.current = null;
       area.current?.dispose();
