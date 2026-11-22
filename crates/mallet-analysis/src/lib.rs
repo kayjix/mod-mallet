@@ -46,6 +46,7 @@ pub mod recommendations;
 pub mod setup;
 pub mod switched_off;
 mod tin;
+pub mod versions;
 pub mod walkways;
 
 use std::cell::OnceCell;
@@ -109,6 +110,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
     vec![
         Box::new(setup::SetupProblems),
         Box::new(extender::ExtenderPlugins),
+        Box::new(versions::VersionChecks),
         Box::new(masters::MissingMasters),
         Box::new(generated::GeneratedPlugins),
         Box::new(knowledge::KnownRules),

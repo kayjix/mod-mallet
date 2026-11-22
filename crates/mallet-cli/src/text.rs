@@ -17,6 +17,9 @@ pub fn write_report(
     out: &mut dyn Write,
 ) -> io::Result<()> {
     write_header(report, messages, out)?;
+    if let Some(changes) = &report.version_changes {
+        writeln!(out, "{}", version_changes(changes, messages))?;
+    }
     writeln!(out)?;
 
     if report.findings.is_empty() {
@@ -80,6 +83,62 @@ pub fn write_report(
     }
     writeln!(out, "{}", messages.text("report-explain-hint", &[]))?;
     Ok(())
+}
+
+/// What changed in the versions since the last scan, in one sentence
+/// (ADR 0079).
+fn version_changes(changes: &mallet_core::VersionChanges, messages: &Messages) -> String {
+    let count = |len: usize| ArgValue::Number(i64::try_from(len).unwrap_or(i64::MAX));
+    let step = |id: &str, step: &mallet_core::VersionStep| {
+        messages.text(
+            id,
+            &[
+                ("from", ArgValue::from(step.from.as_str())),
+                ("to", ArgValue::from(step.to.as_str())),
+            ],
+        )
+    };
+    let mut parts = Vec::new();
+    if let Some(game) = &changes.game {
+        parts.push(step("report-version-game", game));
+    }
+    if let Some(extender) = &changes.extender {
+        parts.push(step("report-version-extender", extender));
+    }
+    if !changes.plugins.is_empty() {
+        parts.push(messages.text(
+            "report-version-plugins",
+            &[("count", count(changes.plugins.len()))],
+        ));
+    }
+    if !changes.mods.is_empty() {
+        parts.push(messages.text(
+            "report-version-mods",
+            &[("count", count(changes.mods.len()))],
+        ));
+    }
+    if changes.foundation_unfit {
+        parts.push(messages.text("report-version-foundation", &[]));
+    }
+    if !changes.unfit.is_empty() {
+        parts.push(messages.text(
+            "report-version-unfit",
+            &[
+                ("count", count(changes.unfit.len())),
+                ("files", ArgValue::from(changes.unfit.join(", "))),
+            ],
+        ));
+    }
+    messages.text(
+        "report-version-since",
+        &[
+            (
+                "since",
+                ArgValue::from(if changes.since == 0 { "start" } else { "scan" }),
+            ),
+            ("changes", ArgValue::from(parts.join("; "))),
+        ],
+    )
 }
 
 /// Writes the places the scan looked at, one per line.

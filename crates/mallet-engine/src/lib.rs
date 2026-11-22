@@ -322,6 +322,23 @@ fn scan_with(
     facts.installers = installers;
     facts.switched_off_plugins =
         switched_off::plugins(game, &game_dir, &facts.plugins, mods.as_ref());
+    // The versions as the files tell them now, and what changed since the
+    // last stored scan (ADR 0079).
+    facts.versions = read_versions(game, &game_dir, &virtual_data);
+    facts.versions.newer_versions = mod_infos
+        .iter()
+        .filter_map(|info| Some((info.mod_ref.id.clone(), info.newer_version.clone()?)))
+        .collect();
+    let snapshot = mallet_analysis::versions::snapshot(&facts);
+    let previous = store.and_then(|store| {
+        store
+            .load_scan_without_findings()
+            .map_err(|error| tracing::info!(%error, "the last report is not compared"))
+            .ok()
+            .flatten()
+    });
+    facts.versions.changes =
+        mallet_analysis::versions::changes(previous.as_ref(), &snapshot, &mod_infos, now());
     tracing::info!(
         plugins = facts.plugins.len(),
         archives = facts.archives.len(),
@@ -371,6 +388,11 @@ fn scan_with(
     let started = Instant::now();
     let context = Context::new(&facts, mods.as_ref());
     let findings = mallet_analysis::run_all(&context);
+    let version_changes = facts
+        .versions
+        .changes
+        .clone()
+        .map(|changes| mallet_analysis::versions::with_unfit(changes, &findings));
     let map = mallet_analysis::map::world_map(&context);
     let duels = mallet_analysis::duels::duels(&findings, &context);
     let shipped = mallet_game_bethesda::locate::shipped_plugins(game, &game_dir);
@@ -391,11 +413,15 @@ fn scan_with(
         game: GameInfo {
             id: game.id().to_owned(),
             name: game.name().to_owned(),
-            version: extender.and_then(|report| report.game_version.clone()),
-            extender_version: extender.and_then(|report| report.extender_version.clone()),
+            version: snapshot.game.clone(),
+            extender_version: snapshot.extender.clone(),
             unreal_visuals: !game.draws_its_data(),
         },
-        extender_plugins_checked: extender.map_or(0, |report| count(report.plugins.len())),
+        // The plugins read from their files, or else those the log names.
+        extender_plugins_checked: match read_plugins(&facts) {
+            0 => extender.map_or(0, |report| count(report.plugins.len())),
+            read => read,
+        },
         plugins_checked: count(facts.plugins.len()),
         archives_checked: count(facts.archives.len()),
         installers_checked: count(facts.installers.len()),
@@ -411,7 +437,46 @@ fn scan_with(
         switched_off_plugins: facts.switched_off_plugins.clone(),
         manager: Some(options.manager.id().to_owned()),
         load_order,
+        versions: snapshot,
+        version_changes,
     })
+}
+
+/// The versions of the game, its script extender and the extender's
+/// plugins, from their files as they are now (ADR 0079). The plugins are
+/// looked for where the game sees them: in the folders a mod manager lays
+/// over the data directory first, then in the data directory.
+fn read_versions(
+    game: Game,
+    game_dir: &Path,
+    virtual_data: &VirtualData,
+) -> mallet_core::facts::VersionFacts {
+    let started = Instant::now();
+    let install = locate::install_dir(game, game_dir);
+    let plugin_dir = GamePath::new(game.script_extender().plugin_dir);
+    let mut dirs: Vec<PathBuf> = plugin_dir
+        .strip_base(&GamePath::new("data"))
+        .map_or_default(|below| {
+            virtual_data
+                .folders
+                .iter()
+                .map(|folder| folder.join(below.as_str()))
+                .collect()
+        });
+    dirs.push(install.join(plugin_dir.as_str()));
+    let versions = mallet_game_bethesda::versions::read(game, &install, &dirs);
+    tracing::info!(
+        game = ?versions.game.map(|version| version.to_string()),
+        extender = ?versions
+            .extender
+            .as_ref()
+            .and_then(|extender| extender.version)
+            .map(|version| version.to_string()),
+        plugins = versions.native_plugins.len(),
+        elapsed_ms = started.elapsed().as_millis(),
+        "read the versions of the game and its script extender's plugins"
+    );
+    versions
 }
 
 /// Whether Base Object Swapper is in the game's data directory, or in a
@@ -941,4 +1006,25 @@ fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs())
+}
+
+/// How many DLLs of the script extender's plugin folder were read as
+/// plugins from their files (ADR 0079).
+fn read_plugins(facts: &Facts) -> u32 {
+    use mallet_core::facts::versions::PluginDeclaration;
+    count(
+        facts
+            .versions
+            .native_plugins
+            .iter()
+            .filter(|plugin| {
+                matches!(
+                    plugin.declaration,
+                    PluginDeclaration::VersionData(_)
+                        | PluginDeclaration::QueryOnly
+                        | PluginDeclaration::Library
+                )
+            })
+            .count(),
+    )
 }

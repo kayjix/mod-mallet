@@ -6,7 +6,7 @@ use mallet_core::{Tool, ToolGroup, ToolNeed, ToolState};
 use std::path::Path;
 
 use mallet_game_bethesda::tools::ListedTool;
-use mallet_game_bethesda::{locate, skse_log, tools};
+use mallet_game_bethesda::{Game, locate, skse_log, tools, versions};
 use mallet_source_vortex::VortexTool;
 use mallet_source_vortex::app;
 use mallet_source_vortex::link::{self, Link};
@@ -37,17 +37,25 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
         vortex(manager)
     };
     if let (Ok(game), Some((game_dir, _))) = (scan.game(), scan.located_game_dir()) {
-        let game_version = scan
-            .extender_log
-            .clone()
-            .or_else(|| locate::extender_log(game, Some(&game_dir)))
-            .and_then(|path| std::fs::read_to_string(path).ok())
-            .and_then(|text| skse_log::parse(game, &text).game_version);
+        // The version the game's program has now, which a Steam update
+        // changes before the game is started again; else the one the
+        // extender logged at the last start (ADR 0079).
+        let install = locate::install_dir(game, &game_dir);
+        let game_version = versions::game_version(game, &install)
+            .map(|version| version.to_string())
+            .or_else(|| {
+                scan.extender_log
+                    .clone()
+                    .or_else(|| locate::extender_log(game, Some(&game_dir)))
+                    .and_then(|path| std::fs::read_to_string(path).ok())
+                    .and_then(|text| skse_log::parse(game, &text).game_version)
+            });
         found.extend(tools::requirements(
             game,
             &game_dir,
             game_version.as_deref(),
         ));
+        found.extend(version_tools(game, &install));
         // Vortex has LOOT built in; then LOOT on its own is not needed.
         if let Some(built_in) = loot_in_vortex(manager, scan.game_id()).filter(|_| !manager.by_hand)
             && let Some(loot) = found.iter_mut().find(|tool| tool.id == "loot")
@@ -107,6 +115,100 @@ pub fn toolbox(scan: &ScanOptions, manager: &ManagerOptions) -> Vec<Tool> {
         .with_path(unpacker.map(|unpacker| unpacker.program().display().to_string())),
     );
     found
+}
+
+/// Libraries many script extender plugins and mods need, by the file of
+/// their plugin, with their identifier in the toolbox and their page. Only
+/// those that are installed are shown (ADR 0079).
+const LIBRARIES: [(&str, &str, &str); 3] = [
+    (
+        "PapyrusUtil.dll",
+        "papyrus-util",
+        "https://www.nexusmods.com/skyrimspecialedition/mods/13048",
+    ),
+    (
+        "po3_PapyrusExtender.dll",
+        "papyrus-extender",
+        "https://www.nexusmods.com/skyrimspecialedition/mods/22854",
+    ),
+    (
+        "JContainers64.dll",
+        "jcontainers",
+        "https://www.nexusmods.com/skyrimspecialedition/mods/16495",
+    ),
+];
+
+/// The lines of the toolbox about versions (ADR 0079): how many of the
+/// script extender's plugins fit the game version now, and the libraries
+/// most plugins need, each with whether it fits.
+fn version_tools(game: Game, install: &Path) -> Vec<Tool> {
+    use mallet_analysis::versions::{Verdict, verdict};
+    use mallet_core::facts::versions::PluginDeclaration;
+
+    let dirs = [install.join(game.script_extender().plugin_dir)];
+    let facts = versions::read(game, install, &dirs);
+    let Some(game_version) = facts.game else {
+        return Vec::new();
+    };
+    let extender = facts
+        .extender
+        .as_ref()
+        .and_then(|extender| extender.version);
+    let fits = |declaration: &PluginDeclaration| {
+        verdict(declaration, game_version, extender) == Verdict::Fits
+    };
+    let plugins: Vec<_> = facts
+        .native_plugins
+        .iter()
+        .filter(|plugin| {
+            matches!(
+                plugin.declaration,
+                PluginDeclaration::VersionData(_) | PluginDeclaration::QueryOnly
+            )
+        })
+        .collect();
+    let mut tools = Vec::new();
+    if !plugins.is_empty() {
+        let fitting = plugins
+            .iter()
+            .filter(|plugin| fits(&plugin.declaration))
+            .count();
+        let state = if fitting == plugins.len() {
+            ToolState::Ready
+        } else {
+            ToolState::Outdated
+        };
+        tools.push(
+            Tool::new("extender-plugins", ToolNeed::Required, state).with_version(Some(format!(
+                "{fitting}/{} → {game_version}",
+                plugins.len()
+            ))),
+        );
+    }
+    if game != Game::SkyrimSe {
+        return tools;
+    }
+    for (file, id, page) in LIBRARIES {
+        let Some(plugin) = facts
+            .native_plugins
+            .iter()
+            .find(|plugin| plugin.file_name.eq_ignore_ascii_case(file))
+        else {
+            continue;
+        };
+        let state = if fits(&plugin.declaration) {
+            ToolState::Ready
+        } else {
+            ToolState::Outdated
+        };
+        tools.push(
+            Tool::new(id, ToolNeed::Recommended, state)
+                .with_page(page)
+                .with_version(plugin.file_version.clone())
+                .with_path(Some(dirs[0].join(&plugin.file_name).display().to_string())),
+        );
+    }
+    tools
 }
 
 /// The modding tools Vortex lists for the game on its dashboard, as the

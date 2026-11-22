@@ -117,6 +117,17 @@
       "items": {
         "$ref": "#/$defs/UnrealPak"
       }
+    },
+    "versionChanges": {
+      "description": "What changed in the versions since an earlier scan, and what of it\nno longer fits (ADR 0079).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VersionChanges"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -1575,6 +1586,29 @@
         "name"
       ]
     },
+    "ModStep": {
+      "description": "A mod that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "mod": {
+          "description": "The mod.",
+          "$ref": "#/$defs/ModRef"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mod",
+        "from",
+        "to"
+      ]
+    },
     "Moves": {
       "description": "The moves to carry into the game, as one plugin.",
       "type": "object",
@@ -2266,6 +2300,29 @@
           "type": "string",
           "const": "removed"
         }
+      ]
+    },
+    "PluginStep": {
+      "description": "A script extender plugin that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Its file name.",
+          "type": "string"
+        },
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "from",
+        "to"
       ]
     },
     "RecordChange": {
@@ -3064,6 +3121,93 @@
         "folder",
         "extensions",
         "bytes"
+      ]
+    },
+    "VersionChanges": {
+      "description": "What changed in the versions of a setup since an earlier scan, and what\nof it no longer fits (ADR 0079).\n\nA change is kept from scan to scan while something it broke is still\nbroken, and for [`VersionChanges::KEPT_FOR`] seconds after it was first\nnoticed, so that scanning again does not hide it at once.",
+      "type": "object",
+      "properties": {
+        "extender": {
+          "description": "The script extender's update, if it was updated.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "foundationUnfit": {
+          "description": "Whether the script extender, or the Address Library most of its\nplugins need, does not support the game version now, so that more\nthan the plugins named in [`VersionChanges::unfit`] stops working.",
+          "type": "boolean"
+        },
+        "game": {
+          "description": "The game's update, if it was updated.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mods": {
+          "description": "The mods the mod manager updated.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModStep"
+          }
+        },
+        "noticed": {
+          "description": "When a scan first noticed the change.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "plugins": {
+          "description": "The script extender plugins whose files changed version.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginStep"
+          }
+        },
+        "since": {
+          "description": "When the scan ran that saw the versions before, in seconds since\n1970-01-01 UTC; `0` when the earlier versions come from the script\nextender's log instead of a scan.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "unfit": {
+          "description": "The script extender plugins that do not fit the setup now, by file\nname: filled in from the findings of this scan.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "since",
+        "noticed"
+      ]
+    },
+    "VersionStep": {
+      "description": "One thing that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
       ]
     },
     "WorldMap": {

@@ -41,6 +41,13 @@ fn finding_for(
 
     let finding = match &plugin.status {
         ExtenderPluginStatus::Loaded => return None,
+        // The version checks read the file as it is now, and speak for it
+        // (ADR 0079).
+        ExtenderPluginStatus::IncompatibleGameVersion | ExtenderPluginStatus::NoVersionData
+            if crate::versions::covers(context, file) =>
+        {
+            return None;
+        }
         ExtenderPluginStatus::IncompatibleGameVersion => {
             Finding::new(&kinds::EXTENDER_PLUGIN_INCOMPATIBLE, subject)
                 .with_arg("file", file)

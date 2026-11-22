@@ -8,6 +8,19 @@ in [Releases](docs/src/contributing/releases.md).
 
 ### Added
 
+- After a Steam update of Skyrim Special Edition, Mod Mallet says which
+  script extender plugins no longer fit before you start the game: it reads
+  the game's version from its program and what each plugin says about the
+  game versions it was built for. Each finding says how bad it is and the
+  way out: wait for the author's usual quick rebuild, install a newer
+  version Vortex already knows, switch the mod off on a click, or roll the
+  game back. The script extender, the Address Library, plugins made for the
+  game before 1.6, plugins that need a newer script extender, patches whose
+  masters were updated under them and LOOT's warnings about versions are
+  checked too. The overview shows at the top what changed since your last
+  scan ("the game updated from 1.6.1170 to 1.7.104; these 4 plugins no
+  longer fit"), and the toolbox counts the plugins that fit and shows
+  PapyrusUtil, powerofthree's Papyrus Extender and JContainers.
 - A mod you switched off that the game still loads, because Vortex left an
   old copy of its plugin in the Data folder, now gets a way out: on a
   click, Vortex switches that plugin off in its list of plugins, together

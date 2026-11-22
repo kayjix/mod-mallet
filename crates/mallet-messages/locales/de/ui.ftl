@@ -64,6 +64,29 @@ report-meshes-compared =
        *[other] { $count } Ersatz-Modelle mit dem Original verglichen
     }
 report-no-extender-log = Der Script Extender hat kein Protokoll geschrieben, seine Plugins wurden deshalb nicht geprüft.
+report-version-since =
+    { $since ->
+        [start] Seit dem letzten Spielstart
+       *[scan] Seit dem letzten Scan
+    }: { $changes }.
+report-version-game = das Spiel ging von { $from } auf { $to }
+report-version-extender = der Script Extender ging von { $from } auf { $to }
+report-version-plugins =
+    { $count ->
+        [one] 1 Script-Extender-Plugin wurde aktualisiert
+       *[other] { $count } Script-Extender-Plugins wurden aktualisiert
+    }
+report-version-mods =
+    { $count ->
+        [one] 1 Mod wurde aktualisiert
+       *[other] { $count } Mods wurden aktualisiert
+    }
+report-version-unfit =
+    { $count ->
+        [one] 1 Plugin passt nicht mehr
+       *[other] { $count } Plugins passen nicht mehr
+    }: { $files }
+report-version-foundation = der Script Extender oder die Address Library unterstützt die Spielversion noch nicht
 report-no-findings = Keine Probleme gefunden.
 report-totals =
     { $errors ->
@@ -274,6 +297,14 @@ tool-skse-name = Skyrim Script Extender (SKSE)
 tool-skse-purpose = Erlaubt Mods, dem Spiel Programmcode hinzuzufügen. Braucht eine Fassung genau für deine Spielversion; Steam-Updates legen ihn lahm, bis SKSE nachzieht.
 tool-address-library-name = Address Library for SKSE Plugins
 tool-address-library-purpose = Sagt SKSE-Plugins, wo in deiner Spielversion was liegt, damit sie kleine Spielupdates überstehen. Die meisten SKSE-Plugins brauchen sie.
+tool-extender-plugins-name = Script-Extender-Plugins
+tool-extender-plugins-purpose = Die Plugins (DLL-Dateien), die deine Mods über den Script Extender mitbringen, und wie viele davon jetzt zur Spielversion passen. Eines, das nicht passt, wird beim Start des Spiels abgeschaltet; die Aufgabenliste sagt, welches und was zu tun ist.
+tool-papyrus-util-name = PapyrusUtil
+tool-papyrus-util-purpose = Eine Bibliothek, mit der die Skripte vieler Mods Daten speichern und nachschlagen. Mods, die sie brauchen, funktionieren nicht mehr, wenn sie nicht zur Spielversion passt.
+tool-papyrus-extender-name = powerofthree's Papyrus Extender
+tool-papyrus-extender-purpose = Eine Bibliothek, die den Skripten von Mods viele weitere Funktionen gibt. Viele Mods brauchen sie und funktionieren nicht mehr, wenn sie nicht zur Spielversion passt.
+tool-jcontainers-name = JContainers
+tool-jcontainers-purpose = Eine Bibliothek, mit der die Skripte von Mods Listen und Tabellen von Daten führen. Mods, die sie brauchen, funktionieren nicht mehr, wenn sie nicht zur Spielversion passt.
 tool-vc-runtime-name = Microsoft Visual C++ Redistributable
 tool-vc-runtime-purpose = Ein Windows-Baustein, mit dem fast jedes Script-Extender-Plugin gebaut ist. Ohne ihn laden diese Plugins nicht.
 tool-base-object-swapper-name = Base Object Swapper

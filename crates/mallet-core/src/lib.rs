@@ -39,6 +39,7 @@ pub mod reach;
 pub mod report;
 pub mod toolbox;
 pub mod unreal;
+pub mod versions;
 pub mod walkway_repair;
 
 pub use action::{Action, ActionOutcome, ActionStatus, ObjectRef, OptionToTick};
@@ -63,3 +64,6 @@ pub use report::{
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};
 pub use unreal::{PakFolder, UnrealPak};
+pub use versions::{
+    ModStep, PluginStep, PluginVersion, VersionChanges, VersionSnapshot, VersionStep,
+};

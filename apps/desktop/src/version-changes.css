@@ -1,0 +1,43 @@
+/* The banner about what a game or mod update changed (ADR 0079). */
+
+.version-changes {
+  --tone: var(--ok);
+  border-left: 4px solid var(--tone);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+}
+
+.version-changes[data-tone="error"] {
+  --tone: var(--error);
+}
+
+.version-changes h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.version-changes p {
+  margin: 0;
+}
+
+.version-changes-foundation {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.version-changes-list,
+.version-changes-updated {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.version-changes-mod {
+  color: var(--muted);
+}
+
+.version-changes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

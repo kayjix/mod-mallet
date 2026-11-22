@@ -203,6 +203,12 @@ pub fn read(
                     })
                 })
                 .collect();
+            knowledge.version_messages = general
+                .iter()
+                .filter(|general| general.condition().is_some_and(is_about_versions))
+                .filter_map(message)
+                .filter(|message| message.level >= MessageLevel::Warning)
+                .collect();
         }
         Err(error) => tracing::warn!(%error, "LOOT's general messages could not be evaluated"),
     }
@@ -236,6 +242,13 @@ fn plugins_named(condition: &str, plugins: &[PluginFacts]) -> Vec<String> {
         }
     }
     named
+}
+
+/// Whether a LOOT condition is about the version of a file, such as the
+/// game's program or the script extender's loader, and names no plugin:
+/// a message about the setup's versions (ADR 0079).
+fn is_about_versions(condition: &str) -> bool {
+    condition.contains("version(") && !condition.contains("active(")
 }
 
 /// A message of LOOT as plain English text, or `None` if it has none.
@@ -548,6 +561,39 @@ globals:
             "Use the Series Patch Collection (https://example.org/series)."
         );
         assert_eq!(general.plugins, ["Hall.esp", "Inn.esp"]);
+    }
+
+    #[test]
+    fn warnings_about_versions_are_read_apart() {
+        let setup = Setup::new(&["City.esp"], &["SKSE/Plugins/marker.txt"]);
+        let masterlist = setup.masterlist(
+            r#"
+globals:
+  - type: warn
+    content: 'An older version of **the script extender** is installed.'
+    condition: 'file("SKSE/Plugins/marker.txt") or version("../loader.exe", <, "0.2.3.1")'
+  - type: say
+    content: 'The script extender is up to date.'
+    condition: 'file("SKSE/Plugins/marker.txt") or version("../loader.exe", >=, "0.2.3.1")'
+  - type: warn
+    content: 'Not about versions.'
+    condition: 'file("SKSE/Plugins/marker.txt")'
+"#,
+        );
+        let knowledge = setup.read(&masterlist, &["City.esp"]);
+        assert_eq!(
+            knowledge.version_messages,
+            [KnownMessage {
+                level: MessageLevel::Warning,
+                text: "An older version of the script extender is installed.".to_owned(),
+            }]
+        );
+        assert!(is_about_versions(
+            r#"product_version("../SkyrimSE.exe", ==, "1.7.104.0")"#
+        ));
+        assert!(!is_about_versions(
+            r#"active("x.esp") and version("x.esp", <, "1.0")"#
+        ));
     }
 
     #[test]

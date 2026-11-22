@@ -14,6 +14,7 @@ import { useReviewTexts } from "./review-texts";
 import "./journey.css";
 import "./overview.css";
 import { LoadingScreen } from "./LoadingMallet";
+import { VersionChanges } from "./version-changes";
 
 /** The pages the overview leads to. */
 export type OverviewTarget = Target | "map" | "assets" | "toolbox" | "review";
@@ -216,6 +217,7 @@ export function Overview({
   return (
     <div className="stack">
       {banner}
+      <VersionChanges report={report} onTasks={() => onOpen("tasks")} />
       <HealthPanel health={health} onOpen={onOpen} />
       <div className="overview-tiles">
         {tiles.map((tile) => (

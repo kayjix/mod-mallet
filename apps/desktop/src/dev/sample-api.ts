@@ -637,6 +637,14 @@ function report(lang: Lang): RenderedReport {
     // Two of the three suggested objects, and one whose collision is gone.
     duels: sampleDuels(lang),
     loadOrder: sampleLoadOrder(),
+    // Steam updated the game since the scan the day before (ADR 0079).
+    versionChanges: {
+      since: 1794609181,
+      noticed: 1794695581,
+      game: { from: "1.6.1170", to: "1.7.104" },
+      plugins: [{ file: "Fixes.dll", from: "1.2.0.0", to: "1.3.0.0" }],
+      unfit: ["Old.dll"],
+    },
     installedPatch: {
       objects: [
         { plugin: "Gone Mod.esp", localId: 0x10 },

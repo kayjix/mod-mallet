@@ -346,6 +346,10 @@ pub struct RenderedReport {
     /// The active plugins in load order, each with the plugins it needs.
     #[serde(default)]
     pub load_order: Vec<LoadedPlugin>,
+    /// What changed in the versions since an earlier scan, and what of it
+    /// no longer fits (ADR 0079).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_changes: Option<mallet_core::VersionChanges>,
     /// The findings with their texts, most severe first.
     pub findings: Vec<RenderedFinding>,
 }
@@ -814,6 +818,7 @@ impl Messages {
                     .collect()
             },
             load_order: report.load_order.clone(),
+            version_changes: report.version_changes.clone(),
         }
     }
 

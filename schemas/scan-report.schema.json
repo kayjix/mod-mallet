@@ -141,6 +141,24 @@
       "items": {
         "$ref": "#/$defs/UnrealPak"
       }
+    },
+    "versionChanges": {
+      "description": "What changed in the versions since an earlier scan, and what of it\nno longer fits (ADR 0079).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VersionChanges"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "versions": {
+      "description": "The versions this scan saw, for the next scan to compare with\n(ADR 0079).",
+      "$ref": "#/$defs/VersionSnapshot",
+      "default": {
+        "plugins": []
+      }
     }
   },
   "required": [
@@ -1575,6 +1593,29 @@
         "name"
       ]
     },
+    "ModStep": {
+      "description": "A mod that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "mod": {
+          "description": "The mod.",
+          "$ref": "#/$defs/ModRef"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mod",
+        "from",
+        "to"
+      ]
+    },
     "Moves": {
       "description": "The moves to carry into the game, as one plugin.",
       "type": "object",
@@ -2268,6 +2309,49 @@
         }
       ]
     },
+    "PluginStep": {
+      "description": "A script extender plugin that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Its file name.",
+          "type": "string"
+        },
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "from",
+        "to"
+      ]
+    },
+    "PluginVersion": {
+      "description": "A script extender plugin and its version.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Its file name.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Its file version, if it has one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "file"
+      ]
+    },
     "RecordChange": {
       "description": "A change to a record that merging doors needs. Mod Mallet writes such\nchanges as overrides in a plugin of its own (ADR 0060); the record is\ncopied from the version the game uses and only the named field changes.",
       "oneOf": [
@@ -2908,6 +2992,128 @@
         "folder",
         "extensions",
         "bytes"
+      ]
+    },
+    "VersionChanges": {
+      "description": "What changed in the versions of a setup since an earlier scan, and what\nof it no longer fits (ADR 0079).\n\nA change is kept from scan to scan while something it broke is still\nbroken, and for [`VersionChanges::KEPT_FOR`] seconds after it was first\nnoticed, so that scanning again does not hide it at once.",
+      "type": "object",
+      "properties": {
+        "extender": {
+          "description": "The script extender's update, if it was updated.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "foundationUnfit": {
+          "description": "Whether the script extender, or the Address Library most of its\nplugins need, does not support the game version now, so that more\nthan the plugins named in [`VersionChanges::unfit`] stops working.",
+          "type": "boolean"
+        },
+        "game": {
+          "description": "The game's update, if it was updated.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mods": {
+          "description": "The mods the mod manager updated.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModStep"
+          }
+        },
+        "noticed": {
+          "description": "When a scan first noticed the change.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "plugins": {
+          "description": "The script extender plugins whose files changed version.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginStep"
+          }
+        },
+        "since": {
+          "description": "When the scan ran that saw the versions before, in seconds since\n1970-01-01 UTC; `0` when the earlier versions come from the script\nextender's log instead of a scan.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "unfit": {
+          "description": "The script extender plugins that do not fit the setup now, by file\nname: filled in from the findings of this scan.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "since",
+        "noticed"
+      ]
+    },
+    "VersionSnapshot": {
+      "description": "The versions one scan saw, kept with its report so that the next scan\ncan say what changed.",
+      "type": "object",
+      "properties": {
+        "extender": {
+          "description": "The script extender's version.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "game": {
+          "description": "The game's version as its program told it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastStarted": {
+          "description": "The game's version the script extender logged at the last start of\nthe game, which is older than [`VersionSnapshot::game`] when the\ngame was updated and not started since.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plugins": {
+          "description": "The script extender's plugins with their file versions, by file\nname.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PluginVersion"
+          }
+        }
+      }
+    },
+    "VersionStep": {
+      "description": "One thing that went from one version to another.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The version before.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The version now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
       ]
     },
     "WorldMap": {

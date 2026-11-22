@@ -12,6 +12,7 @@ pub mod models;
 pub mod navmeshes;
 pub mod objects;
 pub mod terrain;
+pub mod versions;
 
 use crate::GamePath;
 
@@ -24,6 +25,7 @@ pub use models::ModelFacts;
 pub use navmeshes::NavmeshFacts;
 pub use objects::ObjectFacts;
 pub use terrain::TerrainFacts;
+pub use versions::VersionFacts;
 
 /// Everything known about one setup at the time of a scan.
 ///
@@ -80,6 +82,9 @@ pub struct Facts {
     /// Every door, where it leads and which paths go through it
     /// (ADR 0067).
     pub doors: DoorFacts,
+    /// The versions of the game, its script extender and the extender's
+    /// plugins, as their files tell them now (ADR 0079).
+    pub versions: VersionFacts,
 }
 
 /// The surface textures a mesh names.

@@ -236,6 +236,11 @@ export interface RenderedReport {
    * The mods for the game's Unreal Engine side (ADR 0065).
    */
   unrealPaks?: UnrealPak[];
+  /**
+   * What changed in the versions since an earlier scan, and what of it
+   * no longer fits (ADR 0079).
+   */
+  versionChanges?: VersionChanges | null;
 }
 /**
  * A duel between two mods, in words.
@@ -2232,4 +2237,112 @@ export interface UnrealPak {
    * The mod its `.pak` file came from, if the mod manager knows.
    */
   provider?: ModRef3 | null;
+}
+/**
+ * What changed in the versions of a setup since an earlier scan, and what
+ * of it no longer fits (ADR 0079).
+ *
+ * A change is kept from scan to scan while something it broke is still
+ * broken, and for [`VersionChanges::KEPT_FOR`] seconds after it was first
+ * noticed, so that scanning again does not hide it at once.
+ */
+export interface VersionChanges {
+  /**
+   * The script extender's update, if it was updated.
+   */
+  extender?: VersionStep | null;
+  /**
+   * Whether the script extender, or the Address Library most of its
+   * plugins need, does not support the game version now, so that more
+   * than the plugins named in [`VersionChanges::unfit`] stops working.
+   */
+  foundationUnfit?: boolean;
+  /**
+   * The game's update, if it was updated.
+   */
+  game?: VersionStep | null;
+  /**
+   * The mods the mod manager updated.
+   */
+  mods?: ModStep[];
+  /**
+   * When a scan first noticed the change.
+   */
+  noticed: number;
+  /**
+   * The script extender plugins whose files changed version.
+   */
+  plugins?: PluginStep[];
+  /**
+   * When the scan ran that saw the versions before, in seconds since
+   * 1970-01-01 UTC; `0` when the earlier versions come from the script
+   * extender's log instead of a scan.
+   */
+  since: number;
+  /**
+   * The script extender plugins that do not fit the setup now, by file
+   * name: filled in from the findings of this scan.
+   */
+  unfit?: string[];
+}
+/**
+ * One thing that went from one version to another.
+ */
+export interface VersionStep {
+  /**
+   * The version before.
+   */
+  from: string;
+  /**
+   * The version now.
+   */
+  to: string;
+}
+/**
+ * A mod that went from one version to another.
+ */
+export interface ModStep {
+  /**
+   * The version before.
+   */
+  from: string;
+  mod: ModRef6;
+  /**
+   * The version now.
+   */
+  to: string;
+}
+/**
+ * A mod as a mod manager knows it.
+ */
+export interface ModRef6 {
+  /**
+   * The manager's own identifier of the mod.
+   */
+  id: string;
+  /**
+   * The name to show to people.
+   */
+  name: string;
+  /**
+   * The manager that knows this mod, for example `vortex`.
+   */
+  source: string;
+}
+/**
+ * A script extender plugin that went from one version to another.
+ */
+export interface PluginStep {
+  /**
+   * Its file name.
+   */
+  file: string;
+  /**
+   * The version before.
+   */
+  from: string;
+  /**
+   * The version now.
+   */
+  to: string;
 }

@@ -18,6 +18,9 @@ pub struct KnowledgeFacts {
     /// plugins in their conditions, such as a patch collection for a
     /// series of mods.
     pub general: Vec<GeneralMessage>,
+    /// LOOT's general warnings that apply to this setup because of the
+    /// versions of the game or its script extender (ADR 0079).
+    pub version_messages: Vec<KnownMessage>,
 }
 
 /// A general message of LOOT, with the active plugins it is about.

@@ -9,6 +9,15 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `extender.plugin-incompatible` | Error | certain | Script extender plugin does not support this game version |
 | `extender.plugin-not-loaded` | Error | certain | Script extender plugin was not loaded |
 | `extender.plugin-no-version-data` | Note | certain | File in the plugin folder is not a script extender plugin |
+| `versions.extender-lacks-game` | Error | certain | The script extender does not support this game version yet |
+| `versions.address-library-lacks-game` | Error | certain | The Address Library has no file for this game version |
+| `versions.address-library-missing` | Error | certain | The Address Library is not installed |
+| `versions.plugin-wrong-game` | Error | certain | Script extender plugin was built for another game version |
+| `versions.plugin-needs-newer-game` | Error | certain | Script extender plugin needs a newer game version |
+| `versions.plugin-before-anniversary` | Error | certain | Script extender plugin is made for the game before version 1.6 |
+| `versions.plugin-needs-newer-extender` | Error | certain | Script extender plugin needs a newer script extender |
+| `versions.master-updated` | Warning | hint | A plugin builds on a mod that was updated under it |
+| `versions.loot-warning` | Warning | hint | LOOT warns about the versions in your setup |
 | `plugins.master-missing` | Error | certain | A plugin builds on a plugin that is not installed |
 | `plugins.generated-outdated` | Warning | likely | A generated plugin is older than the load order |
 | `plugins.requirement-missing` | Warning | likely | A plugin needs a file that is not in the game |
@@ -78,6 +87,114 @@ The script extender tried to load this native plugin (a DLL file) and gave up. T
 Some mods ship support libraries next to their plugin. The script extender examines every DLL in its plugin folder and skips those that carry no plugin information, which is harmless. It only points to a problem if you expected this file to be a plugin: then it is damaged or was built for a different game.
 
 **What to do:** Nothing to do if the file is a support library of one of your mods. If it should be a plugin, reinstall the mod it belongs to.
+
+## versions.extender-lacks-game
+
+**The script extender does not support this game version yet**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `extender`, `gameVersion`, `extenderVersion`, `newest`, `plugins`
+
+The script extender has to match the game's version exactly: it brings one file per game version it supports. When Steam updates the game, the script extender's authors usually publish a new version within a day or a few. Until then the game only starts without it, and then everything that mods add through it is missing: menus, tweaks, fixes and new features.
+
+**What to do:** Wait for the new script extender and install it from its page; this usually takes days, not weeks. Until then you can play without the mods that need it. If you want to play with them now, roll the game back to the newest version the script extender supports: if Steam offers that version under the game's Properties, Betas, pick it there; otherwise a downgrade patcher from Nexus Mods does it. To keep Steam from updating the game by surprise, set its Updates to "Only update this game when I launch it" and start the game through the script extender's loader.
+
+## versions.address-library-lacks-game
+
+**The Address Library has no file for this game version**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `gameVersion`, `count`, `examples`
+
+Most script extender plugins do not contain the places in the game's code they change. They look them up in the Address Library, a mod with one file per game version. That is why these plugins keep working after a game update without being rebuilt: only the Address Library needs a new file, which its author usually publishes within days of an update.
+
+**What to do:** Update the Address Library for SKSE Plugins from Nexus Mods once it has a file for your game version; this usually takes days, not weeks. Until then, roll the game back through Steam's Betas or a downgrade patcher, or play without these plugins.
+
+## versions.address-library-missing
+
+**The Address Library is not installed**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `count`, `examples`
+
+Most script extender plugins do not contain the places in the game's code they change. They look them up in the Address Library, a mod with one file per game version. Without it, these plugins cannot find their way into the game.
+
+**What to do:** Install the Address Library for SKSE Plugins from Nexus Mods (the "All in one" file) with your mod manager.
+
+## versions.plugin-wrong-game
+
+**Script extender plugin was built for another game version**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `file`, `gameVersion`, `builtFor`, `confirmed`, `update`, `updateKnown`
+
+This plugin contains the places in the game's code it changes for exactly the versions it lists, so it does not work after a game update until its author builds it again. For popular mods that rebuild usually comes within days of the update. The game still starts, but everything the plugin provides is missing, and mods that build on it may misbehave.
+
+**What to do:** Look on the mod's page for a version made for your game version and install it; usually it comes within days. Until then, switch the mod off so that nothing relies on half of it, or roll the game back to the version the plugin was built for: through Steam's Betas under the game's Properties, if Steam offers that version, or with a downgrade patcher from Nexus Mods.
+
+## versions.plugin-needs-newer-game
+
+**Script extender plugin needs a newer game version**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `file`, `gameVersion`, `builtFor`, `confirmed`
+
+Mod authors update their plugins for each new game version, and sometimes drop the older ones. A plugin built for a newer game version than yours does not load. The game still starts, but everything the plugin provides is missing, and mods that build on it may misbehave.
+
+**What to do:** Update the game through Steam, or install the previous version of the mod again, the one made for your game version. Mod managers keep older files of a mod on its page under Files, often as "old files".
+
+## versions.plugin-before-anniversary
+
+**Script extender plugin is made for the game before version 1.6**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `file`, `gameVersion`, `update`, `updateKnown`
+
+Since game version 1.6, script extender plugins describe themselves in a new way, and the script extender no longer loads plugins that do not. A rebuild is not enough here: the mod's author has to change the plugin for the new game, and many old mods were never changed. The game still starts, but everything the plugin provides is missing.
+
+**What to do:** Look on the mod's page for a version for the Anniversary Edition (often called "AE" or "1.6.x"), or for a newer mod that does the same. If there is none, switch the mod off. Going back to game version 1.5.97 for it is possible with a downgrade patcher, but then many newer plugins stop working instead.
+
+## versions.plugin-needs-newer-extender
+
+**Script extender plugin needs a newer script extender**
+
+- Severity: Error
+- Confidence: certain
+- Message arguments: `file`, `required`, `extenderVersion`
+
+Plugins can rely on things the script extender only offers from a certain version on, and say so. Updating the script extender is safe as long as the new version supports your game version.
+
+**What to do:** Install the newest script extender for your game version from its page. Its files go into the game's folder, next to the game's program.
+
+## versions.master-updated
+
+**A plugin builds on a mod that was updated under it**
+
+- Severity: Warning
+- Confidence: hint
+- Message arguments: `plugin`, `mod`, `count`, `masters`
+
+A patch or add-on is made for the plugins it builds on as they were then. After an update of those, it usually still loads, but it may undo the update's changes or point at things that are no longer there. Many authors say on their page which version of the other mod their patch is for. This is only a hint: often nothing is wrong.
+
+**What to do:** Look on the patch's page which version of the other mod it was made for, and whether there is a newer patch. If the update brought its own patch, switch the old one off.
+
+## versions.loot-warning
+
+**LOOT warns about the versions in your setup**
+
+- Severity: Warning
+- Confidence: hint
+- Message arguments: `count`, `messages`
+
+LOOT, the tool that sorts plugins, also knows which versions of the game and its script extender are current, and which go together. Mod Mallet quotes its warnings as LOOT writes them, in English, and only those whose conditions hold for your setup.
+
+**What to do:** Read the message and follow it: usually it asks to update the script extender or the game.
 
 ## plugins.master-missing
 

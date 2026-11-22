@@ -52,12 +52,14 @@ pub mod navmeshes;
 pub mod npc;
 pub mod objects;
 pub mod paths_plugin;
+pub mod pe;
 pub mod place_kinds;
 pub mod skse_log;
 pub mod swap;
 pub mod terrain;
 pub mod tools;
 pub mod unreal;
+pub mod versions;
 pub mod walkways;
 
 pub use game::Game;

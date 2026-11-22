@@ -21,6 +21,96 @@ extender-plugin-no-version-data = Datei im Plugin-Ordner ist kein Script-Extende
     .explanation = Manche Mods liefern neben ihrem Plugin Hilfsbibliotheken mit. Der Script Extender prüft jede DLL in seinem Plugin-Ordner und überspringt alle ohne Plugin-Angaben. Das ist harmlos. Ein Problem ist es nur, wenn die Datei eigentlich ein Plugin sein sollte: Dann ist sie beschädigt oder für ein anderes Spiel gebaut.
     .remedy = Nichts zu tun, wenn die Datei eine Hilfsbibliothek einer deiner Mods ist. Sollte sie ein Plugin sein, installiere die zugehörige Mod neu.
 
+versions-extender-lacks-game = Der Script Extender unterstützt diese Spielversion noch nicht
+    .headline = { $extender } { $extenderVersion } unterstützt die Spielversion { $gameVersion } noch nicht
+    .summary = Das Spiel hat jetzt die Version { $gameVersion }, und der installierte { $extender } { $extenderVersion } reicht nur bis { $newest }. Über { $extender } gestartet läuft das Spiel nicht, und keines seiner { $plugins } Plugins wird geladen. Seine Autoren bringen nach einem Update des Spiels meist innerhalb weniger Tage eine passende Version; du kannst das Spiel auch auf { $newest } zurücksetzen.
+    .explanation = Der Script Extender muss genau zur Version des Spiels passen: Er bringt für jede unterstützte Spielversion eine eigene Datei mit. Wenn Steam das Spiel aktualisiert, veröffentlichen seine Autoren meist innerhalb von einem bis wenigen Tagen eine neue Version. Bis dahin startet das Spiel nur ohne ihn, und dann fehlt alles, was Mods über ihn nachrüsten: Menüs, Anpassungen, Fehlerbehebungen und neue Funktionen.
+    .remedy = Warte auf den neuen Script Extender und installiere ihn von seiner Seite; das dauert meist Tage, nicht Wochen. Bis dahin kannst du ohne die Mods spielen, die ihn brauchen. Willst du jetzt mit ihnen spielen, setze das Spiel auf die neueste Version zurück, die der Script Extender unterstützt: Bietet Steam diese Version in den Eigenschaften des Spiels unter Betas an, wähle sie dort; sonst erledigt das ein Downgrade-Patcher von Nexus Mods. Damit Steam das Spiel nicht überraschend aktualisiert, stelle bei Updates „Dieses Spiel nur beim Starten aktualisieren“ ein und starte das Spiel über den Loader des Script Extenders.
+
+versions-address-library-lacks-game = Die Address Library hat keine Datei für diese Spielversion
+    .headline = Die Address Library hat keine Datei für die Spielversion { $gameVersion }
+    .summary =
+        { $count ->
+            [one] 1 Script-Extender-Plugin findet seinen Weg ins Spiel über die Address Library
+           *[other] { $count } Script-Extender-Plugins finden ihren Weg ins Spiel über die Address Library
+        }, die noch keine Datei für die Spielversion { $gameVersion } hat: { $examples }. Sie brechen beim Start des Spiels mit einer Fehlermeldung ab oder funktionieren nicht. Ihr Autor ergänzt die Datei meist wenige Tage nach einem Update des Spiels.
+    .explanation = Die meisten Script-Extender-Plugins enthalten die Stellen im Code des Spiels, die sie ändern, nicht selbst. Sie schlagen sie in der Address Library nach, einer Mod mit einer Datei je Spielversion. Deshalb funktionieren diese Plugins nach einem Update des Spiels weiter, ohne neu gebaut zu werden: Nur die Address Library braucht eine neue Datei, und die veröffentlicht ihr Autor meist wenige Tage nach einem Update.
+    .remedy = Aktualisiere die Address Library for SKSE Plugins von Nexus Mods, sobald sie eine Datei für deine Spielversion hat; das dauert meist Tage, nicht Wochen. Bis dahin setze das Spiel über die Betas von Steam oder einen Downgrade-Patcher zurück, oder spiele ohne diese Plugins.
+
+versions-address-library-missing = Die Address Library ist nicht installiert
+    .headline =
+        Die Address Library ist nicht installiert, und { $count ->
+            [one] 1 Plugin braucht sie
+           *[other] { $count } Plugins brauchen sie
+        }
+    .summary =
+        { $count ->
+            [one] 1 Script-Extender-Plugin findet seinen Weg ins Spiel über die Address Library
+           *[other] { $count } Script-Extender-Plugins finden ihren Weg ins Spiel über die Address Library
+        }, die nicht installiert ist: { $examples }. Sie brechen beim Start des Spiels mit einer Fehlermeldung ab oder funktionieren nicht.
+    .explanation = Die meisten Script-Extender-Plugins enthalten die Stellen im Code des Spiels, die sie ändern, nicht selbst. Sie schlagen sie in der Address Library nach, einer Mod mit einer Datei je Spielversion. Ohne sie finden diese Plugins ihren Weg ins Spiel nicht.
+    .remedy = Installiere die Address Library for SKSE Plugins von Nexus Mods (die Datei „All in one“) mit deinem Mod-Manager.
+
+versions-plugin-wrong-game = Script-Extender-Plugin ist für eine andere Spielversion gebaut
+    .headline = { $file } ist für die Spielversion { $builtFor } gebaut, nicht für { $gameVersion }
+    .summary =
+        { $file } nennt nur die Spielversion { $builtFor }, und das Spiel hat jetzt die Version { $gameVersion }. { $confirmed ->
+            [yes] Der Script Extender hat es beim letzten Spielstart abgeschaltet.
+           *[other] Der Script Extender wird es beim Start des Spiels abschalten.
+        } { $updateKnown ->
+            [yes] Dein Mod-Manager kennt eine neuere Version der Mod, { $update }: Installiere sie zuerst, vielleicht passt sie schon.
+           *[other] Meist veröffentlicht der Autor innerhalb weniger Tage eine neu gebaute Version.
+        }
+    .explanation = Dieses Plugin enthält die Stellen im Code des Spiels, die es ändert, genau für die Versionen, die es nennt. Nach einem Update des Spiels funktioniert es deshalb erst wieder, wenn sein Autor es neu baut. Bei beliebten Mods kommt das meist wenige Tage nach dem Update. Das Spiel startet trotzdem, aber alles, was das Plugin bereitstellt, fehlt, und Mods, die darauf aufbauen, können sich falsch verhalten.
+    .remedy = Sieh auf der Seite der Mod nach einer Version für deine Spielversion und installiere sie; meist kommt sie innerhalb weniger Tage. Bis dahin schalte die Mod ab, damit nichts auf eine halbe Mod baut, oder setze das Spiel auf die Version zurück, für die das Plugin gebaut ist: über die Betas von Steam in den Eigenschaften des Spiels, wenn Steam diese Version anbietet, oder mit einem Downgrade-Patcher von Nexus Mods.
+
+versions-plugin-needs-newer-game = Script-Extender-Plugin braucht eine neuere Spielversion
+    .headline = { $file } ist für die Spielversion { $builtFor } gebaut, neuer als { $gameVersion }
+    .summary =
+        { $file } nennt nur die Spielversion { $builtFor }, und das Spiel hat die Version { $gameVersion }. { $confirmed ->
+            [yes] Der Script Extender hat es beim letzten Spielstart abgeschaltet.
+           *[other] Der Script Extender wird es beim Start des Spiels abschalten.
+        } Seine Mod wurde wohl für ein Update des Spiels aktualisiert, das du noch nicht hast.
+    .explanation = Mod-Autoren bringen ihre Plugins für jede neue Spielversion heraus und lassen ältere manchmal fallen. Ein Plugin für eine neuere Spielversion als deine wird nicht geladen. Das Spiel startet trotzdem, aber alles, was das Plugin bereitstellt, fehlt, und Mods, die darauf aufbauen, können sich falsch verhalten.
+    .remedy = Aktualisiere das Spiel über Steam, oder installiere wieder die vorige Version der Mod, die für deine Spielversion gemacht ist. Ältere Dateien einer Mod stehen auf ihrer Seite unter Files, oft als „Old files“.
+
+versions-plugin-before-anniversary = Script-Extender-Plugin ist für das Spiel vor Version 1.6 gemacht
+    .headline = { $file } ist für das Spiel vor Version 1.6 gemacht
+    .summary =
+        { $file } funktioniert nur mit dem Spiel vor dem Anniversary-Update von 2021 (Version 1.5.97 und älter). Der Script Extender für die Spielversion { $gameVersion } lädt es nicht. { $updateKnown ->
+            [yes] Dein Mod-Manager kennt eine neuere Version der Mod, { $update }, die vielleicht für das neuere Spiel gemacht ist.
+           *[other] Ein Neubau reicht hier nicht: Die Mod braucht eine echte Änderung durch ihren Autor.
+        }
+    .explanation = Seit der Spielversion 1.6 beschreiben sich Script-Extender-Plugins auf eine neue Art, und der Script Extender lädt keine Plugins mehr, die das nicht tun. Ein Neubau reicht hier nicht: Der Autor der Mod muss das Plugin für das neue Spiel ändern, und viele alte Mods wurden nie geändert. Das Spiel startet trotzdem, aber alles, was das Plugin bereitstellt, fehlt.
+    .remedy = Sieh auf der Seite der Mod nach einer Version für die Anniversary Edition (oft „AE“ oder „1.6.x“ genannt) oder nach einer neueren Mod, die dasselbe tut. Gibt es keine, schalte die Mod ab. Für sie auf die Spielversion 1.5.97 zurückzugehen geht mit einem Downgrade-Patcher, aber dann funktionieren stattdessen viele neuere Plugins nicht mehr.
+
+versions-plugin-needs-newer-extender = Script-Extender-Plugin braucht einen neueren Script Extender
+    .headline = { $file } braucht Script Extender { $required } oder neuer
+    .summary = { $file } verlangt mindestens den Script Extender in Version { $required }, installiert ist { $extenderVersion }. Der Script Extender lädt es nicht.
+    .explanation = Plugins können auf etwas angewiesen sein, das der Script Extender erst ab einer bestimmten Version bietet, und sagen das. Den Script Extender zu aktualisieren ist unbedenklich, solange die neue Version deine Spielversion unterstützt.
+    .remedy = Installiere den neuesten Script Extender für deine Spielversion von seiner Seite. Seine Dateien gehören in den Ordner des Spiels, neben das Programm des Spiels.
+
+versions-master-updated = Ein Plugin baut auf einer Mod auf, die darunter aktualisiert wurde
+    .headline =
+        { $plugin }: { $count ->
+            [one] ein Plugin, auf dem es aufbaut, wurde aktualisiert
+           *[other] { $count } Plugins, auf denen es aufbaut, wurden aktualisiert
+        }
+    .summary = Seit deinem letzten Scan wurde die Mod dessen, worauf { $plugin } aufbaut, aktualisiert, { $mod } aber nicht: { $masters }.
+    .explanation = Ein Patch oder eine Erweiterung ist für die Plugins gemacht, auf denen sie aufbaut, so wie sie damals waren. Nach deren Update lädt sie meist weiter, kann aber Änderungen des Updates rückgängig machen oder auf Dinge zeigen, die es nicht mehr gibt. Viele Autoren schreiben auf ihre Seite, für welche Version der anderen Mod ihr Patch gemacht ist. Das ist nur ein Hinweis: Oft ist alles in Ordnung.
+    .remedy = Sieh auf der Seite des Patches nach, für welche Version der anderen Mod er gemacht ist und ob es einen neueren Patch gibt. Bringt das Update einen eigenen Patch mit, schalte den alten ab.
+
+versions-loot-warning = LOOT warnt vor den Versionen in deinem Setup
+    .headline =
+        LOOT hat { $count ->
+            [one] eine Warnung
+           *[other] { $count } Warnungen
+        } zu Versionen
+    .summary = LOOT sagt, in seinen eigenen Worten: { $messages }
+    .explanation = LOOT, das Werkzeug, das Plugins sortiert, weiß auch, welche Versionen des Spiels und seines Script Extenders aktuell sind und welche zusammenpassen. Mod Mallet zitiert seine Warnungen so, wie LOOT sie schreibt, auf Englisch, und nur die, deren Bedingungen für dein Setup gelten.
+    .remedy = Lies die Meldung und folge ihr: Meist bittet sie, den Script Extender oder das Spiel zu aktualisieren.
+
+
 plugins-master-missing = Ein Plugin baut auf einem Plugin auf, das nicht installiert ist
     .headline =
         { $plugin }: { $count ->

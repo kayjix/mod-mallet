@@ -168,6 +168,21 @@ impl Store {
         Ok(())
     }
 
+    /// The stored scan without its findings, or `None` if nothing has been
+    /// stored yet: what the next scan compares its versions with
+    /// (ADR 0079).
+    pub fn load_scan_without_findings(&self) -> Result<Option<ScanReport>, StoreError> {
+        let report_json = self
+            .connection
+            .query_row("SELECT report_json FROM scan WHERE id = 1", [], |row| {
+                row.get::<_, String>(0)
+            })
+            .optional()?;
+        Ok(report_json
+            .map(|json| serde_json::from_str(&json))
+            .transpose()?)
+    }
+
     /// The stored scan, or `None` if nothing has been stored yet.
     pub fn load_scan(&self) -> Result<Option<ScanReport>, StoreError> {
         let report_json = self
@@ -237,6 +252,8 @@ mod tests {
             switched_off_plugins: Vec::new(),
             manager: None,
             load_order: Vec::new(),
+            versions: mallet_core::VersionSnapshot::default(),
+            version_changes: None,
             findings: file_names
                 .iter()
                 .map(|file_name| {
@@ -265,6 +282,18 @@ mod tests {
         let mut store = Store::open_in_memory().unwrap();
         store.save_scan(&report).unwrap();
         assert_eq!(store.load_scan().unwrap(), Some(report));
+    }
+
+    #[test]
+    fn a_scan_can_be_loaded_without_its_findings() {
+        let mut store = Store::open_in_memory().unwrap();
+        assert_eq!(store.load_scan_without_findings().unwrap(), None);
+        let mut report = sample_report(&["Old.dll"]);
+        report.versions.game = Some("1.6.1170".to_owned());
+        store.save_scan(&report).unwrap();
+        let loaded = store.load_scan_without_findings().unwrap().unwrap();
+        assert_eq!(loaded.findings, []);
+        assert_eq!(loaded.versions.game.as_deref(), Some("1.6.1170"));
     }
 
     #[test]

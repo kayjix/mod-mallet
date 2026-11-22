@@ -50,6 +50,106 @@ pub const EXTENDER_PLUGIN_NO_VERSION_DATA: KindInfo = KindInfo {
     args: &["file"],
 };
 
+/// The script extender has no library for the version the game is in now,
+/// so the game cannot start with it and none of its plugins load
+/// (ADR 0079).
+pub const VERSIONS_EXTENDER_LACKS_GAME: KindInfo = KindInfo {
+    id: "versions.extender-lacks-game",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &[
+        "extender",
+        "gameVersion",
+        "extenderVersion",
+        "newest",
+        "plugins",
+    ],
+};
+
+/// The Address Library, which most script extender plugins find the
+/// game's code through, has no file for the version the game is in now
+/// (ADR 0079).
+pub const VERSIONS_ADDRESS_LIBRARY_LACKS_GAME: KindInfo = KindInfo {
+    id: "versions.address-library-lacks-game",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &["gameVersion", "count", "examples"],
+};
+
+/// The Address Library is not installed, while script extender plugins
+/// find the game's code through it (ADR 0079).
+pub const VERSIONS_ADDRESS_LIBRARY_MISSING: KindInfo = KindInfo {
+    id: "versions.address-library-missing",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &["count", "examples"],
+};
+
+/// A script extender plugin was built for other versions of the game than
+/// the one it is in now, so the script extender switches it off
+/// (ADR 0079).
+pub const VERSIONS_PLUGIN_WRONG_GAME: KindInfo = KindInfo {
+    id: "versions.plugin-wrong-game",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &[
+        "file",
+        "gameVersion",
+        "builtFor",
+        "confirmed",
+        "update",
+        "updateKnown",
+    ],
+};
+
+/// A script extender plugin was built for newer versions of the game than
+/// the one it is in, usually by an update of its mod for a game update
+/// the setup does not have yet (ADR 0079).
+pub const VERSIONS_PLUGIN_NEEDS_NEWER_GAME: KindInfo = KindInfo {
+    id: "versions.plugin-needs-newer-game",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &["file", "gameVersion", "builtFor", "confirmed"],
+};
+
+/// A script extender plugin was built for the game before version 1.6
+/// and is not loaded by the script extender of later versions
+/// (ADR 0079).
+pub const VERSIONS_PLUGIN_BEFORE_ANNIVERSARY: KindInfo = KindInfo {
+    id: "versions.plugin-before-anniversary",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &["file", "gameVersion", "update", "updateKnown"],
+};
+
+/// A script extender plugin needs a newer script extender than the one
+/// installed (ADR 0079).
+pub const VERSIONS_PLUGIN_NEEDS_NEWER_EXTENDER: KindInfo = KindInfo {
+    id: "versions.plugin-needs-newer-extender",
+    severity: Severity::Error,
+    confidence: Confidence::Certain,
+    args: &["file", "required", "extenderVersion"],
+};
+
+/// A plugin builds on plugins whose mods were updated since the last scan,
+/// while its own mod was not: a patch made for the earlier version may no
+/// longer fit (ADR 0079).
+pub const VERSIONS_MASTER_UPDATED: KindInfo = KindInfo {
+    id: "versions.master-updated",
+    severity: Severity::Warning,
+    confidence: Confidence::Hint,
+    args: &["plugin", "mod", "count", "masters"],
+};
+
+/// LOOT warns about the versions of the game or its script extender, in
+/// its own words (ADR 0079).
+pub const VERSIONS_LOOT_WARNING: KindInfo = KindInfo {
+    id: "versions.loot-warning",
+    severity: Severity::Warning,
+    confidence: Confidence::Hint,
+    args: &["count", "messages"],
+};
+
 /// Characters whose face files and winning record describe different
 /// faces.
 pub const NPCS_FACE_MISMATCH: KindInfo = KindInfo {
@@ -327,6 +427,15 @@ pub const ALL: &[KindInfo] = &[
     EXTENDER_PLUGIN_INCOMPATIBLE,
     EXTENDER_PLUGIN_NOT_LOADED,
     EXTENDER_PLUGIN_NO_VERSION_DATA,
+    VERSIONS_EXTENDER_LACKS_GAME,
+    VERSIONS_ADDRESS_LIBRARY_LACKS_GAME,
+    VERSIONS_ADDRESS_LIBRARY_MISSING,
+    VERSIONS_PLUGIN_WRONG_GAME,
+    VERSIONS_PLUGIN_NEEDS_NEWER_GAME,
+    VERSIONS_PLUGIN_BEFORE_ANNIVERSARY,
+    VERSIONS_PLUGIN_NEEDS_NEWER_EXTENDER,
+    VERSIONS_MASTER_UPDATED,
+    VERSIONS_LOOT_WARNING,
     PLUGINS_MASTER_MISSING,
     PLUGINS_GENERATED_OUTDATED,
     PLUGINS_REQUIREMENT_MISSING,

@@ -217,6 +217,14 @@ pub struct ScanReport {
     /// plugins it needs (ADR 0068).
     #[serde(default)]
     pub load_order: Vec<LoadedPlugin>,
+    /// The versions this scan saw, for the next scan to compare with
+    /// (ADR 0079).
+    #[serde(default)]
+    pub versions: crate::VersionSnapshot,
+    /// What changed in the versions since an earlier scan, and what of it
+    /// no longer fits (ADR 0079).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_changes: Option<crate::VersionChanges>,
 }
 
 /// An active plugin, at its place in the load order, and the plugins it
