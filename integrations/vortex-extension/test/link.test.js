@@ -455,6 +455,43 @@ test("a mod is switched off in the active profile as Vortex's mod list does it",
   assert.equal(unclear.code, "failed");
 });
 
+test("plugins are switched off in the plugin list, which is then shown narrowed to them", () => {
+  const api = fakeApi();
+  const dispatched = [];
+  api.store = { dispatch: (action) => dispatched.push(action) };
+  const result = link.handle(
+    api,
+    {
+      ...request(),
+      action: "set-plugins-enabled",
+      plugins: ["Citizens.esp", "Lights - Citizens patch.esp"],
+      enabled: false,
+    },
+    NOW,
+  );
+  assert.equal(result.code, "applied");
+  assert.equal(result.ok, true);
+  assert.deepEqual(dispatched, [
+    { type: "SET_PLUGIN_ENABLED", payload: { pluginName: "Citizens.esp", enabled: false } },
+    {
+      type: "SET_PLUGIN_ENABLED",
+      payload: { pluginName: "Lights - Citizens patch.esp", enabled: false },
+    },
+    {
+      type: "SET_ATTRIBUTE_FILTER",
+      payload: { tableId: "gamebryo-plugins", attributeId: "name", filter: "Citizens.esp" },
+    },
+  ]);
+  assert.deepEqual(api.emitted, [["show-main-page", "gamebryo-plugins"]]);
+
+  const ask = (fields) =>
+    link.plan(state(), { ...request(), action: "set-plugins-enabled", ...fields }, NOW).code;
+  assert.equal(ask({ plugins: ["Citizens.esp"] }), "failed");
+  assert.equal(ask({ plugins: [], enabled: false }), "failed");
+  assert.equal(ask({ plugins: ["..\\evil.dll"], enabled: false }), "failed");
+  assert.equal(ask({ plugins: "Citizens.esp", enabled: false }), "failed");
+});
+
 const VIGIL = { step: "Patches", group: "Guilds", option: "Vigil", index: 3 };
 
 test("options to tick are added to the choices saved last time", () => {

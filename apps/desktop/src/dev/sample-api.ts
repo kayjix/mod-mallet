@@ -187,6 +187,37 @@ const samples: Sample[] = [
   faces("Cut Content.esp", 34),
   faces("Temple.esp", 4),
   overlap("Old Town", "Texture Pack", 3),
+  overlap("Busy Streets.esp", "Old Town", 4),
+  {
+    kind: "plugins.switched-off-but-loaded",
+    severity: "warning",
+    confidence: "certain",
+    key: "Busy Streets.esp",
+    title: two(
+      "A mod you switched off is still in the game",
+      "Eine Mod, die du ausgeschaltet hast, ist noch im Spiel",
+    ),
+    headline: two(
+      "Busy Streets is switched off, but the game still loads Busy Streets.esp",
+      "Busy Streets ist ausgeschaltet, aber das Spiel lädt Busy Streets.esp trotzdem",
+    ),
+    summary: two(
+      "Busy Streets is switched off in your mod manager, but the game still loads Busy Streets.esp. Copies of its files are still in the game's Data folder: Busy Streets.bsa, Busy Streets.esp.",
+      "Busy Streets ist in deinem Mod-Manager ausgeschaltet, aber das Spiel lädt Busy Streets.esp trotzdem. Kopien ihrer Dateien liegen noch im Data-Ordner des Spiels: Busy Streets.bsa, Busy Streets.esp.",
+    ),
+    args: {
+      plugin: "Busy Streets.esp",
+      mod: "Busy Streets",
+      deployed: 0,
+      fileCount: 2,
+      files: "Busy Streets.bsa, Busy Streets.esp",
+      fileList: "Busy Streets.bsa\nBusy Streets.esp",
+      dependentCount: 1,
+      dependents: "Water Mod - Busy Streets Patch.esp",
+      dependentPlugins: "Water Mod - Busy Streets Patch.esp",
+      dependentModIds: "Water Mod",
+    },
+  },
   {
     kind: "meshes.retexture-bypassed",
     severity: "warning",
@@ -432,41 +463,53 @@ function render(sample: Sample, lang: Lang): RenderedFinding {
                 guide: [],
               },
             ]
-          : sample.kind === "mods.collides-widely" && provider !== undefined
+          : sample.kind === "plugins.switched-off-but-loaded"
             ? [
                 {
-                  action: { type: "disable-mod", mod: provider },
-                  label: de ? "In Vortex ausschalten" : "Switch it off in Vortex",
+                  action: {
+                    type: "disable-plugins",
+                    plugins: ["Busy Streets.esp", "Water Mod - Busy Streets Patch.esp"],
+                  },
+                  label: de ? "Busy Streets.esp ausschalten" : "Switch off Busy Streets.esp",
                   description: "",
                   guide: [],
                 },
               ]
-            : sample.direct && provider !== undefined
+            : sample.kind === "mods.collides-widely" && provider !== undefined
               ? [
                   {
-                    action: { type: "reinstall-mod", mod: provider },
-                    label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
-                    description: de
-                      ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
-                      : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
-                    guide: [
-                      {
-                        tick: {
-                          page: 5,
-                          pages: 7,
-                          step: "Additional Patches A-M",
-                          group: "Towns",
-                          option: "City Overhaul",
-                          description: de
-                            ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
-                            : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
-                        },
-                        pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
-                      },
-                    ],
+                    action: { type: "disable-mod", mod: provider },
+                    label: de ? "In Vortex ausschalten" : "Switch it off in Vortex",
+                    description: "",
+                    guide: [],
                   },
                 ]
-              : [],
+              : sample.direct && provider !== undefined
+                ? [
+                    {
+                      action: { type: "reinstall-mod", mod: provider },
+                      label: de ? "In Vortex neu installieren" : "Reinstall in Vortex",
+                      description: de
+                        ? `Vortex öffnet den Installer von ${provider.name} erneut, mit deiner früheren Auswahl vorbelegt.`
+                        : `Vortex opens the installer of ${provider.name} again, with your earlier choices filled in.`,
+                      guide: [
+                        {
+                          tick: {
+                            page: 5,
+                            pages: 7,
+                            step: "Additional Patches A-M",
+                            group: "Towns",
+                            option: "City Overhaul",
+                            description: de
+                              ? "Patch für City Overhaul. Nur ankreuzen, wenn City Overhaul installiert ist."
+                              : "Patch for City Overhaul. Only tick if City Overhaul is installed.",
+                          },
+                          pageLabel: de ? "Seite 5 von 7" : "Page 5 of 7",
+                        },
+                      ],
+                    },
+                  ]
+                : [],
   };
 }
 
@@ -593,6 +636,12 @@ function report(lang: Lang): RenderedReport {
         mod: { source: "vortex", id: "Gone Mod", name: "Gone Mod" },
         loaded: false,
       },
+      {
+        plugin: "Busy Streets.esp",
+        mod: { source: "vortex", id: "Busy Streets", name: "Busy Streets" },
+        loaded: true,
+        leftBehind: ["Busy Streets.bsa", "Busy Streets.esp"],
+      },
     ],
   };
 }
@@ -614,6 +663,7 @@ const sampleMods: ModInfo[] = [
   modInfo("Texture Pack", "1.5"),
   modInfo("Mesh Improvements", "2.0", { enabled: false }),
   modInfo("Gone Mod", "1.1", { enabled: false }),
+  modInfo("Busy Streets", "3.2", { enabled: false }),
 ];
 
 /** Made-up land: hills around a lake, a sea in the north. */
@@ -1511,6 +1561,7 @@ export const sampleApi: Api = {
   savePatchReport: () =>
     later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch - report.txt"),
   openFolder: async () => {},
+  showDataFile: async () => {},
   toolbox: (lang) => later(toolbox(lang)),
   restartManager: () => later(undefined),
   // The sample has no pictures; the page shows its placeholder.

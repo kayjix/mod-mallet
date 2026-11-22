@@ -115,6 +115,13 @@ action-load-after = { $plugin } gewinnen lassen
 action-disable-mod = { $mod } deaktivieren
     .description = Vortex schaltet { $mod } im verwendeten Profil ab und bittet ums Bereitstellen. Gelöscht wird nichts; schalte die Mod in Vortex wieder ein, um es rückgängig zu machen.
 
+action-disable-plugins = { $plugin } ausschalten
+    .description = Vortex schaltet { $plugin } in seiner Plugin-Liste aus{ $otherCount ->
+        [0] {""}
+        [one] , zusammen mit dem Plugin, das darauf aufbaut ({ $others })
+       *[other] , zusammen mit den { $otherCount } Plugins, die darauf aufbauen ({ $others })
+    }, und zeigt dir die Liste. Das Spiel lädt { $plugin } dann nicht mehr, auch nicht das Archiv mit demselben Namen. Gelöscht wird nichts; setz den Haken bei { $plugin } in Vortex' Plugin-Liste wieder, um es rückgängig zu machen.
+
 action-enable-mod = { $mod } einschalten
     .description = Vortex schaltet { $mod } im verwendeten Profil ein und bittet ums Bereitstellen. Schalte die Mod in Vortex wieder ab, um es rückgängig zu machen.
 
@@ -165,6 +172,12 @@ action-load-after-mo2 = { $plugin } gewinnen lassen
 
 action-disable-mod-mo2 = { $mod } in Mod Organizer abhaken
     .description = Mod Mallet kann Mod Organizer nicht darum bitten. Nimm in Mod Organizers Mod-Liste links den Haken bei { $mod } heraus. Gelöscht wird nichts; setz den Haken wieder, um es rückgängig zu machen.
+
+action-disable-plugins-mo2 = { $plugin } in Mod Organizer abhaken
+    .description = Mod Mallet kann Mod Organizer nicht darum bitten. Nimm in Mod Organizers Plugin-Liste rechts den Haken bei { $plugin } heraus{ $otherCount ->
+        [0] {""}
+       *[other] , ebenso bei { $others }, die darauf aufbauen
+    }. Gelöscht wird nichts; setz den Haken wieder, um es rückgängig zu machen.
 
 action-enable-mod-mo2 = { $mod } in Mod Organizer anhaken
     .description = Mod Mallet kann Mod Organizer nicht darum bitten. Setz in Mod Organizers Mod-Liste links den Haken bei { $mod }. Nimm ihn wieder heraus, um es rückgängig zu machen.

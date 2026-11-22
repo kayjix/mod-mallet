@@ -44,8 +44,50 @@ fn action_source(action: &Action) -> Option<&str> {
         Action::HideObjects { .. }
         | Action::MoveObjects { .. }
         | Action::RepairPaths { .. }
-        | Action::LoadAfter { .. } => None,
+        | Action::LoadAfter { .. }
+        | Action::DisablePlugins { .. } => None,
     }
+}
+
+/// The arguments of switching plugins off: the plugin the action is about,
+/// and those that build on it (ADR 0073).
+fn disable_plugins_args(plugins: &[String]) -> Vec<(&'static str, ArgValue)> {
+    let (first, others) = plugins
+        .split_first()
+        .map_or(("", &[][..]), |(first, others)| (first.as_str(), others));
+    vec![
+        ("plugin", ArgValue::from(first)),
+        (
+            "otherCount",
+            ArgValue::Number(i64::try_from(others.len()).unwrap_or(i64::MAX)),
+        ),
+        ("others", ArgValue::from(others.join(", ").as_str())),
+    ]
+}
+
+/// The text and arguments of deciding whose copies of files reach the game
+/// (ADR 0054): one mod's, the archives', or as before.
+fn file_overrides_args(
+    files: &[String],
+    leave_out: &[mallet_core::ModRef],
+    provide: &[mallet_core::ModRef],
+) -> (&'static str, Vec<(&'static str, ArgValue)>) {
+    let id = match (leave_out.is_empty(), provide.first()) {
+        (true, _) => "action-file-overrides-reset",
+        (false, Some(_)) => "action-file-overrides",
+        (false, None) => "action-file-overrides-archives",
+    };
+    let winner = provide.first().map_or("", |mod_ref| mod_ref.name.as_str());
+    (
+        id,
+        vec![
+            ("mod", ArgValue::from(winner)),
+            (
+                "count",
+                ArgValue::Number(i64::try_from(files.len()).unwrap_or(i64::MAX)),
+            ),
+        ],
+    )
 }
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -477,6 +519,11 @@ impl Messages {
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 &no_ticks,
             ),
+            Action::DisablePlugins { plugins } => (
+                "action-disable-plugins",
+                disable_plugins_args(plugins),
+                &no_ticks,
+            ),
             Action::EnableMod { mod_ref } => (
                 "action-enable-mod",
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
@@ -487,23 +534,8 @@ impl Messages {
                 leave_out,
                 provide,
             } => {
-                let id = match (leave_out.is_empty(), provide.first()) {
-                    (true, _) => "action-file-overrides-reset",
-                    (false, Some(_)) => "action-file-overrides",
-                    (false, None) => "action-file-overrides-archives",
-                };
-                let winner = provide.first().map_or("", |mod_ref| mod_ref.name.as_str());
-                (
-                    id,
-                    vec![
-                        ("mod", ArgValue::from(winner)),
-                        (
-                            "count",
-                            ArgValue::Number(i64::try_from(files.len()).unwrap_or(i64::MAX)),
-                        ),
-                    ],
-                    &no_ticks,
-                )
+                let (id, args) = file_overrides_args(files, leave_out, provide);
+                (id, args, &no_ticks)
             }
         };
         let args: Vec<_> = args.iter().map(|(name, value)| (*name, value)).collect();
@@ -1122,6 +1154,36 @@ mod tests {
                 "{}",
                 patch.message
             );
+        }
+    }
+
+    /// Switching plugins off names the plugin and what builds on it, for
+    /// Vortex and, by hand, for Mod Organizer (ADR 0073).
+    #[test]
+    fn switching_plugins_off_names_what_goes_with_them() {
+        let action = Action::DisablePlugins {
+            plugins: vec![
+                "Citizens.esp".to_owned(),
+                "Lights - Citizens.esp".to_owned(),
+            ],
+        };
+        let alone = Action::DisablePlugins {
+            plugins: vec!["Citizens.esp".to_owned()],
+        };
+        for locale in Locale::ALL {
+            let messages = Messages::new(locale);
+            let vortex = messages.render_action_for(&action, Some("vortex"));
+            assert!(vortex.label.contains("Citizens.esp"), "{vortex:?}");
+            assert!(vortex.description.contains("Vortex"), "{vortex:?}");
+            assert!(
+                vortex.description.contains("Lights - Citizens.esp"),
+                "{vortex:?}"
+            );
+            let by_hand = messages.render_action_for(&action, Some("mo2"));
+            assert!(by_hand.description.contains("Mod Organizer"), "{by_hand:?}");
+            assert!(!by_hand.description.contains("Vortex"), "{by_hand:?}");
+            let single = messages.render_action_for(&alone, Some("vortex"));
+            assert!(!single.description.contains("Lights"), "{single:?}");
         }
     }
 

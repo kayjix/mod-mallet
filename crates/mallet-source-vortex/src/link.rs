@@ -103,6 +103,8 @@ struct Request<'a> {
     leave_out: &'a [&'a str],
     #[serde(skip_serializing_if = "<[&str]>::is_empty")]
     provide: &'a [&'a str],
+    #[serde(skip_serializing_if = "<[&str]>::is_empty")]
+    plugins: &'a [&'a str],
     created_at: u64,
 }
 
@@ -128,6 +130,7 @@ struct Subject<'a> {
     files: &'a [&'a str],
     leave_out: &'a [&'a str],
     provide: &'a [&'a str],
+    plugins: &'a [&'a str],
 }
 
 #[derive(Deserialize)]
@@ -242,6 +245,25 @@ impl Link {
         self.ask("set-mod-enabled", game, &subject, timeout)
     }
 
+    /// Asks Vortex to switch `plugins` on or off in its plugin list, which
+    /// holds every plugin in the game's Data folder, also those it did not
+    /// install, and then to show the list narrowed to the first of them
+    /// (ADR 0073). Since extension 0.9.0.
+    pub fn set_plugins_enabled(
+        &self,
+        game: &str,
+        plugins: &[&str],
+        enabled: bool,
+        timeout: Duration,
+    ) -> Result<Reply, LinkError> {
+        let subject = Subject {
+            plugins,
+            enabled: Some(enabled),
+            ..Subject::default()
+        };
+        self.ask("set-plugins-enabled", game, &subject, timeout)
+    }
+
     /// Asks Vortex to list Mod Mallet among the tools of `game` on its
     /// dashboard (`add`), or to take it off the list again (ADR 0063).
     pub fn mallet_tool(
@@ -317,6 +339,7 @@ impl Link {
             files: subject.files,
             leave_out: subject.leave_out,
             provide: subject.provide,
+            plugins: subject.plugins,
             created_at: now_ms(),
         };
 
@@ -515,6 +538,33 @@ mod tests {
             0
         );
         assert_eq!(fs::read_dir(dir.path().join("results")).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn plugins_to_switch_off_are_named_in_the_request() {
+        let (dir, link) = shared_folder();
+        write_status(dir.path(), now_ms());
+        let extension = answer_next_request(
+            dir.path().to_path_buf(),
+            r#"{"id":"x","ok":true,"code":"applied"}"#,
+        );
+        let reply = link
+            .set_plugins_enabled(
+                "skyrimse",
+                &["Citizens.esp", "Lights - Citizens patch.esp"],
+                false,
+                Duration::from_secs(5),
+            )
+            .unwrap();
+        assert_eq!(reply.code, "applied");
+        let request: serde_json::Value = serde_json::from_str(&extension.join().unwrap()).unwrap();
+        assert_eq!(request["action"], "set-plugins-enabled");
+        assert_eq!(
+            request["plugins"],
+            serde_json::json!(["Citizens.esp", "Lights - Citizens patch.esp"])
+        );
+        assert_eq!(request["enabled"], false);
+        assert!(request.get("modId").is_none());
     }
 
     #[test]

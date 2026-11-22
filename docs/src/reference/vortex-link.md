@@ -129,11 +129,12 @@ tool's program if `app.json` names another one (Mod Mallet moved).
 |---|---|
 | `protocol` | Version of this format. The extension refuses other versions. |
 | `id` | The name of the file without `.json`. |
-| `action` | `reinstall-mod`, `install-archive`, `load-after`, `set-mod-enabled`, `file-overrides`, `add-to-tools` or `remove-from-tools` (the last two since extension 0.8.0, without further fields). |
+| `action` | `reinstall-mod`, `install-archive`, `load-after`, `set-mod-enabled`, `file-overrides`, `add-to-tools`, `remove-from-tools` (these two since extension 0.8.0, without further fields) or `set-plugins-enabled` (since extension 0.9.0). |
 | `game` | Vortex's identifier of the game. The request is refused if Vortex is managing another game. |
 | `modId` | For `reinstall-mod` and `set-mod-enabled`: the mod's folder in Vortex's staging directory, or Vortex's own id of the mod. |
 | `plugin`, `after` | For `load-after`: two plugin file names (`.esp`, `.esm`, `.esl`). |
-| `enabled` | For `set-mod-enabled`: `true` or `false`. |
+| `enabled` | For `set-mod-enabled` and `set-plugins-enabled`: `true` or `false`. |
+| `plugins` | For `set-plugins-enabled`: one to 50 plugin file names (`.esp`, `.esm`, `.esl`), the one the request is about first. Since extension 0.9.0. |
 | `tick` | For `reinstall-mod`, optional: installer options to tick in advance, each `{ "step", "group", "option", "index" }`, with `index` the option's position in its group, counting from 0, in the order the installer shows them. Since extension 0.6.0. |
 | `files`, `leaveOut`, `provide` | For `file-overrides`: files below the data directory (at most 200, relative, without `..`), and the mods (folder or Vortex's id) that are to leave them out and to deploy them again. Since extension 0.7.0. |
 | `path` | For `install-archive`: a zip archive in `%LOCALAPPDATA%\mod-mallet\patches`. Archives anywhere else are refused (`not-allowed`). |
@@ -194,6 +195,20 @@ The extension switches the mod on or off in the profile in use, as the
 switch in Vortex's mod list does (`SET_MOD_ENABLED`, then `mods-enabled`),
 and answers `applied`. Vortex then deploys, or asks to.
 
+### set-plugins-enabled
+
+The extension switches each plugin on or off in Vortex's list of plugins,
+as the switch beside a plugin there does (`SET_PLUGIN_ENABLED`), and
+answers `applied`. The list holds every plugin in the game's Data folder,
+also those Vortex did not install, and Vortex writes the game's
+`plugins.txt` from it: a plugin switched off there is no longer loaded, nor
+the archives of its name. The extension then shows the list, narrowed to
+the first plugin, as Vortex's own "show plugin" does (`show-main-page`
+with `gamebryo-plugins`, then `SET_ATTRIBUTE_FILTER` on the column
+`name`). Mod Mallet asks for this for a copy of a switched-off mod's plugin
+that Vortex left behind, together with the plugins that build on it
+([ADR 0073](../adr/0073-switched-off-mods-taken-out-through-vortex.md)).
+
 ### file-overrides
 
 The extension adds the files, as full paths into the game's `Data` folder
@@ -220,7 +235,7 @@ change them there (ADR 0054).
 | `unsupported` | Another protocol version or an unknown action. |
 | `expired` | The request was older than a minute. |
 | `installing` | Vortex was handed the archive (`install-archive`). |
-| `applied` | Vortex made the change (`load-after`, `set-mod-enabled`). |
+| `applied` | Vortex made the change (`load-after`, `set-mod-enabled`, `set-plugins-enabled`, `file-overrides`). |
 | `not-allowed` | The archive is not a zip in the patches folder, or not there; `detail` says which. |
 | `failed` | Something else; `detail` says what. |
 

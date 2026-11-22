@@ -260,6 +260,27 @@
           ]
         },
         {
+          "description": "Switch plugins off in the mod manager's list of plugins, so that the\ngame no longer loads them, nor the archives of their names (ADR\n0073). The list holds every plugin in the data directory, also those\nthe mod manager did not install, such as a copy left behind by a mod\nthat is switched off. Nothing is deleted; switching them on there\nagain undoes it.",
+          "type": "object",
+          "properties": {
+            "plugins": {
+              "description": "The plugins by file name: the one the finding is about first,\nthen those that build on it and would lose their master.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "disable-plugins"
+            }
+          },
+          "required": [
+            "type",
+            "plugins"
+          ]
+        },
+        {
           "description": "Switch a mod on that is installed in the mod manager but switched\noff in the profile in use. Switching it off again there undoes it.",
           "type": "object",
           "properties": {
@@ -2680,6 +2701,13 @@
       "description": "A plugin of a mod the mod manager keeps switched off (ADR 0061).\n\nUsually the game no longer loads it, and the decisions about its\ncollisions wait until the mod is on again. The game still loads it while\nthe manager has not deployed since the mod went off, or when a copy the\nmanager did not put there is still in the data directory and active.",
       "type": "object",
       "properties": {
+        "leftBehind": {
+          "description": "The files of the plugin's name in the data directory that no mod\nmanager put there: the plugin and the archives named after it, left\nbehind when the mod went (ADR 0073). Empty where the mod manager\nstill has its own copies there, or nothing is left.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "loaded": {
           "description": "Whether the game loads the plugin all the same.",
           "type": "boolean"

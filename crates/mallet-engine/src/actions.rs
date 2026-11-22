@@ -143,6 +143,13 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
                 link.set_mod_enabled(options.vortex_game(), &mod_ref.id, false, timeout)
             })
         }
+        Action::DisablePlugins { plugins } => {
+            let plugins: Vec<&str> = plugins.iter().map(String::as_str).collect();
+            in_vortex(options, |link, timeout| {
+                tracing::info!(?plugins, "asking Vortex to switch plugins off");
+                link.set_plugins_enabled(options.vortex_game(), &plugins, false, timeout)
+            })
+        }
         Action::EnableMod { mod_ref } if mod_ref.source == SOURCE_ID => {
             in_vortex(options, |link, timeout| {
                 tracing::info!(mod_id = mod_ref.id, "asking Vortex to enable a mod");

@@ -54,6 +54,14 @@ export type Action =
       type: "disable-mod";
     }
   | {
+      /**
+       * The plugins by file name: the one the finding is about first,
+       * then those that build on it and would lose their master.
+       */
+      plugins: string[];
+      type: "disable-plugins";
+    }
+  | {
       mod: ModRef2;
       type: "enable-mod";
     }
@@ -347,6 +355,14 @@ export interface DuelResolution {
     | {
         mod: ModRef1;
         type: "disable-mod";
+      }
+    | {
+        /**
+         * The plugins by file name: the one the finding is about first,
+         * then those that build on it and would lose their master.
+         */
+        plugins: string[];
+        type: "disable-plugins";
       }
     | {
         mod: ModRef2;
@@ -810,6 +826,14 @@ export interface RenderedAction {
     | {
         mod: ModRef1;
         type: "disable-mod";
+      }
+    | {
+        /**
+         * The plugins by file name: the one the finding is about first,
+         * then those that build on it and would lose their master.
+         */
+        plugins: string[];
+        type: "disable-plugins";
       }
     | {
         mod: ModRef2;
@@ -1925,6 +1949,13 @@ export interface ModRef4 {
  * manager did not put there is still in the data directory and active.
  */
 export interface SwitchedOffPlugin {
+  /**
+   * The files of the plugin's name in the data directory that no mod
+   * manager put there: the plugin and the archives named after it, left
+   * behind when the mod went (ADR 0073). Empty where the mod manager
+   * still has its own copies there, or nothing is left.
+   */
+  leftBehind?: string[];
   /**
    * Whether the game loads the plugin all the same.
    */

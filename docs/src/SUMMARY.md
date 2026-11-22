@@ -83,6 +83,7 @@
   - [0067 Stacked doors are merged into one](adr/0067-stacked-doors-are-merged-into-one.md)
   - [0068 Which plugin needs which](adr/0068-which-plugin-needs-which.md)
   - [0069 Places where characters do something](adr/0069-places-where-characters-do-something.md)
+  - [0073 Switched-off mods are taken out through Vortex's plugin list](adr/0073-switched-off-mods-taken-out-through-vortex.md)
   - [Template](adr/template.md)
 
 # Reference

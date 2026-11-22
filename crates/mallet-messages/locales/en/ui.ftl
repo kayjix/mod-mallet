@@ -115,6 +115,13 @@ action-load-after = Let { $plugin } win
 action-disable-mod = Disable { $mod }
     .description = Vortex switches { $mod } off in the profile you use, and asks to deploy. Nothing is deleted; switch it on again in Vortex to undo it.
 
+action-disable-plugins = Switch off { $plugin }
+    .description = Vortex switches { $plugin } off in its list of plugins{ $otherCount ->
+        [0] {""}
+        [one] , together with the plugin that builds on it ({ $others })
+       *[other] , together with the { $otherCount } plugins that build on it ({ $others })
+    }, and shows you the list. The game then no longer loads { $plugin }, nor the archive of the same name. Nothing is deleted; tick { $plugin } again in Vortex's list of plugins to undo it.
+
 action-enable-mod = Switch on { $mod }
     .description = Vortex switches { $mod } on in the profile you use, and asks to deploy. Switch it off again in Vortex to undo it.
 
@@ -174,6 +181,12 @@ action-load-after-mo2 = Let { $plugin } win
 
 action-disable-mod-mo2 = Untick { $mod } in Mod Organizer
     .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of mods on the left, untick { $mod }. Nothing is deleted; tick it again to undo it.
+
+action-disable-plugins-mo2 = Untick { $plugin } in Mod Organizer
+    .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of plugins on the right, untick { $plugin }{ $otherCount ->
+        [0] {""}
+       *[other] , and also { $others }, which build on it
+    }. Nothing is deleted; tick it again to undo it.
 
 action-enable-mod-mo2 = Tick { $mod } in Mod Organizer
     .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of mods on the left, tick { $mod }. Untick it again to undo it.

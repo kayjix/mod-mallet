@@ -14,6 +14,7 @@ import { type CollisionSpot, collisionSpots, weightOf } from "./health";
 import { DependencyContext, ModDependencies, ModsTabs } from "./ModDependencies";
 import type { WorkKind } from "./map-places";
 import { type ModFilter, type ModSort, useOverviewTexts } from "./overview-texts";
+import { LEFT_BEHIND, STILL_LOADED, StillLoadedHelp } from "./still-loaded";
 import { FindingRow } from "./Tasks";
 import { COLLIDES_WIDELY, toneOf, WideAdvice, WideTag } from "./wide-advice";
 import "./overview.css";
@@ -47,6 +48,8 @@ interface ModState {
   collisions: Collided[];
   openSpots: number;
   crash: boolean;
+  /** The mod is switched off, but its plugin still loaded, or files of it left (ADR 0073). */
+  stillLoaded?: RenderedFinding;
 }
 
 /** Arguments in which findings name mods (or plugins, where no mod is known). */
@@ -204,6 +207,16 @@ function ModList({
 
   const states = useMemo(() => {
     const byName = new Map(mods.map((info) => [info.mod.name.toLowerCase(), info]));
+    // Collisions name the plugin of a mod switched off but still loaded by
+    // its file, as no mod in Vortex brings that copy: it is the mod's all
+    // the same (ADR 0073).
+    for (const rendered of findings) {
+      const { kind, args } = rendered.finding;
+      const info = byName.get(String(args.mod ?? "").toLowerCase());
+      if (kind === STILL_LOADED && info !== undefined && typeof args.plugin === "string") {
+        byName.set(args.plugin.toLowerCase(), info);
+      }
+    }
     const byId = new Map(mods.map((info) => [info.mod.id, info]));
     const found = new Map<string, ModState>(
       mods.map((info) => [
@@ -226,6 +239,13 @@ function ModList({
         const state = found.get(id);
         if (state === undefined) {
           continue;
+        }
+        const { kind } = rendered.finding;
+        if (
+          (kind === STILL_LOADED || kind === LEFT_BEHIND) &&
+          state.info.mod.name === rendered.finding.args.mod
+        ) {
+          state.stillLoaded = rendered;
         }
         if (step === "advice") {
           state.advice.push(rendered);
@@ -481,9 +501,14 @@ const wideOf = (state: ModState) =>
 function ModDetails({ state }: { state: ModState }) {
   const { t, decideSpot, mods, showModOnMap } = useSession();
   const wide = wideOf(state);
-  const advice = state.advice.filter((rendered) => rendered !== wide);
+  // The mod switched off but still in the game leads its page (ADR 0073).
+  const still = state.stillLoaded;
+  const advice = state.advice.filter((rendered) => rendered !== wide && rendered !== still);
+  const problems = state.problems.filter((rendered) => rendered !== still);
+  const spotCount = state.collisions.reduce((sum, collided) => sum + collided.spots.length, 0);
   const o = useOverviewTexts();
   const nothing =
+    still === undefined &&
     state.problems.length === 0 &&
     state.collisions.length === 0 &&
     state.overridden.length === 0 &&
@@ -499,17 +524,18 @@ function ModDetails({ state }: { state: ModState }) {
   }
   return (
     <>
+      {still !== undefined && <StillLoadedHelp rendered={still} lead spots={spotCount} />}
       {wide !== undefined && (
         <WideAdvice
           rendered={wide}
           onShowMod={toneOf(wide) === "keep" ? undefined : () => showModOnMap(state.info.mod.name)}
         />
       )}
-      {state.problems.length > 0 && (
+      {problems.length > 0 && (
         <div className="mod-section tasks">
           <h3>{o.sectionFindings}</h3>
           <ul>
-            {state.problems.map((rendered) => (
+            {problems.map((rendered) => (
               <FindingRow key={rendered.finding.id} rendered={rendered} />
             ))}
           </ul>

@@ -8,6 +8,14 @@ in [Releases](docs/src/contributing/releases.md).
 
 ### Added
 
+- A mod you switched off that the game still loads, because Vortex left an
+  old copy of its plugin in the Data folder, now gets a way out: on a
+  click, Vortex switches that plugin off in its list of plugins, together
+  with the plugins that build on it (asked first), and shows you the list.
+  The mod's page in Mods says first that its collisions stay until then,
+  and a button shows the files in the Data folder for you to move out.
+  Once the plugin is off, a note names the files still lying there. Needs
+  Vortex link 0.9.0; update the link in the toolbox.
 - The toolbox lists the modding tools Vortex knows for your game (SSEEdit and
   its variants, FNIS, Wrye Bash, BodySlide) with what each is for and whether
   it is still where Vortex expects it. Findings about plugins that need

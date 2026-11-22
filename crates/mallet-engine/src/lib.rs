@@ -75,6 +75,7 @@ pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
     select_game, setup_fingerprint, update_settings,
 };
+pub use switched_off::data_file;
 pub use toolbox::{game_art, restart_manager, toolbox};
 pub use versions::{asset_versions, asset_view};
 pub use walkways::{NavmeshRecord, hidden_walkways, repaired_navmeshes, walkway_repair};

@@ -42,6 +42,14 @@ export type Action =
       type: "disable-mod";
     }
   | {
+      /**
+       * The plugins by file name: the one the finding is about first,
+       * then those that build on it and would lose their master.
+       */
+      plugins: string[];
+      type: "disable-plugins";
+    }
+  | {
       mod: ModRef2;
       type: "enable-mod";
     }

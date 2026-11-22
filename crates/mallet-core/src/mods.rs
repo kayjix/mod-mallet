@@ -71,6 +71,12 @@ pub struct SwitchedOffPlugin {
     pub mod_ref: ModRef,
     /// Whether the game loads the plugin all the same.
     pub loaded: bool,
+    /// The files of the plugin's name in the data directory that no mod
+    /// manager put there: the plugin and the archives named after it, left
+    /// behind when the mod went (ADR 0073). Empty where the mod manager
+    /// still has its own copies there, or nothing is left.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub left_behind: Vec<String>,
 }
 
 /// The [`ModSource`] of a setup that no known mod manager looks after.

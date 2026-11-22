@@ -359,6 +359,7 @@ pub const ALL: &[KindInfo] = &[
     MODS_DUPLICATES_ANOTHER,
     PATCH_HIDES_WALKWAY,
     PLUGINS_SWITCHED_OFF_LOADED,
+    PLUGINS_SWITCHED_OFF_LEFT_BEHIND,
 ];
 
 /// A mod whose placed objects collide with many spots of other mods: a
@@ -452,10 +453,24 @@ pub const PLUGINS_SWITCHED_OFF_LOADED: KindInfo = KindInfo {
         "mod",
         "deployed",
         "fileCount",
+        "fileList",
         "files",
         "dependentCount",
         "dependents",
+        // Every plugin that would lose a master, with its mod (ADR 0073).
+        "dependentPlugins",
+        "dependentModIds",
     ],
+};
+
+/// A mod the mod manager keeps switched off left files in the data
+/// directory that the mod manager did not put there, though the game no
+/// longer loads its plugin (ADR 0073).
+pub const PLUGINS_SWITCHED_OFF_LEFT_BEHIND: KindInfo = KindInfo {
+    id: "plugins.switched-off-left-behind",
+    severity: Severity::Info,
+    confidence: Confidence::Certain,
+    args: &["plugin", "mod", "fileCount", "files", "fileList"],
 };
 
 /// Looks a kind up by its identifier.

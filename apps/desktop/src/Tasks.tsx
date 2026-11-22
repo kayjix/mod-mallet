@@ -24,6 +24,7 @@ import { reportSpots, type SpotState, weightOf } from "./health";
 import type { Texts } from "./i18n";
 import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
+import { LEFT_BEHIND, STILL_LOADED, StillLoadedHelp } from "./still-loaded";
 import { useTaskRowTexts } from "./task-row-texts";
 import { ToolHint } from "./tool-hint";
 import { COLLIDES_WIDELY, SwitchOffButton, WideAdvice, wideFindings } from "./wide-advice";
@@ -197,10 +198,13 @@ export function FindingRow({
               key={available.label}
               title={available.description}
               disabled={action.busy}
-              // Switching off a mod that collides widely opens the row first:
-              // what relies on it is said there, and asked about (ADR 0061).
+              // Switching off a mod that collides widely, or the plugins of
+              // one switched off but still loaded, opens the row first: what
+              // relies on it is said there, and asked about (ADR 0061, 0073).
               onClick={() =>
-                finding.kind === COLLIDES_WIDELY ? setOpen(true) : action.run(available.action)
+                finding.kind === COLLIDES_WIDELY || available.action.type === "disable-plugins"
+                  ? setOpen(true)
+                  : action.run(available.action)
               }
             >
               {available.label}
@@ -215,6 +219,9 @@ export function FindingRow({
               <p className="summary">{rendered.summary}</p>
               {ways.length === 0 && rendered.actions.length === 0 && (
                 <p className="remedy">{rendered.remedy}</p>
+              )}
+              {(finding.kind === STILL_LOADED || finding.kind === LEFT_BEHIND) && (
+                <StillLoadedHelp rendered={rendered} />
               )}
               <Ways rendered={rendered} action={action} ways={ways} />
               <ToolHint kind={finding.kind} />
@@ -370,7 +377,12 @@ function useWays(rendered: RenderedFinding, known: ModInfo[]): Way[] {
     typeof mod === "string" &&
     typeof other === "string"
   ) {
-    ways.push({ key: "pair", label: o.pairOpen, run: () => openPair(mod, other), primary: true });
+    ways.push({
+      key: "pair",
+      label: o.pairOpen,
+      run: () => openPair(mod, other),
+      primary: true,
+    });
   }
   if (finding.kind === "mods.collides-widely" && typeof mod === "string") {
     // With one other mod, `others` is its name and its count of spots: "Large Town (25)".
@@ -393,7 +405,12 @@ function useWays(rendered: RenderedFinding, known: ModInfo[]): Way[] {
   }
   if (finding.kind.startsWith("navmeshes.") && showToolbox !== undefined) {
     // Named by what it is for; the button opens the tool's row in the toolbox.
-    ways.push({ key: "toolbox", label: o.navmeshChoice, run: showToolbox, primary: false });
+    ways.push({
+      key: "toolbox",
+      label: o.navmeshChoice,
+      run: showToolbox,
+      primary: false,
+    });
   }
   for (const info of known) {
     const page = info.page;
@@ -408,7 +425,12 @@ function useWays(rendered: RenderedFinding, known: ModInfo[]): Way[] {
   }
   const onMap = collision ? undefined : where.find((spot) => spot.location.type === "exterior");
   if (onMap !== undefined) {
-    ways.push({ key: "map", label: t.showOnMap, run: () => showOnMap(onMap), primary: false });
+    ways.push({
+      key: "map",
+      label: t.showOnMap,
+      run: () => showOnMap(onMap),
+      primary: false,
+    });
   }
   // Where Mod Mallet hands nothing to the mod manager, the first way is the main one.
   const first = ways[0];
@@ -438,9 +460,12 @@ function Ways({
   return (
     <div className="ways">
       {rendered.actions.map((available) =>
+        // The plugins of a switched-off mod are switched off from the help
+        // above, which asks first about what builds on them (ADR 0073).
         // Switching off a mod that collides widely asks first about what
         // relies on it (ADR 0061).
-        finding.kind === COLLIDES_WIDELY && available.action.type === "disable-mod" ? (
+        available.action.type === "disable-plugins" ? null : finding.kind === COLLIDES_WIDELY &&
+          available.action.type === "disable-mod" ? (
           <SwitchOffButton key={available.label} rendered={rendered} />
         ) : (
           <button
@@ -685,7 +710,12 @@ function CollisionsCard({ report }: { report: RenderedReport }) {
     () => reportSpots(report, ignored, patchChoices),
     [report, ignored, patchChoices],
   );
-  const states: Record<SpotState, number> = { open: 0, kept: 0, waiting: 0, patched: 0 };
+  const states: Record<SpotState, number> = {
+    open: 0,
+    kept: 0,
+    waiting: 0,
+    patched: 0,
+  };
   for (const spot of spots) {
     states[spot.state] += 1;
   }

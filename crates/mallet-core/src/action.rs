@@ -63,6 +63,17 @@ pub enum Action {
         #[serde(rename = "mod")]
         mod_ref: ModRef,
     },
+    /// Switch plugins off in the mod manager's list of plugins, so that the
+    /// game no longer loads them, nor the archives of their names (ADR
+    /// 0073). The list holds every plugin in the data directory, also those
+    /// the mod manager did not install, such as a copy left behind by a mod
+    /// that is switched off. Nothing is deleted; switching them on there
+    /// again undoes it.
+    DisablePlugins {
+        /// The plugins by file name: the one the finding is about first,
+        /// then those that build on it and would lose their master.
+        plugins: Vec<String>,
+    },
     /// Switch a mod on that is installed in the mod manager but switched
     /// off in the profile in use. Switching it off again there undoes it.
     EnableMod {

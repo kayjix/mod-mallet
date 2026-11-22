@@ -58,11 +58,18 @@ pub(crate) fn plugins(
                 plugin: loaded.map_or_else(|| name.to_owned(), |plugin| plugin.name.clone()),
                 mod_ref,
                 loaded: loaded.is_some(),
+                left_behind: Vec::new(),
             })
         })
         .collect();
     found.sort();
     found.dedup();
+    if !found.is_empty() {
+        let data_files = data_files(&game_dir.join("Data"));
+        for plugin in &mut found {
+            plugin.left_behind = left_behind(&plugin.plugin, &data_files, mods);
+        }
+    }
     if found.iter().any(|plugin| plugin.loaded) {
         tracing::info!(
             plugins = ?found
@@ -75,6 +82,78 @@ pub(crate) fn plugins(
     }
     found
 }
+
+/// Where a plugin or an archive named `name` lies directly in the game's
+/// data directory, for the window to show it in the file explorer (ADR
+/// 0073). `None` for any other name, for a name with a folder in it, and
+/// for a file that is not there, so that nothing else can be shown this way.
+pub fn data_file(options: &crate::ScanOptions, name: &str) -> Option<std::path::PathBuf> {
+    let lower = name.to_lowercase();
+    let ending = lower.rsplit_once('.').map(|(_, ending)| ending)?;
+    let plain = !name.is_empty()
+        && name.len() <= 260
+        && !name.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|'])
+        && name != "."
+        && name != "..";
+    let known = PLUGIN_ENDINGS
+        .iter()
+        .any(|plugin| plugin.strip_prefix('.') == Some(ending))
+        || ARCHIVE_ENDINGS.contains(&ending);
+    if !plain || !known {
+        return None;
+    }
+    let (game_dir, _) = options.located_game_dir()?;
+    let file = game_dir.join("Data").join(name);
+    file.is_file().then_some(file)
+}
+
+/// The names of the files directly in the data directory. Only reads;
+/// nothing where the directory cannot be read.
+fn data_files(data_dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(data_dir) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect()
+}
+
+/// The files among `data_files` that belong to `plugin` by name, the plugin
+/// itself and the archives named after it, which no mod manager put there
+/// (ADR 0073). In the spelling of the data directory, sorted.
+fn left_behind(plugin: &str, data_files: &[String], mods: &dyn ModSource) -> Vec<String> {
+    let plugin = plugin.to_lowercase();
+    let stem = plugin
+        .rsplit_once('.')
+        .map_or(plugin.as_str(), |(stem, _)| stem);
+    let data = GamePath::new("data");
+    let mut found: Vec<String> = data_files
+        .iter()
+        .filter(|name| {
+            let lower = name.to_lowercase();
+            if lower == plugin {
+                return true;
+            }
+            let Some((name_stem, ending)) = lower.rsplit_once('.') else {
+                return false;
+            };
+            ARCHIVE_ENDINGS.contains(&ending)
+                && (name_stem == stem
+                    || name_stem
+                        .strip_prefix(stem)
+                        .is_some_and(|rest| rest.starts_with(" - ")))
+        })
+        .filter(|name| mods.provider_of(&data.join(name)).is_none())
+        .cloned()
+        .collect();
+    found.sort_by_key(|name| name.to_lowercase());
+    found
+}
+
+/// The file endings of the game's archives, in lower case, without the dot.
+const ARCHIVE_ENDINGS: [&str; 2] = ["bsa", "ba2"];
 
 /// The Creation Club plugins the game counts as its own.
 fn creation_club(game: Game, game_dir: &Path) -> Vec<String> {
@@ -157,13 +236,81 @@ mod tests {
                     plugin: "Town.esp".to_owned(),
                     mod_ref: town(),
                     loaded: true,
+                    left_behind: Vec::new(),
                 },
                 SwitchedOffPlugin {
                     plugin: "gone.esm".to_owned(),
                     mod_ref: town(),
                     loaded: false,
+                    left_behind: Vec::new(),
                 },
             ]
         );
+    }
+
+    #[test]
+    fn the_files_no_mod_manager_put_there_are_named_as_left_behind() {
+        let game = tempfile::tempdir().unwrap();
+        let data = game.path().join("Data");
+        std::fs::create_dir_all(data.join("Town.bsa folder")).unwrap();
+        for name in [
+            "Town.esp",
+            "Town.bsa",
+            "Town - Textures.bsa",
+            "Townhall.bsa",
+            "Town.ini",
+            "shared.esp",
+        ] {
+            std::fs::write(data.join(name), b"").unwrap();
+        }
+        let found = plugins(Game::SkyrimSe, game.path(), &[active("Town.esp")], &Manager);
+        let town = found
+            .iter()
+            .find(|plugin| plugin.plugin == "Town.esp")
+            .unwrap();
+        assert_eq!(
+            town.left_behind,
+            ["Town - Textures.bsa", "Town.bsa", "Town.esp"]
+        );
+        // Nothing of the other plugin is left in the folder.
+        let gone = found
+            .iter()
+            .find(|plugin| plugin.plugin == "gone.esm")
+            .unwrap();
+        assert_eq!(gone.left_behind, Vec::<String>::new());
+    }
+
+    #[test]
+    fn files_a_mod_manager_put_there_are_not_left_behind() {
+        let files = ["shared.esp".to_owned(), "Shared.bsa".to_owned()];
+        assert_eq!(left_behind("shared.esp", &files, &Manager), ["Shared.bsa"]);
+    }
+
+    #[test]
+    fn only_plugins_and_archives_in_the_data_directory_are_shown() {
+        let game = tempfile::tempdir().unwrap();
+        let data = game.path().join("Data");
+        std::fs::create_dir_all(data.join("meshes")).unwrap();
+        for name in ["Town.esp", "Town.bsa", "Town.ini"] {
+            std::fs::write(data.join(name), b"").unwrap();
+        }
+        std::fs::write(game.path().join("Outside.esp"), b"").unwrap();
+        let options = crate::ScanOptions {
+            game_dir: Some(game.path().to_path_buf()),
+            ..crate::ScanOptions::default()
+        };
+        assert_eq!(data_file(&options, "Town.esp"), Some(data.join("Town.esp")));
+        assert_eq!(data_file(&options, "Town.bsa"), Some(data.join("Town.bsa")));
+        for name in [
+            "Town.ini",
+            "Gone.esp",
+            "../Outside.esp",
+            r"..\Outside.esp",
+            "meshes",
+            r"C:\Windows\notepad.esp",
+            "",
+        ] {
+            assert_eq!(data_file(&options, name), None, "{name}");
+        }
     }
 }

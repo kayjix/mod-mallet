@@ -25,7 +25,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const PROTOCOL = 1;
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 
 /** How often status.json is refreshed. */
 const HEARTBEAT_MS = 5000;
@@ -62,6 +62,7 @@ const ACTIONS = [
   "file-overrides",
   "add-to-tools",
   "remove-from-tools",
+  "set-plugins-enabled",
 ];
 
 /** How many files one request for file overrides may name. */
@@ -69,6 +70,9 @@ const MAX_OVERRIDE_FILES = 200;
 
 /** A plugin's file name, as a rule in the plugin list may name it. */
 const PLUGIN_FILE = /^[^\\/:*?"<>|]{1,200}\.(esp|esm|esl)$/i;
+
+/** How many plugins one request to switch plugins on or off may name. */
+const MAX_PLUGINS = 50;
 
 /** The profile Vortex is currently using. */
 function activeProfile(state) {
@@ -123,6 +127,9 @@ function plan(state, request, now, env = process.env) {
   }
   if (request.action === "file-overrides") {
     return planFileOverrides(state, request, game);
+  }
+  if (request.action === "set-plugins-enabled") {
+    return planPluginsEnabled(request);
   }
   const modId = findModId(state, game, request.modId);
   if (modId === undefined) {
@@ -237,6 +244,30 @@ function planLoadAfter(state, request) {
     (entry) => (typeof entry === "string" ? entry : entry?.name)?.toLowerCase() === reference,
   );
   return { code: "applied", rule: known ? undefined : { pluginId, reference } };
+}
+
+/**
+ * Plugins to switch on or off in the plugin list (ADR 0073). Vortex's list
+ * holds every plugin in the game's Data folder, also those it did not
+ * install, and writes the game's `plugins.txt` from it: a plugin switched
+ * off there is no longer loaded, nor the archives of its name. Only plugin
+ * file names are accepted.
+ */
+function planPluginsEnabled(request) {
+  const { plugins, enabled } = request;
+  if (
+    !Array.isArray(plugins) ||
+    plugins.length === 0 ||
+    plugins.length > MAX_PLUGINS ||
+    !plugins.every((plugin) => typeof plugin === "string" && PLUGIN_FILE.test(plugin)) ||
+    typeof enabled !== "boolean"
+  ) {
+    return {
+      code: "failed",
+      detail: "plugins are not plugin names, or enabled is not true or false",
+    };
+  }
+  return { code: "applied", plugins: { names: plugins, enabled } };
 }
 
 /** A file below the data directory, as Mod Mallet names it: relative, without `..`. */
@@ -408,6 +439,24 @@ function handle(
   }
   if (request?.action === "load-after" && planned.code === "applied") {
     api.events.emit("autosort-plugins", true);
+  }
+  if (planned.plugins !== undefined) {
+    const { names, enabled } = planned.plugins;
+    // What the switch beside a plugin in Vortex's plugin list does.
+    for (const pluginName of names) {
+      api.store?.dispatch({ type: "SET_PLUGIN_ENABLED", payload: { pluginName, enabled } });
+    }
+    // What Vortex does to show a plugin: its plugin list, narrowed to it.
+    api.events.emit("show-main-page", "gamebryo-plugins");
+    api.store?.dispatch({
+      type: "SET_ATTRIBUTE_FILTER",
+      payload: { tableId: "gamebryo-plugins", attributeId: "name", filter: names[0] },
+    });
+    api.sendNotification?.({
+      type: "info",
+      message: `Mod Mallet asked to switch ${enabled ? "on" : "off"}: ${names.join(", ")}.`,
+      displayMS: 8000,
+    });
   }
   if (planned.overrides !== undefined) {
     // What Vortex's editor of file conflicts does when it saves.

@@ -105,6 +105,8 @@ export interface Api {
   savePatchReport(text: string): Promise<string>;
   /** Shows one of Mod Mallet's own folders in the file explorer. */
   openFolder(which: "patches" | "logs"): Promise<void>;
+  /** Shows a plugin or an archive in the game's Data folder in the file explorer, selected (ADR 0073). */
+  showDataFile(name: string): Promise<void>;
   /** Where the app writes its log. */
   logFile(): Promise<string | null>;
   /** What the setup needs besides its mods, and how each of those stands. */
@@ -262,6 +264,7 @@ const tauriApi: Api = {
   createPaths: (repairs) => invoke<CreatedPaths>("create_paths", { repairs }),
   savePatchReport: (text) => invoke<string>("save_patch_report", { text }),
   openFolder: (which) => invoke<void>("open_folder", { which }),
+  showDataFile: (name) => invoke<void>("show_data_file", { name }),
   logFile: () => invoke<string | null>("log_file"),
   toolbox: (lang) => invoke<RenderedToolbox>("toolbox", { lang }),
   restartManager: () => invoke<void>("restart_manager"),

@@ -56,6 +56,7 @@ import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, usePaintReach, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
+import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
@@ -692,13 +693,31 @@ export function Collisions({
     return found;
   }, [report.switchedOffPlugins]);
   const offHere = current?.sides.find((side) => stillLoaded.has(side.plugin.toLowerCase()));
+  // What takes it out, on the spot as on the mod's page (ADR 0073).
+  const offFinding =
+    offHere === undefined
+      ? undefined
+      : report.findings.find(
+          (rendered) =>
+            rendered.finding.kind === STILL_LOADED &&
+            String(rendered.finding.args.plugin ?? "").toLowerCase() ===
+              offHere.plugin.toLowerCase(),
+        );
   const offNote = offHere !== undefined && (
-    <p className="still-loaded-note" role="note">
-      {switchedOffTexts[lang].stillLoadedSpot(
-        stillLoaded.get(offHere.plugin.toLowerCase()) ?? offHere.plugin,
-        offHere.plugin,
+    <div className="still-loaded-note" role="note">
+      <p>
+        {switchedOffTexts[lang].stillLoadedSpot(
+          stillLoaded.get(offHere.plugin.toLowerCase()) ?? offHere.plugin,
+          offHere.plugin,
+        )}
+      </p>
+      {offFinding !== undefined && (
+        <div className="still-buttons">
+          <DisablePluginsButton rendered={offFinding} />
+          <ShowFilesButton files={stillFiles(offFinding)} />
+        </div>
       )}
-    </p>
+    </div>
   );
   const modCount = useMemo(
     () => new Set(items.filter((item) => item.pairs.length > 0).map((item) => item.mods.key)).size,

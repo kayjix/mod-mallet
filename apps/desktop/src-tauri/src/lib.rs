@@ -408,6 +408,47 @@ fn open_folder(which: String) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+/// Shows a plugin or an archive in the game's Data folder in the file
+/// explorer, selected, so that the user can move it out (ADR 0073). Only
+/// such a file, by its bare name, and only one that is there; nothing is
+/// moved or deleted.
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn show_data_file(name: String) -> Result<(), String> {
+    let file = mallet_engine::data_file(&settings()?.scan_options(), &name)
+        .ok_or_else(|| format!("not a file in the Data folder: {name}"))?;
+    tracing::info!(file = %file.display(), "showing a file in the Data folder");
+    reveal(&file).map_err(|error| error.to_string())
+}
+
+/// Opens the folder of `file` in the file explorer with the file selected,
+/// where the system can; elsewhere the folder.
+fn reveal(file: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Explorer reads `/select,` and the path as one argument of its
+        // own making; a path never contains a quotation mark on Windows.
+        std::process::Command::new("explorer")
+            .raw_arg(format!("/select,\"{}\"", file.display()))
+            .spawn()
+            .map(|_| ())
+    }
+    #[cfg(not(windows))]
+    {
+        let opener = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        let folder = file.parent().unwrap_or(file);
+        std::process::Command::new(opener)
+            .arg(folder)
+            .spawn()
+            .map(|_| ())
+    }
+}
+
 /// What the setup needs besides its mods, and how each of those stands.
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -866,6 +907,7 @@ pub fn run() -> tauri::Result<()> {
             create_paths,
             save_patch_report,
             open_folder,
+            show_data_file,
             log_file,
             toolbox,
             restart_manager,

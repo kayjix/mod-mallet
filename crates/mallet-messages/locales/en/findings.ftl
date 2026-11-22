@@ -473,7 +473,28 @@ plugins-switched-off-but-loaded = A mod you switched off is still in the game
            *[other] { $dependentCount } plugins build on it: { $dependents }. Take these out as well, or the game will not start once { $plugin } is gone.
         }
     .explanation = When a mod manager installs a mod, it puts the mod's files into the game's Data folder; when you switch the mod off, it takes them out again the next time it deploys. Until it deploys, the game still loads them. And if a file of the same name was already in the folder before, from an installation by hand or by another tool, the mod manager sets it aside and puts it back when the mod goes. The game then keeps finding the plugin, and the mod manager keeps it in the list of active plugins. Either way, the mod is off in the mod manager but still in the game.
-    .remedy = If your mod manager has not deployed yet, deploy. If the files stay, they were not the mod manager's: open its list of plugins and switch the plugin off, or delete the files named here from the game's Data folder. If plugins of other mods build on it, switch those off too. Then scan again. If you want the mod after all, switch it on again in your mod manager instead.
+    .remedy = If your mod manager has not deployed yet, deploy. If the files stay, they were not the mod manager's: switch the plugin off in its list of plugins, together with the plugins of other mods that build on it (Vortex can be asked to do this from here). The game then no longer loads it, nor the archive of the same name. To tidy up, move the files named here out of the game's Data folder afterwards, for example into a folder next to it; do not delete them until you are sure nothing is missing. Then scan again. If you want the mod after all, switch it on again in your mod manager instead.
+
+plugins-switched-off-left-behind = Files of a switched-off mod are still in the Data folder
+    .headline = { $mod } is out of the game, but { $fileCount ->
+        [one] a file of it is
+       *[other] { $fileCount } files of it are
+    } still in the Data folder
+    .summary = The game no longer loads { $plugin }, so { $mod } is out of the game. But { $fileCount ->
+        [one] this file is
+       *[other] these files are
+    } still in the game's Data folder: { $files }. Your mod manager did not put { $fileCount ->
+        [one] it
+       *[other] them
+    } there, so it will not take { $fileCount ->
+        [one] it
+       *[other] them
+    } away. { $fileCount ->
+        [one] It does
+       *[other] They do
+    } no harm while { $plugin } is switched off.
+    .explanation = A copy that was in the Data folder before a mod manager installed the mod is set aside while the mod is on and put back when it goes. Such leftovers are easy to forget: if you switch the mod on again, the mod manager sets them aside once more; if you tick its plugin again in the list of plugins, the game loads the old copy again.
+    .remedy = Move the files named here out of the game's Data folder, for example into a folder next to it, and scan again. Keep them until you are sure nothing is missing.
 
 patch-hides-walkway = Mod Mallet's patch hides something characters walk on
     .headline =

@@ -126,6 +126,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(recommendations::DuplicateMods),
         Box::new(walkways::HiddenWalkways),
         Box::new(switched_off::SwitchedOffButLoaded),
+        Box::new(switched_off::SwitchedOffLeftBehind),
     ]
 }
 

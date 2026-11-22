@@ -159,6 +159,27 @@
           ]
         },
         {
+          "description": "Switch plugins off in the mod manager's list of plugins, so that the\ngame no longer loads them, nor the archives of their names (ADR\n0073). The list holds every plugin in the data directory, also those\nthe mod manager did not install, such as a copy left behind by a mod\nthat is switched off. Nothing is deleted; switching them on there\nagain undoes it.",
+          "type": "object",
+          "properties": {
+            "plugins": {
+              "description": "The plugins by file name: the one the finding is about first,\nthen those that build on it and would lose their master.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "disable-plugins"
+            }
+          },
+          "required": [
+            "type",
+            "plugins"
+          ]
+        },
+        {
           "description": "Switch a mod on that is installed in the mod manager but switched\noff in the profile in use. Switching it off again there undoes it.",
           "type": "object",
           "properties": {

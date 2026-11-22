@@ -464,7 +464,22 @@ plugins-switched-off-but-loaded = Eine Mod, die du ausgeschaltet hast, ist noch 
            *[other] { $dependentCount } Plugins bauen darauf auf: { $dependents }. Nimm sie auch heraus, sonst startet das Spiel nicht mehr, sobald { $plugin } weg ist.
         }
     .explanation = Wenn ein Mod-Manager eine Mod installiert, legt er ihre Dateien in den Data-Ordner des Spiels; schaltest du die Mod aus, nimmt er sie beim nächsten Bereitstellen wieder heraus. Bis dahin lädt das Spiel sie weiter. Und lag dort schon vorher eine Datei gleichen Namens, von einer Installation von Hand oder durch ein anderes Werkzeug, legt der Mod-Manager sie beiseite und legt sie zurück, wenn die Mod geht. Das Spiel findet das Plugin dann weiterhin, und der Mod-Manager lässt es in der Liste der aktiven Plugins. So oder so ist die Mod im Mod-Manager aus, im Spiel aber noch da.
-    .remedy = Hat dein Mod-Manager noch nicht bereitgestellt, stelle bereit. Bleiben die Dateien, gehörten sie nicht dem Mod-Manager: Öffne seine Liste der Plugins und schalte das Plugin aus, oder lösche die hier genannten Dateien aus dem Data-Ordner des Spiels. Bauen Plugins anderer Mods darauf auf, schalte die auch aus. Scanne danach erneut. Willst du die Mod doch, schalte sie in deinem Mod-Manager stattdessen wieder ein.
+    .remedy = Hat dein Mod-Manager noch nicht bereitgestellt, stelle bereit. Bleiben die Dateien, gehörten sie nicht dem Mod-Manager: Schalte das Plugin in seiner Plugin-Liste aus, zusammen mit den Plugins anderer Mods, die darauf aufbauen (Vortex kann von hier aus darum gebeten werden). Das Spiel lädt es dann nicht mehr, auch nicht das Archiv mit demselben Namen. Zum Aufräumen verschiebe die hier genannten Dateien danach aus dem Data-Ordner des Spiels, zum Beispiel in einen Ordner „_aussortiert“ daneben; lösche sie erst, wenn du sicher bist, dass nichts fehlt. Scanne danach erneut. Willst du die Mod doch, schalte sie in deinem Mod-Manager stattdessen wieder ein.
+
+plugins-switched-off-left-behind = Dateien einer ausgeschalteten Mod liegen noch im Data-Ordner
+    .headline = { $mod } ist aus dem Spiel, aber { $fileCount ->
+        [one] eine Datei davon liegt
+       *[other] { $fileCount } Dateien davon liegen
+    } noch im Data-Ordner
+    .summary = Das Spiel lädt { $plugin } nicht mehr, { $mod } ist also aus dem Spiel. Aber { $fileCount ->
+        [one] diese Datei liegt
+       *[other] diese Dateien liegen
+    } noch im Data-Ordner des Spiels: { $files }. Dein Mod-Manager hat sie nicht dorthin gelegt, darum nimmt er sie auch nicht weg. Solange { $plugin } ausgeschaltet ist, { $fileCount ->
+        [one] schadet sie
+       *[other] schaden sie
+    } nicht.
+    .explanation = Eine Kopie, die schon vor der Installation einer Mod im Data-Ordner lag, legt der Mod-Manager beiseite, solange die Mod an ist, und legt sie zurück, wenn sie geht. Solche Reste vergisst man leicht: Schaltest du die Mod wieder ein, legt der Mod-Manager sie erneut beiseite; setzt du den Haken bei ihrem Plugin in der Plugin-Liste wieder, lädt das Spiel die alte Kopie.
+    .remedy = Verschiebe die hier genannten Dateien aus dem Data-Ordner des Spiels, zum Beispiel in einen Ordner „_aussortiert“ daneben, und scanne erneut. Behalte sie, bis du sicher bist, dass nichts fehlt.
 
 patch-hides-walkway = Der Patch von Mod Mallet versteckt etwas, worauf Figuren laufen
     .headline =

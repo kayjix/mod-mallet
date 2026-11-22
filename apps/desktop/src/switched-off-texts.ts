@@ -22,6 +22,24 @@ export interface SwitchedOffTexts {
   installed: (objects: number, plugins: string[]) => string;
   installedNote: string;
   makePatch: string;
+  /** On a mod's page: the mod is off, but its plugin still loaded (ADR 0073). */
+  modLead: (mod: string, plugin: string, spots: number) => string;
+  /** The files that keep it in the game, which Vortex did not put there. */
+  notVortex: (files: number) => string;
+  /** Vortex has not deployed since the mod went off. */
+  notDeployed: string;
+  /** After switching off: what a new scan shows. */
+  afterwards: string;
+  /** Before switching off a plugin others build on. */
+  confirmPlugins: (plugin: string, others: string[]) => string;
+  confirmYes: string;
+  cancel: string;
+  /** Opens the Data folder with the plugin selected. */
+  showFiles: string;
+  /** What to do with the files: by hand, since Mod Mallet moves nothing. */
+  moveOut: (files: number) => string;
+  /** On a mod's page: the mod is out of the game, but files are left. */
+  leftLead: (mod: string, files: number) => string;
 }
 
 export interface WideTexts {
@@ -74,6 +92,41 @@ export const switchedOffTexts: Record<Lang, SwitchedOffTexts> = {
     installedNote:
       "The next patch leaves them out. Your decisions about them are kept for when the mod is on again.",
     makePatch: "Make the patch without them",
+    modLead: (mod, plugin, spots) =>
+      `You switched ${mod} off, but the game still loads ${plugin}. ${
+        spots === 0
+          ? "Until it is out of the game, its objects stay in the world."
+          : `Its ${spots === 1 ? "collision" : `${spots} collisions`} below ${
+              spots === 1 ? "stays" : "stay"
+            } until it is out of the game.`
+      }`,
+    notVortex: (files) =>
+      `${files === 1 ? "This file is" : "These files are"} still in the game's Data folder. Vortex did not put ${
+        files === 1 ? "it" : "them"
+      } there, so deploying does not take ${files === 1 ? "it" : "them"} away:`,
+    notDeployed:
+      "Vortex has not deployed since you switched the mod off. Deploy in Vortex, then scan again.",
+    afterwards:
+      "Once Vortex has switched it off, scan again: its collisions are gone, and what you decided about them waits for the mod.",
+    confirmPlugins: (plugin, others) =>
+      `Vortex switches off ${plugin} and, with it, ${
+        others.length === 1
+          ? "the plugin that builds on it"
+          : `the ${others.length} plugins that build on it`
+      }: ${named(others, enMore, 5)}. Without ${plugin} the game would not start with ${
+        others.length === 1 ? "it" : "them"
+      }. Nothing is deleted; you can tick them again in Vortex's list of plugins. Go ahead?`,
+    confirmYes: "Switch them off",
+    cancel: "Cancel",
+    showFiles: "Show in the Data folder",
+    moveOut: (files) =>
+      `Mod Mallet does not move or delete ${files === 1 ? "it" : "them"}. To tidy up, move ${
+        files === 1 ? "it" : "them"
+      } out of the Data folder yourself, for example into a folder next to it, and scan again.`,
+    leftLead: (mod, files) =>
+      `${mod} is out of the game, but ${
+        files === 1 ? "a file of it is" : `${files} files of it are`
+      } still in the Data folder. Vortex did not put ${files === 1 ? "it" : "them"} there.`,
   },
   de: {
     waiting: (decisions, mods) =>
@@ -95,6 +148,35 @@ export const switchedOffTexts: Record<Lang, SwitchedOffTexts> = {
     installedNote:
       "Der nächste Patch lässt sie weg. Deine Entscheidungen dazu bleiben erhalten, für den Fall, dass du die Mod wieder einschaltest.",
     makePatch: "Patch ohne sie erstellen",
+    modLead: (mod, plugin, spots) =>
+      `Du hast ${mod} ausgeschaltet, aber das Spiel lädt ${plugin} noch. ${
+        spots === 0
+          ? "Bis es aus dem Spiel ist, bleiben seine Objekte in der Welt."
+          : `${spots === 1 ? "Seine Kollision unten bleibt" : `Seine ${spots} Kollisionen unten bleiben`}, bis es aus dem Spiel ist.`
+      }`,
+    notVortex: (files) =>
+      `${files === 1 ? "Diese Datei liegt" : "Diese Dateien liegen"} noch im Data-Ordner des Spiels. Vortex hat sie nicht dorthin gelegt, darum nimmt Bereitstellen sie auch nicht weg:`,
+    notDeployed:
+      "Vortex hat seit dem Ausschalten nicht bereitgestellt. Stelle in Vortex bereit und scanne dann erneut.",
+    afterwards:
+      "Hat Vortex es ausgeschaltet, scanne erneut: Seine Kollisionen sind dann weg, und was du dazu entschieden hast, wartet auf die Mod.",
+    confirmPlugins: (plugin, others) =>
+      `Vortex schaltet ${plugin} aus und mit ihm ${
+        others.length === 1
+          ? "das Plugin, das darauf aufbaut"
+          : `die ${others.length} Plugins, die darauf aufbauen`
+      }: ${named(others, deMore, 5)}. Ohne ${plugin} würde das Spiel mit ${
+        others.length === 1 ? "ihm" : "ihnen"
+      } nicht starten. Gelöscht wird nichts; in Vortex' Plugin-Liste kannst du die Haken wieder setzen. Fortfahren?`,
+    confirmYes: "Ausschalten",
+    cancel: "Abbrechen",
+    showFiles: "Im Data-Ordner zeigen",
+    moveOut: () =>
+      "Mod Mallet verschiebt und löscht sie nicht. Zum Aufräumen verschiebe sie selbst aus dem Data-Ordner, zum Beispiel in einen Ordner „_aussortiert“ daneben, und scanne erneut.",
+    leftLead: (mod, files) =>
+      `${mod} ist aus dem Spiel, aber ${
+        files === 1 ? "eine Datei davon liegt" : `${files} Dateien davon liegen`
+      } noch im Data-Ordner. Vortex hat sie nicht dorthin gelegt.`,
   },
 };
 
