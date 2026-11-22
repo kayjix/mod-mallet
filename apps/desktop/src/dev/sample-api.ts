@@ -835,7 +835,7 @@ function sampleMap(): RenderedReport["map"] {
             object: water,
             plugin: "Water Mod.esp",
             name: "WaterInnDoor",
-            leadsTo: house,
+            broken: true,
             leadsBack: false,
             walkable: false,
             otherSideWalkable: true,
@@ -851,6 +851,15 @@ function sampleMap(): RenderedReport["map"] {
             keep: water,
             hide: [town],
             changes: [
+              {
+                type: "teleport",
+                door: water,
+                at: [x * 4096 + 2048, y * 4096 + 2040, 0],
+                plugin: "Water Mod.esp",
+                to: inside,
+                arrival: [0, 100, 0],
+                facing: [0, 0, 3142],
+              },
               {
                 type: "teleport",
                 door: inside,

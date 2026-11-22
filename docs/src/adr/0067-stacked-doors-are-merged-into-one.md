@@ -72,15 +72,23 @@ worklist never offered to hide them.
 6. **A plan per door.** Keeping one door means: the patch hides the
    others; every door elsewhere that led to a hidden door leads to the
    kept one (`RecordChange::Teleport`, the arrival moved by as far as the
-   doors stand apart); a kept door without a teleport takes over the
-   hidden one's; every door triangle that named a hidden door names the
-   kept one (`RecordChange::NavmeshDoor`). Places only a hidden door led
-   to are listed as lost. The suggested door is not one the plugin of
+   doors stand apart); a kept door that leads nowhere takes over the
+   hidden one's way; every door triangle that named a hidden door names
+   the kept one (`RecordChange::NavmeshDoor`). Whichever door is kept, the
+   way through stays: it leads where the group leads, and the door there
+   leads back to it. A door whose teleport names a door that is not there
+   leads nowhere, as one without a teleport; the card says so. Only where
+   the doors lead to places apart (`DoorGroup::apart`: not the same door,
+   room or, outside, place within about 7 m) is there no merge: the game
+   cannot take the player to both. Keeping one door then keeps its own way
+   and only hides the others; their places are listed as lost, and the
+   window says plainly that keeping both is the other choice. The suggested
+   door is not one the plugin of
    another door of the group changed (it put that door aside, as Open
    Cities does with the game's Riften door); then the one whose other side
    leads back and that characters walk through on both sides, then the
    one most things refer to, then the plan with the fewest changes, then
-   the one in front.
+   the one in front. It is a hint; any door can be kept.
 7. **The teleports go into the plugin of moves.** A door's new teleport is
    an override of the door's winning version, copied as ADR 0060 copies a
    moved object, with its cell and worldspace, its references rewritten
@@ -111,7 +119,13 @@ worklist never offered to hide them.
    the door of B now use the door of A"). It says whether the characters'
    paths lead through the kept door, and asks the check of ADR 0059
    whether hiding the others leaves every way there (`walkway_reach` with
-   the hidden doors). The guided review shows the same for the doors among
+   the hidden doors). Each card names the door by plugin and number (as
+   xEdit shows it without the load order's byte) and its base, and has an
+   eye at its top right: while it is on, the 3D view lights up that door
+   alone and draws the others as ghosts, or leaves them out without the
+   markings. What keeping a door means starts with where it then leads
+   ("It now leads to Tamriel 28,27; the door there leads back to it").
+   The guided review shows the same for the doors among
    a structure's spots. Merging is the spot's choice where the other doors
    are one plugin's, otherwise each hidden on its own. The patch page
    lists a led door among the moves ("leads to the door …").

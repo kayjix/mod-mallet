@@ -6,7 +6,7 @@
 import { useState } from "react";
 import "./doors.css";
 import { useSession } from "./Actions";
-import { doorTexts } from "./door-texts";
+import { type DoorTexts, doorTexts } from "./door-texts";
 import type {
   DoorGroup,
   DoorMerge,
@@ -59,10 +59,10 @@ interface DoorPanelProps {
   onKeepAll: () => void;
   /** Whether everything stays: the spot is decided as "keep all". */
   keptAll: boolean;
-  /** Looks at the place without a plugin's doors, without deciding. */
-  onPreview?: (plugin: string) => void;
-  /** The plugins looked at without. */
-  previewed?: Set<string>;
+  /** The door looked at alone in the 3D view, the others as ghosts. */
+  looking?: ObjectRef | null;
+  /** Looks at one door alone in the 3D view, or at all again with null. */
+  onLookAt?: (object: ObjectRef | null) => void;
   /** The worldspace or interior cell the doors are in, to ask where characters still go. */
   place: string | null;
   /** Outside: where the doors stand; null inside. */
@@ -76,19 +76,19 @@ export function DoorPanel({
   onMerge,
   onKeepAll,
   keptAll,
-  onPreview,
-  previewed,
+  looking = null,
+  onLookAt,
   place,
   centre,
 }: DoorPanelProps) {
   const { lang } = useSession();
   const d = doorTexts[lang];
   const merged = mergedInto(group, hidden);
-  const [looked, setLooked] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
   const mergedAt = group.doors.findIndex(
     (door) => merged !== null && sameObject(door.object, merged),
   );
-  const shown = looked ?? Math.max(mergedAt, 0);
+  const shown = hovered ?? Math.max(mergedAt, 0);
   const plan = group.plans[shown];
   const kept = group.doors[shown];
   const modOf = (object: ObjectRef) =>
@@ -96,27 +96,33 @@ export function DoorPanel({
       group.doors.find((candidate) => sameObject(candidate.object, object))?.plugin ??
         object.plugin,
     );
-  const nameOf = (object: ObjectRef) => {
-    const door = group.doors.find((candidate) => sameObject(candidate.object, object));
-    return d.doorOf(short(door?.plugin ?? object.plugin));
-  };
+  const nameOf = (object: ObjectRef) => d.doorOf(modOf(object));
   return (
     <div className="door-panel">
       <p className="door-intro">
         {d.intro(group.doors.length)}
         {group.flicker && <> {d.flicker}</>}
       </p>
+      {group.apart === true && <p className="door-apart">{d.apart}</p>}
       <div className="door-cards">
         {group.doors.map((door, index) => (
           <DoorCard
             key={`${door.object.plugin}:${door.object.localId}`}
             door={door}
             first={index === 0}
+            apart={group.apart === true}
             merged={merged !== null && sameObject(merged, door.object)}
             gone={merged !== null && !sameObject(merged, door.object)}
-            onLook={(looking) => setLooked(looking ? index : null)}
-            onPreview={onPreview === undefined ? undefined : () => onPreview(door.object.plugin)}
-            previewed={previewed?.has(door.object.plugin) ?? false}
+            looking={looking !== null && sameObject(looking, door.object)}
+            onHover={(hovering) => setHovered(hovering ? index : null)}
+            onLook={
+              onLookAt === undefined
+                ? undefined
+                : () =>
+                    onLookAt(
+                      looking !== null && sameObject(looking, door.object) ? null : door.object,
+                    )
+            }
             onMerge={() => {
               const chosen = group.plans[index];
               if (chosen !== undefined) {
@@ -129,35 +135,29 @@ export function DoorPanel({
       <div className="door-plan">
         {plan !== undefined && kept !== undefined && (
           <>
-            <strong>{d.ifKept(d.doorOf(short(kept.plugin)))}</strong>
+            <strong>{d.ifKept(nameOf(kept.object))}</strong>
+            <p className="door-outcome">{outcome(d, group, plan, kept)}</p>
             <ul>
-              {plan.hide
-                .filter((object) => {
-                  const door = group.doors.find((candidate) =>
-                    sameObject(candidate.object, object),
-                  );
-                  return door !== undefined && (door.walkable || door.references > 0);
-                })
-                .map((object) => (
-                  <li key={`users:${object.plugin}:${object.localId}`}>
-                    {d.usersMove(nameOf(object), nameOf(plan.keep))}
-                  </li>
-                ))}
-              {plan.changes.map((change, index) => {
-                if (change.type === "navmesh-door") {
+              {group.apart !== true &&
+                plan.hide
+                  .filter((object) => {
+                    const door = group.doors.find((candidate) =>
+                      sameObject(candidate.object, object),
+                    );
+                    return door !== undefined && (door.walkable || door.references > 0);
+                  })
+                  .map((object) => (
+                    <li key={`users:${object.plugin}:${object.localId}`}>
+                      {d.usersMove(nameOf(object), nameOf(plan.keep))}
+                    </li>
+                  ))}
+              {plan.changes.map((change) => {
+                if (
+                  change.type !== "teleport" ||
+                  change.from === undefined ||
+                  change.from === null
+                ) {
                   return null;
-                }
-                const key = `${change.door.plugin}:${change.door.localId}:${index}`;
-                if (change.from === undefined || change.from === null) {
-                  const leads = kept.leadsTo ?? null;
-                  const destination = group.doors.find(
-                    (door) =>
-                      door.leadsTo?.door != null && sameObject(door.leadsTo.door, change.to),
-                  )?.leadsTo;
-                  const place = destination ?? leads;
-                  return place === null || place === undefined ? null : (
-                    <li key={key}>{d.takesWay(modOf(plan.keep), placeName(place.location))}</li>
-                  );
                 }
                 const from = change.from;
                 const across = group.doors.find((door) => sameObject(door.object, from));
@@ -166,7 +166,7 @@ export function DoorPanel({
                     ? placeName(across.leadsTo.location)
                     : change.door.plugin;
                 return (
-                  <li key={key}>
+                  <li key={`${change.door.plugin}:${change.door.localId}`}>
                     {d.otherSide(there, modOf(plan.keep))}
                     {change.arrival !== null && change.arrival !== undefined && (
                       <> {d.arrivalMoves}</>
@@ -182,16 +182,16 @@ export function DoorPanel({
                   )}
                 </li>
               )}
-              {plan.lost.map((place) => (
-                <li key={`lost:${placeName(place.location)}`} className="door-lost">
+              {plan.lost.map((lost) => (
+                <li key={`lost:${placeName(lost.location)}`} className="door-lost">
                   {d.lost(
-                    placeName(place.location),
+                    placeName(lost.location),
                     nameOf(
                       group.doors.find(
                         (door) =>
                           door.leadsTo !== null &&
                           door.leadsTo !== undefined &&
-                          placeName(door.leadsTo.location) === placeName(place.location),
+                          placeName(door.leadsTo.location) === placeName(lost.location),
                       )?.object ?? plan.keep,
                     ),
                   )}
@@ -202,7 +202,9 @@ export function DoorPanel({
               {kept.walkable ? d.keptReached : d.keptNotOnPaths}
             </p>
             <DoorReach place={place} centre={centre} hide={plan.hide} />
-            {plan.changes.length === 0 && <p className="aside">{d.nothingElse}</p>}
+            {plan.changes.length === 0 && plan.lost.length === 0 && (
+              <p className="aside">{d.nothingElse}</p>
+            )}
             {plan.changes.some((change) => change.type === "teleport") && (
               <p className="aside">{d.viaMoves}</p>
             )}
@@ -219,6 +221,45 @@ export function DoorPanel({
   );
 }
 
+/**
+ * Where the kept door leads once the others are gone, and whether the door
+ * there leads back: its own way, or the one it takes over.
+ */
+function outcome(d: DoorTexts, group: DoorGroup, plan: DoorMerge, kept: StackedDoor): string {
+  const taken = plan.changes.find(
+    (change) =>
+      change.type === "teleport" &&
+      (change.from === undefined || change.from === null) &&
+      sameObject(change.door, plan.keep),
+  );
+  const destination =
+    kept.leadsTo ??
+    (taken === undefined
+      ? null
+      : (group.doors.find(
+          (door) =>
+            door.leadsTo?.door !== undefined &&
+            door.leadsTo.door !== null &&
+            sameObject(door.leadsTo.door, taken.to),
+        )?.leadsTo ?? null));
+  if (destination === null) {
+    return d.outcomeOpensOnly;
+  }
+  const there = destination.door ?? null;
+  const back =
+    (kept.leadsBack && taken === undefined) ||
+    plan.changes.some(
+      (change) =>
+        change.type === "teleport" &&
+        sameObject(change.to, plan.keep) &&
+        there !== null &&
+        sameObject(change.door, there),
+    );
+  return back
+    ? d.outcomeLeadsBack(placeName(destination.location))
+    : d.outcomeLeads(placeName(destination.location));
+}
+
 /** What hiding the doors does to the ways characters take there (ADR 0059). */
 function DoorReach(props: {
   place: string | null;
@@ -228,71 +269,90 @@ function DoorReach(props: {
   return <ReachNote reach={useReach(props.place, props.centre, props.hide)} />;
 }
 
+/** A record's number in its plugin, as xEdit shows it without the load order's byte. */
+const hex = (object: ObjectRef) => object.localId.toString(16).toUpperCase().padStart(6, "0");
+
 interface DoorCardProps {
   door: StackedDoor;
   /** Whether it is the first door, the one others are measured from. */
   first: boolean;
+  /** Whether the doors lead to places apart, so keeping one is no merge. */
+  apart: boolean;
   merged: boolean;
   gone: boolean;
-  onLook: (looking: boolean) => void;
+  /** Whether it is looked at alone in the 3D view. */
+  looking: boolean;
+  onHover: (hovering: boolean) => void;
+  /** Looks at it alone in the 3D view, or at all again. */
+  onLook: (() => void) | undefined;
   onMerge: () => void;
-  onPreview: (() => void) | undefined;
-  previewed: boolean;
 }
 
-/** One door: whose, where it leads, whether characters walk through it. */
+/** One door: which, where it leads, whether characters walk through it. */
 function DoorCard({
   door,
   first,
+  apart,
   merged,
   gone,
+  looking,
+  onHover,
   onLook,
   onMerge,
-  onPreview,
-  previewed,
 }: DoorCardProps) {
   const { lang } = useSession();
   const d = doorTexts[lang];
   const check = (ok: boolean, yes: string, no: string) => <li data-ok={ok}>{ok ? yes : no}</li>;
+  const leadsTo = door.leadsTo ?? null;
+  const changedBy = door.plugin.toLowerCase() !== door.object.plugin.toLowerCase();
   return (
-    <div className="door-card" data-merged={merged || undefined} data-gone={gone || undefined}>
+    <div
+      className="door-card"
+      data-merged={merged || undefined}
+      data-gone={gone || undefined}
+      data-looking={looking || undefined}
+    >
       <div className="door-card-head">
-        <strong title={door.plugin}>{short(door.plugin)}</strong>
-        {onPreview !== undefined && (
-          <button
-            type="button"
-            className="small quiet door-eye"
-            aria-pressed={previewed}
-            title={d.lookWithout}
-            aria-label={d.lookWithout}
-            onClick={onPreview}
-          >
-            {previewed ? "◌" : "◉"}
-          </button>
-        )}
+        <strong title={door.object.plugin}>{short(door.object.plugin)}</strong>
+        <code className="door-id">{hex(door.object)}</code>
         {door.suggested && (
           <span className="suggested-mark" title={d.suggestedHint}>
             {d.suggested}
           </span>
         )}
+        {onLook !== undefined && (
+          <button
+            type="button"
+            className="small quiet door-eye"
+            aria-pressed={looking}
+            title={d.lookAlone}
+            aria-label={d.lookAlone}
+            onClick={onLook}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        )}
       </div>
       <div className="aside">
         {door.name}
+        {changedBy && <> · {d.changedBy(short(door.plugin))}</>}
         {door.front && <> · {d.front}</>}
         {!first && door.offset > 0 && <> · {d.away(centimetres(door.offset))}</>}
       </div>
       <p className="door-leads">
-        {door.leadsTo !== null && door.leadsTo !== undefined
-          ? d.leadsTo(placeName(door.leadsTo.location))
-          : d.opensOnly}
+        {leadsTo !== null
+          ? d.leadsTo(placeName(leadsTo.location))
+          : door.broken
+            ? d.broken
+            : d.opensOnly}
       </p>
       <ul className="door-checks">
-        {door.leadsTo !== null &&
-          door.leadsTo !== undefined &&
-          check(door.leadsBack, d.leadsBack, d.leadsElsewhere)}
+        {leadsTo !== null && check(door.leadsBack, d.leadsBack, d.leadsElsewhere)}
         {check(door.walkable, d.walkable, d.notWalkable)}
-        {door.leadsTo !== null &&
-          door.leadsTo !== undefined &&
+        {leadsTo !== null &&
           door.walkable &&
           check(door.otherSideWalkable, d.otherSideWalkable, d.otherSideNotWalkable)}
       </ul>
@@ -301,13 +361,15 @@ function DoorCard({
         className="work-choice"
         aria-pressed={merged}
         onClick={onMerge}
-        onMouseEnter={() => onLook(true)}
-        onMouseLeave={() => onLook(false)}
-        onFocus={() => onLook(true)}
-        onBlur={() => onLook(false)}
+        onMouseEnter={() => onHover(true)}
+        onMouseLeave={() => onHover(false)}
+        onFocus={() => onHover(true)}
+        onBlur={() => onHover(false)}
       >
         <span className="work-choice-text">
-          <strong className="work-choice-title">{merged ? d.merged : d.mergeInto}</strong>
+          <strong className="work-choice-title">
+            {apart ? (merged ? d.keptOnly : d.keepOnly) : merged ? d.merged : d.mergeInto}
+          </strong>
         </span>
       </button>
     </div>

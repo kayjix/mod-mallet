@@ -30,8 +30,6 @@ export interface DoorTexts {
   /** The door in `place` leads to the door of the mod `to`. */
   otherSide: (place: string, to: string) => string;
   arrivalMoves: string;
-  /** The door of the mod `mod` takes over the way to `place`. */
-  takesWay: (mod: string, place: string) => string;
   paths: (count: number, to: string) => string;
   lost: (place: string, from: string) => string;
   nothingElse: string;
@@ -45,7 +43,22 @@ export interface DoorTexts {
   keptNotOnPaths: string;
   /** In the list of moves: a door led to another door. */
   ledTo: (door: string) => string;
-  lookWithout: string;
+  /** Looks at one door alone in the 3D view. */
+  lookAlone: string;
+  /** The version the game uses is another plugin's. */
+  changedBy: (plugin: string) => string;
+  /** A door whose way leads to a door that is not there. */
+  broken: string;
+  /** The doors lead to places apart. */
+  apart: string;
+  keepOnly: string;
+  keptOnly: string;
+  /** Where the kept door leads, and that the door there leads back. */
+  outcomeLeadsBack: (place: string) => string;
+  /** Where the kept door leads; the door there leads elsewhere. */
+  outcomeLeads: (place: string) => string;
+  /** The kept door leads nowhere, as none of them did. */
+  outcomeOpensOnly: string;
   /** A door named by its mod. */
   doorOf: (mod: string) => string;
 }
@@ -76,7 +89,6 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     usersMove: (from, to) => `Characters who used ${from} now use ${to}.`,
     otherSide: (place, to) => `The door in ${place} leads to the door of ${to} instead.`,
     arrivalMoves: "You come out in front of it.",
-    takesWay: (mod, place) => `The door of ${mod} takes over the way to ${place}.`,
     paths: (count, to) =>
       count === 1
         ? `1 path of the characters is to be attached to ${to} (later).`
@@ -91,7 +103,16 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     keptNotOnPaths:
       "No path of the characters leads through the kept door yet; they use the paths of the hidden one, beside it.",
     ledTo: (door) => `leads to the door ${door}`,
-    lookWithout: "Look at the place without this door, without deciding",
+    lookAlone: "Look at this door alone in the view; the others show as ghosts",
+    changedBy: (plugin) => `as ${plugin} has it`,
+    broken: "Leads to a door that is not there, so it only opens",
+    apart:
+      "These doors lead to different places; the game can't take you to both. Keep both, or keep one with its own way and give up the other's.",
+    keepOnly: "Keep only this one",
+    keptOnly: "Kept with its own way; the others are hidden",
+    outcomeLeadsBack: (place) => `It now leads to ${place}; the door there leads back to it.`,
+    outcomeLeads: (place) => `It now leads to ${place}.`,
+    outcomeOpensOnly: "It only opens, as all of them do.",
     doorOf: (mod) => `the door of ${mod}`,
   },
   de: {
@@ -119,7 +140,6 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     usersMove: (from, to) => `Figuren, die ${from} benutzt haben, benutzen jetzt ${to}.`,
     otherSide: (place, to) => `Die Tür in ${place} führt stattdessen zur Tür von ${to}.`,
     arrivalMoves: "Du kommst vor ihr heraus.",
-    takesWay: (mod, place) => `Die Tür von ${mod} übernimmt den Weg nach ${place}.`,
     paths: (count, to) =>
       count === 1
         ? `1 Weg der Figuren wird an ${to} angeschlossen (später).`
@@ -135,7 +155,16 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     keptNotOnPaths:
       "Noch führt kein Weg der Figuren durch die behaltene Tür; sie nehmen die Wege der ausgeblendeten, direkt daneben.",
     ledTo: (door) => `führt zur Tür ${door}`,
-    lookWithout: "Den Ort ohne diese Tür ansehen, ohne zu entscheiden",
+    lookAlone: "Nur diese Tür in der Ansicht zeigen; die anderen erscheinen als Geister",
+    changedBy: (plugin) => `wie ${plugin} sie hat`,
+    broken: "Führt zu einer Tür, die es nicht gibt, und geht deshalb nur auf",
+    apart:
+      "Diese Türen führen an verschiedene Orte; das Spiel kann dich nicht an beide bringen. Behalte beide, oder behalte eine mit ihrem eigenen Weg und gib den der anderen auf.",
+    keepOnly: "Nur diese behalten",
+    keptOnly: "Mit ihrem eigenen Weg behalten; die anderen sind ausgeblendet",
+    outcomeLeadsBack: (place) => `Sie führt dann nach ${place}; die Tür dort führt zu ihr zurück.`,
+    outcomeLeads: (place) => `Sie führt dann nach ${place}.`,
+    outcomeOpensOnly: "Sie geht nur auf, wie alle hier.",
     doorOf: (mod) => `die Tür von ${mod}`,
   },
 };

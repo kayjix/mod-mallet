@@ -19,6 +19,7 @@ import type { ObjectAnchors } from "./generated/object-anchors";
 import type {
   DoorMerge,
   MapSpot,
+  ObjectRef,
   RenderedFinding,
   RenderedReport,
 } from "./generated/rendered-report";
@@ -479,6 +480,12 @@ export function CollisionsStep({
     setNote(null);
   }, [currentKey]);
   const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+  // One door of stacked doors looked at alone (ADR 0067): the others as ghosts.
+  const [doorLook, setDoorLook] = useState<{ object: ObjectRef; others: ObjectRef[] } | null>(null);
+  const stageHidden = useMemo(
+    () => (doorLook === null ? hidden : new Set([...hidden, ...doorLook.others.map(matchKey)])),
+    [hidden, doorLook],
+  );
   // The parts of the place that a decision might hide, to ask the game's ties of.
   const asking = cluster === undefined ? null : partsToAsk(cluster, segments);
   const askingKey = asking === null ? "" : `${asking.place}|${asking.keys.join(",")}`;
@@ -1100,9 +1107,9 @@ export function CollisionsStep({
         reach={reach}
         within={cluster.passage?.keys ?? null}
         radius={radius}
-        focus={focusKeys}
+        focus={doorLook === null ? focusKeys : [matchKey(doorLook.object)]}
         names={names}
-        hidden={hidden}
+        hidden={stageHidden}
         walked={walked}
         onSegments={(found) => {
           setSegments(found);
@@ -1133,6 +1140,19 @@ export function CollisionsStep({
             keptAll={patchChoices[key] === null}
             onMerge={merge}
             onKeepAll={() => merge(null)}
+            looking={doorLook?.object ?? null}
+            onLookAt={(object) =>
+              setDoorLook(
+                object === null
+                  ? null
+                  : {
+                      object,
+                      others: group.doors
+                        .map((door) => door.object)
+                        .filter((other) => matchKey(other) !== matchKey(object)),
+                    },
+              )
+            }
             place={at.place.type === "exterior" ? at.place.world : at.place.cell}
             centre={at.place.type === "exterior" ? [at.centre[0], at.centre[1]] : null}
           />

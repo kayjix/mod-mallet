@@ -24,6 +24,11 @@ pub struct DoorGroup {
     /// Whether two of the doors stand in the same plane, so that the game
     /// shows them flickering through each other.
     pub flicker: bool,
+    /// Whether the doors lead to places apart, so that the game cannot
+    /// take the player to both: keeping one is no merge, and the other
+    /// places are no longer entered here.
+    #[serde(default)]
+    pub apart: bool,
 }
 
 /// One door of a [`DoorGroup`].
@@ -44,6 +49,10 @@ pub struct StackedDoor {
     /// Where it leads; `None` for a door that only opens.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leads_to: Option<DoorDestination>,
+    /// Whether it has a teleport to a door that is not there: it leads
+    /// nowhere, though it looks like a door to somewhere.
+    #[serde(default)]
+    pub broken: bool,
     /// Whether the door on the other side leads back to this one.
     pub leads_back: bool,
     /// Whether characters walk through it: a path of the game names it.

@@ -1549,6 +1549,12 @@ export interface MapSpot {
  */
 export interface DoorGroup {
   /**
+   * Whether the doors lead to places apart, so that the game cannot
+   * take the player to both: keeping one is no merge, and the other
+   * places are no longer entered here.
+   */
+  apart?: boolean;
+  /**
    * The doors, the one suggested to keep first.
    */
   doors: StackedDoor[];
@@ -1566,6 +1572,11 @@ export interface DoorGroup {
  * One door of a [`DoorGroup`].
  */
 export interface StackedDoor {
+  /**
+   * Whether it has a teleport to a door that is not there: it leads
+   * nowhere, though it looks like a door to somewhere.
+   */
+  broken?: boolean;
   /**
    * Whether the player sees this door in front of the others.
    */

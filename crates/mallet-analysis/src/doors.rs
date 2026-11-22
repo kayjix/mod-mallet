@@ -416,6 +416,7 @@ fn describe(
                     .clone()
                     .unwrap_or_else(|| door.base.to_string()),
                 leads_to: destination(door, doors, &object),
+                broken: door.teleport.is_some() && other_side.is_none(),
                 leads_back: other_side
                     .and_then(|other| other.teleport.as_ref())
                     .is_some_and(|back| back.door == door.id),
@@ -428,9 +429,19 @@ fn describe(
             }
         })
         .collect();
+    // Doors that lead to places apart are not merged: the game cannot
+    // take the player to both.
+    let leads = |door: &&PlacedDoor| doors.other_side(door).is_some();
+    let apart = group.iter().enumerate().any(|(index, a)| {
+        leads(a)
+            && group
+                .iter()
+                .skip(index + 1)
+                .any(|b| leads(b) && !same_destination(a, b, doors))
+    });
     let mut plans: Vec<DoorMerge> = group
         .iter()
-        .map(|keep| plan(keep, group, doors, owners, &object))
+        .map(|keep| plan(keep, group, apart, doors, owners, &object))
         .collect();
     suggest(&mut stacked, &mut plans, group, &object);
 
@@ -476,6 +487,7 @@ fn describe(
             doors: stacked,
             plans,
             flicker,
+            apart,
         }),
     };
     Some((
@@ -586,6 +598,7 @@ fn whole(length: f64) -> u32 {
 fn plan(
     keep: &PlacedDoor,
     group: &[&PlacedDoor],
+    apart: bool,
     doors: &Doors<'_>,
     owners: &Owners<'_>,
     object: &dyn Fn(&RecordId) -> ObjectRef,
@@ -599,8 +612,21 @@ fn plan(
     let kept_destination = destination(keep, doors, object).map(|place| place.location);
     let mut changes: Vec<RecordChange> = Vec::new();
     let mut lost: Vec<DoorDestination> = Vec::new();
-    let mut takes_teleport = keep.teleport.is_none();
+    // A door whose teleport leads to a door that is not there leads
+    // nowhere, as one without a teleport.
+    let mut takes_teleport = kept_destination.is_none();
     for door in &hidden {
+        if apart {
+            // The doors lead to places apart: the kept one keeps its own,
+            // the others' are no longer entered here. Nothing is merged.
+            if let Some(place) = destination(door, doors, object)
+                && kept_destination.as_ref() != Some(&place.location)
+                && !lost.iter().any(|known| known.location == place.location)
+            {
+                lost.push(place);
+            }
+            continue;
+        }
         // The doors on the other side that led to the hidden door lead to
         // the kept one, the player arriving as far moved as the doors are.
         let shift = [
@@ -637,7 +663,10 @@ fn plan(
             });
         }
         // A kept door that led nowhere takes over where the hidden one led.
-        if takes_teleport && let Some(teleport) = &door.teleport {
+        if takes_teleport
+            && destination(door, doors, object).is_some()
+            && let Some(teleport) = &door.teleport
+        {
             takes_teleport = false;
             changes.push(RecordChange::Teleport {
                 door: object(&keep.id),
@@ -660,13 +689,6 @@ fn plan(
                 from: object(&door.id),
                 to: object(&keep.id),
             });
-        }
-        if keep.teleport.is_some()
-            && let Some(place) = destination(door, doors, object)
-            && kept_destination.as_ref() != Some(&place.location)
-            && !lost.iter().any(|known| known.location == place.location)
-        {
-            lost.push(place);
         }
     }
     DoorMerge {
@@ -949,7 +971,7 @@ mod tests {
     }
 
     #[test]
-    fn a_door_leading_elsewhere_loses_its_place_when_hidden() {
+    fn doors_leading_to_places_apart_are_not_merged() {
         let mut facts = house();
         facts.doors.doors.push(door(
             "town.esp",
@@ -968,6 +990,7 @@ mod tests {
         }
         let found = groups(&facts);
         let group = found.spots.first().unwrap().doors.as_ref().unwrap();
+        assert!(group.apart);
         let keep_game = group
             .plans
             .iter()
@@ -979,12 +1002,41 @@ mod tests {
                 cell: "skyrim.esm:000E01".to_owned()
             })
         );
-        // The mod's room's door then leads out through the game's door.
-        assert!(keep_game.changes.iter().any(|change| matches!(
-            change,
-            RecordChange::Teleport { door, to, .. }
-                if *door == object("town.esp", 0x900) && *to == object("skyrim.esm", 0xA02)
-        )));
+        // Each keeps its own way: nothing is led elsewhere.
+        assert_eq!(keep_game.changes, []);
+    }
+
+    #[test]
+    fn a_kept_door_whose_way_is_broken_takes_over_the_hidden_ones() {
+        // The mod's door leads to a door that is not there; keeping it
+        // still keeps the way into the house, both ways.
+        let mut facts = house();
+        if let Some(own) = facts.doors.doors.get_mut(2) {
+            own.teleport = Some(Teleport {
+                door: id("town.esp", 0x999),
+                position: [0, 0, 0],
+                rotation: [0, 0, 0],
+                flags: 0,
+            });
+        }
+        let found = groups(&facts);
+        let group = found.spots.first().unwrap().doors.as_ref().unwrap();
+        assert!(!group.apart);
+        let keep_mod = group
+            .plans
+            .iter()
+            .find(|plan| plan.keep == object("town.esp", 0x800))
+            .unwrap();
+        assert_eq!(keep_mod.lost, []);
+        let led = |from: ObjectRef, to: ObjectRef| {
+            keep_mod.changes.iter().any(|change| matches!(
+                change,
+                RecordChange::Teleport { door, to: target, .. } if *door == from && *target == to
+            ))
+        };
+        // It leads into the house, and the house's door leads back to it.
+        assert!(led(object("town.esp", 0x800), object("skyrim.esm", 0xA01)));
+        assert!(led(object("skyrim.esm", 0xA01), object("town.esp", 0x800)));
     }
 
     #[test]

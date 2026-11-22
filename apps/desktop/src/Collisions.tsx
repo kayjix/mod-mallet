@@ -1318,6 +1318,10 @@ function Spot(props: SpotProps) {
   const { item, passage, preview, decided, marks } = props;
   const { spot, pairs } = item;
   const depth = spot.depth ?? null;
+  // One door of stacked doors looked at alone in the view (ADR 0067).
+  const [doorLook, setDoorLook] = useState<ObjectRef | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new spot looks at all again.
+  useEffect(() => setDoorLook(null), [item.key]);
   const pairSpots = spotsOf(pairs);
   const modSides = sidesOfMods(pairs);
   // The objects of the area, to hide a whole passage of one mod.
@@ -1635,8 +1639,8 @@ function Spot(props: SpotProps) {
             onKeepAll={() => spot.doors && props.onMergeDoors(spot.doors, null)}
             place={walkPlace}
             centre={walkCentre}
-            onPreview={props.onPreview}
-            previewed={preview}
+            looking={doorLook}
+            onLookAt={setDoorLook}
           />
         ) : (
           <div className="work-columns">
@@ -1720,6 +1724,7 @@ function Spot(props: SpotProps) {
         tools={viewTools}
         paint={paintReach}
         paths={repairShown}
+        lookAt={doorLook}
       />
     </>
   );
@@ -1799,6 +1804,7 @@ function Stage({
   tools,
   paint,
   paths = null,
+  lookAt = null,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
@@ -1809,6 +1815,8 @@ function Stage({
   paint?: ComponentProps<typeof MapView3D>["paint"];
   /** The repair of paths to show in the view (ADR 0058), if any. */
   paths?: PathsOverlay | null;
+  /** One part looked at alone: lit up, the spot's other parts as ghosts. */
+  lookAt?: ObjectRef | null;
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -1841,9 +1849,13 @@ function Stage({
   );
   const picked = useMemo<Picked>(() => ({ type: "spot", spot: item.spot }), [item.spot]);
   const parts = item.spot.parts ?? [];
+  const looked = lookAt === null ? null : objectKey(lookAt.plugin, lookAt.localId);
   const focus = useMemo(
-    () => new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId))),
-    [parts],
+    () =>
+      looked === null
+        ? new Set(parts.map((part) => objectKey(part.object.plugin, part.object.localId)))
+        : new Set([looked]),
+    [parts, looked],
   );
   const ghosts = useMemo(() => {
     const keys = new Set(hiddenObjects.map((object) => objectKey(object.plugin, object.localId)));
@@ -1855,8 +1867,17 @@ function Stage({
     for (const object of previewObjects) {
       keys.add(objectKey(object.plugin, object.localId));
     }
+    // Looking at one part alone, the others show as ghosts.
+    if (looked !== null) {
+      for (const part of parts) {
+        const key = objectKey(part.object.plugin, part.object.localId);
+        if (key !== looked) {
+          keys.add(key);
+        }
+      }
+    }
     return keys;
-  }, [hiddenObjects, parts, preview, previewObjects]);
+  }, [hiddenObjects, parts, preview, previewObjects, looked]);
 
   // An object of another collision picked in the view opens that collision.
   const { spots: spotsByFinding } = useSession();

@@ -412,6 +412,11 @@
       "description": "Doors that stand on almost the same spot.",
       "type": "object",
       "properties": {
+        "apart": {
+          "description": "Whether the doors lead to places apart, so that the game cannot\ntake the player to both: keeping one is no merge, and the other\nplaces are no longer entered here.",
+          "type": "boolean",
+          "default": false
+        },
         "doors": {
           "description": "The doors, the one suggested to keep first.",
           "type": "array",
@@ -2489,6 +2494,11 @@
       "description": "One door of a [`DoorGroup`].",
       "type": "object",
       "properties": {
+        "broken": {
+          "description": "Whether it has a teleport to a door that is not there: it leads\nnowhere, though it looks like a door to somewhere.",
+          "type": "boolean",
+          "default": false
+        },
         "front": {
           "description": "Whether the player sees this door in front of the others.",
           "type": "boolean"

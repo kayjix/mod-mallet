@@ -94,3 +94,42 @@
 .door-reached[data-ok="false"] {
   color: var(--warning);
 }
+
+.door-id {
+  font-size: 0.8rem;
+}
+
+.door-eye {
+  margin-left: auto;
+  padding: 2px 6px;
+  line-height: 0;
+}
+
+.door-eye svg {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+}
+
+.door-eye[aria-pressed="true"] {
+  background: var(--spot-door);
+  color: #fff;
+}
+
+.door-card[data-looking] {
+  border-color: var(--spot-door);
+  box-shadow: 0 0 0 2px var(--spot-door);
+}
+
+.door-apart {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--warning);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.door-outcome {
+  margin: 0;
+  font-weight: 600;
+}
