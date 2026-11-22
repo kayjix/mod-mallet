@@ -55,8 +55,12 @@ two places:
      more inside it) or rest on it (a point of the underside on or in it,
      and its middle clearly higher: a roof on the walls, a trim in the
      roof, a ridge on top), whether or not the other mod comes near them.
-     A part goes only when at least half of what holds it goes, so a roof
-     shared with the next building stays there. A part beside another at
+     A part goes only when more than half of what holds it goes, so a roof
+     shared with the next building stays there; when exactly half goes,
+     only if one of those lies under its middle (added the same day, after
+     Clockwork's entrance at Markarth: a bridge set into JK's quay at one
+     end and resting on a pier at the other went with the quay; it is a
+     structure of its own, joined at an edge, and stays). A part beside another at
      the same height is not part of it (the next building's wall). Nothing
      rests on a wide flat part at the bottom of the passage, and a part 7 m
      long or more carries nothing an eighth of its length or less: a cliff

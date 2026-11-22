@@ -444,8 +444,10 @@ fn attach(
     let mut sides = component;
     for (side, owner) in sides.iter_mut().zip(owners) {
         // Until nothing more comes along: a part goes with the side when
-        // at least half of what holds it goes too, so that a roof shared
-        // with the next building stays on that building.
+        // more than half of what holds it goes too, so that a roof shared
+        // with the next building stays on that building; when exactly half
+        // goes, only if one of those holds its middle, so that a bridge set
+        // into a quay at one end and resting on a pier at the other stays.
         loop {
             let mut candidates: BTreeSet<usize> = BTreeSet::new();
             for holder in side.iter().filter_map(|&at| solids.get(at)) {
@@ -483,7 +485,9 @@ fn attach(
                     .map(|holder| holder.longest_side())
                     .fold(0.0, f64::max);
                 if !held.is_empty()
-                    && held.len() * 2 >= holders.len()
+                    && (held.len() * 2 > holders.len()
+                        || (held.len() * 2 == holders.len()
+                            && held.iter().any(|holder| holder.under_middle_of(part))))
                     && part.longest_side() <= LARGE.max(LARGER * longest)
                     && (held.len() >= 2
                         || part.longest_side()
@@ -709,6 +713,15 @@ impl Solid<'_> {
         self.wide_and_flat() && self.world_max.z <= part.world_min.z + REST
     }
 
+    /// Whether this part lies under (or around) the middle of `part`: the
+    /// point straight below or above that middle, at this part's own height,
+    /// is in its box or within [`REST`] of it.
+    fn under_middle_of(&self, part: &Self) -> bool {
+        let middle = part.centre();
+        let level = self.centre();
+        self.contains_within(Vector::new(middle.x, middle.y, level.z), REST)
+    }
+
     /// Whether this part is so much larger than `part` that it is the
     /// ground `part` stands on rather than what it belongs to.
     fn dwarfs(&self, part: &Self) -> bool {
@@ -867,6 +880,8 @@ mod tests {
     const LEAN: u32 = 0x26;
     /// The other mod's lean-to along a side.
     const LEAN_SIDE: u32 = 0x27;
+    /// A footbridge, 6 m long.
+    const BRIDGE: u32 = 0x28;
 
     fn id(plugin: &str, local_id: u32) -> RecordId {
         RecordId {
@@ -994,6 +1009,13 @@ mod tests {
                         false,
                         [-300, -10, 0],
                         [300, 10, 150],
+                    ),
+                    sized(
+                        BRIDGE,
+                        "meshes/bridge.nif",
+                        false,
+                        [-300, -50, 0],
+                        [300, 50, 30],
                     ),
                     sized(
                         LEAN_SIDE,
@@ -1210,6 +1232,54 @@ mod tests {
         };
         assert!(
             ids(&passage.parts[0]).iter().all(|id| *id < 0x810),
+            "{:x?}",
+            ids(&passage.parts[0])
+        );
+    }
+
+    #[test]
+    fn a_bridge_from_the_stable_to_a_pier_that_stays_stays_too() {
+        // A footbridge of the first mod is set into the stable's roof at one
+        // end and rests on a pier of its own at the other, as a bridge set
+        // into a quay. Half of what holds it goes with the stable, but not
+        // what holds its middle: it stays, as does the pier.
+        let mut objects: Vec<PlacedObject> = stable()
+            .into_iter()
+            .filter(|object| !(0x810..=0x814).contains(&object.id.local_id))
+            .collect();
+        objects.extend([
+            placed("Forge.esp", 0x820, BRIDGE, [450, 0, 320]),
+            placed("Forge.esp", 0x821, SIDE, [750, 0, 20]),
+        ]);
+        let found = passages(objects);
+
+        let [passage] = found.as_slice() else {
+            panic!("expected one passage, got {found:?}");
+        };
+        assert_eq!(
+            ids(&passage.parts[0]),
+            vec![0x800, 0x801, 0x802, 0x803, 0x804, 0x805, 0x806]
+        );
+    }
+
+    #[test]
+    fn a_bridge_resting_on_two_walls_of_the_stable_goes_with_it() {
+        // The same footbridge across the stable, from wall to wall: all that
+        // holds it goes, so it goes too.
+        let mut objects: Vec<PlacedObject> = stable()
+            .into_iter()
+            .filter(|object| {
+                !(0x810..=0x814).contains(&object.id.local_id) && object.id.local_id != 0x804
+            })
+            .collect();
+        objects.push(placed("Forge.esp", 0x820, BRIDGE, [0, 0, 250]));
+        let found = passages(objects);
+
+        let [passage] = found.as_slice() else {
+            panic!("expected one passage, got {found:?}");
+        };
+        assert!(
+            ids(&passage.parts[0]).contains(&0x820),
             "{:x?}",
             ids(&passage.parts[0])
         );
