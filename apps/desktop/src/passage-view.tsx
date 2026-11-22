@@ -12,7 +12,14 @@ import type { MapPassage, MapSpot, ObjectRef, RenderedReport } from "./generated
 import { LocateButton } from "./locate";
 import { usePassageTexts } from "./passage-texts";
 import { usePassageTitle } from "./passages";
-import { chooseObject, chooseSpot, type PatchChoices, revealObjects } from "./patch";
+import {
+  chooseObject,
+  chooseSpot,
+  freeObjects,
+  matchKey,
+  type PatchChoices,
+  revealObjects,
+} from "./patch";
 import { groupsOf } from "./Review";
 import type { Cluster, Decided } from "./review-clusters";
 import { useReviewTexts } from "./review-texts";
@@ -161,6 +168,55 @@ export async function tiedIn(api: Api, place: string, objects: ObjectRef[]): Pro
   );
 }
 
+/** How far around a passage's box an object counts as part of the place, in game units (3 m). */
+const AROUND_BOX = 210;
+
+/**
+ * The objects of the side kept, `side`, that `choices` hide on their own
+ * in or right around the passage: hidden by hand, with the wand or one by
+ * one. Keeping that side's version means its whole version, so these are
+ * shown again with it, and the panel says so.
+ */
+export function hiddenByHand(
+  choices: PatchChoices,
+  passage: MapPassage,
+  segments: StageSegment[] | null,
+  area: AreaObjects | null,
+  side: 0 | 1,
+): ObjectRef[] {
+  const plugin = passage.plugins[side].toLowerCase();
+  const inside = new Set(sideParts(passage, segments, side).map(matchKey));
+  const [low, high] = [passage.min, passage.max];
+  const near = (position: readonly number[]) =>
+    [0, 1, 2].every(
+      (axis) =>
+        (position[axis] ?? 0) >= (low[axis] ?? 0) - AROUND_BOX &&
+        (position[axis] ?? 0) <= (high[axis] ?? 0) + AROUND_BOX,
+    );
+  for (const object of area?.objects ?? []) {
+    if (object.id.plugin.toLowerCase() === plugin && near(object.position)) {
+      inside.add(matchKey(object.id));
+    }
+  }
+  return freeObjects(choices).filter(
+    (object) => object.plugin.toLowerCase() === plugin && inside.has(matchKey(object)),
+  );
+}
+
+/** What the last decision of a whole passage did, said right under its head. */
+export interface PassageOutcome {
+  /** The passage, by key. */
+  key: string;
+  /** The side kept, or null for both. */
+  side: 0 | 1 | null;
+  /** How many parts of the other side it hid. */
+  hidden: number;
+  /** How many of them stay, as the game ties them in. */
+  held: number;
+  /** The kept side's parts hidden by hand that it showed again. */
+  byHand: ObjectRef[];
+}
+
 /** The switch in the 3D view's bar: the place now, or with one side's version only. */
 export function VersionSwitch({
   plugins,
@@ -207,17 +263,26 @@ export function PassageHead({
   worlds,
   decided,
   segments,
-  held,
+  outcome,
+  pending,
   onKeep,
+  onUndo,
+  onHideAgain,
 }: {
   cluster: Cluster;
   worlds: RenderedReport["map"]["worlds"];
   decided: Decided;
   segments: StageSegment[] | null;
-  /** How many parts the last decision left because the game ties them in, if any. */
-  held: number;
+  /** What the last decision of this passage did, if one was made here. */
+  outcome: PassageOutcome | null;
+  /** Whether a decision waits for what the game ties in. */
+  pending: boolean;
   /** Keeps one side's version (0 or 1), or both (null). */
   onKeep: (side: 0 | 1 | null) => void;
+  /** Takes the last decision back. */
+  onUndo: () => void;
+  /** Hides again the parts hidden by hand that the decision showed. */
+  onHideAgain: () => void;
 }) {
   const p = usePassageTexts();
   const r = useReviewTexts();
@@ -262,10 +327,14 @@ export function PassageHead({
               {p.why[passage.severity]} {p.bounded}
             </p>
           </Note>
-          {held > 0 && (
-            <Note tone="warn" summary={p.held(held)} hint={`${p.held(held)}. ${p.heldHint}`}>
+          {outcome !== null && outcome.held > 0 && (
+            <Note
+              tone="warn"
+              summary={p.held(outcome.held)}
+              hint={`${p.held(outcome.held)}. ${p.heldHint}`}
+            >
               <p className="aside">
-                {p.held(held)}. {p.heldHint}
+                {p.held(outcome.held)}. {p.heldHint}
               </p>
             </Note>
           )}
@@ -283,6 +352,7 @@ export function PassageHead({
               key={side}
               className="small"
               aria-pressed={kept === side}
+              disabled={pending}
               onClick={() => onKeep(side)}
             >
               {p.keepVersion(names[side])}
@@ -292,12 +362,38 @@ export function PassageHead({
             type="button"
             className="small"
             aria-pressed={kept === null}
+            disabled={pending}
             onClick={() => onKeep(null)}
           >
             {r.keepBoth}
           </button>
         </span>
       </div>
+      {pending && (
+        <p className="passage-done" role="status">
+          {p.deciding}
+        </p>
+      )}
+      {!pending && outcome !== null && (
+        <p className="passage-done" role="status">
+          <span>
+            {outcome.side === null
+              ? p.keptBoth
+              : p.keptDone(names[outcome.side], outcome.hidden, names[outcome.side === 0 ? 1 : 0])}
+          </span>
+          {outcome.side !== null && outcome.byHand.length > 0 && (
+            <span>
+              {p.byHand(outcome.byHand.length, names[outcome.side])}{" "}
+              <button type="button" className="small quiet" onClick={onHideAgain}>
+                {p.hideAgain}
+              </button>
+            </span>
+          )}
+          <button type="button" className="small" onClick={onUndo}>
+            {r.undo}
+          </button>
+        </p>
+      )}
       <details className="passage-sections">
         <summary>{segments === null ? p.measuring : p.sections(segments.length)}</summary>
         {segments !== null && (

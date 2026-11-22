@@ -42,8 +42,10 @@ import { MoveControls, SpotMoves } from "./move-controls";
 import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
 import { usePassageTexts } from "./passage-texts";
 import {
+  hiddenByHand,
   keepPassage,
   PassageHead,
+  type PassageOutcome,
   type PassageVersion,
   sideParts,
   tiedIn,
@@ -605,6 +607,10 @@ export function Collisions({
     setVersion("now");
   }, [passageAt]);
   const openedPassage = passageClusters.find((cluster) => cluster.key === passageAt) ?? null;
+  const passageItem =
+    openedPassage === null
+      ? undefined
+      : openedPassage.spots.map(({ key }) => byKey.get(key)).find((item) => item !== undefined);
   // The passage the camera frames, also while one of its spots is open.
   const [framed, setFramed] = useState<{ key: string; frame: StageFrame } | null>(null);
   const startKey = start === null ? null : spotKey(start);
@@ -808,30 +814,97 @@ export function Collisions({
 
   const pairs = useMemo(() => pairsOf(report, ignored), [report, ignored]);
   const passageSegments = usePassageSegments(openedPassage, passageLayer, passageArea);
-  // Parts the last decision of a whole passage left, as the game ties them in.
-  const [held, setHeld] = useState<{ key: string; count: number } | null>(null);
+  // What the last decision of a whole passage did, with the choices before
+  // it for the undo, and whether one waits for what the game ties in.
+  const [outcome, setOutcome] = useState<{
+    done: PassageOutcome;
+    before: PatchChoices;
+  } | null>(null);
+  const [deciding, setDeciding] = useState(false);
   const choicesNow = useRef(choices);
   choicesNow.current = choices;
-  /** Keeps one side's version of a whole passage, or both; what the game ties in stays. */
-  const keepWhole = (cluster: Cluster, item: Item, side: 0 | 1 | null) => {
+  // What the game ties in among the passage's parts, asked as soon as the
+  // passage is open, so that deciding it answers at once.
+  const tiesKey =
+    openedPassage === null ? null : `${openedPassage.key}|${passageSegments?.length ?? "scan"}`;
+  const [ties, setTies] = useState<{ key: string; tied: Set<string> } | null>(null);
+  const tiesAsked = useRef<string | null>(null);
+  const tiedFor = (cluster: Cluster, item: Item): Promise<Set<string>> => {
     const passage = cluster.passage?.passage;
-    if (side === null || passage === undefined) {
-      setPatchChoices(keepPassage(choices, spotsByFinding, cluster, passageSegments, side));
-      setHeld(null);
-      return;
+    if (passage === undefined) {
+      return Promise.resolve(new Set());
     }
     const { location } = item.spot;
     const place = location.type === "interior" ? location.cell : location.world;
-    const losing = sideParts(passage, passageSegments, side === 0 ? 1 : 0);
-    void tiedIn(api, place, losing).then((tied) => {
-      setPatchChoices(
-        keepPassage(choicesNow.current, spotsByFinding, cluster, passageSegments, side, tied),
-      );
-      setHeld({
-        key: cluster.key,
-        count: losing.filter((object) => tied.has(objectKey(object.plugin, object.localId))).length,
-      });
+    return tiedIn(api, place, [
+      ...sideParts(passage, passageSegments, 0),
+      ...sideParts(passage, passageSegments, 1),
+    ]);
+  };
+  const tiedForNow = useRef(tiedFor);
+  tiedForNow.current = tiedFor;
+  useEffect(() => {
+    if (tiesKey === null || openedPassage === null || passageItem === undefined) {
+      return;
+    }
+    if (tiesAsked.current === tiesKey) {
+      return;
+    }
+    tiesAsked.current = tiesKey;
+    void tiedForNow.current(openedPassage, passageItem).then((tied) => {
+      setTies({ key: tiesKey, tied });
     });
+  }, [tiesKey, openedPassage, passageItem]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: another passage starts without a note.
+  useEffect(() => {
+    setOutcome(null);
+    setDeciding(false);
+  }, [passageAt]);
+  /**
+   * Keeps one side's version of a whole passage, or both: what the game
+   * ties in stays, and the kept side's parts hidden by hand are shown
+   * again. The view then shows the place as decided, and the panel says
+   * what was done.
+   */
+  const keepWhole = (cluster: Cluster, side: 0 | 1 | null) => {
+    const passage = cluster.passage?.passage;
+    if (passage === undefined) {
+      return;
+    }
+    const apply = (tied: Set<string>) => {
+      const before = choicesNow.current;
+      let next = keepPassage(before, spotsByFinding, cluster, passageSegments, side, tied);
+      const byHand =
+        side === null ? [] : hiddenByHand(before, passage, passageSegments, passageArea, side);
+      next = revealObjects(next, spotsByFinding, byHand);
+      const losing = side === null ? [] : sideParts(passage, passageSegments, side === 0 ? 1 : 0);
+      const hiddenNow = hiddenKeysOf(spotsByFinding, next);
+      setPatchChoices(next);
+      setVersion("now");
+      setPreview(new Set());
+      setOutcome({
+        before,
+        done: {
+          key: cluster.key,
+          side,
+          hidden: losing.filter((object) => hiddenNow.has(matchKey(object))).length,
+          held: losing.filter((object) => tied.has(objectKey(object.plugin, object.localId)))
+            .length,
+          byHand,
+        },
+      });
+    };
+    if (side === null) {
+      apply(new Set());
+    } else if (ties !== null && ties.key === tiesKey) {
+      apply(ties.tied);
+    } else if (passageItem !== undefined) {
+      setDeciding(true);
+      void tiedFor(cluster, passageItem).then((tied) => {
+        setDeciding(false);
+        apply(tied);
+      });
+    }
   };
   const hiddenObjects = useMemo(() => objectsOf(pairs, choices), [pairs, choices]);
   // The suggestion about a mod that collides widely, when the list is
@@ -962,10 +1035,6 @@ export function Collisions({
     current === null
       ? undefined
       : passageClusters.find((cluster) => cluster.key === current.passage);
-  const passageItem =
-    openedPassage === null
-      ? undefined
-      : openedPassage.spots.map(({ key }) => byKey.get(key)).find((item) => item !== undefined);
   // The spot the panel and the view are about: a passage's first while the
   // passage is open.
   const shownItem = passageItem ?? current;
@@ -1122,8 +1191,30 @@ export function Collisions({
                           worlds={report.map.worlds}
                           decided={decidedOf(openedPassage.spots, choices)}
                           segments={passageSegments}
-                          held={held !== null && held.key === openedPassage.key ? held.count : 0}
-                          onKeep={(side) => keepWhole(openedPassage, shownItem, side)}
+                          outcome={
+                            outcome !== null && outcome.done.key === openedPassage.key
+                              ? outcome.done
+                              : null
+                          }
+                          pending={deciding}
+                          onKeep={(side) => keepWhole(openedPassage, side)}
+                          onUndo={() => {
+                            if (outcome !== null) {
+                              setPatchChoices(outcome.before);
+                              setOutcome(null);
+                            }
+                          }}
+                          onHideAgain={() => {
+                            if (outcome === null) {
+                              return;
+                            }
+                            let next = choices;
+                            for (const object of outcome.done.byHand) {
+                              next = chooseObject(next, object, true);
+                            }
+                            setPatchChoices(next);
+                            setOutcome({ ...outcome, done: { ...outcome.done, byHand: [] } });
+                          }}
                         />
                       ),
                       focus: openedPassage.passage?.keys ?? new Set(),

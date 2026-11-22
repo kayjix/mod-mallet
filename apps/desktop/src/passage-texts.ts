@@ -53,6 +53,14 @@ export interface PassageTexts {
   /** Parts a decision of the whole passage left, as the game ties them in. */
   held: (count: number) => string;
   heldHint: string;
+  /** While a decision of the whole passage asks what the game ties in. */
+  deciding: string;
+  /** What a decision of the whole passage did. */
+  keptDone: (kept: string, hidden: number, other: string) => string;
+  keptBoth: string;
+  /** The kept side's parts hidden by hand, shown again with its whole version. */
+  byHand: (count: number, name: string) => string;
+  hideAgain: string;
 }
 
 const en: PassageTexts = {
@@ -104,6 +112,15 @@ const en: PassageTexts = {
       ? "1 part stays: the game relies on it"
       : `${count} parts stay: the game relies on them`,
   heldHint: "Pick such a part in the view to see why, and decide it on its own.",
+  deciding: "Checking what the game relies on…",
+  keptDone: (kept, hidden, other) =>
+    `Kept ${kept}'s version here: ${hidden} ${hidden === 1 ? "part" : "parts"} of ${other} hidden.`,
+  keptBoth: "Kept both versions here.",
+  byHand: (count, name) =>
+    count === 1
+      ? `1 part of ${name} you had hidden yourself is shown again, as its whole version stays.`
+      : `${count} parts of ${name} you had hidden yourself are shown again, as its whole version stays.`,
+  hideAgain: "Hide them again",
 };
 
 const de: PassageTexts = {
@@ -155,6 +172,15 @@ const de: PassageTexts = {
       ? "1 Teil bleibt: Das Spiel stützt sich darauf"
       : `${count} Teile bleiben: Das Spiel stützt sich darauf`,
   heldHint: "Wähl so ein Teil in der Ansicht, um zu sehen, warum, und entscheide es einzeln.",
+  deciding: "Prüfe, worauf sich das Spiel stützt…",
+  keptDone: (kept, hidden, other) =>
+    `Hier die Fassung von ${kept} behalten: ${hidden} ${hidden === 1 ? "Teil" : "Teile"} von ${other} ausgeblendet.`,
+  keptBoth: "Hier beide Fassungen behalten.",
+  byHand: (count, name) =>
+    count === 1
+      ? `1 Teil von ${name}, das du selbst ausgeblendet hattest, ist wieder zu sehen: Die ganze Fassung bleibt.`
+      : `${count} Teile von ${name}, die du selbst ausgeblendet hattest, sind wieder zu sehen: Die ganze Fassung bleibt.`,
+  hideAgain: "Wieder ausblenden",
 };
 
 export const passageTexts: Record<Lang, PassageTexts> = { en, de };
