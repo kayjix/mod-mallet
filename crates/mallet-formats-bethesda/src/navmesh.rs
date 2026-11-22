@@ -26,7 +26,26 @@
 //! door triangle is where characters step through a door. A door that has
 //! none cannot be used by anyone but the player.
 //!
-//! Other games lay the field out differently; for them nothing is read.
+//! Fallout 4 (format version 15) keeps the same parts in the same order,
+//! with longer entries (ADR 0078):
+//!
+//! ```text
+//! u32 n, n × 21 bytes              triangles: three u16 vertices,
+//!                                  three u16 edges, f32 height, u8,
+//!                                  u16 flags, u16 cover flags
+//! u32 n, n × 11 bytes              links: u32 kind, u32 mesh,
+//!                                  u16 triangle, u8
+//! u32 n, n × 10 bytes              door triangles, as in Skyrim
+//! ...                              cover, waypoints, then a search grid
+//! ```
+//!
+//! The layout was checked against the 7,894 navigation meshes of
+//! `Fallout4.esm`: every field ends exactly where its search grid does,
+//! the flags' link bits agree with the edges of all 3.66 million
+//! triangles, and all 283,269 links name a triangle their mesh has.
+//!
+//! Both are read; only Skyrim's can be cut ([`cut`], [`unlink`]). Other
+//! games lay the field out differently; for them nothing is read.
 
 use std::collections::BTreeSet;
 
@@ -35,14 +54,53 @@ use crate::Bytes;
 /// The format version of Skyrim's navigation meshes.
 const SKYRIM_VERSION: u32 = 12;
 
-/// Bytes per vertex, triangle, link and door triangle.
+/// The format version of Fallout 4's navigation meshes.
+const FALLOUT_4_VERSION: u32 = 15;
+
+/// Bytes per vertex and per door triangle, the same in both versions.
 const VERTEX_LEN: usize = 12;
-const TRIANGLE_LEN: usize = 16;
-const LINK_LEN: usize = 10;
+const DOOR_LEN: usize = 10;
+
+/// How long the entries of one version of the field are.
+#[derive(Clone, Copy)]
+struct Sizes {
+    /// Bytes per triangle.
+    triangle: usize,
+    /// Where in a triangle its flags lie.
+    flags_at: usize,
+    /// Bytes per link to a neighbouring mesh.
+    link: usize,
+}
+
+/// Skyrim's entries.
+const SKYRIM: Sizes = Sizes {
+    triangle: 16,
+    flags_at: 12,
+    link: 10,
+};
+
+/// Fallout 4's entries: a height after the edges, and one more byte
+/// before the flags and after each link.
+const FALLOUT_4: Sizes = Sizes {
+    triangle: 21,
+    flags_at: 17,
+    link: 11,
+};
+
+/// The sizes of the version a field starts with, if it is one this reader
+/// knows.
+fn sizes_of(version: u32) -> Option<Sizes> {
+    match version {
+        SKYRIM_VERSION => Some(SKYRIM),
+        FALLOUT_4_VERSION => Some(FALLOUT_4),
+        _ => None,
+    }
+}
 
 /// The doors a navigation mesh connects to, by their form IDs as the
 /// plugin writes them (relative to its masters), in file order. `None`
-/// if the field is not in Skyrim's format or does not hold together.
+/// if the field is not in Skyrim's or Fallout 4's format or does not hold
+/// together.
 pub fn doors(nvnm: &[u8]) -> Option<Vec<u32>> {
     door_triangles(nvnm).map(|doors| doors.into_iter().map(|(_, door)| door).collect())
 }
@@ -52,18 +110,16 @@ pub fn doors(nvnm: &[u8]) -> Option<Vec<u32>> {
 /// [`doors`].
 pub fn door_triangles(nvnm: &[u8]) -> Option<Vec<(u16, u32)>> {
     let mut bytes = Bytes::new(nvnm);
-    if bytes.u32()? != SKYRIM_VERSION {
-        return None;
-    }
+    let sizes = sizes_of(bytes.u32()?)?;
     // Checksum, worldspace, and grid position or cell.
     bytes.skip(12)?;
     skip_array(&mut bytes, VERTEX_LEN)?;
-    let triangles = skip_array(&mut bytes, TRIANGLE_LEN)?;
-    skip_array(&mut bytes, LINK_LEN)?;
+    let triangles = skip_array(&mut bytes, sizes.triangle)?;
+    skip_array(&mut bytes, sizes.link)?;
 
     let count = usize::try_from(bytes.u32()?).ok()?;
     // Each entry needs ten bytes; a count that cannot fit is damage.
-    if count > bytes.remaining() / LINK_LEN {
+    if count > bytes.remaining() / DOOR_LEN {
         return None;
     }
     let mut doors = Vec::with_capacity(count);
@@ -114,28 +170,32 @@ pub struct Geometry {
 }
 
 /// The vertices, triangles, edges and doors of a navigation mesh. `None`
-/// if the field is not in Skyrim's format or does not hold together, as
-/// when a triangle names a vertex the mesh does not have. An edge that
-/// names a triangle or link the mesh does not have leads nowhere.
+/// if the field is not in Skyrim's or Fallout 4's format or does not hold
+/// together, as when a triangle names a vertex the mesh does not have. An
+/// edge that names a triangle or link the mesh does not have leads
+/// nowhere.
 pub fn geometry(nvnm: &[u8]) -> Option<Geometry> {
     let layout = Layout::of(nvnm)?;
+    let sizes = layout.sizes;
     let mut bytes = Bytes::new(nvnm.get(layout.vertices..)?);
     let mut vertices = Vec::with_capacity(layout.vertex_count);
     for _ in 0..layout.vertex_count {
         vertices.push([bytes.f32()?, bytes.f32()?, bytes.f32()?]);
     }
     let mut links = Vec::with_capacity(layout.link_count);
-    let mut bytes = Bytes::new(nvnm.get(layout.links..)?);
-    for _ in 0..layout.link_count {
-        bytes.skip(4)?;
-        let navmesh = bytes.u32()?;
-        let triangle = bytes.u16()?;
+    for index in 0..layout.link_count {
+        let start = layout.links.checked_add(index.checked_mul(sizes.link)?)?;
+        let navmesh = read_u32(nvnm, start.checked_add(4)?)?;
+        let triangle = read_u16(nvnm, start.checked_add(8)?)?;
         links.push(Beyond::Link { navmesh, triangle });
     }
     let mut triangles = Vec::with_capacity(layout.triangle_count);
     let mut edges = Vec::with_capacity(layout.triangle_count);
-    let mut bytes = Bytes::new(nvnm.get(layout.triangles..)?);
-    for _ in 0..layout.triangle_count {
+    for index in 0..layout.triangle_count {
+        let start = layout
+            .triangles
+            .checked_add(index.checked_mul(sizes.triangle)?)?;
+        let mut bytes = Bytes::new(nvnm.get(start..)?);
         let triangle = [bytes.u16()?, bytes.u16()?, bytes.u16()?];
         if triangle
             .iter()
@@ -144,8 +204,7 @@ pub fn geometry(nvnm: &[u8]) -> Option<Geometry> {
             return None;
         }
         let across = [bytes.u16()?, bytes.u16()?, bytes.u16()?];
-        let flags = bytes.u16()?;
-        bytes.skip(2)?;
+        let flags = read_u16(nvnm, start.checked_add(sizes.flags_at)?)?;
         let mut beyond = [Beyond::Nothing; 3];
         for ((edge, value), slot) in across.iter().enumerate().zip(beyond.iter_mut()) {
             *slot = if *value == NONE {
@@ -190,7 +249,7 @@ pub fn geometry(nvnm: &[u8]) -> Option<Geometry> {
 /// Everything else stays byte for byte. `None` if the field is not in
 /// Skyrim's format or does not hold together.
 pub fn cut(nvnm: &[u8], cut: &BTreeSet<u16>) -> Option<Vec<u8>> {
-    let layout = Layout::of(nvnm)?;
+    let layout = Layout::skyrim(nvnm)?;
     let mut data = nvnm.to_vec();
     for index in 0..layout.triangle_count {
         let number = u16::try_from(index).ok()?;
@@ -223,7 +282,7 @@ pub fn cut(nvnm: &[u8], cut: &BTreeSet<u16>) -> Option<Vec<u8>> {
 /// for byte. `None` if the field is not in Skyrim's format or does not
 /// hold together.
 pub fn unlink(nvnm: &[u8], navmesh: u32, cut: &BTreeSet<u16>) -> Option<Vec<u8>> {
-    let layout = Layout::of(nvnm)?;
+    let layout = Layout::skyrim(nvnm)?;
     let mut data = nvnm.to_vec();
     for index in 0..layout.triangle_count {
         let start = layout
@@ -253,9 +312,13 @@ pub fn unlink(nvnm: &[u8], navmesh: u32, cut: &BTreeSet<u16>) -> Option<Vec<u8>>
 /// An edge that leads nowhere.
 const NONE: u16 = 0xFFFF;
 
-/// Where in a triangle its three edges and its flags lie.
+/// Where in a triangle its three edges lie.
 const EDGES_AT: usize = 6;
-const FLAGS_AT: usize = 12;
+
+/// Skyrim's sizes, the only ones [`cut`] and [`unlink`] write.
+const TRIANGLE_LEN: usize = SKYRIM.triangle;
+const FLAGS_AT: usize = SKYRIM.flags_at;
+const LINK_LEN: usize = SKYRIM.link;
 
 /// The flags that say an edge leads onto a neighbouring mesh.
 const EDGE_LINK_FLAGS: u16 = 0b111;
@@ -263,6 +326,7 @@ const EDGE_LINK_FLAGS: u16 = 0b111;
 /// Where the parts of a field start, in bytes, and how many entries each
 /// has. The parts lie within the field: [`Layout::of`] checks that.
 struct Layout {
+    sizes: Sizes,
     vertices: usize,
     vertex_count: usize,
     triangles: usize,
@@ -276,16 +340,15 @@ struct Layout {
 impl Layout {
     fn of(nvnm: &[u8]) -> Option<Self> {
         let mut bytes = Bytes::new(nvnm);
-        if bytes.u32()? != SKYRIM_VERSION {
-            return None;
-        }
+        let sizes = sizes_of(bytes.u32()?)?;
         // Checksum, worldspace, and grid position or cell.
         bytes.skip(12)?;
         let (vertices, vertex_count) = array(&mut bytes, nvnm, VERTEX_LEN)?;
-        let (triangles, triangle_count) = array(&mut bytes, nvnm, TRIANGLE_LEN)?;
-        let (links, link_count) = array(&mut bytes, nvnm, LINK_LEN)?;
-        let (doors, door_count) = array(&mut bytes, nvnm, LINK_LEN)?;
+        let (triangles, triangle_count) = array(&mut bytes, nvnm, sizes.triangle)?;
+        let (links, link_count) = array(&mut bytes, nvnm, sizes.link)?;
+        let (doors, door_count) = array(&mut bytes, nvnm, DOOR_LEN)?;
         Some(Self {
+            sizes,
             vertices,
             vertex_count,
             triangles,
@@ -295,6 +358,13 @@ impl Layout {
             doors,
             door_count,
         })
+    }
+
+    /// [`Layout::of`] for a field in Skyrim's format only.
+    fn skyrim(nvnm: &[u8]) -> Option<Self> {
+        (read_u32(nvnm, 0)? == SKYRIM_VERSION)
+            .then(|| Self::of(nvnm))
+            .flatten()
     }
 }
 
@@ -374,7 +444,7 @@ mod tests {
 
     #[test]
     fn other_versions_and_broken_fields_are_not_read() {
-        assert_eq!(doors(&field(15, 2, &[(0, 1)])), None);
+        assert_eq!(doors(&field(14, 2, &[(0, 1)])), None);
         // A door on a triangle the mesh does not have.
         assert_eq!(doors(&field(12, 2, &[(2, 1)])), None);
         let mut cut = field(12, 2, &[(0, 1)]);
@@ -394,7 +464,20 @@ mod tests {
         links: &[(u32, u16)],
         doors: &[(u16, u32)],
     ) -> Vec<u8> {
-        let mut data = 12u32.to_le_bytes().to_vec();
+        mesh_in(SKYRIM_VERSION, vertices, triangles, links, doors)
+    }
+
+    /// [`mesh`] in the layout of `version`: Fallout 4's has a height and
+    /// a byte more in each triangle, and a byte more after each link.
+    fn mesh_in(
+        version: u32,
+        vertices: &[[f32; 3]],
+        triangles: &[Written],
+        links: &[(u32, u16)],
+        doors: &[(u16, u32)],
+    ) -> Vec<u8> {
+        let fallout_4 = version == FALLOUT_4_VERSION;
+        let mut data = version.to_le_bytes().to_vec();
         data.extend([0; 12]);
         data.extend(u32::try_from(vertices.len()).unwrap().to_le_bytes());
         for vertex in vertices {
@@ -407,6 +490,10 @@ mod tests {
             for value in corners.iter().chain(edges) {
                 data.extend(value.to_le_bytes());
             }
+            if fallout_4 {
+                data.extend(12.5f32.to_le_bytes());
+                data.push(0x5A);
+            }
             data.extend(flags.to_le_bytes());
             data.extend(0x0101u16.to_le_bytes());
         }
@@ -415,6 +502,9 @@ mod tests {
             data.extend(0u32.to_le_bytes());
             data.extend(navmesh.to_le_bytes());
             data.extend(triangle.to_le_bytes());
+            if fallout_4 {
+                data.push(0xA5);
+            }
         }
         data.extend(u32::try_from(doors.len()).unwrap().to_le_bytes());
         for (triangle, door) in doors {
@@ -454,7 +544,7 @@ mod tests {
     fn a_triangle_with_a_missing_vertex_breaks_the_surface() {
         let vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
         assert_eq!(geometry(&surface(&vertices, &[[0, 1, 3]])), None);
-        assert_eq!(geometry(&field(15, 1, &[])), None);
+        assert_eq!(geometry(&field(14, 1, &[])), None);
     }
 
     /// The neighbouring mesh in [`strip`], as the plugin writes it.
@@ -464,6 +554,11 @@ mod tests {
     /// Triangle 3 leads onto triangle 7 of [`NEIGHBOUR`], and onto
     /// triangle 2 of it through a second link; triangle 1 has a door.
     fn strip() -> Vec<u8> {
+        strip_in(SKYRIM_VERSION)
+    }
+
+    /// [`strip`] in the layout of `version`.
+    fn strip_in(version: u32) -> Vec<u8> {
         let vertices = [
             [0.0, 0.0, 0.0],
             [0.0, 100.0, 0.0],
@@ -479,7 +574,8 @@ mod tests {
             // Edge 1-2 leads to link 0, edge 2-0 to link 1.
             ([3, 5, 4], [NONE, 0, 1], 0b110 | 0x0040),
         ];
-        mesh(
+        mesh_in(
+            version,
             &vertices,
             &triangles,
             &[(NEIGHBOUR, 7), (NEIGHBOUR, 2)],
@@ -515,6 +611,22 @@ mod tests {
             ]
         );
         assert_eq!(geometry.doors, vec![(1, 0x0000_1234)]);
+    }
+
+    #[test]
+    fn a_fallout_4_navmesh_reads_like_the_same_skyrim_one() {
+        let fallout_4 = strip_in(FALLOUT_4_VERSION);
+        assert_eq!(fallout_4.len(), strip().len() + 4 * 5 + 2);
+        assert_eq!(geometry(&fallout_4), geometry(&strip()));
+        assert_eq!(doors(&fallout_4), Some(vec![0x0000_1234]));
+        assert_eq!(door_triangles(&fallout_4), Some(vec![(1, 0x0000_1234)]));
+    }
+
+    #[test]
+    fn a_fallout_4_navmesh_is_not_cut() {
+        let fallout_4 = strip_in(FALLOUT_4_VERSION);
+        assert_eq!(cut(&fallout_4, &BTreeSet::from([0])), None);
+        assert_eq!(unlink(&fallout_4, NEIGHBOUR, &BTreeSet::from([7])), None);
     }
 
     #[test]
@@ -608,6 +720,26 @@ mod tests {
             let _ = geometry(&data);
             let _ = cut(&data, &BTreeSet::from([0, 1, 2]));
             let _ = unlink(&data, 0, &BTreeSet::from([0, 1, 2]));
+        }
+
+        #[test]
+        fn never_panics_on_a_fallout_4_start(rest in prop::collection::vec(any::<u8>(), 0..256)) {
+            let mut data = FALLOUT_4_VERSION.to_le_bytes().to_vec();
+            data.extend(rest);
+            let _ = doors(&data);
+            let _ = geometry(&data);
+            let _ = cut(&data, &BTreeSet::from([0, 1, 2]));
+        }
+
+        #[test]
+        fn never_panics_on_a_damaged_fallout_4_mesh(at in 0usize..200, byte in any::<u8>(), keep in 0usize..200) {
+            let mut data = strip_in(FALLOUT_4_VERSION);
+            if let Some(slot) = data.get_mut(at) {
+                *slot = byte;
+            }
+            data.truncate(keep.max(4));
+            let _ = doors(&data);
+            let _ = geometry(&data);
         }
 
         #[test]
