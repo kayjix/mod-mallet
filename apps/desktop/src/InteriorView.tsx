@@ -18,6 +18,8 @@ import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } 
 import { InfoTip } from "./info-tip";
 import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
+import { registerLocator } from "./locate";
+import { framedDistance, framing } from "./locate-frame";
 import { CELL } from "./map-places";
 import { moveKeysOf, moveOf } from "./moves";
 import { matchKey } from "./patch";
@@ -396,6 +398,24 @@ export function InteriorView({
   useEffect(() => {
     redraw();
   }, [actionsShown, picked, redraw]);
+  // Objects located from a card beside the view glow, and the camera turns to them.
+  useEffect(
+    () =>
+      registerLocator((objects) => {
+        const found = layer.current?.pulse(objects) ?? [];
+        const frame = framing(found.map((object) => object.position));
+        if (frame === null) {
+          return;
+        }
+        camera.current = {
+          ...camera.current,
+          target: [frame.target[0] / CELL, frame.target[1] / CELL, frame.target[2] / CELL],
+          distance: framedDistance(frame.radius / CELL, camera.current.distance, 0.03),
+        };
+        redrawNow.current();
+      }),
+    [],
+  );
 
   /** The object drawn at a point of the screen, if any. */
   const objectAt = (clientX: number, clientY: number): AreaObject | null => {

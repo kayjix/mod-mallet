@@ -32,6 +32,8 @@ import {
 import { InfoTip } from "./info-tip";
 import { LoadingMallet } from "./LoadingMallet";
 import { LandLayer } from "./land-layer";
+import { registerLocator } from "./locate";
+import { framedDistance, framing } from "./locate-frame";
 import { LodLayer } from "./lod-layer";
 import {
   CELL,
@@ -1488,6 +1490,70 @@ export function MapView3D({
       distance: Math.min(camera.current.distance, picked.type === "spot" ? spotDistance : 28),
     });
   }, [picked, fly, spotDistance]);
+
+  // Objects located from a card beside the view glow, and the camera turns
+  // to them; where the view does not hold them yet, it goes to where they
+  // stand and tries again as they come in.
+  useEffect(() => {
+    const timers: number[] = [];
+    const stop = registerLocator((objects, at) => {
+      for (const timer of timers.splice(0)) {
+        window.clearTimeout(timer);
+      }
+      const turn = (found: AreaObject[]) => {
+        const frame = framing(found.map((object) => object.position));
+        if (frame === null) {
+          return;
+        }
+        const raise = state.current.exaggeration;
+        fly({
+          ...camera.current,
+          target: [
+            frame.target[0] / CELL,
+            frame.target[1] / CELL,
+            (frame.target[2] / CELL) * raise,
+          ],
+          distance: framedDistance(frame.radius / CELL, camera.current.distance, 0.08),
+        });
+      };
+      const found = area.current?.pulse(objects) ?? [];
+      if (found.length > 0) {
+        turn(found);
+        return;
+      }
+      if (at === undefined || at === null || at.length < 3) {
+        return;
+      }
+      fly({
+        ...camera.current,
+        target: [
+          (at[0] ?? 0) / CELL,
+          (at[1] ?? 0) / CELL,
+          ((at[2] ?? 0) / CELL) * state.current.exaggeration,
+        ],
+        distance: Math.min(camera.current.distance, spotDistance),
+      });
+      for (let tries = 1; tries <= 5; tries += 1) {
+        timers.push(
+          window.setTimeout(() => {
+            const later = area.current?.pulse(objects) ?? [];
+            if (later.length > 0) {
+              turn(later);
+              for (const timer of timers.splice(0)) {
+                window.clearTimeout(timer);
+              }
+            }
+          }, tries * 700),
+        );
+      }
+    });
+    return () => {
+      stop();
+      for (const timer of timers) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [fly, spotDistance]);
 
   const pickAt = (clientX: number, clientY: number): Picked | null => {
     const rect = overlay.current?.getBoundingClientRect();

@@ -1,0 +1,18 @@
+/* The button that locates objects in the 3D view. */
+
+.locate-button {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 3px 6px;
+}
+
+.locate-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -32,6 +32,7 @@ import type {
   SpotPart,
 } from "./generated/rendered-report";
 import { InteriorView } from "./InteriorView";
+import { LocateButton } from "./locate";
 import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
@@ -1255,6 +1256,7 @@ function Spot(props: SpotProps) {
         <div className="work-column-head">
           <strong title={side.plugin}>{shortName(side.plugin)}</strong>
           {side.suggested && <span className="suggested-mark">{t.patchSuggested}</span>}
+          <LocateButton objects={side.parts.map((part) => part.object)} at={spot.position} />
         </div>
         <div className="work-side" data-left={left || undefined}>
           <button
@@ -1422,7 +1424,7 @@ function Spot(props: SpotProps) {
             </button>
           </span>
           <span className="work-nav-more">
-            <label className="control-check aside">
+            <label className="control-check aside" title={t.workAfterDecideHint}>
               <input
                 type="checkbox"
                 checked={props.advance}

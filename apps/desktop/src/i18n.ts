@@ -317,6 +317,8 @@ export interface Texts {
   workHideObject: string;
   workDecideHere: string;
   workAfterDecide: string;
+  /** What the fast forward checkbox does, as its tooltip. */
+  workAfterDecideHint: string;
   mapTopView: string;
   mapPlaces: string;
   placesShowAll: string;
@@ -726,7 +728,8 @@ export const texts: Record<Lang, Texts> = {
       "The game needs both objects (for example doors with a loading screen, or things scripts refer to). Nothing here can be hidden safely; keeping both is usually right.",
     workHideObject: "Hide this object here",
     workDecideHere: "Decide in the worklist",
-    workAfterDecide: "After deciding, go on to the next open spot",
+    workAfterDecide: "Fast forward",
+    workAfterDecideHint: "After deciding, go on to the next open spot",
     mapTopView: "From above",
     mapPlaces: "Places",
     placesShowAll: "Show all",
@@ -1191,7 +1194,8 @@ export const texts: Record<Lang, Texts> = {
       "Das Spiel braucht beide Objekte (zum Beispiel Türen mit Ladebildschirm oder Dinge, auf die Skripte verweisen). Hier lässt sich nichts gefahrlos ausblenden; beide zu behalten ist meist richtig.",
     workHideObject: "Dieses Objekt hier ausblenden",
     workDecideHere: "In der Arbeitsliste entscheiden",
-    workAfterDecide: "Nach dem Entscheiden zur nächsten offenen Stelle",
+    workAfterDecide: "Vorspulen",
+    workAfterDecideHint: "Nach dem Entscheiden zur nächsten offenen Stelle",
     mapTopView: "Von oben",
     mapPlaces: "Orte",
     placesShowAll: "Alle zeigen",

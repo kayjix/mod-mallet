@@ -73,6 +73,17 @@ the left, and did not show that a spot is about two mods.
      object's own first. Hidden parts of the selection are drawn as lit
      ghosts, also where the view leaves hidden parts out, so that they can
      be seen before they are shown again.
+   - **Locating.** Wherever parts are named or chosen (each side of a
+     spot, the parts the game needs, the wand's selection) a small button
+     makes exactly those parts glow in the 3D view for about three
+     seconds, also where hidden, and turns the camera to them. The view
+     that is open registers itself (`registerLocator` in `locate.tsx`);
+     `AreaLayer.pulse` does the glowing.
+   - **Conflicts.** The card of a picked object lists the open collisions
+     and door spots it is part of, each with a link to decide it in the
+     worklist, and says which collisions its being hidden decided (a spot
+     with no choice of its own is decided by a part hidden on its own).
+     Door spots are only listed and linked: the door panel decides them.
 6. **One column per mod.** The panel over a collision up close has, from
    top to bottom:
    - a bar to go through the spots: the spot and where it is, previous,

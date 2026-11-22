@@ -1,0 +1,28 @@
+/* The collisions an object picked in a 3D view is part of. */
+
+.object-conflicts {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.object-conflict-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.object-conflict-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.object-conflict-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}

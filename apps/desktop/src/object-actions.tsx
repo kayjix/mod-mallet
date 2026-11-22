@@ -14,7 +14,9 @@ import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
+import { LocateButton } from "./locate";
 import { MoveControls } from "./move-controls";
+import { ObjectConflicts } from "./object-conflicts";
 import {
   chooseObject,
   decisionAt,
@@ -148,7 +150,9 @@ export function PartsTogether({ tools }: { tools: PartTools }) {
   const offers = offersFor(split, first !== undefined && isHidden(first));
   return (
     <div className="parts-together">
-      <p className="aside wand-took">{w.took(group.length, level)}</p>
+      <p className="aside wand-took">
+        {w.took(group.length, level)} <LocateButton objects={group.map((part) => part.id)} />
+      </p>
       {split.hidden.length > 0 && split.visible.length > 0 && (
         <p className="aside parts-hint">{w.mixed(split.hidden.length, split.visible.length)}</p>
       )}
@@ -180,6 +184,13 @@ export function PartsTogether({ tools }: { tools: PartTools }) {
           </button>
         ))}
       </span>
+      {group[0] !== undefined && (
+        <ObjectConflicts
+          objects={group.map((part) => part.id)}
+          except={[group[0].id]}
+          subject="parts"
+        />
+      )}
       {split.tied > 0 && <p className="aside parts-hint">{own.partsSomeTied(split.tied)}</p>}
     </div>
   );
@@ -214,6 +225,8 @@ export function FreeObjectActions({
   const isHidden = hidden.has(matchKey(object.id));
   // A null choice is one shown again on purpose, not one hidden by itself.
   const byItself = (patchChoices[objectChoiceKey(object.id)] ?? null) !== null;
+  // The collisions and door spots it is part of, and which hiding it decided.
+  const conflicts = <ObjectConflicts objects={[object.id]} />;
   const together = tools === undefined ? null : <PartsTogether tools={tools} />;
   // Or a little to one side instead (ADR 0060).
   const move = <MoveControls object={object} tools={tools} place={place} interior={interior} />;
@@ -238,6 +251,7 @@ export function FreeObjectActions({
         >
           {t.workObjectShow}
         </button>
+        {conflicts}
         {together}
       </div>
     );
@@ -247,6 +261,7 @@ export function FreeObjectActions({
       <div className="relief-object-action">
         {action}
         <p className="aside">{t.anchorAsking}</p>
+        {conflicts}
         {together}
         {move}
       </div>
@@ -258,6 +273,7 @@ export function FreeObjectActions({
         {action}
         <p className="aside">{t.anchorLocked}</p>
         {anchors !== null && <AnchorReasons anchors={anchors} />}
+        {conflicts}
         {together}
         {move}
       </div>
@@ -281,6 +297,7 @@ export function FreeObjectActions({
         {careful ? t.anchorHideAnyway : t.workObjectHide}
       </button>
       <p className="aside parts-hint">{own.hideHint}</p>
+      {conflicts}
       {together}
       {move}
     </div>
@@ -307,6 +324,7 @@ export function NeededPart({
   return (
     <div className="needed-part">
       <strong>{name}</strong>
+      <LocateButton objects={[object]} />
       {anchors === undefined ? (
         <span className="aside">{t.anchorAsking}</span>
       ) : anchors === null ? null : (

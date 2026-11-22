@@ -48,6 +48,7 @@ uniform bool u_alphaTest;
 uniform vec3 u_mark;
 uniform vec3 u_focus;
 uniform vec3 u_ghost;
+uniform float u_pulse;
 out vec4 colour;
 void main() {
   vec4 sampled = u_hasTexture ? texture(u_texture, v_uv) : vec4(0.7, 0.7, 0.7, 1.0);
@@ -57,7 +58,12 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
-  if (v_look > 6.5) {
+  if (v_look > 7.5) {
+    // Located: glows in its own colour, drawn even where it is hidden.
+    float glow = 0.5 + 0.5 * sin(u_pulse);
+    shaded = mix(shaded, min(shaded * 2.2, vec3(1.0)), glow);
+    shaded = mix(shaded, vec3(1.0), 0.35 * glow);
+  } else if (v_look > 6.5) {
     // Hidden and in the chain of the picked object: the ghost, lit up.
     if (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) {
       discard;
@@ -550,6 +556,9 @@ const WAND_STEPS: Record<number, { alike: "model" | "family" | "kind"; gap: numb
 /** How far from the picked object the magic wand reaches at most, in game units (about 30 m). */
 const WAND_REACH = 2048;
 
+/** How long a located object glows, in milliseconds. */
+const PULSE_MS = 3000;
+
 /** How many parts the magic wand chains at most. */
 const WAND_MOST = 300;
 
@@ -581,6 +590,8 @@ export const LOOK = {
   chained: 6,
   /** Hidden by the patch and in the chain of the picked object: the ghost, lit up. */
   chainedGhost: 7,
+  /** Located for a moment: glowing, even where it is hidden. */
+  pulse: 8,
 } as const;
 export type Look = (typeof LOOK)[keyof typeof LOOK];
 
@@ -614,6 +625,10 @@ export class AreaLayer {
   private selected = new Set<string>();
   /** The chain of the picked object, lit faintly (ADR 0055). */
   private chained = new Set<string>();
+  /** The objects located for a moment, by key (see {@link AreaLayer.pulse}). */
+  private pulsing = new Set<string>();
+  private pulseStart = 0;
+  private pulseTimer: ReturnType<typeof setInterval> | null = null;
   /** Where moved objects stand now, by key (ADR 0060). */
   private moves = new Map<string, Move>();
   /** The objects shown, as last set. */
@@ -630,6 +645,9 @@ export class AreaLayer {
 
   /** How an object is drawn now: picked, in the chain, or as its look says. */
   private lookOf(key: string, look: Look): Look {
+    if (this.pulsing.has(key)) {
+      return LOOK.pulse;
+    }
     if (this.selected.has(key)) {
       return LOOK.selected;
     }
@@ -858,6 +876,51 @@ export class AreaLayer {
       }),
       ...contents,
     ];
+  }
+
+  /**
+   * Makes the objects with these ids glow in the view for `ms` milliseconds,
+   * so that one can see which ones are meant, also where they are hidden.
+   * Returns those the view has, with where they stand; none where they
+   * are not shown (yet).
+   */
+  pulse(objects: readonly { plugin: string; localId: number }[], ms = PULSE_MS): AreaObject[] {
+    const wanted = new Set(objects.map((object) => objectKey(object.plugin, object.localId)));
+    const found = this.instances
+      .map((instance) => instance.object)
+      .filter((object) => wanted.has(objectKey(object.id.plugin, object.id.localId)));
+    const before = this.pulsing.size;
+    this.stopPulse();
+    if (found.length === 0) {
+      if (before > 0) {
+        this.relookAll();
+        this.changed();
+      }
+      return [];
+    }
+    this.pulsing = new Set(found.map((object) => objectKey(object.id.plugin, object.id.localId)));
+    this.pulseStart = performance.now();
+    this.relookAll();
+    this.changed();
+    // The glow is drawn by the clock, so the view is drawn anew meanwhile.
+    this.pulseTimer = setInterval(() => {
+      if (this.disposed || performance.now() - this.pulseStart >= ms) {
+        this.stopPulse();
+        if (!this.disposed) {
+          this.relookAll();
+        }
+      }
+      this.changed();
+    }, 40);
+    return found;
+  }
+
+  private stopPulse() {
+    if (this.pulseTimer !== null) {
+      clearInterval(this.pulseTimer);
+      this.pulseTimer = null;
+    }
+    this.pulsing = new Set();
   }
 
   /** Lights `objects` faintly besides what is picked: what the magic wand took along. */
@@ -1230,6 +1293,8 @@ export class AreaLayer {
     gl.uniform3f(at("u_mark"), ...colours.mark);
     gl.uniform3f(at("u_focus"), ...colours.focus);
     gl.uniform3f(at("u_ghost"), ...colours.ghost);
+    // Two glows a second, from the moment the pulse began.
+    gl.uniform1f(at("u_pulse"), ((performance.now() - this.pulseStart) / 1000) * Math.PI * 4);
     gl.uniform1i(at("u_texture"), 0);
     const hasTexture = at("u_hasTexture");
     const alphaTest = at("u_alphaTest");
@@ -1321,6 +1386,7 @@ export class AreaLayer {
   /** Frees everything; the layer is not used again. */
   dispose() {
     this.disposed = true;
+    this.stopPulse();
     const { gl } = this;
     for (const model of this.models.values()) {
       if (Array.isArray(model.surfaces)) {
