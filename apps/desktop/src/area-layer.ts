@@ -134,7 +134,42 @@ void main() {
   gl_Position = u_matrix * vec4(world.xy / ${CELL}.0, world.z / ${CELL}.0 * u_exaggeration, 1.0);
 }`;
 
-/** Where every attribute is, the same in both programs. */
+/**
+ * The objects seen from straight above, into a depth texture: the higher
+ * a point, the nearer (ADR 0074). Hidden objects count too: where the
+ * game has loaded a place it draws no level of detail, whether an object
+ * there is shown or not.
+ */
+const TOPS_VERTEX = `#version 300 es
+in vec3 a_position;
+in vec2 a_uv;
+in mat4 a_model;
+uniform vec4 u_rect;
+uniform vec2 u_range;
+out vec2 v_uv;
+void main() {
+  vec4 world = a_model * vec4(a_position, 1.0);
+  v_uv = a_uv;
+  vec2 at = (world.xy - u_rect.xy) / (u_rect.zw - u_rect.xy) * 2.0 - 1.0;
+  float depth = clamp((u_range.y - world.z) / (u_range.y - u_range.x), 0.0, 1.0);
+  gl_Position = vec4(at, depth * 2.0 - 1.0, 1.0);
+}`;
+
+const TOPS_FRAGMENT = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform bool u_hasTexture;
+uniform bool u_alphaTest;
+out vec4 colour;
+void main() {
+  if (u_alphaTest && u_hasTexture && texture(u_texture, v_uv).a < 0.5) {
+    discard;
+  }
+  colour = vec4(1.0);
+}`;
+
+/** Where every attribute is, the same in all programs. */
 const LOCATIONS: [string, number][] = [
   ["a_position", 0],
   ["a_normal", 1],
@@ -616,6 +651,9 @@ interface Model {
 export class AreaLayer {
   private readonly program: WebGLProgram;
   private readonly picking: WebGLProgram;
+  private readonly tops: WebGLProgram;
+  /** Counts the changes to what is drawn where, see {@link version}. */
+  private changes = 0;
   private readonly models = new Map<string, Model>();
   private readonly textures = new Map<string, Shared>();
   private readonly queue: string[] = [];
@@ -641,6 +679,12 @@ export class AreaLayer {
   ) {
     this.program = linked(gl, VERTEX, FRAGMENT);
     this.picking = linked(gl, PICK_VERTEX, PICK_FRAGMENT);
+    this.tops = linked(gl, TOPS_VERTEX, TOPS_FRAGMENT);
+  }
+
+  /** Changes whenever an object is drawn elsewhere or a model or texture arrives. */
+  get version(): number {
+    return this.changes;
   }
 
   /** How an object is drawn now: picked, in the chain, or as its look says. */
@@ -663,6 +707,7 @@ export class AreaLayer {
   /** Shows `area`, each object drawn as `look` says by its key (see {@link objectKey}). */
   show(area: AreaObjects, look: (key: string) => Look) {
     this.area = area;
+    this.changes += 1;
     rememberActions(area);
     this.instances = area.objects.map((object) => {
       const key = objectKey(object.id.plugin, object.id.localId);
@@ -1126,6 +1171,7 @@ export class AreaLayer {
       return;
     }
     const { gl } = this;
+    this.changes += 1;
     const own = this.instances.filter((instance) => instance.object.model === name);
     const data = new Float32Array(own.length * 17);
     own.forEach((instance, index) => {
@@ -1252,6 +1298,7 @@ export class AreaLayer {
         .then((url) => {
           if (url === null || this.disposed) {
             this.textures.set(path, "missing");
+            this.changes += 1;
             this.changed();
             return;
           }
@@ -1269,6 +1316,7 @@ export class AreaLayer {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
             this.textures.set(path, made);
+            this.changes += 1;
             this.changed();
           };
           image.onerror = () => this.textures.set(path, "missing");
@@ -1311,6 +1359,44 @@ export class AreaLayer {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.uniform1i(hasTexture, texture === null ? 0 : 1);
         gl.uniform1i(alphaTest, surface.alphaTest ? 1 : 0);
+        gl.bindVertexArray(surface.vao);
+        gl.drawElementsInstanced(gl.TRIANGLES, surface.count, gl.UNSIGNED_INT, 0, model.count);
+      }
+    }
+    gl.bindVertexArray(null);
+  }
+
+  /**
+   * Draws the objects seen from straight above into the bound frame's
+   * depth: `rect` (west, south, east, north) and `range` (lowest and
+   * highest height) in game units span it, the highest point nearest.
+   * Surfaces whose texture is still on its way are left out, as in
+   * {@link draw}.
+   */
+  drawTops(rect: [number, number, number, number], range: [number, number]) {
+    if (this.disposed) {
+      return;
+    }
+    const { gl } = this;
+    // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram is no React hook.
+    gl.useProgram(this.tops);
+    const at = (name: string) => gl.getUniformLocation(this.tops, name);
+    gl.uniform4f(at("u_rect"), ...rect);
+    gl.uniform2f(at("u_range"), ...range);
+    gl.uniform1i(at("u_texture"), 0);
+    gl.activeTexture(gl.TEXTURE0);
+    for (const model of this.models.values()) {
+      if (!Array.isArray(model.surfaces) || model.count === 0) {
+        continue;
+      }
+      for (const surface of model.surfaces) {
+        const texture = surface.texture === null ? null : this.texture(surface.texture);
+        if (texture === "pending") {
+          continue;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(at("u_hasTexture"), texture === null ? 0 : 1);
+        gl.uniform1i(at("u_alphaTest"), surface.alphaTest ? 1 : 0);
         gl.bindVertexArray(surface.vao);
         gl.drawElementsInstanced(gl.TRIANGLES, surface.count, gl.UNSIGNED_INT, 0, model.count);
       }
@@ -1408,5 +1494,6 @@ export class AreaLayer {
     this.textures.clear();
     gl.deleteProgram(this.program);
     gl.deleteProgram(this.picking);
+    gl.deleteProgram(this.tops);
   }
 }

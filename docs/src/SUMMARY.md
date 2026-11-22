@@ -86,6 +86,7 @@
   - [0071 The paths mode of the 3D views](adr/0071-the-paths-mode-of-the-3d-views.md)
   - [0072 Passages where two mods build the same](adr/0072-passages-where-two-mods-build-the-same.md)
   - [0073 Switched-off mods are taken out through Vortex's plugin list](adr/0073-switched-off-mods-taken-out-through-vortex.md)
+  - [0074 The level of detail makes room for the real objects](adr/0074-level-of-detail-makes-room-for-real-objects.md)
   - [Template](adr/template.md)
 
 # Reference

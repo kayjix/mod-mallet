@@ -30,6 +30,14 @@ import type {
 } from "../generated/rendered-report";
 import type { RenderedTool, RenderedToolbox, Tool } from "../generated/rendered-toolbox";
 import type { Lang } from "../i18n";
+import {
+  houseBox,
+  SAMPLE_LOD,
+  sampleHouses,
+  sampleLodMesh,
+  sampleLodTexture,
+  sampleLodTiles,
+} from "./sample-lod";
 import { onSampleScanProgress, simulateScan } from "./sample-scan";
 
 type Two = Record<Lang, string>;
@@ -1863,9 +1871,11 @@ export const sampleApi: Api = {
         };
       }),
     }),
-  lodTiles: (world) => later({ world, tiles: [] }),
-  lodMesh: () => later(null),
-  lodTexture: () => later(null),
+  // With `?lod` in the address, a made-up level of detail around the docks.
+  lodTiles: (world) => later({ world, tiles: SAMPLE_LOD ? sampleLodTiles() : [] }),
+  lodMesh: (_world, _level, x, y, objects) =>
+    later(SAMPLE_LOD ? sampleLodMesh(sampleTerrain(), x, y, objects) : null),
+  lodTexture: (_world, path) => later(SAMPLE_LOD ? sampleLodTexture(path) : null),
   ranking: () => later([...ranked]),
   setRanking: (next) => {
     ranked = [...next];
@@ -2250,12 +2260,15 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
         action("Skyrim.esm", 0xb01, "sit", "BenchMarker", [cx - 300, cy - 200, ground], false),
       ]
     : [];
+  if (SAMPLE_LOD) {
+    objects.push(...sampleHouses(sampleTerrain(), cx, cy, radius));
+  }
   return { world, centre: [cx, cy], radius, objects, actions };
 }
 
 /** A box of the made-up models, as the backend sends a model up close. */
 function sampleBox(name: string): LodMesh | null {
-  const half = SAMPLE_MODELS[name];
+  const half = SAMPLE_MODELS[name] ?? houseBox(name);
   if (half === undefined) {
     return null;
   }

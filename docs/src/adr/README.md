@@ -98,3 +98,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0071](0071-the-paths-mode-of-the-3d-views.md) | The paths mode of the 3D views shows where characters walk | accepted |
 | [0072](0072-passages-where-two-mods-build-the-same.md) | Passages: where two mods build the same thing, decided as one | accepted |
 | [0073](0073-switched-off-mods-taken-out-through-vortex.md) | Switched-off mods still loaded are taken out through Vortex's plugin list | accepted |
+| [0074](0074-level-of-detail-makes-room-for-real-objects.md) | The level of detail makes room for the real objects up close | accepted |

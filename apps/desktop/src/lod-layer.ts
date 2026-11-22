@@ -9,6 +9,7 @@ import type { LodMesh } from "./generated/lod-mesh";
 import type { LodTile } from "./generated/lod-tiles";
 import { type Mat4, program, type Vec3 } from "./gl";
 import { CELL } from "./map-places";
+import type { RealTopsView } from "./real-tops";
 
 /** How close, in block sizes, the camera has to be for a block to split. */
 const SPLIT = 2.4;
@@ -19,6 +20,17 @@ const KEPT = 360;
 /** The largest side of a block's own land texture, and of shared ones. */
 const LAND_TEXTURE = 512;
 const SHARED_TEXTURE = 2048;
+/**
+ * How much higher than the real objects below it a reduced object may
+ * reach and still be left out, in game units (about 2.3 m): a reduced
+ * roof or chimney is never quite where the real one is.
+ */
+const ABOVE_REAL = 160;
+/**
+ * How far apart the points are where real objects are looked for around
+ * a reduced one, in game units; five by five of them, some 1.8 m across.
+ */
+const AROUND_REAL = 32;
 
 const VERTEX = `#version 300 es
 in vec3 a_position;
@@ -29,8 +41,10 @@ uniform float u_exaggeration;
 out vec2 v_uv;
 out vec3 v_normal;
 out vec2 v_xy;
+out vec3 v_game;
 void main() {
   v_uv = a_uv;
+  v_game = a_position;
   v_normal = a_normal;
   v_xy = a_position.xy / ${CELL}.0;
   gl_Position = u_matrix * vec4(v_xy, a_position.z / ${CELL}.0 * u_exaggeration, 1.0);
@@ -41,6 +55,7 @@ precision highp float;
 in vec2 v_uv;
 in vec3 v_normal;
 in vec2 v_xy;
+in vec3 v_game;
 uniform sampler2D u_texture;
 uniform bool u_hasTexture;
 uniform bool u_alphaTest;
@@ -50,8 +65,30 @@ uniform bool u_showCells;
 uniform sampler2D u_cells;
 uniform vec4 u_cellsRect;
 uniform vec4 u_fine;
+uniform bool u_hasTops;
+uniform sampler2D u_tops;
+uniform vec4 u_topsRect;
+uniform vec2 u_topsRange;
 out vec4 colour;
 void main() {
+  // Where the real objects are drawn up close, the reduced ones are left
+  // out at their place and up to a little above them (ADR 0074).
+  if (!u_land && u_hasTops) {
+    vec2 at = (v_game.xy - u_topsRect.xy) / (u_topsRect.zw - u_topsRect.xy);
+    if (at.x > 0.0 && at.y > 0.0 && at.x < 1.0 && at.y < 1.0) {
+      vec2 spacing = vec2(${AROUND_REAL}.0) / (u_topsRect.zw - u_topsRect.xy);
+      float nearest = 1.0;
+      for (int i = -2; i <= 2; i++) {
+        for (int j = -2; j <= 2; j++) {
+          nearest = min(nearest, texture(u_tops, at + vec2(float(i), float(j)) * spacing).r);
+        }
+      }
+      float top = u_topsRange.y - nearest * (u_topsRange.y - u_topsRange.x);
+      if (nearest < 1.0 && v_game.z <= top + ${ABOVE_REAL}.0) {
+        discard;
+      }
+    }
+  }
   // Where the game's own ground is drawn up close (ADR 0041), its land
   // stays out of the way; its water stays.
   if (u_land && u_hasTexture && v_xy.x > u_fine.x && v_xy.y > u_fine.y &&
@@ -149,9 +186,9 @@ export interface LodView {
   cells: WebGLTexture;
   /** West, south, columns, rows of the cells texture. */
   cellsRect: [number, number, number, number];
-  /** Cells (west, south, east, north) where the real objects are drawn,
-   * so that the reduced ones are left out there. */
-  realObjects: [number, number, number, number] | null;
+  /** Where and how high the real objects are drawn up close, so that the
+   * reduced ones are left out there. */
+  realObjects: RealTopsView | null;
   /** Cells (west, south, east, north edges) where the game's own ground
    * is drawn, so that the land of the blocks is left out there. */
   fineLand?: [number, number, number, number] | null;
@@ -276,6 +313,15 @@ export class LodLayer {
     gl.uniform1i(at("u_showCells"), view.showCells ? 1 : 0);
     gl.uniform4f(at("u_cellsRect"), ...view.cellsRect);
     gl.uniform4f(at("u_fine"), ...(view.fineLand ?? [0, 0, 0, 0]));
+    const real = view.realObjects;
+    gl.uniform1i(at("u_hasTops"), real === null ? 0 : 1);
+    gl.uniform1i(at("u_tops"), 3);
+    if (real !== null) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, real.texture);
+      gl.uniform4f(at("u_topsRect"), ...real.rect);
+      gl.uniform2f(at("u_topsRange"), ...real.range);
+    }
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, view.cells);
     gl.uniform1i(at("u_cells"), 1);
@@ -291,14 +337,7 @@ export class LodLayer {
       if (Array.isArray(loaded.land)) {
         this.drawSurfaces(loaded.land, at, true);
       }
-      const real = view.realObjects;
-      const overlapsReal =
-        real !== null &&
-        tile.x <= real[2] &&
-        tile.x + tile.level > real[0] &&
-        tile.y <= real[3] &&
-        tile.y + tile.level > real[1];
-      if (Array.isArray(loaded.objects) && !overlapsReal) {
+      if (Array.isArray(loaded.objects)) {
         this.drawSurfaces(loaded.objects, at, false);
       }
     }

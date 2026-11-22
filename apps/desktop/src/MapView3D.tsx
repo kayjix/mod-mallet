@@ -52,6 +52,7 @@ import { moveKeysOf, moveOf } from "./moves";
 import { matchKey, pinsOf, spotKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
+import { RealTops } from "./real-tops";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 interface MapView3DProps {
@@ -513,6 +514,8 @@ export function MapView3D({
   // The objects themselves, around the point the camera looks at (ADR 0038).
   const [withObjects, setWithObjects] = useState(true);
   const area = useRef<AreaLayer | null>(null);
+  // Where and how high they stand, for the level of detail (ADR 0074).
+  const tops = useRef<RealTops | null>(null);
   // The repair of paths shown, taken out and laid new (ADR 0058).
   const pathsLayer = useRef<PathsLayer | null>(null);
   const pathsNow = useRef<PathsOverlay | null>(paths);
@@ -750,8 +753,13 @@ export function MapView3D({
     } = state.current;
     wantArea.current(view.target, view.distance);
     const shownArea = near && view.distance <= NEAR * 1.5 ? (area.current?.area ?? null) : null;
-    // The level of detail stays: towns such as Whiterun are only there.
-    const realObjects = null;
+    // The reduced objects make room where real ones are drawn, and only
+    // there: towns such as Whiterun are in the level of detail alone
+    // (ADR 0074).
+    const realObjects =
+      shownArea !== null && area.current !== null && withLod
+        ? (tops.current?.update(area.current) ?? null)
+        : null;
     // The whole land of a world without level of detail is drawn from any
     // distance; the land around the camera only up close.
     const fineLand =
@@ -1164,6 +1172,7 @@ export function MapView3D({
     } catch {
       area.current = null;
     }
+    tops.current = new RealTops(gl);
     try {
       pathsLayer.current = new PathsLayer(gl);
       pathsLayer.current.set(pathsNow.current);
@@ -1216,6 +1225,8 @@ export function MapView3D({
       lod.current?.dispose();
       lod.current = null;
       area.current?.dispose();
+      tops.current?.dispose();
+      tops.current = null;
       pathsLayer.current?.dispose();
       pathsLayer.current = null;
       area.current = null;
