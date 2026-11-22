@@ -11,6 +11,7 @@ import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { catalogueTexts } from "./catalogue-texts";
 import type { DependencyTarget } from "./dependencies";
+import { EditingChip } from "./editing-chip";
 import { type Games, useGames } from "./games";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedLink } from "./generated/rendered-link";
@@ -672,6 +673,15 @@ export default function App({ api, startLang }: AppProps) {
           toolbox={toolbox}
           t={t}
           j={j}
+          editing={
+            report !== null &&
+            (current === "collisions" ||
+              current === "review" ||
+              current === "assets" ||
+              current === "map") ? (
+              <EditingChip />
+            ) : null
+          }
           steps={
             <NavSteps
               lang={lang}
@@ -856,6 +866,8 @@ interface SidebarProps {
   /** The game in use, with scanning. */
   gameCard: ReactNode;
   /** Back and forward (ADR 0070), above the toolbox. */
+  /** Which patch decisions go to, on the pages where something is decided (ADR 0070). */
+  editing: ReactNode;
   steps: ReactNode;
 }
 
@@ -876,6 +888,7 @@ function Sidebar({
   t,
   j,
   gameCard,
+  editing,
   steps,
 }: SidebarProps) {
   const reviewTexts = useReviewTexts();
@@ -953,6 +966,7 @@ function Sidebar({
       {gameCard}
       <nav>{game.map(navButton)}</nav>
       <div className="nav-bottom">
+        {editing}
         {steps}
         <nav>{beside.map(navButton)}</nav>
       </div>

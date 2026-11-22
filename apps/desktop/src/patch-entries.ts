@@ -10,7 +10,7 @@ import type { BookPatch } from "./generated/patch-book";
 import type { MapSpot, ObjectRef, RenderedReport, SpotPart } from "./generated/rendered-report";
 import { CM_PER_UNIT, isMoveKey, movesOf } from "./moves";
 import { keptBy, matchKey, type Pair, type PatchChoices } from "./patch";
-import { DUEL, pluginsOf } from "./patch-book";
+import { DUEL, NO_REPAIR, pluginsOf } from "./patch-book";
 import type { PatchTexts } from "./patch-texts";
 import { REPAIR } from "./repair-paths";
 import { pluginsInKey } from "./switched-off";
@@ -149,7 +149,7 @@ export function entriesOf(patch: BookPatch, context: EntryContext): Entry[] {
     return other === undefined ? "" : modOf(other);
   };
   for (const [key, value] of Object.entries(patch.decisions)) {
-    if (key.startsWith("pin:")) {
+    if (key.startsWith("pin:") || key.startsWith(NO_REPAIR)) {
       continue;
     }
     const base = { key, ticked: !unticked.has(key), section: null, where: null, target: null };

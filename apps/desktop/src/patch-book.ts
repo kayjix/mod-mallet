@@ -11,7 +11,7 @@
 // in the order of the book; on the same key the later one wins, so the
 // user's own decisions win over loaded ones.
 
-import { withDoorMoves } from "./doors";
+import { placeName, withDoorMoves } from "./doors";
 import type { BookPatch, PatchBook } from "./generated/patch-book";
 import type {
   MapSpot,
@@ -23,6 +23,7 @@ import type {
 import { objectMovesOf } from "./moves";
 import {
   decisionAt,
+  matchKey,
   objectChoiceKey,
   objectsOf,
   type Pair,
@@ -32,280 +33,12 @@ import {
 import { repairsOf } from "./repair-paths";
 import { splitWaiting } from "./switched-off";
 
-/** The prefix of a pin among the choices; a pin is no decision. */
-const PIN = "pin:";
+export * from "./book";
 
-/** The prefix of a file choice of Asset collisions among a patch's decisions. */
-export const DUEL = "duel:";
-
-/** The name the first patch gets, as patches had before there were several. */
-export const FIRST_PATCH_NAME = "Mod Mallet Patch";
+import { countedPatches, DUEL, FIRST_PATCH_NAME, PIN, tickedOf } from "./book";
 
 /** The version of the manifest's format this window writes. */
 const MANIFEST_FORMAT = 1;
-
-/** A new identity for a patch, different from those in the book. */
-export function newPatchId(book: PatchBook | null): string {
-  const taken = new Set((book?.patches ?? []).map((patch) => patch.id));
-  for (let attempt = 0; ; attempt += 1) {
-    const id = `p${Date.now().toString(36)}${attempt === 0 ? "" : `-${attempt}`}`;
-    if (!taken.has(id)) {
-      return id;
-    }
-  }
-}
-
-/** A name not used by another patch of the book: `wanted`, or with a number after it. */
-export function freeName(book: PatchBook, wanted: string, except?: string): string {
-  const taken = new Set(
-    book.patches.filter((patch) => patch.id !== except).map((patch) => patch.name.toLowerCase()),
-  );
-  const base = wanted.trim() === "" ? FIRST_PATCH_NAME : wanted.trim();
-  if (!taken.has(base.toLowerCase())) {
-    return base;
-  }
-  for (let number = 2; ; number += 1) {
-    const name = `${base} (${number})`;
-    if (!taken.has(name.toLowerCase())) {
-      return name;
-    }
-  }
-}
-
-/**
- * The book made the first time from the choices as they were kept before
- * there were several patches: one patch with every decision, the pins
- * apart.
- */
-export function bookFromChoices(choices: PatchChoices): PatchBook {
-  const decisions: PatchChoices = {};
-  const pins: string[] = [];
-  for (const [key, value] of Object.entries(choices)) {
-    if (key.startsWith(PIN)) {
-      pins.push(key);
-    } else {
-      decisions[key] = value;
-    }
-  }
-  const id = newPatchId(null);
-  return {
-    patches: [{ id, name: FIRST_PATCH_NAME, decisions, unticked: [] }],
-    active: id,
-    pins,
-  };
-}
-
-/** Whether a patch is somebody else's, whose decisions the window never changes. */
-export const isForeign = (patch: BookPatch) => patch.foreign === true;
-
-/** The patch new decisions go to: the active one, or else the first of the user's own. */
-export function activePatch(book: PatchBook): BookPatch | undefined {
-  return (
-    book.patches.find((patch) => patch.id === book.active && !isForeign(patch)) ??
-    book.patches.find((patch) => !isForeign(patch))
-  );
-}
-
-/** A patch's decisions that are ticked. */
-export function tickedOf(patch: BookPatch): PatchChoices {
-  const unticked = new Set(patch.unticked ?? []);
-  if (unticked.size === 0) {
-    return patch.decisions;
-  }
-  return Object.fromEntries(Object.entries(patch.decisions).filter(([key]) => !unticked.has(key)));
-}
-
-/** The patches that count, in the order in which they count: loaded ones first. */
-export function countedPatches(book: PatchBook): BookPatch[] {
-  const on = book.patches.filter((patch) => patch.off !== true);
-  return [...on.filter(isForeign), ...on.filter((patch) => !isForeign(patch))];
-}
-
-/** The choices every page reads: the pins, and the ticked decisions of every patch that counts. */
-export function countedChoices(book: PatchBook): PatchChoices {
-  const choices: PatchChoices = {};
-  for (const pin of book.pins ?? []) {
-    choices[pin] = "pinned";
-  }
-  for (const patch of countedPatches(book)) {
-    Object.assign(choices, tickedOf(patch));
-  }
-  return choices;
-}
-
-/** A copy of a patch with its decisions and unticked keys copied too, to change. */
-function copyOf(patch: BookPatch): BookPatch {
-  return { ...patch, decisions: { ...patch.decisions }, unticked: [...(patch.unticked ?? [])] };
-}
-
-/**
- * The book with a page's change put in: `before` is what the page read,
- * `after` what it wants. A changed decision goes to the user's own patch
- * that decides it now (the last that counts), or else to the active one.
- * A decision taken back is taken out of the user's own patches; in a patch
- * by someone else it is unticked, which leaves its author's decisions as
- * they are.
- */
-export function withChange(book: PatchBook, before: PatchChoices, after: PatchChoices): PatchBook {
-  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  const changed = [...keys].filter(
-    (key) => before[key] !== after[key] || key in before !== key in after,
-  );
-  if (changed.length === 0) {
-    return book;
-  }
-  const patches = book.patches.map(copyOf);
-  let pins = [...(book.pins ?? [])];
-  const byId = new Map(patches.map((patch) => [patch.id, patch]));
-  const counted = countedPatches({ ...book, patches }).map((patch) => byId.get(patch.id) ?? patch);
-  const active = activePatch({ ...book, patches });
-  for (const key of changed) {
-    if (key.startsWith(PIN)) {
-      pins = pins.filter((pin) => pin !== key);
-      if (key in after) {
-        pins.push(key);
-      }
-      continue;
-    }
-    const holders = counted.filter(
-      (patch) => key in patch.decisions && !(patch.unticked ?? []).includes(key),
-    );
-    if (key in after) {
-      const own = [...holders].reverse().find((patch) => !isForeign(patch));
-      const target = own ?? active;
-      if (target === undefined) {
-        continue;
-      }
-      target.decisions[key] = after[key] ?? null;
-      target.unticked = (target.unticked ?? []).filter((unticked) => unticked !== key);
-    } else {
-      for (const patch of holders) {
-        if (isForeign(patch)) {
-          patch.unticked = [...(patch.unticked ?? []), key];
-        } else {
-          delete patch.decisions[key];
-        }
-      }
-    }
-  }
-  return { ...book, patches, pins };
-}
-
-/** The book with one patch changed by `change`. */
-export function withPatch(
-  book: PatchBook,
-  id: string,
-  change: (patch: BookPatch) => BookPatch,
-): PatchBook {
-  return {
-    ...book,
-    patches: book.patches.map((patch) => (patch.id === id ? change(copyOf(patch)) : patch)),
-  };
-}
-
-/** The book with a new empty patch of the user's own, which becomes the active one. */
-export function withNewPatch(book: PatchBook, name: string): { book: PatchBook; id: string } {
-  const id = newPatchId(book);
-  return {
-    id,
-    book: {
-      ...book,
-      active: id,
-      patches: [...book.patches, { id, name: freeName(book, name), decisions: {}, unticked: [] }],
-    },
-  };
-}
-
-/** The book without a patch. Another of the user's own becomes active; one is made if none is left. */
-export function withoutPatch(book: PatchBook, id: string): PatchBook {
-  const patches = book.patches.filter((patch) => patch.id !== id);
-  const rest = { ...book, patches };
-  if (patches.some((patch) => !isForeign(patch))) {
-    return { ...rest, active: activePatch(rest)?.id ?? rest.active };
-  }
-  return withNewPatch(rest, FIRST_PATCH_NAME).book;
-}
-
-/** The book with decisions of one patch ticked or unticked. */
-export function withTicked(
-  book: PatchBook,
-  id: string,
-  keys: string[],
-  ticked: boolean,
-): PatchBook {
-  return withPatch(book, id, (patch) => {
-    const rest = (patch.unticked ?? []).filter((key) => !keys.includes(key));
-    return { ...patch, unticked: ticked ? rest : [...rest, ...keys] };
-  });
-}
-
-/**
- * The book with decisions moved or copied from one patch to another. A
- * patch by someone else gives copies only; nothing goes into one.
- */
-export function withMoved(
-  book: PatchBook,
-  from: string,
-  to: string,
-  keys: string[],
-  copy: boolean,
-): PatchBook {
-  const source = book.patches.find((patch) => patch.id === from);
-  const target = book.patches.find((patch) => patch.id === to);
-  if (source === undefined || target === undefined || isForeign(target) || from === to) {
-    return book;
-  }
-  const keep = copy || isForeign(source);
-  let next = withPatch(book, to, (patch) => {
-    for (const key of keys) {
-      if (key in source.decisions) {
-        patch.decisions[key] = source.decisions[key] ?? null;
-      }
-    }
-    patch.unticked = (patch.unticked ?? []).filter((key) => !keys.includes(key));
-    return patch;
-  });
-  if (!keep) {
-    next = withPatch(next, from, (patch) => {
-      for (const key of keys) {
-        delete patch.decisions[key];
-      }
-      patch.unticked = (patch.unticked ?? []).filter((key) => !keys.includes(key));
-      return patch;
-    });
-  }
-  return next;
-}
-
-/** The book with a loaded patch added, as somebody else's when it names an author. */
-export function withLoaded(
-  book: PatchBook,
-  loaded: {
-    archive: string;
-    name: string;
-    author: string | null;
-    version: string | null;
-    decisions: PatchChoices;
-  },
-): { book: PatchBook; id: string } {
-  const id = newPatchId(book);
-  const foreign = loaded.author !== null && loaded.author.trim() !== "";
-  const patch: BookPatch = {
-    id,
-    name: freeName(book, loaded.name),
-    author: loaded.author,
-    version: loaded.version,
-    loadedFrom: loaded.archive,
-    foreign,
-    decisions: { ...loaded.decisions },
-    unticked: [],
-  };
-  return {
-    id,
-    book: { ...book, patches: [...book.patches, patch], active: foreign ? book.active : id },
-  };
-}
-
 /** The decisions an archive without a manifest stands for: each object hidden on its own. */
 export function decisionsOfObjects(objects: ObjectRef[]): PatchChoices {
   return Object.fromEntries(objects.map((object) => [objectChoiceKey(object), object.plugin]));
@@ -318,7 +51,7 @@ const PLUGIN_IN_KEY = /[^:|/,+]+?\.(?:esp|esm|esl)(?=$|[:|/,+])/gi;
 export function pluginsOf(decisions: PatchChoices): Map<string, string> {
   const found = new Map<string, string>();
   for (const [key, value] of Object.entries(decisions)) {
-    if (key.startsWith(DUEL)) {
+    if (key.startsWith(DUEL) || key.startsWith(NO_REPAIR)) {
       continue;
     }
     for (const match of key.matchAll(PLUGIN_IN_KEY)) {
@@ -418,7 +151,14 @@ export function writtenPatch(
     spots.set(spot.finding, [...(spots.get(spot.finding) ?? []), spot]);
   }
   const moves = withDoorMoves(objectMovesOf(active), active, spots);
+  // The paths over what it hides are repaired by itself, place by place,
+  // unless the user turned that off for a place (ADR 0070).
   const repairs = repairsOf(active, hidden);
+  for (const area of repairAreasOf(report, hidden)) {
+    if (!(noRepairKey(area) in active)) {
+      repairs.places.push({ place: area.place, centre: area.centre, navmeshes: [], every: true });
+    }
+  }
   const plugins = [...pluginsOf(ticked).values()].sort((a, b) => a.localeCompare(b));
   const mods = [
     ...new Set(plugins.map(modOfPlugin).filter((mod): mod is string => mod !== null)),
@@ -510,4 +250,72 @@ export function duelsOf(decisions: PatchChoices): { id: string; side: number }[]
       ? [{ id: key.slice(DUEL.length), side }]
       : [];
   });
+}
+
+/** The prefix of a place whose paths a patch does not repair by itself (ADR 0070). */
+export const NO_REPAIR = "norepair:";
+
+/** A place where a patch hides objects, whose paths it repairs by itself. */
+export interface RepairArea {
+  /** Its identity among a patch's decisions, after {@link NO_REPAIR}. */
+  key: string;
+  /** The worldspace, or the interior cell by its editor ID. */
+  place: string;
+  /** Outside, the middle of the cell; inside, null. */
+  centre: [number, number] | null;
+  /** The place in words. */
+  label: string;
+  /** How many hidden objects stand there. */
+  objects: number;
+}
+
+/** The decision that turns repairing the paths of a place off. */
+export const noRepairKey = (area: RepairArea) => `${NO_REPAIR}${area.key}`;
+
+/** Game units per side of an outside cell. */
+const CELL = 4096;
+
+/**
+ * The places where `hidden` objects stand, cell by cell, as the spots of
+ * the report place them. Objects no spot names are left out: where they
+ * stand is not known here.
+ */
+export function repairAreasOf(report: RenderedReport, hidden: ObjectRef[]): RepairArea[] {
+  const where = new Map<string, MapSpot>();
+  for (const spot of report.map.spots) {
+    for (const part of spot.parts ?? []) {
+      const key = matchKey(part.object);
+      if (!where.has(key)) {
+        where.set(key, spot);
+      }
+    }
+  }
+  const areas = new Map<string, RepairArea>();
+  for (const object of hidden) {
+    const spot = where.get(matchKey(object));
+    if (spot === undefined) {
+      continue;
+    }
+    const location = spot.location;
+    const area: RepairArea =
+      location.type === "interior"
+        ? {
+            key: `cell:${location.cell}`,
+            place: location.cell,
+            centre: null,
+            label: "",
+            objects: 0,
+          }
+        : {
+            key: `${location.world}|${location.x},${location.y}`,
+            place: location.world,
+            centre: [Math.round((location.x + 0.5) * CELL), Math.round((location.y + 0.5) * CELL)],
+            label: "",
+            objects: 0,
+          };
+    const known = areas.get(area.key) ?? { ...area, label: placeName(location) };
+    known.objects += 1;
+    areas.set(area.key, known);
+  }
+  return [...areas.values()].sort((a, b) => a.label.localeCompare(b.label));
 }

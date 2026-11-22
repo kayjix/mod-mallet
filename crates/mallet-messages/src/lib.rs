@@ -880,11 +880,7 @@ fn patch_args(patch: &mallet_core::Patch) -> Vec<(&'static str, ArgValue)> {
     let number = |count: usize| ArgValue::Number(i64::try_from(count).unwrap_or(i64::MAX));
     let moved = patch.moves.as_ref().map_or(0, |moves| moves.moves.len());
     let paths = patch.repairs.as_ref().map_or(0, |repairs| {
-        repairs
-            .places
-            .iter()
-            .filter(|place| !place.navmeshes.is_empty())
-            .count()
+        repairs.places.iter().filter(|place| place.wanted()).count()
     });
     vec![
         ("name", ArgValue::from(patch.name.as_str())),

@@ -447,6 +447,7 @@ fn repair_near_the_object() -> Action {
                 place: "Tamriel".to_owned(),
                 centre: Some([100, 200]),
                 navmeshes: vec!["skyrim.esm:000999".to_owned()],
+                every: false,
             }],
             hidden: vec![mallet_core::ObjectRef {
                 plugin: "Skyrim.esm".to_owned(),

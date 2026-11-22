@@ -2569,6 +2569,10 @@
           "maxItems": 2,
           "minItems": 2
         },
+        "every": {
+          "description": "Whether every mesh there whose path the game uses runs over a hidden\nobject is repaired, not only those chosen: a patch repairs the paths\nover what it hides by itself (ADR 0070).",
+          "type": "boolean"
+        },
         "navmeshes": {
           "description": "The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].",
           "type": "array",

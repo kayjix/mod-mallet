@@ -35,8 +35,9 @@ pub fn paths_file(options: &ManagerOptions) -> Option<PathBuf> {
 /// Builds the plugin, named `own`, that carries the repaired paths of
 /// `repairs` into the setup `scan` describes, from the versions of the
 /// meshes other than Mod Mallet's own repairs. Each place is repaired with
-/// every object hidden there, and the meshes chosen for it are kept. Also
-/// returns the meshes that cannot be repaired, and why.
+/// every object hidden there; the meshes chosen for it are kept, or, for a
+/// place repaired by itself (ADR 0070), every mesh whose path the game uses
+/// runs over a hidden object. Also returns the meshes that cannot be repaired, and why.
 ///
 /// # Errors
 ///
@@ -60,13 +61,14 @@ pub(crate) fn paths_plugin(
     let mut refused: Vec<RefusedPath> = Vec::new();
     for place in &repairs.places {
         let centre = place.centre.map(|[x, y]| [as_f32(x), as_f32(y)]);
+        // A place repaired by itself takes every mesh that needs it there.
         let chosen: std::collections::BTreeSet<String> = place.navmeshes.iter().cloned().collect();
         let found = crate::walkways::repaired_navmeshes(
             scan,
             &place.place,
             centre,
             &repairs.hidden,
-            Some(&chosen),
+            (!place.every).then_some(&chosen),
         )
         .unwrap_or_default();
         for record in found {

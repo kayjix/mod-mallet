@@ -46,7 +46,7 @@ for it.
 ### A patch is a set of decisions with a name
 
 - The window keeps a **patch book** per game, in the settings
-  (`patch_book`): the patches, in an order, and which one is **active**.
+  (`patch_book`): the patches, in an order, and which one is being edited.
   The old `patch_choices` become the first patch, named "Mod Mallet Patch",
   the first time the book is read.
 - A **patch** has an identity that does not change, a name, an author
@@ -59,25 +59,42 @@ for it.
   `duel:<duel>` for the side picked in a duel. The versions of things of the
   catalogue (ADR 0054) join later, as `version:<thing>`.
 - Pins are no decisions (ADR 0050) and stay outside every patch.
-- A patch is **counted** unless the user switched it off. What counts is
-  the ticked decisions of every counted patch: first the patches by someone
-  else, then the user's own, each in the order of the book; on the same key
-  the later patch wins, so the user's own decisions win over loaded ones.
+- A patch is **switched on** unless the user switched it off: in the game
+  that is its mod, installed and on in Vortex; here, that its decisions
+  count. Several patches can be on at once, each its own mod.
+- Exactly one of the user's own patches is the one **being edited**: every
+  decision made anywhere goes into it. The book keeps it as `active`. The
+  patch page marks it ("You are editing this patch"), and on every page
+  where something is decided (Map collisions, Go through it, Asset
+  collisions, the map) the sidebar shows "Decisions go to: Patch X ▾", with
+  a quick switch to another patch or a new one. Making a new patch, or
+  duplicating one, makes it the one being edited.
+- What the views show is what counts: the ticked decisions of every patch
+  that is switched on, first the patches by someone else, then the user's
+  own, each in the order of the book, and the patch being edited last,
+  whether it is switched on or not. On the same key the later wins, so the
+  views always show what the user is editing.
   Every page reads and writes these, as before; nothing on Map collisions,
   Asset collisions or the 3D views needs to know about patches.
-- A page's change goes to the patch that holds the key if that is one of
-  the user's own; otherwise to the **active** patch, which is always one of
-  the user's own. New decisions go to the active one. The patch page moves
-  or copies decisions between patches.
-- A decision taken back on a page is taken out of the user's own patches;
-  in a patch by someone else it is unticked, which leaves that patch's
-  decisions as its author made them.
+- A page's change goes to the patch being edited. A decision taken back on
+  a page is taken out of the patch being edited, and unticked in any other
+  patch that still makes it, which leaves that patch's decisions as they
+  are. The patch page moves or copies decisions between patches.
+- **Duplicating** a patch copies its decisions into a new patch of the
+  user's own, which becomes the one being edited; the original is switched
+  off here, so what the copy changes shows at once. In Vortex the original
+  stays until the user switches it off there or installs the copy.
 - Unticking keeps the decision in its patch but takes it out of what counts;
   the views show the object again at once.
 
 ### Patches that disagree are shown, and settled outside them
 
-- Two counted patches **disagree** where both decide the same key
+- In the game, two patches that are both on and decide the same place
+  both apply: Base Object Swapper hides whatever either hides, and of two
+  plugins that move or repair the same thing the one loaded later wins.
+  Mod Mallet's views show the patch being edited winning instead, so the
+  page warns about every such place.
+- Two patches that count **disagree** where both decide the same key
   differently, where one hides an object that the other keeps at a spot it
   decided, where both move the same object differently, or where both
   repair the same navigation mesh.
@@ -98,6 +115,25 @@ for it.
   when the patch is written. Until that is built, disagreements with a
   patch by someone else are shown, and settled by switching one of the two
   off.
+
+### A patch repairs the paths over what it hides by itself
+
+- Where a patch hides something characters walk on, the paths there are
+  repaired when the patch is written, as in ADR 0058, into its own plugin
+  of paths. The user does not have to ask for it.
+- The places are the cells of the objects it hides (or the interior
+  cells), as the spots of the scan place them. In each, only a mesh whose
+  version the game uses runs over a hidden object is changed (the checks of
+  ADR 0051 and 0052); where the mod that wins already has a path around the
+  object, nothing is written there.
+- The patch page lists these places under "Paths repaired by the patch
+  itself", each with a tick: unticking keeps the paths of that place as
+  they are, kept in the patch as `norepair:<place>`. Repairs the user chose
+  by hand in a 3D view (`repair:`) stay as they were.
+- A mesh from another mod that is not the one the game uses is not taken
+  over in place of a repair yet: that would copy a whole mesh of another
+  mod, whose links to its neighbours this setup may not match. It is a
+  later step.
 
 ### One patch is one archive is one mod
 
@@ -145,11 +181,12 @@ for it.
 ### What the patch page shows
 
 - On the left, the patches: name, author, whether it is in the game,
-  switched off or not installed yet, how many decisions, the active one
-  marked; "New patch" and "Load a patch".
+  switched off or not installed yet, how many decisions, the one being
+  edited marked; "New patch" and "Load a patch".
 - On the right, the chosen patch:
   - what it does in one sentence, its state in the game, and its buttons:
-    create and install, switch off or on, make active, rename, delete;
+    install or update, switch off or on, edit this patch, duplicate,
+    rename, delete;
   - the mods it touches, each with its number of decisions, marking those
     not installed and those switched off (ADR 0061): "You don't have
     Immersive Citizens; its 84 decisions in this patch do nothing and need no
@@ -178,6 +215,14 @@ for it.
   top of every page. That bar pushed every page down and took height from
   the 3D view in Map collisions, so they moved into the sidebar, where they
   take no height from any page.
+
+### Amended later on 2026-11-22
+
+- *Amended 2026-11-22, later:* "active" left the user unsure which patch
+  they were editing after making a new one. It is now "being edited", shown
+  on the patch page and in the sidebar of every page where something is
+  decided; changes always go to it; patches can be duplicated; and a patch
+  repairs the paths over what it hides by itself.
 
 ## Consequences
 

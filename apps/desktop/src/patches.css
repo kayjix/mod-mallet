@@ -326,3 +326,15 @@ button.link:hover {
   max-width: 170px;
   font-size: 0.8rem;
 }
+
+.patch-editing {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-weight: 600;
+}
+
+.patch-edit-button {
+  border-color: var(--accent);
+  font-weight: 600;
+}

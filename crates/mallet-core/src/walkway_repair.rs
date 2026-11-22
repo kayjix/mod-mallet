@@ -38,6 +38,18 @@ pub struct RepairPlace {
     pub centre: Option<[i32; 2]>,
     /// The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].
     pub navmeshes: Vec<String>,
+    /// Whether every mesh there whose path the game uses runs over a hidden
+    /// object is repaired, not only those chosen: a patch repairs the paths
+    /// over what it hides by itself (ADR 0070).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub every: bool,
+}
+
+impl RepairPlace {
+    /// Whether anything is to be repaired there.
+    pub fn wanted(&self) -> bool {
+        self.every || !self.navmeshes.is_empty()
+    }
 }
 
 /// The plugin of paths as written into Mod Mallet's own folder.

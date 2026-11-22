@@ -286,7 +286,7 @@ fn does_something(patch: &Patch) -> bool {
             repairs
                 .places
                 .iter()
-                .any(|place| !place.navmeshes.is_empty())
+                .any(mallet_core::walkway_repair::RepairPlace::wanted)
         })
 }
 
@@ -334,7 +334,7 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
         repairs
             .places
             .iter()
-            .any(|place| !place.navmeshes.is_empty())
+            .any(mallet_core::walkway_repair::RepairPlace::wanted)
     }) {
         let scan = options.setup.as_ref().ok_or(EngineError::SetupUnknown)?;
         let own = swap::paths_plugin_name(&patch.name);

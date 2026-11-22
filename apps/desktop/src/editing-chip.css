@@ -1,0 +1,37 @@
+/* Which patch the decisions go to (ADR 0070), in the sidebar. */
+
+.editing-chip {
+  display: grid;
+  gap: 3px;
+  margin: 0 8px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.editing-chip-label {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--side-muted);
+  font-size: 0.72rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editing-chip-label:hover {
+  color: var(--side-text);
+  text-decoration: underline;
+}
+
+.editing-chip select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 6px;
+  background: var(--side-bg);
+  color: var(--side-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}

@@ -21,9 +21,6 @@ export interface PatchTexts {
 
   does: (hidden: number, moved: number, paths: number, files: number) => string;
   nothing: string;
-  activeNote: string;
-  makeActive: string;
-  makeActiveHint: string;
   foreignNote: (author: string, version: string | null) => string;
   authorUnproven: string;
   loadedFrom: (archive: string) => string;
@@ -33,6 +30,7 @@ export interface PatchTexts {
   stateSwitchedOff: (mod: string) => string;
   stateNotInstalled: string;
   stateOffHere: string;
+  stateOffEditing: string;
   differs: (objects: number) => string;
   install: string;
   update: string;
@@ -101,6 +99,21 @@ export interface PatchTexts {
   open: (spots: number, pairs: number) => string;
   toCollisions: string;
   emptyBook: string;
+  autoRepairTitle: string;
+  autoRepairNote: string;
+  autoRepairSummary: (places: number, off: number) => string;
+  autoRepairTick: string;
+  objectsHere: (count: number) => string;
+  chipLabel: string;
+  chipHint: string;
+  duplicate: string;
+  duplicateHint: string;
+  copyName: (name: string) => string;
+  editingBanner: string;
+  edit: string;
+  editHint: string;
+  inGameOn: string;
+  inGameOff: string;
   inPatchNote: string;
   patchLabel: (name: string) => string;
 }
@@ -115,18 +128,18 @@ const en: PatchTexts = {
   newPatch: "New patch",
   newPatchName: "New patch",
   newPatchHint:
-    "Starts an empty patch and makes it the active one: what you decide from now on goes into it. The other patches keep their decisions.",
+    "Starts an empty patch and makes it the one you edit: what you decide from now on goes into it. The other patches keep their decisions.",
   load: "Load a patch…",
   loadHint:
     "Reads a patch archive, your own or one somebody shared, back into Mod Mallet as decisions you can look at, change and install. Nothing is installed by loading.",
   loadFailed: (reason) => `The patch could not be loaded: ${reason}`,
   loaded: (name) => `Loaded “${name}”.`,
-  active: "active",
-  activeHint: "New decisions go into this patch.",
+  active: "editing",
+  activeHint: "You are editing this patch: new decisions go into it.",
   by: (author) => `by ${author}`,
   decisions: (count) => plural(count, "decision", "decisions"),
   state: {
-    "in-game": "in the game",
+    "in-game": "on in the game",
     "switched-off": "switched off in Vortex",
     "not-installed": "not installed yet",
     "off-here": "switched off",
@@ -148,10 +161,7 @@ const en: PatchTexts = {
     return `This patch ${text}.`;
   },
   nothing:
-    "This patch decides nothing yet. While it is the active patch, what you decide in Map collisions, Asset collisions and the 3D views goes into it.",
-  activeNote: "Active: what you decide anywhere in Mod Mallet goes into this patch.",
-  makeActive: "Make active",
-  makeActiveHint: "New decisions go into this patch from now on.",
+    "This patch decides nothing yet. While you edit it, what you decide in Map collisions, Asset collisions and the 3D views goes into it.",
   foreignNote: (author, version) =>
     `Made by ${author}${version === null ? "" : `, version ${version}`}. Mod Mallet does not change its decisions: untick what you don't want, decide over it in a patch of your own, or make it yours.`,
   authorUnproven: "Anybody can write any name as the author; nothing proves it yet.",
@@ -165,6 +175,8 @@ const en: PatchTexts = {
   stateNotInstalled: "Not installed yet: nothing of it is in the game.",
   stateOffHere:
     "Switched off: its decisions are kept, but they do not count and the views do not show them.",
+  stateOffEditing:
+    "Switched off in the game. Because you are editing it, the views still show its decisions.",
   differs: (objects) =>
     `${plural(objects, "decided object is", "decided objects are")} not in the installed version yet. Update it in Vortex to bring them into the game.`,
   install: "Install in Vortex",
@@ -260,6 +272,27 @@ const en: PatchTexts = {
     `The old mod “${mod}” is still on. Its moves and paths are part of your patch now; once that is installed, switch the old mod off so that nothing is done twice.`,
   switchOldOff: "Switch the old mod off",
   emptyBook: "No patch yet. Start one, or load one somebody shared.",
+  autoRepairTitle: "Paths repaired by the patch itself",
+  autoRepairNote:
+    "Where this patch hides something characters walk on, Mod Mallet repairs the paths there when it writes the patch, on the ground below. It only changes a path where the one the game uses runs over a hidden object; where another mod's path already goes around it, nothing is changed.",
+  autoRepairSummary: (places, off) =>
+    `Checked when the patch is written, in ${plural(places, "place", "places")} where it hides something${
+      off > 0 ? `; turned off in ${off}` : ""
+    }.`,
+  autoRepairTick: "Untick to leave the paths of this place as they are.",
+  objectsHere: (count) => plural(count, "hidden object", "hidden objects"),
+  chipLabel: "Decisions go to",
+  chipHint:
+    "Everything you decide in Map collisions, Go through it, Asset collisions and the 3D views goes into this patch. Pick another one here, or start a new one.",
+  duplicate: "Duplicate",
+  duplicateHint:
+    "Copies this patch into a new one that you then edit, and switches the original off here, so you can work from it as a starting point. Vortex keeps the original until you switch it off there or install the copy.",
+  copyName: (name) => `${name} (copy)`,
+  editingBanner: "You are editing this patch: what you decide anywhere in Mod Mallet goes into it.",
+  edit: "Edit this patch",
+  editHint: "From now on, what you decide goes into this patch.",
+  inGameOn: "on in the game",
+  inGameOff: "off in the game",
   inPatchNote:
     "These come with this patch: installing it brings them into the game, with no mod of their own.",
   patchLabel: (name) => `patch “${name}”`,
@@ -275,18 +308,18 @@ const de: PatchTexts = {
   newPatch: "Neuer Patch",
   newPatchName: "Neuer Patch",
   newPatchHint:
-    "Beginnt einen leeren Patch und macht ihn zum aktiven: Was du ab jetzt entscheidest, kommt hinein. Die anderen Patches behalten ihre Entscheidungen.",
+    "Beginnt einen leeren Patch und macht ihn zu dem, den du bearbeitest: Was du ab jetzt entscheidest, kommt hinein. Die anderen Patches behalten ihre Entscheidungen.",
   load: "Patch laden…",
   loadHint:
     "Liest ein Patch-Archiv – dein eigenes oder eines, das jemand geteilt hat – zurück in Mod Mallet, als Entscheidungen, die du ansehen, ändern und installieren kannst. Beim Laden wird nichts installiert.",
   loadFailed: (reason) => `Der Patch konnte nicht geladen werden: ${reason}`,
   loaded: (name) => `„${name}“ geladen.`,
-  active: "aktiv",
-  activeHint: "Neue Entscheidungen kommen in diesen Patch.",
+  active: "wird bearbeitet",
+  activeHint: "Du bearbeitest diesen Patch: Neue Entscheidungen kommen hinein.",
   by: (author) => `von ${author}`,
   decisions: (count) => (count === 1 ? "1 Entscheidung" : `${count} Entscheidungen`),
   state: {
-    "in-game": "im Spiel",
+    "in-game": "im Spiel an",
     "switched-off": "in Vortex ausgeschaltet",
     "not-installed": "noch nicht installiert",
     "off-here": "ausgeschaltet",
@@ -310,10 +343,7 @@ const de: PatchTexts = {
     return `Dieser Patch ${text}.`;
   },
   nothing:
-    "Dieser Patch entscheidet noch nichts. Solange er der aktive Patch ist, kommt hinein, was du unter Karten-Kollisionen, Asset-Kollisionen und in den 3D-Ansichten entscheidest.",
-  activeNote: "Aktiv: Was du irgendwo in Mod Mallet entscheidest, kommt in diesen Patch.",
-  makeActive: "Aktiv machen",
-  makeActiveHint: "Neue Entscheidungen kommen ab jetzt in diesen Patch.",
+    "Dieser Patch entscheidet noch nichts. Solange du ihn bearbeitest, kommt hinein, was du unter Karten-Kollisionen, Asset-Kollisionen und in den 3D-Ansichten entscheidest.",
   foreignNote: (author, version) =>
     `Gemacht von ${author}${version === null ? "" : `, Version ${version}`}. Mod Mallet ändert seine Entscheidungen nicht: Hake ab, was du nicht willst, entscheide in einem eigenen Patch darüber, oder mach ihn zu deinem.`,
   authorUnproven: "Als Autor kann jeder jeden Namen eintragen; noch beweist nichts, wer es war.",
@@ -327,6 +357,8 @@ const de: PatchTexts = {
   stateNotInstalled: "Noch nicht installiert: Nichts davon ist im Spiel.",
   stateOffHere:
     "Ausgeschaltet: Seine Entscheidungen bleiben, zählen aber nicht, und die Ansichten zeigen sie nicht.",
+  stateOffEditing:
+    "Im Spiel ausgeschaltet. Weil du ihn bearbeitest, zeigen die Ansichten seine Entscheidungen trotzdem.",
   differs: (objects) =>
     `${objects === 1 ? "1 entschiedenes Objekt ist" : `${objects} entschiedene Objekte sind`} noch nicht in der installierten Fassung. Aktualisiere ihn in Vortex, um sie ins Spiel zu bringen.`,
   install: "In Vortex installieren",
@@ -423,6 +455,29 @@ const de: PatchTexts = {
     `Die alte Mod „${mod}“ ist noch eingeschaltet. Ihre Verschiebungen und Wege gehören jetzt zu deinem Patch; sobald der installiert ist, schalte die alte Mod aus, damit nichts doppelt geschieht.`,
   switchOldOff: "Alte Mod ausschalten",
   emptyBook: "Noch kein Patch. Beginne einen, oder lade einen, den jemand geteilt hat.",
+  autoRepairTitle: "Wege, die der Patch selbst repariert",
+  autoRepairNote:
+    "Wo dieser Patch etwas ausblendet, über das Figuren laufen, repariert Mod Mallet beim Schreiben des Patches die Wege dort, auf dem Boden darunter. Es ändert einen Weg nur, wo der, den das Spiel nimmt, über ein ausgeblendetes Objekt führt; wo der Weg einer anderen Mod schon darum herumführt, bleibt alles, wie es ist.",
+  autoRepairSummary: (places, off) =>
+    `Wird beim Schreiben geprüft, an ${places === 1 ? "1 Ort" : `${places} Orten`}, an denen er etwas ausblendet${
+      off > 0 ? `; an ${off} abgeschaltet` : ""
+    }.`,
+  autoRepairTick: "Abhaken lässt die Wege dieses Ortes, wie sie sind.",
+  objectsHere: (count) =>
+    count === 1 ? "1 ausgeblendetes Objekt" : `${count} ausgeblendete Objekte`,
+  chipLabel: "Entscheidungen gehen in",
+  chipHint:
+    "Alles, was du unter Karten-Kollisionen, Durchgehen, Asset-Kollisionen und in den 3D-Ansichten entscheidest, kommt in diesen Patch. Wähle hier einen anderen, oder beginne einen neuen.",
+  duplicate: "Duplizieren",
+  duplicateHint:
+    "Kopiert diesen Patch in einen neuen, den du dann bearbeitest, und schaltet das Original hier aus – so arbeitest du von ihm aus weiter. In Vortex bleibt das Original, bis du es dort ausschaltest oder die Kopie installierst.",
+  copyName: (name) => `${name} (Kopie)`,
+  editingBanner:
+    "Du bearbeitest diesen Patch: Was du irgendwo in Mod Mallet entscheidest, kommt hinein.",
+  edit: "Diesen Patch bearbeiten",
+  editHint: "Ab jetzt kommt, was du entscheidest, in diesen Patch.",
+  inGameOn: "im Spiel an",
+  inGameOff: "im Spiel aus",
   inPatchNote:
     "Diese kommen mit diesem Patch: Installierst du ihn, sind sie im Spiel, ohne eigene Mod.",
   patchLabel: (name) => `Patch „${name}“`,

@@ -1,11 +1,20 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ActionResult, type PatchAt, useAction, useSession } from "./Actions";
 import type { BookPatch, PatchBook } from "./generated/patch-book";
-import type { MapSpot, RenderedReport } from "./generated/rendered-report";
+import type { MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
 import { InfoTip } from "./info-tip";
 import { MovesPanel } from "./move-controls";
 import { PairReport } from "./PairReport";
-import { choicesOf, matchKey, objectsOf, openSpots, type Pair, pairsOf, spotsByKey } from "./patch";
+import {
+  choicesOf,
+  matchKey,
+  objectsOf,
+  openSpots,
+  type Pair,
+  type PatchChoices,
+  pairsOf,
+  spotsByKey,
+} from "./patch";
 import {
   activePatch,
   conflictsOf,
@@ -13,10 +22,13 @@ import {
   duelsOf,
   installedObjectsOf,
   isForeign,
+  noRepairKey,
   type PatchConflict,
   patchMod,
+  repairAreasOf,
   stateOf,
   tickedOf,
+  withDuplicate,
   withLoaded,
   withMoved,
   withNewPatch,
@@ -191,6 +203,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
               p={p}
               onChange={replace}
               onRemoved={() => setSelected(null)}
+              onDuplicated={setSelected}
             />
           )}
         </div>
@@ -367,6 +380,7 @@ interface PatchDetailProps {
   p: PatchTexts;
   onChange: (book: PatchBook, undoText?: string) => void;
   onRemoved: () => void;
+  onDuplicated: (id: string) => void;
 }
 
 /** One patch: what it does, where it stands, its mods, its disagreements and its decisions. */
@@ -380,6 +394,7 @@ function PatchDetail({
   p,
   onChange,
   onRemoved,
+  onDuplicated,
 }: PatchDetailProps) {
   const session = useSession();
   const { t, api } = session;
@@ -409,7 +424,7 @@ function PatchDetail({
   const missing =
     state === "in-game" ? hidden.filter((object) => !installed.has(matchKey(object))).length : 0;
   const moved = toWrite.moves?.moves.length ?? 0;
-  const paths = toWrite.repairs?.places.length ?? 0;
+  const paths = toWrite.repairs?.places.filter((place) => place.every !== true).length ?? 0;
   const files = duelsOf(tickedOf(patch)).length;
   const count = Object.keys(patch.decisions).length;
   const doesSomething =
@@ -492,6 +507,22 @@ function PatchDetail({
             </button>
           </form>
         )}
+        {active ? (
+          <p className="patch-editing">✎ {p.editingBanner}</p>
+        ) : (
+          !foreign && (
+            <p>
+              <button
+                type="button"
+                className="patch-edit-button"
+                title={p.editHint}
+                onClick={() => change({ ...book, active: patch.id })}
+              >
+                ✎ {p.edit}
+              </button>
+            </p>
+          )
+        )}
         <p className="patch-does">{does === "" ? p.nothing : does}</p>
         {foreign && patch.author && (
           <p className="aside">
@@ -501,13 +532,14 @@ function PatchDetail({
         {patch.loadedFrom && <p className="aside">{p.loadedFrom(patch.loadedFrom)}</p>}
         <p className={`patch-state-line ${patch.off === true ? "off-here" : state}`}>
           {patch.off === true
-            ? p.stateOffHere
+            ? active
+              ? p.stateOffEditing
+              : p.stateOffHere
             : state === "in-game"
               ? p.stateInGame(mod?.name ?? patch.name)
               : state === "switched-off"
                 ? p.stateSwitchedOff(mod?.name ?? patch.name)
                 : p.stateNotInstalled}
-          {active && ` ${p.activeNote}`}
         </p>
         {missing > 0 && patch.off !== true && (
           <p className="patch-line patch-waiting">{p.differs(missing)}</p>
@@ -532,15 +564,17 @@ function PatchDetail({
           >
             {patch.off === true ? p.switchOn : p.switchOff}
           </button>
-          {!active && !foreign && (
-            <button
-              type="button"
-              title={p.makeActiveHint}
-              onClick={() => change({ ...book, active: patch.id })}
-            >
-              {p.makeActive}
-            </button>
-          )}
+          <button
+            type="button"
+            title={p.duplicateHint}
+            onClick={() => {
+              const copy = withDuplicate(book, patch.id, p.copyName(patch.name));
+              change(copy.book);
+              onDuplicated(copy.id);
+            }}
+          >
+            {p.duplicate}
+          </button>
           {foreign && (
             <button
               type="button"
@@ -654,6 +688,25 @@ function PatchDetail({
         onTick={(keys, ticked) => change(withTicked(book, patch.id, keys, ticked))}
         onMove={(keys, to, copy) => change(withMoved(book, patch.id, to, keys, copy))}
         onGo={(target, item) => goTo(target, here(item.key, item.text))}
+      />
+      <AutoRepairs
+        report={report}
+        hidden={hidden}
+        decisions={patch.decisions}
+        editable={!foreign}
+        p={p}
+        onTurn={(key, off) =>
+          change(
+            withPatch(book, patch.id, (each) => {
+              if (off) {
+                each.decisions[key] = "off";
+              } else {
+                delete each.decisions[key];
+              }
+              return each;
+            }),
+          )
+        }
       />
       <MovesPanel inPatch={{ choices: ticked, note: p.inPatchNote }} />
       <PathsPanel hidden={hidden} inPatch={{ choices: ticked, note: p.inPatchNote }} />
@@ -940,5 +993,68 @@ function MoveMenu({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * The paths a patch repairs by itself (ADR 0070): where it hides something
+ * characters walk on, the paths there are repaired when the patch is
+ * written, place by place, unless turned off for a place.
+ */
+function AutoRepairs({
+  report,
+  hidden,
+  decisions,
+  editable,
+  p,
+  onTurn,
+}: {
+  report: RenderedReport;
+  hidden: ObjectRef[];
+  decisions: PatchChoices;
+  editable: boolean;
+  p: PatchTexts;
+  onTurn: (key: string, off: boolean) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const areas = useMemo(() => repairAreasOf(report, hidden), [report, hidden]);
+  if (areas.length === 0) {
+    return null;
+  }
+  const off = areas.filter((area) => noRepairKey(area) in decisions).length;
+  const shown = all ? areas : areas.slice(0, 8);
+  return (
+    <section className="patch-group">
+      <h3>
+        {p.autoRepairTitle} <InfoTip text={p.autoRepairNote} />
+      </h3>
+      <p className="aside">{p.autoRepairSummary(areas.length, off)}</p>
+      <ul className="patch-entries">
+        {shown.map((area) => {
+          const key = noRepairKey(area);
+          const repaired = !(key in decisions);
+          return (
+            <li key={area.key} className={repaired ? "patch-entry" : "patch-entry unticked"}>
+              <input
+                type="checkbox"
+                checked={repaired}
+                disabled={!editable}
+                aria-label={area.label}
+                title={p.autoRepairTick}
+                onChange={(event) => onTurn(key, !event.target.checked)}
+              />
+              <span className="patch-entry-text">{area.label}</span>
+              <span className="patch-entry-where">{p.objectsHere(area.objects)}</span>
+              <span />
+            </li>
+          );
+        })}
+      </ul>
+      {areas.length > shown.length && (
+        <button type="button" className="small" onClick={() => setAll(true)}>
+          + {areas.length - shown.length}
+        </button>
+      )}
+    </section>
   );
 }

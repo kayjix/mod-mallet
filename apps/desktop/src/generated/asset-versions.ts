@@ -377,6 +377,12 @@ export interface RepairPlace {
    */
   centre?: [number, number] | null;
   /**
+   * Whether every mesh there whose path the game uses runs over a hidden
+   * object is repaired, not only those chosen: a patch repairs the paths
+   * over what it hides by itself (ADR 0070).
+   */
+  every?: boolean;
+  /**
    * The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].
    */
   navmeshes: string[];
