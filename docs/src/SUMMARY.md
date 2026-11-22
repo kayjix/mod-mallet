@@ -82,6 +82,7 @@
   - [0066 Other files are compared side by side](adr/0066-other-files-compared-side-by-side.md)
   - [0067 Stacked doors are merged into one](adr/0067-stacked-doors-are-merged-into-one.md)
   - [0068 Which plugin needs which](adr/0068-which-plugin-needs-which.md)
+  - [0069 Places where characters do something](adr/0069-places-where-characters-do-something.md)
   - [Template](adr/template.md)
 
 # Reference

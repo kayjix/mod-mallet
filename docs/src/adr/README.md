@@ -94,3 +94,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0066](0066-other-files-compared-side-by-side.md) | Other files are compared side by side | accepted |
 | [0067](0067-stacked-doors-are-merged-into-one.md) | Stacked doors are found and merged into one | accepted |
 | [0068](0068-which-plugin-needs-which.md) | The report carries which plugin needs which, drawn as arcs | accepted |
+| [0069](0069-places-where-characters-do-something.md) | Places where characters do something can be seen, removed and moved | accepted |
