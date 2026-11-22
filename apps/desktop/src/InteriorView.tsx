@@ -4,14 +4,23 @@
 
 import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
+import {
+  type ActionHit,
+  ActionIconsToggle,
+  actionAt,
+  asAreaObject,
+  paintActionPlaces,
+  useActionIconsShown,
+} from "./action-places";
 import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
-import { colour, lookAt, type Mat4, multiply, perspective, type Vec3 } from "./gl";
+import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
 import { InfoTip } from "./info-tip";
 import { interiorTexts } from "./interior-texts";
 import { LoadingMallet } from "./LoadingMallet";
 import { CELL } from "./map-places";
-import { moveKeysOf } from "./moves";
+import { moveKeysOf, moveOf } from "./moves";
+import { matchKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
@@ -156,6 +165,56 @@ export function InteriorView({
     [centreKey],
   );
 
+  // The places where characters do something, drawn over the objects (ADR 0069).
+  const overlay = useRef<HTMLCanvasElement>(null);
+  const actionsShown = useActionIconsShown();
+  const actionsShownNow = useRef(actionsShown);
+  actionsShownNow.current = actionsShown;
+  const actionHits = useRef<ActionHit[]>([]);
+  const hiddenNow = useRef(hidden);
+  hiddenNow.current = hidden;
+  const pickedKeyNow = useRef<string | null>(null);
+  pickedKeyNow.current = picked === null ? null : matchKey(picked.id);
+  const drawActions = (matrix: Mat4, width: number, tall: number) => {
+    const element = overlay.current;
+    const context = element?.getContext("2d") ?? null;
+    if (element === null || context === null) {
+      return;
+    }
+    const ratio = window.devicePixelRatio || 1;
+    const wanted = [Math.round(width * ratio), Math.round(tall * ratio)];
+    if (element.width !== wanted[0] || element.height !== wanted[1]) {
+      element.width = wanted[0] ?? element.width;
+      element.height = wanted[1] ?? element.height;
+    }
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, tall);
+    const shown = layer.current?.area;
+    actionHits.current =
+      actionsShownNow.current && shown != null
+        ? paintActionPlaces(
+            context,
+            (point) => {
+              const at = project(
+                matrix,
+                [point[0] / CELL, point[1] / CELL, point[2] / CELL],
+                width,
+                tall,
+              );
+              return at === null || at.depth > 1 ? null : at;
+            },
+            shown.actions ?? [],
+            {
+              moves: (object) => moveOf(choicesNow.current, object),
+              hidden: (object) => hiddenNow.current.has(objectKey(object.plugin, object.localId)),
+              picked: pickedKeyNow.current,
+            },
+          )
+        : [];
+  };
+  const drawActionsNow = useRef(drawActions);
+  drawActionsNow.current = drawActions;
+
   const draw = useCallback(() => {
     pending.current = null;
     const element = canvas.current;
@@ -202,6 +261,7 @@ export function InteriorView({
     });
     gl.disable(gl.CULL_FACE);
     pathsLayer.current?.draw(matrix, 1);
+    drawActionsNow.current(matrix, width, tall);
     const now = current.progress;
     setProgress((before) =>
       before.done === now.done && before.total === now.total ? before : now,
@@ -331,6 +391,12 @@ export function InteriorView({
     redraw();
   }, [patchChoices, redraw]);
 
+  // The icons follow their switch and the pick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a change of either redraws.
+  useEffect(() => {
+    redraw();
+  }, [actionsShown, picked, redraw]);
+
   /** The object drawn at a point of the screen, if any. */
   const objectAt = (clientX: number, clientY: number): AreaObject | null => {
     const element = canvas.current;
@@ -407,7 +473,15 @@ export function InteriorView({
     const start = drag.current;
     drag.current = null;
     if (start !== null && !start.moved && !start.turn) {
-      const object = objectAt(start.x, start.y);
+      const rect = canvas.current?.getBoundingClientRect();
+      const action =
+        rect === undefined
+          ? null
+          : actionAt(actionHits.current, start.x - rect.left, start.y - rect.top);
+      const object =
+        action !== null
+          ? asAreaObject(action, layer.current?.area ?? null)
+          : objectAt(start.x, start.y);
       setPicked(object);
       onObject?.(object);
       layer.current?.select(
@@ -457,6 +531,7 @@ export function InteriorView({
         onPointerUp={onPointerUp}
         onContextMenu={(event) => event.preventDefault()}
       />
+      <canvas className="action-overlay" ref={overlay} style={{ height }} />
       {(failed || state !== "shown") && (
         <p
           className="empty"
@@ -559,10 +634,14 @@ export function InteriorView({
               <dd>
                 <code>{picked.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
               </dd>
-              <dt>{t.mapObjectModel}</dt>
-              <dd>
-                <code>{picked.model}</code>
-              </dd>
+              {picked.model !== "" && (
+                <>
+                  <dt>{t.mapObjectModel}</dt>
+                  <dd>
+                    <code>{picked.model}</code>
+                  </dd>
+                </>
+              )}
             </dl>
             {objectExtra?.(picked, {
               selection: selection[0] === picked ? selection : [picked],
@@ -587,6 +666,7 @@ export function InteriorView({
             {own.count(area.objects.length, progress.done, progress.total)}
           </span>
         )}
+        <ActionIconsToggle />
         <InfoTip text={own.hint} above />
       </div>
     </div>

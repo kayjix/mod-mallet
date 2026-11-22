@@ -5,6 +5,14 @@
 
 import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "./Actions";
+import {
+  type ActionHit,
+  ActionIconsToggle,
+  actionAt,
+  asAreaObject,
+  paintActionPlaces,
+  useActionIconsShown,
+} from "./action-places";
 import { AreaLayer, isFlora, LOOK, type Look, objectKey } from "./area-layer";
 import type { AreaObject, AreaObjects, ObjectRef } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
@@ -179,6 +187,11 @@ export function CompareStage3D({
   walkedNow.current = walked;
   /** The path signs over the three views, drawn in 2D after each frame. */
   const signs = useRef<HTMLCanvasElement>(null);
+  // The places where characters do something, drawn with the signs (ADR 0069).
+  const actionsShown = useActionIconsShown();
+  const actionsShownNow = useRef(actionsShown);
+  actionsShownNow.current = actionsShown;
+  const actionHits = useRef<ActionHit[]>([]);
   const seedsNow = useRef(seeds);
   seedsNow.current = seeds;
 
@@ -277,6 +290,42 @@ export function CompareStage3D({
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, third * 3, tall);
+    // The places where characters do something, in each view (ADR 0069).
+    const shownArea = layer.current?.area;
+    actionHits.current = [];
+    if (actionsShownNow.current && shownArea != null) {
+      for (const index of [0, 1, 2] as const) {
+        const look = lookNow.current(index);
+        context.save();
+        context.beginPath();
+        context.rect(third * index, 0, third, tall);
+        context.clip();
+        actionHits.current.push(
+          ...paintActionPlaces(
+            context,
+            (point) => {
+              const at = project(
+                matrix,
+                [point[0] / CELL, point[1] / CELL, point[2] / CELL],
+                third,
+                tall,
+              );
+              return at === null || at.depth > 1 || at.x < 0 || at.x > third
+                ? null
+                : { x: at.x + third * index, y: at.y };
+            },
+            shownArea.actions ?? [],
+            {
+              moves: () => null,
+              hidden: (object) => look(objectKey(object.plugin, object.localId)) === LOOK.ghost,
+              skip: (object) => look(objectKey(object.plugin, object.localId)) === LOOK.gone,
+              picked: null,
+            },
+          ),
+        );
+        context.restore();
+      }
+    }
     const walkedHere = walkedNow.current;
     const current = layer.current;
     if (walkedHere == null || walkedHere.size === 0 || current === null || !markingsNow.current) {
@@ -479,7 +528,7 @@ export function CompareStage3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change how objects look.
   useEffect(() => {
     redraw();
-  }, [markings, trees, hidden, walked, height, redraw]);
+  }, [markings, trees, hidden, walked, height, actionsShown, redraw]);
 
   // The canvas follows the width of its frame.
   useEffect(() => {
@@ -575,7 +624,15 @@ export function CompareStage3D({
     const start = drag.current;
     drag.current = null;
     if (start?.still === true && !start.move && onPick !== undefined) {
-      const found = objectAt(start.x, start.y);
+      const rect = signs.current?.getBoundingClientRect();
+      const action =
+        rect === undefined
+          ? null
+          : actionAt(actionHits.current, start.x - rect.left, start.y - rect.top);
+      const found =
+        action !== null
+          ? asAreaObject(action, layer.current?.area ?? null)
+          : objectAt(start.x, start.y);
       if (found !== null) {
         onPick(found);
       }
@@ -684,6 +741,7 @@ export function CompareStage3D({
           />
           {r.showTrees}
         </label>
+        <ActionIconsToggle className="control-check" />
         <span className="stage3-swatch" data-side="0">
           {r.parts(names[0], counts[0])}
         </span>

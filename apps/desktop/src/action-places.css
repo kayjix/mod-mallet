@@ -1,0 +1,112 @@
+/* The places where characters do something (ADR 0069). */
+
+.action-place-info {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-left: 3px solid #0072b2;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.action-place-info p {
+  margin: 2px 0;
+}
+
+.action-place-kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-place-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #6b7280;
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+.action-place-icon[data-kind="sit"],
+.action-place-icon[data-kind="lean"],
+.action-place-icon[data-kind="sleep"] {
+  background: #0072b2;
+}
+
+.action-place-icon[data-kind="chop-wood"],
+.action-place-icon[data-kind="mine"],
+.action-place-icon[data-kind="smith"],
+.action-place-icon[data-kind="craft"],
+.action-place-icon[data-kind="cook"],
+.action-place-icon[data-kind="work"] {
+  background: #e69f00;
+}
+
+.action-place-icon[data-kind="pray"] {
+  background: #cc79a7;
+}
+
+.action-place-info .action-place-head {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.action-place-users {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.action-place-reach[data-state="reached"] {
+  color: #009e73;
+}
+
+.action-place-reach[data-state="cut-off"],
+.action-place-reach[data-state="off-paths"] {
+  color: #d55e00;
+}
+
+.action-toggle-icons {
+  letter-spacing: -2px;
+}
+
+.follow-hiding {
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  border-left: 3px solid #0072b2;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.follow-hiding p {
+  margin: 2px 0;
+}
+
+.follow-hiding ul {
+  margin: 4px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.follow-hiding li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 2px 0;
+}
+
+.follow-hiding li .relief-object-buttons {
+  margin-left: auto;
+}
+
+.action-overlay {
+  width: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}

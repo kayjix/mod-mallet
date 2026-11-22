@@ -34,6 +34,7 @@ import type {
 } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { ScanProgress } from "./generated/scan-progress";
+import type { SpotsReach } from "./generated/spots-reach";
 import type { WalkwayReach } from "./generated/walkway-reach";
 import type { WalkwayRepair } from "./generated/walkway-repair";
 import type { Lang } from "./i18n";
@@ -188,6 +189,18 @@ export interface Api {
     y: number | null,
     objects: ObjectRef[],
   ): Promise<WalkwayReach | null>;
+  /**
+   * Whether characters can reach `spots`, places where they do something,
+   * where they stand or would stand after a move (ADR 0069), with the
+   * paths over `hidden` cut out. `null` if the setup cannot be read.
+   */
+  spotsReach(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    spots: { object: ObjectRef; at: [number, number, number] }[],
+    hidden: ObjectRef[],
+  ): Promise<SpotsReach | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -281,6 +294,8 @@ const tauriApi: Api = {
     invoke<WalkwayRepair | null>("walkway_repair", { worldOrCell, x, y, objects }),
   walkwayRepairReach: (worldOrCell, x, y, objects) =>
     invoke<WalkwayReach | null>("walkway_repair_reach", { worldOrCell, x, y, objects }),
+  spotsReach: (worldOrCell, x, y, spots, hidden) =>
+    invoke<SpotsReach | null>("spots_reach", { worldOrCell, x, y, spots, hidden }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

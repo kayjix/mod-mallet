@@ -16,6 +16,7 @@ import {
 } from "react";
 import "./work-panel.css";
 import { CopyButton, useSession } from "./Actions";
+import { ActionPlaceInfo } from "./action-places";
 import { objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
 import { collisionsTexts } from "./collisions-texts";
@@ -1542,7 +1543,16 @@ function SideReach(props: {
   centre: [number, number] | null;
   objects: ObjectRef[];
 }) {
-  return <ReachNote reach={useReach(props.place, props.centre, props.objects)} />;
+  return (
+    <ReachNote
+      reach={useReach(props.place, props.centre, props.objects)}
+      follow={
+        props.place === null
+          ? null
+          : { place: props.place, centre: props.centre, hidden: props.objects }
+      }
+    />
+  );
 }
 
 /**
@@ -1685,6 +1695,12 @@ function Stage({
     if (part !== undefined) {
       return (
         <>
+          <ActionPlaceInfo
+            object={object}
+            place={location.type === "interior" ? location.cell : location.world}
+            interior={location.type === "interior"}
+            around={tools.layer?.area?.objects}
+          />
           {part.hideable ? (
             <button
               type="button"

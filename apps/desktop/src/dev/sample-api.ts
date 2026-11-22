@@ -5,7 +5,7 @@
 // development and is not part of a release build.
 
 import type { Api } from "../api";
-import type { AreaObject, AreaObjects } from "../generated/area-objects";
+import type { ActionPlace, AreaObject, AreaObjects } from "../generated/area-objects";
 import type { AssetVersion, AssetVersions } from "../generated/asset-versions";
 import type { Catalogue, CatalogueItem } from "../generated/catalogue";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
@@ -1605,6 +1605,20 @@ export const sampleApi: Api = {
       changes: hides
         ? [
             {
+              outcome: "gone" as const,
+              destination: {
+                ...place(0x6201, "RailLeanMarker", [24_730, 5_120, -60]),
+                object: { plugin: "Water Mod.esp", localId: 0x6201 },
+              },
+            },
+            {
+              outcome: "gone" as const,
+              destination: {
+                ...place(0x6202, "WallLeanMarker", [24_420, 5_150, -60]),
+                object: { plugin: "Water Mod.esp", localId: 0x6202 },
+              },
+            },
+            {
               outcome: "cut-off" as const,
               destination: place(0xb01, "Bench", [25_100, 5_300, -120]),
               before: {
@@ -1726,6 +1740,22 @@ export const sampleApi: Api = {
         : [],
     });
   },
+  // Places on the planks lose their ground once the planks are hidden; the
+  // bank below is reached (made up).
+  spotsReach: (worldOrCell, _x, _y, spots, hidden) =>
+    later({
+      place: worldOrCell,
+      spots: spots.map(({ object, at }) => {
+        const onPlanks = object.plugin === "Water Mod.esp" && hidden.length > 0;
+        return {
+          object,
+          at,
+          state: onPlanks ? ("off-paths" as const) : ("reached" as const),
+          metresOff: onPlanks ? 4 : 0,
+          ground: [at[0], at[1] - 180, at[2] - 60] as [number, number, number],
+        };
+      }),
+    }),
   lodTiles: (world) => later({ world, tiles: [] }),
   lodMesh: () => later(null),
   lodTexture: () => later(null),
@@ -2073,7 +2103,47 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
       "Rock",
     );
   }
-  return { world, centre: [cx, cy], radius, objects };
+  // On the docks, two places to lean on Water Mod's planks, and a bench of
+  // the game on the bank (ADR 0069).
+  const action = (
+    plugin: string,
+    localId: number,
+    kind: ActionPlace["kind"],
+    base: string,
+    position: [number, number, number],
+    drawn: boolean,
+  ): ActionPlace => ({
+    object: { plugin, localId },
+    plugin,
+    kind,
+    idleMarker: false,
+    drawn,
+    base,
+    position,
+    rotation: [0, 0, 1.6],
+  });
+  const actions: ActionPlace[] = docks
+    ? [
+        action(
+          "Water Mod.esp",
+          0x6201,
+          "lean",
+          "RailLeanMarker",
+          [cx + 2 * 76, cy - 12, ground + 61],
+          false,
+        ),
+        action(
+          "Water Mod.esp",
+          0x6202,
+          "lean",
+          "WallLeanMarker",
+          [cx - 2 * 76, cy + 12, ground + 61],
+          false,
+        ),
+        action("Skyrim.esm", 0xb01, "sit", "BenchMarker", [cx - 300, cy - 200, ground], false),
+      ]
+    : [];
+  return { world, centre: [cx, cy], radius, objects, actions };
 }
 
 /** A box of the made-up models, as the backend sends a model up close. */

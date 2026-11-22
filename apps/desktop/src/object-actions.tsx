@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
+import { ActionPlaceInfo } from "./action-places";
 import type { Api } from "./api";
 import { objectKey, type PartTools } from "./area-layer";
 import { collisionsTexts } from "./collisions-texts";
@@ -216,9 +217,19 @@ export function FreeObjectActions({
   const together = tools === undefined ? null : <PartsTogether tools={tools} />;
   // Or a little to one side instead (ADR 0060).
   const move = <MoveControls object={object} tools={tools} place={place} interior={interior} />;
+  // What a place where characters do something is, and who uses it (ADR 0069).
+  const action = (
+    <ActionPlaceInfo
+      object={object}
+      place={place}
+      interior={interior}
+      around={tools?.layer?.area?.objects}
+    />
+  );
   if (isHidden) {
     return (
       <div className="relief-object-action">
+        {action}
         <p className="aside">{byItself ? own.hiddenByItself : own.hiddenByDecision}</p>
         <button
           type="button"
@@ -234,6 +245,7 @@ export function FreeObjectActions({
   if (anchors === undefined) {
     return (
       <div className="relief-object-action">
+        {action}
         <p className="aside">{t.anchorAsking}</p>
         {together}
         {move}
@@ -243,6 +255,7 @@ export function FreeObjectActions({
   if (locked) {
     return (
       <div className="relief-object-action">
+        {action}
         <p className="aside">{t.anchorLocked}</p>
         {anchors !== null && <AnchorReasons anchors={anchors} />}
         {together}
@@ -252,6 +265,7 @@ export function FreeObjectActions({
   }
   return (
     <div className="relief-object-action">
+      {action}
       {careful && anchors !== null && (
         <>
           <p className="aside relief-object-warning">{t.anchorCareful}</p>

@@ -8,6 +8,14 @@ import {
   useState,
 } from "react";
 import { useSession } from "./Actions";
+import {
+  type ActionHit,
+  ActionIconsToggle,
+  actionAt,
+  asAreaObject,
+  paintActionPlaces,
+  useActionIconsShown,
+} from "./action-places";
 import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
@@ -38,8 +46,8 @@ import {
   shapeOf,
   spotPosition,
 } from "./map-places";
-import { moveKeysOf } from "./moves";
-import { pinsOf, spotKey } from "./patch";
+import { moveKeysOf, moveOf } from "./moves";
+import { matchKey, pinsOf, spotKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
@@ -589,6 +597,15 @@ export function MapView3D({
   /** What more to draw over the relief, read while drawing. */
   const paintNow = useRef(paint);
   paintNow.current = paint;
+  // The places where characters do something, drawn last (ADR 0069).
+  const actionsShown = useActionIconsShown();
+  const actionsShownNow = useRef(actionsShown);
+  actionsShownNow.current = actionsShown;
+  const actionHits = useRef<ActionHit[]>([]);
+  const hiddenNow = useRef(hidden);
+  hiddenNow.current = hidden;
+  const pickedKeyNow = useRef<string | null>(null);
+  pickedKeyNow.current = pickedObject === null ? null : matchKey(pickedObject.id);
   /** Where each pin's head was drawn last, for picking. */
   const heads = useRef<{ pin: Pin; x: number; y: number }[]>([]);
   const state = useRef({
@@ -967,7 +984,7 @@ export function MapView3D({
         context.stroke();
       }
     }
-    paintNow.current?.(context, (point) => {
+    const toScreen = (point: [number, number, number]) => {
       const shown = project(
         matrix,
         [point[0] / CELL, point[1] / CELL, (point[2] / CELL) * raise],
@@ -975,7 +992,18 @@ export function MapView3D({
         height,
       );
       return shown === null || shown.depth > 1 ? null : shown;
-    });
+    };
+    paintNow.current?.(context, toScreen);
+    // The places where characters do something, over everything (ADR 0069).
+    const actionArea = area.current?.area;
+    actionHits.current =
+      actionsShownNow.current && state.current.withObjects && actionArea != null
+        ? paintActionPlaces(context, toScreen, actionArea.actions ?? [], {
+            moves: (object) => moveOf(choicesNow.current, object),
+            hidden: (object) => hiddenNow.current.has(objectKey(object.plugin, object.localId)),
+            picked: pickedKeyNow.current,
+          })
+        : [];
   }, [terrain, mesh]);
 
   const redraw = useCallback(() => {
@@ -1376,7 +1404,18 @@ export function MapView3D({
   // biome-ignore lint/correctness/useExhaustiveDependencies: these trigger a redraw.
   useEffect(() => {
     redraw();
-  }, [size, picked, hover, showCells, withBase, withLod, withObjects, exaggeration, redraw]);
+  }, [
+    size,
+    picked,
+    hover,
+    showCells,
+    withBase,
+    withLod,
+    withObjects,
+    exaggeration,
+    actionsShown,
+    redraw,
+  ]);
 
   // Whatever changes the canvas's size, it is drawn anew at its new size.
   useEffect(() => {
@@ -1467,6 +1506,14 @@ export function MapView3D({
     return best?.picked ?? null;
   };
 
+  /** The place where characters do something whose icon lies under a point, if any. */
+  const actionAtPointer = (clientX: number, clientY: number) => {
+    const rect = overlay.current?.getBoundingClientRect();
+    return rect === undefined
+      ? null
+      : actionAt(actionHits.current, clientX - rect.left, clientY - rect.top);
+  };
+
   /** The object drawn at a point of the screen, if any. */
   const objectAt = (clientX: number, clientY: number): AreaObject | null => {
     const element = canvas.current;
@@ -1550,7 +1597,11 @@ export function MapView3D({
         onPick(found);
       }
       if (found === null && !start.turn) {
-        const object = objectAt(event.clientX, event.clientY);
+        const action = actionAtPointer(event.clientX, event.clientY);
+        const object =
+          action !== null
+            ? asAreaObject(action, area.current?.area ?? null)
+            : objectAt(event.clientX, event.clientY);
         setPickedObject(object);
         onObject?.(object);
         area.current?.select(
@@ -1684,10 +1735,14 @@ export function MapView3D({
               <dd>
                 <code>{pickedObject.id.localId.toString(16).padStart(6, "0").toUpperCase()}</code>
               </dd>
-              <dt>{t.mapObjectModel}</dt>
-              <dd>
-                <code>{pickedObject.model}</code>
-              </dd>
+              {pickedObject.model !== "" && (
+                <>
+                  <dt>{t.mapObjectModel}</dt>
+                  <dd>
+                    <code>{pickedObject.model}</code>
+                  </dd>
+                </>
+              )}
             </dl>
             {objectExtra?.(pickedObject, {
               selection: selection[0] === pickedObject ? selection : [pickedObject],
@@ -1739,6 +1794,7 @@ export function MapView3D({
                     : t.mapNearCount(areaState)}
           </span>
         </label>
+        {withObjects && <ActionIconsToggle />}
         <InfoTip text={t.mapReliefHint} above />
       </div>
     </div>

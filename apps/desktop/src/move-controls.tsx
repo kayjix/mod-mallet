@@ -131,10 +131,12 @@ const nameOf = (object: AreaObject) =>
  */
 function collisionAfter(
   tools: PartTools | undefined,
-  group: AreaObject[],
+  moved: AreaObject[],
   choices: PatchChoices,
   against: ObjectRef[] | undefined,
 ): { name: string; before: number; now: number } | "nothing" | null {
+  // An invisible marker has no model to collide with (ADR 0069).
+  const group = moved.filter((object) => object.model !== "");
   const layer = tools?.layer;
   const first = group[0];
   if (layer === undefined || first === undefined) {

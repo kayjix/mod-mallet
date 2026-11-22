@@ -5,6 +5,7 @@
 // Each model is drawn once for all its objects (instancing): their
 // matrices and looks are kept in one buffer per model.
 
+import { rememberActions } from "./action-places";
 import type { Api } from "./api";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
@@ -644,6 +645,7 @@ export class AreaLayer {
   /** Shows `area`, each object drawn as `look` says by its key (see {@link objectKey}). */
   show(area: AreaObjects, look: (key: string) => Look) {
     this.area = area;
+    rememberActions(area);
     this.instances = area.objects.map((object) => {
       const key = objectKey(object.id.plugin, object.id.localId);
       const shown = look(key);

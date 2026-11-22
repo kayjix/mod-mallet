@@ -1553,7 +1553,20 @@ function KeepEffect({
           </span>
         </p>
       )}
-      {effect.walked.length > 0 && <ReachNote reach={reach} />}
+      {effect.walked.length > 0 && (
+        <ReachNote
+          reach={reach}
+          follow={
+            walkPlace === null
+              ? null
+              : {
+                  place: walkPlace,
+                  centre: walkCentre,
+                  hidden: effect.walked.map((part) => part.id),
+                }
+          }
+        />
+      )}
       {effect.walked.length > 0 && walkPlace !== null && (
         <RepairPaths
           place={walkPlace}

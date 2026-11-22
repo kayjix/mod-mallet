@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
+import { FollowHiding } from "./action-places";
 import type { ObjectRef } from "./generated/rendered-report";
 import type { ReachChange, Route, WalkwayReach } from "./generated/walkway-reach";
 import { reachTexts } from "./reach-texts";
@@ -92,32 +93,57 @@ export function useReachSentence(): (change: ReachChange) => string {
  * Says plainly what hiding breaks for the characters, or that nothing
  * does. Nothing while there is nothing to tell.
  */
-export function ReachNote({ reach }: { reach: WalkwayReach | null | undefined }) {
+export function ReachNote({
+  reach,
+  follow,
+}: {
+  reach: WalkwayReach | null | undefined;
+  /**
+   * Where the objects are hidden, to offer moving or hiding the places
+   * where characters do something that stood on them (ADR 0069).
+   */
+  follow?: { place: string; centre: [number, number] | null; hidden: ObjectRef[] } | null;
+}) {
   const r = reachTexts[useSession().lang];
   const sentence = useReachSentence();
   if (reach === undefined || reach === null || reach.checked === 0) {
     return null;
   }
+  const gone = reach.changes
+    .filter((change) => change.outcome === "gone")
+    .map((change) => change.destination);
+  const offers =
+    follow == null || gone.length === 0 ? null : (
+      <FollowHiding
+        place={follow.place}
+        centre={follow.centre}
+        hidden={follow.hidden}
+        destinations={gone}
+      />
+    );
   if (reach.changes.length === 0) {
     return <p className="reach-note reach-fine">{r.allReached(reach.checked)}</p>;
   }
   const listed = reach.changes.slice(0, LISTED);
   const rest = reach.changes.length - listed.length;
   return (
-    <div className="reach-note">
-      <ul>
-        {listed.map((change) => (
-          <li
-            key={`${change.outcome}|${change.destination.object.plugin}:${change.destination.object.localId}`}
-            data-outcome={change.outcome}
-          >
-            {sentence(change)}
-          </li>
-        ))}
-      </ul>
-      {rest > 0 && <p className="reach-more">{r.more(rest)}</p>}
-      <p className="reach-legend">{r.legend}</p>
-    </div>
+    <>
+      <div className="reach-note">
+        <ul>
+          {listed.map((change) => (
+            <li
+              key={`${change.outcome}|${change.destination.object.plugin}:${change.destination.object.localId}`}
+              data-outcome={change.outcome}
+            >
+              {sentence(change)}
+            </li>
+          ))}
+        </ul>
+        {rest > 0 && <p className="reach-more">{r.more(rest)}</p>}
+        <p className="reach-legend">{r.legend}</p>
+      </div>
+      {offers}
+    </>
   );
 }
 
