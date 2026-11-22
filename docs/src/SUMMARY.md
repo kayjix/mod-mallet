@@ -89,6 +89,7 @@
   - [0073 Switched-off mods are taken out through Vortex's plugin list](adr/0073-switched-off-mods-taken-out-through-vortex.md)
   - [0074 The level of detail makes room for the real objects](adr/0074-level-of-detail-makes-room-for-real-objects.md)
   - [0075 A place up close is drawn with one call per material](adr/0075-one-call-per-material-for-a-place-up-close.md)
+  - [0077 One UI kit for every page](adr/0077-one-ui-kit-for-every-page.md)
   - [Template](adr/template.md)
 
 # Reference
