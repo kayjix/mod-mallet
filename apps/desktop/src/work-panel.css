@@ -62,13 +62,6 @@
   white-space: nowrap;
 }
 
-.work-column-head .suggested-mark {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand) 18%, transparent);
-  font-size: 0.72rem;
-}
-
 .work-column-label {
   color: var(--muted);
   font-size: 0.72rem;

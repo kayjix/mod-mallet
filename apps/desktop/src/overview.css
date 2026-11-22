@@ -3,7 +3,9 @@
 
 /* ---- what a finding does to the game ------------------------------------ */
 
-.impact-chip {
+/* The same chip says it on a task and, counted, in a mod's row. */
+.impact-chip,
+.problem-chip {
   flex: none;
   padding: 1px 8px;
   border-radius: 999px;
@@ -14,12 +16,15 @@
   white-space: nowrap;
 }
 
-.impact-chip[data-impact="crash"] {
+.impact-chip[data-impact="crash"],
+.problem-chip[data-tone="crash"],
+.problem-chip[data-tone="error"] {
   background: color-mix(in srgb, var(--error) 16%, transparent);
   color: var(--error);
 }
 
-.impact-chip[data-impact="broken"] {
+.impact-chip[data-impact="broken"],
+.problem-chip[data-tone="warning"] {
   background: color-mix(in srgb, var(--warning) 16%, transparent);
   color: var(--warning);
 }
@@ -29,7 +34,8 @@
   color: var(--info);
 }
 
-.impact-chip[data-impact="collisions"] {
+.impact-chip[data-impact="collisions"],
+.problem-chip[data-tone="collisions"] {
   background: color-mix(in srgb, var(--spot-overlap) 18%, transparent);
   color: var(--text);
 }
@@ -332,30 +338,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-}
-
-.problem-chip {
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.problem-chip[data-tone="crash"],
-.problem-chip[data-tone="error"] {
-  background: color-mix(in srgb, var(--error) 16%, transparent);
-  color: var(--error);
-}
-
-.problem-chip[data-tone="warning"] {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
-}
-
-.problem-chip[data-tone="collisions"] {
-  background: color-mix(in srgb, var(--spot-overlap) 18%, transparent);
-  color: var(--text);
 }
 
 .mod-body {

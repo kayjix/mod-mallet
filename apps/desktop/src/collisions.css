@@ -276,14 +276,6 @@
   font-size: 0.78rem;
 }
 
-.work-choice .suggested-mark {
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand) 18%, transparent);
-  font-size: 0.72rem;
-}
-
 .work kbd {
   min-width: 20px;
   padding: 0 5px;

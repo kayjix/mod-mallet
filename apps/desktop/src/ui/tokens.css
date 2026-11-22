@@ -45,6 +45,8 @@
   --space-6: 32px;
   --radius: 10px;
   --radius-small: 6px;
+  /* The type of paths, codes and file names. */
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
   /* How many mods place objects in a cell, from one to four and more:
      the same in both themes, like a heat map. */
   --heat-1: #3fbf5a;

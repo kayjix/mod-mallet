@@ -155,12 +155,12 @@
 }
 
 .catalogue-changed {
-  color: var(--warn, var(--muted));
+  color: var(--warning, var(--muted));
 }
 
 .catalogue-internal {
   color: var(--muted);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--mono);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
@@ -197,7 +197,7 @@
 
 .catalogue-files li {
   color: var(--muted);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--mono);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
