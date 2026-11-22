@@ -5,11 +5,11 @@
 
 import "./object-conflicts.css";
 import { useMemo } from "react";
-import { useSession } from "./Actions";
+import { useDecisions, useSession } from "./Actions";
 import { collidingWith, conflictsOf } from "./conflicts";
 import type { MapSpot } from "./generated/rendered-report";
 import type { Lang } from "./i18n";
-import { decisionAt, hiddenKeysOf, matchKey, spotKey } from "./patch";
+import { decisionAt, matchKey, spotKey } from "./patch";
 
 interface ConflictTexts {
   /** "This object is in 2 open collisions and 1 open door spot:" */
@@ -94,7 +94,7 @@ export function ObjectConflicts({
     [spots, patchChoices, objects, except],
   );
   // Door spots are decided in the door panel: they are listed, not counted as decided.
-  const hidden = hiddenKeysOf(spots, patchChoices);
+  const hidden = useDecisions().decisions.hiddenKeys;
   const mine = new Set(objects.map(matchKey));
   const decided = found.decidedByHiding.filter(
     (spot) =>

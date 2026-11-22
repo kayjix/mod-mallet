@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import type { Api } from "./api";
+import type { Decisions } from "./decisions";
 import type { DependencyTarget } from "./dependencies";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
@@ -48,6 +49,12 @@ export interface Session {
   decidePassage: (spot: MapSpot, passage: string) => void;
   /** What the patch is to hide, per collision; shared by all views. */
   patchChoices: PatchChoices;
+  /**
+   * What every page asks about the decisions (ADR 0081): what is hidden and
+   * why, what is decided, and the choices with objects hidden or shown
+   * again. One snapshot per change of the choices.
+   */
+  decided: Decisions;
   /** Replaces the patch's choice. */
   setPatchChoices: (choices: PatchChoices) => void;
   /** Switches to the patch view. */
@@ -118,6 +125,19 @@ export function useSession(): Session {
     throw new Error("no session: the component is used outside the app");
   }
   return session;
+}
+
+/**
+ * The decisions every page reads (ADR 0081), and their change. A page keys
+ * what it works out from them on the snapshot, so that it redraws whenever
+ * a decision changes, on whichever page.
+ */
+export function useDecisions(): {
+  decisions: Decisions;
+  setChoices: (choices: PatchChoices) => void;
+} {
+  const { decided, setPatchChoices } = useSession();
+  return { decisions: decided, setChoices: setPatchChoices };
 }
 
 /** An action as one finding sees it: how to start it and what became of it. */

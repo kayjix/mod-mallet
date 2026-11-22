@@ -40,7 +40,8 @@ pub struct Settings {
     /// in the report and are shown apart.
     pub ignored: BTreeSet<String>,
     /// Which side the user picked in a duel between two mods, by the
-    /// duel's identity: 0 or 1.
+    /// duel's identity: 0 or 1. Kept here before the picks became
+    /// decisions of the patches (ADR 0081); the window moves them there.
     pub decisions: BTreeMap<String, u8>,
     /// The mods in the order the user likes them, the favourite first, by
     /// the mod manager's identity. Duels are decided by it.

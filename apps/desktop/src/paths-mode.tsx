@@ -12,7 +12,7 @@ import type { ActionPlace, AreaObjects } from "./generated/area-objects";
 import type { AreaPaths } from "./generated/area-paths";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import { CELL } from "./map-places";
-import { objectsOf, type PatchChoices, pairFor } from "./patch";
+import type { PatchChoices } from "./patch";
 import type { MarkShape, PathGroup, PathMarks, PathPattern, PathsOverlay } from "./paths-layer";
 import { pathsModeTexts } from "./paths-mode-texts";
 import { repairKey } from "./repair-paths";
@@ -642,22 +642,4 @@ function PathsIcon() {
       <path d="M7 21l2-6M11 11l2-6M13 21l2-6M17 11l2-6" />
     </svg>
   );
-}
-
-/**
- * The objects the current choices hide among the collisions `spots`, for
- * a page that has the spots but not the pairs, such as the world map.
- */
-export function useHiddenBySpots(spots: MapSpot[]): ObjectRef[] {
-  const { patchChoices, ignored } = useSession();
-  return useMemo(() => {
-    const byFinding = new Map<string, MapSpot[]>();
-    for (const spot of spots) {
-      if (!ignored.has(spot.finding)) {
-        byFinding.set(spot.finding, [...(byFinding.get(spot.finding) ?? []), spot]);
-      }
-    }
-    const pairs = [...byFinding.entries()].flatMap(([id, found]) => pairFor(id, "", found) ?? []);
-    return objectsOf(pairs, patchChoices);
-  }, [spots, ignored, patchChoices]);
 }

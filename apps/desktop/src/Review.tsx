@@ -15,7 +15,8 @@ import {
 } from "./CompareStage3D";
 import { useCollisionStepTexts } from "./collision-step-texts";
 import { DuelLine } from "./Duels";
-import { DoorPanel, mergeChoices } from "./doors";
+import { mergeDoors } from "./decisions";
+import { DoorPanel } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
 import type {
@@ -477,8 +478,17 @@ export function CollisionsStep({
   cursor: string | null;
   onCursor: (key: string) => void;
 }) {
-  const { api, lang, ignored, patchChoices, setPatchChoices, spots, decidePassage, decideSpot } =
-    useSession();
+  const {
+    api,
+    lang,
+    ignored,
+    patchChoices,
+    setPatchChoices,
+    spots,
+    decidePassage,
+    decideSpot,
+    decided: shared,
+  } = useSession();
   const r = useReviewTexts();
   const c = useCollisionStepTexts();
   const p = usePassageTexts();
@@ -536,7 +546,8 @@ export function CollisionsStep({
     setPicked(new Set());
     setSingles([false, false]);
   }, [currentKey]);
-  const hidden = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+  // What is hidden, the same on every page (ADR 0081).
+  const hidden = shared.hiddenKeys;
   // One door of stacked doors looked at alone (ADR 0067): the others as ghosts.
   const [doorLook, setDoorLook] = useState<{ object: ObjectRef; others: ObjectRef[] } | null>(null);
   const stageHidden = useMemo(
@@ -651,7 +662,7 @@ export function CollisionsStep({
       : decided.plugin.toLowerCase() === sides[1].toLowerCase()
         ? 0
         : 1;
-  const placeDecided = decidedOf(cluster.spots, patchChoices);
+  const placeDecided = decidedOf(cluster.spots, patchChoices, cluster.passage?.passage);
 
   /** A side's parts in `chosen`, or the spots' own parts until the structures are known. */
   const partsOf = (chosen: StageSegment[], side: 0 | 1): Part[] => {
@@ -1042,12 +1053,7 @@ export function CollisionsStep({
   /** Hides one object on its own, or shows it again (ADR 0040). */
   const toggle = (part: Part) => {
     const key = objectKey(part.id.plugin, part.id.localId);
-    apply(
-      hidden.has(key)
-        ? revealObjects(patchChoices, spots, [part.id])
-        : chooseObject(patchChoices, part.id, true),
-      false,
-    );
+    apply(hidden.has(key) ? shared.show([part.id]) : shared.hide([part.id]), false);
   };
   /** An object clicked in the views: of the two mods, it is hidden or shown again. */
   const pick = (object: AreaObject) => {
@@ -1308,7 +1314,7 @@ export function CollisionsStep({
         }
         const at = placeOf(item.spot, report.map.worlds);
         const merge = (plan: DoorMerge | null) =>
-          apply(mergeChoices(patchChoices, key, group, plan, spots), false);
+          apply(mergeDoors(patchChoices, key, group, plan, spots), false);
         return (
           <DoorPanel
             key={key}
@@ -2054,7 +2060,7 @@ function ReportStep({
     }
   }
   const line = (cluster: Cluster) => {
-    const state = decidedOf(cluster.spots, patchChoices);
+    const state = decidedOf(cluster.spots, patchChoices, cluster.passage?.passage);
     const what =
       state.type === "open"
         ? r.stateOpen

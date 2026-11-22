@@ -140,16 +140,29 @@ function DuelPicker({
   selected: string | null;
   onSelect: (id: string) => void;
 }) {
-  const { t, decisions, mods, ranking } = useSession();
+  const { t, decisions, mods, ranking, decided: snapshot } = useSession();
   const a = useAssetsTexts();
   const [search, setSearch] = useState("");
   const [showDecided, setShowDecided] = useState(false);
   const [folded, setFolded] = useState<Set<Topic>>(new Set());
   const decidedCount = duels.filter((rendered) => decisions[rendered.duel.id] !== undefined).length;
+  // Where nothing is open, the decided duels are listed rather than nothing.
+  const allDecided = duels.length > 0 && decidedCount === duels.length;
+  const showingDecided = showDecided || allDecided;
+  // The patches the picks are in, as the patch page names them (ADR 0081).
+  const patchNames = [
+    ...new Set(
+      duels.flatMap((rendered) => {
+        const from = snapshot.patchesOf(`duel:${rendered.duel.id}`);
+        const last = from[from.length - 1];
+        return last === undefined ? [] : [last.name];
+      }),
+    ),
+  ];
   const wanted = search.trim().toLowerCase();
   const shown = duels.filter((rendered) => {
     const { duel } = rendered;
-    if (!showDecided && decisions[duel.id] !== undefined && duel.id !== selected) {
+    if (!showingDecided && decisions[duel.id] !== undefined && duel.id !== selected) {
       return false;
     }
     if (wanted === "") {
@@ -185,13 +198,18 @@ function DuelPicker({
       <p className="compare-summary">
         <strong>{duels.length - decidedCount}</strong> {t.compareOpenLabel} ·{" "}
         <strong>{decidedCount}</strong> {t.compareDecidedLabel}
+        {decidedCount > 0 && patchNames.length > 0 && !allDecided && (
+          <> {a.decidedIn(patchNames)}</>
+        )}
       </p>
+      {allDecided && <p className="aside">{a.allDecided(duels.length, patchNames)}</p>}
       <Toolbar stacked className="compare-filters">
         <SearchField value={search} onChange={setSearch} placeholder={t.compareSearch} wide />
         <label className="compare-check">
           <input
             type="checkbox"
-            checked={showDecided}
+            checked={showingDecided}
+            disabled={allDecided}
             onChange={(event) => setShowDecided(event.target.checked)}
           />
           {t.compareShowDecided}

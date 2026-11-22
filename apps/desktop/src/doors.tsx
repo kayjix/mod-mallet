@@ -6,6 +6,7 @@
 import { type ReactNode, useState } from "react";
 import "./doors.css";
 import { useSession } from "./Actions";
+import { mergedBy } from "./decisions";
 import { type DoorTexts, doorTexts } from "./door-texts";
 import type {
   DoorGroup,
@@ -15,19 +16,7 @@ import type {
   ObjectRef,
   StackedDoor,
 } from "./generated/rendered-report";
-import {
-  chooseObject,
-  chooseSpot,
-  decisionAt,
-  forgetObjects,
-  hiddenKeysOf,
-  keepChoice,
-  keptBy,
-  matchKey,
-  type PatchChoices,
-  revealObjects,
-  spotKey,
-} from "./patch";
+import { decisionAt, keptBy, matchKey, type PatchChoices, spotKey } from "./patch";
 import { ReachNote, useReach } from "./reach";
 import { Note, NoteRow, useNotesInFull } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
@@ -487,60 +476,6 @@ function DoorCard({
       </button>
     </div>
   );
-}
-
-/**
- * The patch's choices with a group merged into the door `plan` keeps: the
- * spot's choice keeps that door and hides the others ({@link keepChoice}),
- * and the kept door is shown again however it was hidden. With `plan`
- * null every door stays: the spot keeps all, and every hiding of its doors
- * goes, whatever its source. `spots` are the collisions' spots, by finding.
- */
-export function mergeChoices(
-  choices: PatchChoices,
-  key: string,
-  group: DoorGroup,
-  plan: DoorMerge | null,
-  spots: Map<string, MapSpot[]>,
-): PatchChoices {
-  if (plan === null) {
-    const doors = group.doors.map((door) => door.object);
-    return chooseSpot(forgetObjects(revealObjects(choices, spots, doors), doors), key, null);
-  }
-  const next = forgetObjects(revealObjects(choices, spots, [plan.keep]), [plan.keep, ...plan.hide]);
-  return chooseSpot(next, key, keepChoice(plan.keep));
-}
-
-/**
- * The choices with the door `object` of a group hidden, as the object card
- * or the magic wand hides it: where one door is then left, the group is
- * merged into it; otherwise the door is hidden on its own.
- */
-export function hideDoor(
-  choices: PatchChoices,
-  key: string,
-  group: DoorGroup,
-  object: ObjectRef,
-  spots: Map<string, MapSpot[]>,
-): PatchChoices {
-  const hidden = hiddenKeysOf(spots, choices);
-  const left = group.doors.filter(
-    (door) => !sameObject(door.object, object) && !hidden.has(matchKey(door.object)),
-  );
-  const [only] = left;
-  const plan =
-    left.length === 1 && only !== undefined
-      ? group.plans.find((candidate) => sameObject(candidate.keep, only.object))
-      : undefined;
-  return plan === undefined
-    ? chooseObject(choices, object, true)
-    : mergeChoices(choices, key, group, plan, spots);
-}
-
-/** The plan a spot's doors are merged by, if its choice keeps one of them. */
-export function mergedBy(group: DoorGroup, decided: string | null | undefined): DoorMerge | null {
-  const kept = keptBy(decided);
-  return kept === null ? null : (group.plans.find((plan) => sameObject(plan.keep, kept)) ?? null);
 }
 
 /**

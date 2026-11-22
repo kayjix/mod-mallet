@@ -25,6 +25,7 @@ import { CatalogueView } from "./Catalogue";
 import { Collisions } from "./Collisions";
 import { CompareView } from "./Compare";
 import { catalogueTexts } from "./catalogue-texts";
+import { choicesAtStart, chooseDuel, snapshotOf, withLegacyDuels, worldOf } from "./decisions";
 import type { DependencyTarget } from "./dependencies";
 import { EditingChip } from "./editing-chip";
 import { GameLacks } from "./game-lacks";
@@ -47,23 +48,15 @@ import { Overview, openFileDuels } from "./Overview";
 import { reportFile } from "./PairReport";
 import { PatchView } from "./PatchView";
 import { Places } from "./Places";
-import {
-  choicesOf,
-  installedKeys,
-  mergeChoices,
-  type PatchChoices,
-  pairsOf,
-  withoutDecidedPins,
-  withoutMisspelt,
-} from "./patch";
-import { bookFromChoices, countedChoices, DUEL, withChange } from "./patch-book";
+import { type PatchChoices, withoutDecidedPins } from "./patch";
+import { bookFromChoices, countedChoices, withChange } from "./patch-book";
 import { pinTexts } from "./pins";
 import { Review } from "./Review";
 import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
 import { ScanProgressView, scanStepLine, useScanProgress } from "./scan-progress";
 import { scanTexts } from "./scan-texts";
-import { splitWaiting, withWaiting } from "./switched-off";
+import { withWaiting } from "./switched-off";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 import { NotDrawnHere, UnrealPaks } from "./Unreal";
@@ -135,8 +128,6 @@ export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
   const [places, setPlaces] = useState<RenderedPlaces | null>(null);
   const [report, setReport] = useState<RenderedReport | null>(null);
-  const reportRef = useRef(report);
-  reportRef.current = report;
   // What became of pins when their spots were decided, shown a moment.
   const [pinNote, setPinNote] = useState<number | null>(null);
   const pinNoteTimer = useRef<number | undefined>(undefined);
@@ -149,6 +140,11 @@ export default function App({ api, startLang }: AppProps) {
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
   const games = useGames(api);
+  // What the decisions depend on besides the book: the spots, passages and
+  // switched-off mods of the report, and the findings set aside.
+  const worldNow = useMemo(() => worldOf(report, ignored), [report, ignored]);
+  const world = useRef(worldNow);
+  world.current = worldNow;
   // The user's patches are kept in the settings (ADR 0070). Where none are
   // kept yet, the first is made once from the choices kept before there
   // were several patches, over what the patch in the game hides; later
@@ -194,8 +190,6 @@ export default function App({ api, startLang }: AppProps) {
     },
     [saveBook],
   );
-  // What every page reads: the decisions of the patches that count.
-  const patchChoices = useMemo(() => (book === null ? null : countedChoices(book)), [book]);
   const setPatchChoices = useCallback(
     (wanted: PatchChoices) => {
       const now = bookRef.current;
@@ -204,10 +198,7 @@ export default function App({ api, startLang }: AppProps) {
       }
       // A pin marks a spot to solve later; once the spot is decided, the
       // pin has done its work and goes, with a short note (ADR 0050).
-      const { choices: next, cleared } = withoutDecidedPins(
-        wanted,
-        spotsByFinding(reportRef.current),
-      );
+      const { choices: next, cleared } = withoutDecidedPins(wanted, world.current.spots);
       if (cleared > 0) {
         setPinNote(cleared);
         window.clearTimeout(pinNoteTimer.current);
@@ -217,16 +208,14 @@ export default function App({ api, startLang }: AppProps) {
     },
     [setBook],
   );
+  // What every page reads (ADR 0081): one snapshot of the decisions of the
+  // patches that count, made once per change of the book or the report.
   // Decisions about mods that are switched off wait (ADR 0061): the pages
   // see the others, and what they change is kept together with them.
+  const snapshot = useMemo(() => snapshotOf(book, worldNow), [book, worldNow]);
   const split = useMemo(
-    () =>
-      splitWaiting(
-        patchChoices ?? {},
-        report?.switchedOffPlugins ?? [],
-        report?.installedPatch ?? null,
-      ),
-    [patchChoices, report],
+    () => ({ active: snapshot.decisions.choices, waiting: snapshot.waiting }),
+    [snapshot],
   );
   const waitingRef = useRef(split.waiting);
   waitingRef.current = split.waiting;
@@ -239,35 +228,42 @@ export default function App({ api, startLang }: AppProps) {
     window.addEventListener("pagehide", saveBook);
     return () => window.removeEventListener("pagehide", saveBook);
   }, [saveBook]);
-  const [decisions, setDecisions] = useState<Record<string, number>>({});
+  // The file choices of duels are decisions of the patches like any other
+  // (ADR 0081): every page reads them from the snapshot.
+  const decisions = snapshot.decisions.duels;
+  // Picks kept outside the patches before go into the first patch, once,
+  // and leave the old place, so that they do not come back from there.
+  const [legacyDuels, setLegacyDuels] = useState<Record<string, number> | null>(null);
   useEffect(() => {
     api
       .decisions()
-      .then(setDecisions)
-      .catch(() => {});
+      .then(setLegacyDuels)
+      .catch(() => setLegacyDuels({}));
   }, [api]);
-  // A file choice of a duel is also kept in the patch that decides it, or
-  // in the active one (ADR 0070).
+  useEffect(() => {
+    if (book === null || legacyDuels === null || Object.keys(legacyDuels).length === 0) {
+      return;
+    }
+    setBook(withLegacyDuels(book, legacyDuels));
+    const ids = Object.keys(legacyDuels);
+    setLegacyDuels({});
+    void ids
+      .reduce<Promise<unknown>>(
+        (before, id) => before.then(() => api.setDecision(id, null)),
+        Promise.resolve(),
+      )
+      .catch(() => {});
+  }, [api, book, legacyDuels, setBook]);
+  // A file choice of a duel goes into the patch being edited (ADR 0070).
   const decide = useCallback(
     (id: string, side: number | null) => {
-      api
-        .setDecision(id, side)
-        .then(setDecisions)
-        .catch((error: unknown) => setFailure(String(error)));
       const now = bookRef.current;
       if (now !== null) {
-        const key = `${DUEL}${id}`;
         const before = countedChoices(now);
-        const after = { ...before };
-        if (side === null) {
-          delete after[key];
-        } else {
-          after[key] = String(side);
-        }
-        setBook(withChange(now, before, after));
+        setBook(withChange(now, before, chooseDuel(before, id, side)));
       }
     },
-    [api, setBook],
+    [setBook],
   );
   const [ranking, setRankingList] = useState<string[]>([]);
   useEffect(() => {
@@ -314,18 +310,8 @@ export default function App({ api, startLang }: AppProps) {
       return;
     }
     // What the installed patch hides counts as decided; what the user chose
-    // since, and kept, wins over it. Objects an earlier reading of the patch
-    // kept under another spelling go.
-    const installed = choicesOf(
-      pairsOf(report, ignored),
-      installedKeys(report),
-      report.installedPatch?.objects ?? [],
-    );
-    setBook(
-      bookFromChoices(
-        withoutMisspelt(mergeChoices(installed, storedChoices ?? {}), pairsOf(report, ignored)),
-      ),
-    );
+    // since, and kept, wins over it.
+    setBook(bookFromChoices(choicesAtStart(report, ignored, storedChoices ?? null)));
   }, [book, storedBook, storedChoices, report, ignored, setBook]);
   const t = texts[lang];
   const j = journeyTexts[lang];
@@ -610,7 +596,8 @@ export default function App({ api, startLang }: AppProps) {
       ignored,
       setIgnored,
       mods: modsByName(report?.mods ?? []),
-      spots: spotsByFinding(report),
+      spots: worldNow.spots,
+      decided: snapshot.decisions,
       showOnMap,
       decideSpot,
       decidePassage,
@@ -652,6 +639,8 @@ export default function App({ api, startLang }: AppProps) {
       decideSpot,
       decidePassage,
       split,
+      worldNow,
+      snapshot,
       setActiveChoices,
       go,
       showPatch,
@@ -866,14 +855,6 @@ export default function App({ api, startLang }: AppProps) {
       </div>
     </SessionContext>
   );
-}
-
-function spotsByFinding(report: RenderedReport | null): Map<string, MapSpot[]> {
-  const found = new Map<string, MapSpot[]>();
-  for (const spot of report?.map.spots ?? []) {
-    found.set(spot.finding, [...(found.get(spot.finding) ?? []), spot]);
-  }
-  return found;
 }
 
 function headlinesOf(report: RenderedReport): Map<string, string> {

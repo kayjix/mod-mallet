@@ -16,6 +16,10 @@ export interface CollisionsTexts {
   aroundCarefulHint: string;
   hiddenByItself: string;
   hiddenByDecision: string;
+  /** An object hidden by a decision of a patch other than the one being edited (ADR 0070). */
+  hiddenInPatch: (patch: string) => string;
+  /** An object a decision about a switched-off mod would hide (ADR 0061). */
+  hiddenWhenOn: string;
   hideHint: string;
   /** The middle column of a spot: what concerns both mods. */
   common: string;
@@ -49,6 +53,10 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
     hiddenByItself: "Hidden on its own by the patch.",
     hiddenByDecision:
       "Hidden by the patch, through a decision of a collision. Showing it again keeps both objects at that spot.",
+    hiddenInPatch: (patch) =>
+      `The patch “${patch}” decides this, not the one you are editing. Showing it again leaves the decision out of that patch.`,
+    hiddenWhenOn:
+      "A decision about a mod that is switched off would hide it. It waits until that mod is on again.",
     hideHint: "Only this object goes; the patch hides it while the game runs and changes no file.",
     common: "Both",
     pairSpots: (first, second, spots) => `${first} and ${second} collide at ${spots} spots.`,
@@ -81,6 +89,10 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
     hiddenByItself: "Vom Patch einzeln ausgeblendet.",
     hiddenByDecision:
       "Vom Patch ausgeblendet, über die Entscheidung einer Kollision. Wieder zeigen behält an dieser Stelle beide Objekte.",
+    hiddenInPatch: (patch) =>
+      `Das entscheidet der Patch „${patch}“, nicht der, den du gerade bearbeitest. Wieder zeigen lässt die Entscheidung in diesem Patch weg.`,
+    hiddenWhenOn:
+      "Eine Entscheidung zu einer ausgeschalteten Mod würde es ausblenden. Sie wartet, bis die Mod wieder an ist.",
     hideHint:
       "Nur dieses Objekt verschwindet; der Patch blendet es aus, während das Spiel läuft, und ändert keine Datei.",
     common: "Beide",

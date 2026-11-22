@@ -95,6 +95,7 @@
   - [0078 Other games closer to Skyrim](adr/0078-other-games-closer-to-skyrim.md)
   - [0079 Version changes are read from the files, and compared with the last scan](adr/0079-version-changes.md)
   - [0080 The collisions step is decided by side, with the pictures](adr/0080-collisions-decided-by-side-with-the-pictures.md)
+  - [0081 One source of truth for decisions](adr/0081-one-source-of-truth-for-decisions.md)
   - [Template](adr/template.md)
 
 # Reference

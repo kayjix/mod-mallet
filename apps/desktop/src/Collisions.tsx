@@ -15,13 +15,14 @@ import {
   useState,
 } from "react";
 import "./work-panel.css";
-import { CopyButton, useSession } from "./Actions";
+import { CopyButton, useDecisions, useSession } from "./Actions";
 import { ActionPlaceInfo } from "./action-places";
 import { type AreaLayer, objectKey, type PartTools } from "./area-layer";
 import { isCollision } from "./arrange";
 import { collisionsTexts } from "./collisions-texts";
+import { mergeDoors as mergeDoorChoices } from "./decisions";
 import { doorTexts } from "./door-texts";
-import { DoorPanel, hideDoor, keptLabel, mergeChoices } from "./doors";
+import { DoorPanel, keptLabel } from "./doors";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type {
   DoorGroup,
@@ -39,9 +40,15 @@ import { PlaceIcon, useWorldPicture } from "./MapView";
 import { MapView3D } from "./MapView3D";
 import { CELL, kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
 import { MoveControls, SpotMoves } from "./move-controls";
-import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
+import {
+  FreeObjectActions,
+  HidingReason,
+  NeededPart,
+  PartsTogether,
+  spotOf,
+} from "./object-actions";
 import { hiddenByHand, keepPassage, sideParts } from "./passage-choices";
-import { passageTexts, usePassageTexts } from "./passage-texts";
+import { usePassageTexts } from "./passage-texts";
 import {
   PassageHead,
   type PassageOutcome,
@@ -58,8 +65,6 @@ import {
   decisionAt,
   hiddenKeysOf,
   matchKey,
-  objectChoiceKey,
-  objectsOf,
   type Pair,
   type PatchChoices,
   pairsOf,
@@ -73,13 +78,7 @@ import { usePathsMode, withPaths } from "./paths-mode";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, usePaintReach, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
-import {
-  type Cluster,
-  collisionClusters,
-  decidedOf,
-  passageKey,
-  spotsInPassages,
-} from "./review-clusters";
+import { type Cluster, collisionClusters, passageKey, spotsInPassages } from "./review-clusters";
 import { Note, NoteRow, NotesInFull } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
 import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
@@ -462,6 +461,8 @@ export function Collisions({
     spots: spotsByFinding,
     api,
   } = useSession();
+  // What is hidden and decided, the same on every page (ADR 0081).
+  const { decisions: shared } = useDecisions();
   const own = collisionsTexts[lang];
   const p = usePassageTexts();
   const passageTitle = usePassageTitle();
@@ -736,25 +737,17 @@ export function Collisions({
     goOn(next);
   };
   const mergeDoors = (item: Item, group: DoorGroup, plan: DoorMerge | null) => {
-    const next = mergeChoices(choices, item.key, group, plan, spotsByFinding);
+    const next = mergeDoorChoices(choices, item.key, group, plan, spotsByFinding);
     setPatchChoices(next);
     setPreview(new Set());
     if (item === current) {
       goOn(next);
     }
   };
-  // A door hidden or shown again in the view, through the door decision.
-  const hideOrShowDoor = (item: Item, object: ObjectRef, hide: boolean) => {
-    const group = item.spot.doors;
-    if (group === null || group === undefined) {
-      return;
-    }
-    setPatchChoices(
-      hide
-        ? hideDoor(choices, item.key, group, object, spotsByFinding)
-        : revealObjects(choices, spotsByFinding, [object]),
-    );
-  };
+  // An object hidden or shown again in the view, as on every page: a
+  // door of stacked doors through the door decision (ADR 0067, 0081).
+  const hideOrShow = (object: ObjectRef, hide: boolean) =>
+    setPatchChoices(hide ? shared.hide([object]) : shared.show([object]));
   const undecide = (item: Item) => setPatchChoices(undecideSpot(choices, item.key));
   const decideMods = (pairs: Pair[], plugin: string | null) => {
     // The duel of the two mods, if one gathers these findings: the pair's
@@ -925,7 +918,7 @@ export function Collisions({
       });
     }
   };
-  const hiddenObjects = useMemo(() => objectsOf(pairs, choices), [pairs, choices]);
+  const hiddenObjects = shared.hiddenObjects;
   // The suggestion about a mod that collides widely, when the list is
   // narrowed to that mod or to a pair with it (ADR 0043, 0061).
   const wide = useMemo(() => {
@@ -1207,7 +1200,11 @@ export function Collisions({
                         <PassageHead
                           cluster={openedPassage}
                           worlds={report.map.worlds}
-                          decided={decidedOf(openedPassage.spots, choices)}
+                          decided={
+                            openedPassage.passage === undefined
+                              ? { type: "open" }
+                              : shared.decisionOfPassage(openedPassage.passage.passage)
+                          }
                           segments={passageSegments}
                           outcome={
                             outcome !== null && outcome.done.key === openedPassage.key
@@ -1289,9 +1286,9 @@ export function Collisions({
                 changeTab("mods");
               }}
               onDecidePassage={decidePassage}
-              onObject={(object, hide) => setPatchChoices(chooseObject(choices, object, hide))}
+              onObject={hideOrShow}
               onMergeDoors={(group, plan) => mergeDoors(shownItem, group, plan)}
-              onDoor={(object, hide) => hideOrShowDoor(shownItem, object, hide)}
+              onDoor={hideOrShow}
               onPick={(spot) => {
                 const key = spotKey(spot);
                 go(key === null ? null : (byKey.get(key) ?? null));
@@ -1544,7 +1541,7 @@ interface SpotProps {
 
 /** The spot looked at: what it is, what to do about it, and the place in 3D. */
 function Spot(props: SpotProps & SpotFrameProps) {
-  const { t, lang, showOnMap, spots: spotsByFinding } = useSession();
+  const { t, lang, showOnMap } = useSession();
   const own = collisionsTexts[lang];
   const { item, passage, preview, decided, marks } = props;
   const { spot, pairs } = item;
@@ -1555,11 +1552,8 @@ function Spot(props: SpotProps & SpotFrameProps) {
   useEffect(() => {
     setDoorLook(null);
   }, [item.key]);
-  // What the patch hides, from the one source of every choice.
-  const hiddenKeys = useMemo(
-    () => hiddenKeysOf(spotsByFinding, props.choices),
-    [spotsByFinding, props.choices],
-  );
+  // What the patch hides, from the one source of every choice (ADR 0081).
+  const hiddenKeys = useDecisions().decisions.hiddenKeys;
   const pairSpots = spotsOf(pairs);
   const modSides = sidesOfMods(pairs);
   // The objects of the area, to hide a whole passage of one mod.
@@ -2127,7 +2121,6 @@ function Stage({
   onPick,
   onDecide,
   onDoor,
-  choices,
   onArea,
   previewObjects,
   tools,
@@ -2150,7 +2143,6 @@ function Stage({
   | "onPick"
   | "onDecide"
   | "onDoor"
-  | "choices"
 > & {
   onArea: (area: AreaObjects | null) => void;
   /** Where the camera stays, framing a place larger than the spot (ADR 0072). */
@@ -2254,12 +2246,8 @@ function Stage({
   }, [hiddenObjects, parts, preview, previewObjects, looked]);
 
   // An object of another collision picked in the view opens that collision.
-  const { spots: spotsByFinding, lang, setPatchChoices } = useSession();
-  const own = collisionsTexts[lang];
-  const hiddenKeys = useMemo(
-    () => hiddenKeysOf(spotsByFinding, choices),
-    [spotsByFinding, choices],
-  );
+  const { spots: spotsByFinding, lang } = useSession();
+  const { decisions, setChoices } = useDecisions();
   const openSpotOf = (object: AreaObject | null) => {
     if (object === null) {
       return;
@@ -2283,12 +2271,10 @@ function Stage({
     if (part !== undefined) {
       // A door of stacked doors goes through the door decision (ADR 0067).
       const door = item.spot.doors !== null && item.spot.doors !== undefined;
-      const doorHidden = door && hiddenKeys.has(key);
-      // Hidden otherwise: by itself, by the spot's choice, or by the
-      // decision of its passage (ADR 0072). Shown again the same way as
-      // anywhere, the spot then keeping both.
-      const partHidden = !door && hiddenKeys.has(matchKey(part.object));
-      const byItself = (choices[objectChoiceKey(part.object)] ?? null) !== null;
+      // Hidden on its own, by the spot's choice, by merged doors or by the
+      // decision of its passage (ADR 0072), and shown again the same way as
+      // anywhere (ADR 0081).
+      const hiding = decisions.hiding(part.object);
       return (
         <>
           <ActionPlaceInfo
@@ -2297,28 +2283,15 @@ function Stage({
             interior={location.type === "interior"}
             around={tools.layer?.area?.objects}
           />
-          {doorHidden ? (
+          {hiding !== null ? (
             <p className="aside relief-object-action">
-              {doorTexts[lang].hiddenByDoors}{" "}
-              <button type="button" className="small" onClick={() => onDoor(part.object, false)}>
-                {doorTexts[lang].showAgain}
-              </button>
-            </p>
-          ) : partHidden ? (
-            <p className="aside relief-object-action">
-              {byItself
-                ? own.hiddenByItself
-                : item.passageGroup.passage !== undefined
-                  ? passageTexts[lang].hiddenByPassage
-                  : own.hiddenByDecision}{" "}
+              <HidingReason hiding={hiding} />{" "}
               <button
                 type="button"
                 className="small primary"
-                onClick={() =>
-                  setPatchChoices(revealObjects(choices, spotsByFinding, [part.object]))
-                }
+                onClick={() => setChoices(decisions.show([part.object]))}
               >
-                {t.workObjectShow}
+                {door ? doorTexts[lang].showAgain : t.workObjectShow}
               </button>
             </p>
           ) : part.hideable ? (

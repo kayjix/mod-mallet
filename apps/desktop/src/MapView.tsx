@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { CopyButton, useSession } from "./Actions";
+import { CopyButton, useDecisions, useSession } from "./Actions";
 import type { AreaObjects } from "./generated/area-objects";
 import type {
   MapCell,
@@ -50,7 +50,7 @@ import {
 } from "./map-places";
 import { MapObjectActions } from "./object-actions";
 import { pinsOf, spotKey } from "./patch";
-import { useHiddenBySpots, usePathsMode, withPaths } from "./paths-mode";
+import { usePathsMode, withPaths } from "./paths-mode";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { EmptyState, Segmented, Toolbar } from "./ui/kit";
 import { type WorldTexts, worldTexts } from "./world-texts";
@@ -140,11 +140,12 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   const shownSpots = filter.collisions ? worldSpots : [];
   // The paths mode (ADR 0071), where the relief shows the objects up close.
   const [area, setArea] = useState<AreaObjects | null>(null);
-  const hiddenBySpots = useHiddenBySpots(map.spots);
+  // What the patch hides, drawn as on every page (ADR 0081).
+  const { decisions } = useDecisions();
   const pathsMode = usePathsMode({
     area,
     interior: false,
-    hidden: hiddenBySpots,
+    hidden: decisions.hiddenObjects,
     spots: worldSpots,
     onOpen: decideSpot,
   });
@@ -230,6 +231,7 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             hover={hover}
             onPick={setPicked}
             onHover={setHover}
+            hidden={decisions.hiddenKeys}
             objectExtra={(object, tools) => (
               <MapObjectActions object={object} tools={tools} place={world.name} />
             )}

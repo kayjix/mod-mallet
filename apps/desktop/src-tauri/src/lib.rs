@@ -192,15 +192,17 @@ fn set_asset_choice(
     Ok(settings.asset_choices)
 }
 
-/// The sides the user picked in duels between mods, by duel.
+/// The sides the user picked in duels between mods, by duel, as kept
+/// before the picks became decisions of the patches (ADR 0081): read once
+/// to move them into the first patch.
 #[tauri::command(async)]
 fn decisions() -> Result<BTreeMap<String, u8>, String> {
     Ok(settings()?.decisions)
 }
 
 /// Remembers the side picked in a duel, or forgets it with `None`, and
-/// returns all decisions afterwards. Only ever called because the user
-/// pressed a button.
+/// returns all decisions afterwards. The window only forgets picks with it,
+/// once they moved into a patch (ADR 0081).
 #[tauri::command(async)]
 fn set_decision(id: String, side: Option<u8>) -> Result<BTreeMap<String, u8>, String> {
     let settings = change_settings(|settings| {

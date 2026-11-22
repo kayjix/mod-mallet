@@ -4,11 +4,12 @@
 // needs it. Built in the window from the patch's choices; the scan only
 // read what is there.
 
+import { decisionsOf } from "./decisions";
 import type { AreaObject } from "./generated/area-objects";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { isGameObject } from "./object-actions";
-import { hiddenKeysOf, matchKey, type PatchChoices } from "./patch";
+import { matchKey, type PatchChoices } from "./patch";
 import { type Cluster, clustersOf, type Decided, decidedOf } from "./review-clusters";
 
 /** What the window remembers of an object it once showed: name, plugin, worldspace, place. */
@@ -143,7 +144,13 @@ export function patchReport(
   choices: PatchChoices,
   game: string,
 ): PatchReport {
-  const hidden = hiddenKeysOf(spotsByFinding(report), choices);
+  // What the patch hides, as every page shows it: set-aside findings hide nothing (ADR 0081).
+  const hidden = decisionsOf({
+    choices,
+    spots: spotsByFinding(report),
+    ignored,
+    passages: report.map.passages ?? [],
+  }).hiddenKeys;
   const known = readKnown(game);
   const names = new Map<string, string>();
   for (const spot of report.map.spots) {

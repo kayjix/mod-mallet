@@ -18,6 +18,10 @@ export interface AssetsTexts {
   lineDecided: (name: string) => string;
   lineSuggested: (name: string) => string;
   lineOpen: string;
+  /** The patches the picks of the decided duels are in (ADR 0081). */
+  decidedIn: (patches: string[]) => string;
+  /** Every duel decided: they are listed, and where a new pick goes. */
+  allDecided: (count: number, patches: string[]) => string;
 }
 
 const en: AssetsTexts = {
@@ -32,6 +36,9 @@ const en: AssetsTexts = {
   lineDecided: (name) => `${name} wins`,
   lineSuggested: (name) => `suggested: ${name}`,
   lineOpen: "not decided",
+  decidedIn: (patches) => `in “${patches.join("”, “")}”`,
+  allDecided: (count, patches) =>
+    `All ${count} are decided, in “${patches.join("”, “")}”, and listed below. What you pick now goes into the patch you are editing.`,
 };
 
 const de: AssetsTexts = {
@@ -46,6 +53,9 @@ const de: AssetsTexts = {
   lineDecided: (name) => `${name} gewinnt`,
   lineSuggested: (name) => `Vorschlag: ${name}`,
   lineOpen: "nicht entschieden",
+  decidedIn: (patches) => `in „${patches.join("“, „")}“`,
+  allDecided: (count, patches) =>
+    `Alle ${count} sind entschieden, in „${patches.join("“, „")}“, und stehen unten. Was du jetzt wählst, geht in den Patch, den du bearbeitest.`,
 };
 
 export const assetsTexts: Record<Lang, AssetsTexts> = { en, de };

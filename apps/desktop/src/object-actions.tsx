@@ -4,12 +4,14 @@
 // took along with it (ADR 0055); or, where it is part of a
 // collision, decide that collision on the collisions' page.
 
-import { useEffect, useMemo, useState } from "react";
-import { useSession } from "./Actions";
+import { useEffect, useState } from "react";
+import { useDecisions, useSession } from "./Actions";
 import { ActionPlaceInfo } from "./action-places";
 import type { Api } from "./api";
 import { objectKey, type PartTools } from "./area-layer";
 import { collisionsTexts } from "./collisions-texts";
+import type { Hiding } from "./decisions";
+import { doorTexts } from "./door-texts";
 import type { AreaObject } from "./generated/area-objects";
 import type { Anchor, ObjectAnchors } from "./generated/object-anchors";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
@@ -17,15 +19,8 @@ import type { Texts } from "./i18n";
 import { LocateButton } from "./locate";
 import { MoveControls } from "./move-controls";
 import { ObjectConflicts } from "./object-conflicts";
-import {
-  chooseObject,
-  decisionAt,
-  hiddenKeysOf,
-  matchKey,
-  objectChoiceKey,
-  revealObjects,
-  spotKey,
-} from "./patch";
+import { passageTexts } from "./passage-texts";
+import { spotKey } from "./patch";
 import { PinButton } from "./pins";
 import { useWandTexts } from "./wand";
 import { offersFor, splitParts } from "./wand-parts";
@@ -110,10 +105,39 @@ export function AnchorReasons({ anchors }: { anchors: ObjectAnchors }) {
   );
 }
 
-/** What the current choices hide, by {@link matchKey}. */
-function useHidden(): Set<string> {
-  const { spots, patchChoices } = useSession();
-  return useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+/**
+ * Why an object is hidden, in words, the same on every page (ADR 0081): on
+ * its own, by a collision's decision, by merged doors or by a passage, and
+ * from which patch where it is not the one being edited.
+ */
+export function HidingReason({ hiding }: { hiding: Hiding }) {
+  const { lang } = useSession();
+  const own = collisionsTexts[lang];
+  const reason =
+    hiding.by === "own"
+      ? own.hiddenByItself
+      : hiding.by === "door"
+        ? doorTexts[lang].hiddenByDoors
+        : hiding.by === "passage"
+          ? passageTexts[lang].hiddenByPassage
+          : own.hiddenByDecision;
+  // The patch that counts last makes the decision.
+  const from = hiding.patches[hiding.patches.length - 1];
+  return (
+    <>
+      {reason}
+      {from !== undefined && !from.edited && <> {own.hiddenInPatch(from.name)}</>}
+    </>
+  );
+}
+
+/** A note where a decision that waits for a switched-off mod would hide an object. */
+export function WaitingNote({ object }: { object: ObjectRef }) {
+  const { lang } = useSession();
+  const { decisions } = useDecisions();
+  return decisions.waits(object) ? (
+    <p className="aside">{collisionsTexts[lang].hiddenWhenOn}</p>
+  ) : null;
 }
 
 /**
@@ -121,10 +145,10 @@ function useHidden(): Set<string> {
  * again together; with the wand off, where to raise it.
  */
 export function PartsTogether({ tools }: { tools: PartTools }) {
-  const { lang, spots, patchChoices, setPatchChoices } = useSession();
+  const { lang } = useSession();
+  const { decisions, setChoices } = useDecisions();
   const own = collisionsTexts[lang];
   const w = useWandTexts();
-  const hidden = useHidden();
   const { selection: group, level } = tools;
   if (level === 0) {
     return (
@@ -144,7 +168,7 @@ export function PartsTogether({ tools }: { tools: PartTools }) {
   // Both ways (ADR 0055): from a hidden object the hidden parts of the
   // selection are shown again, from a visible one the visible parts are
   // hidden; a selection of both states offers both.
-  const isHidden = (part: AreaObject) => hidden.has(matchKey(part.id));
+  const isHidden = (part: AreaObject) => decisions.isHidden(part.id);
   const split = splitParts(group, isHidden);
   const first = group[0];
   const offers = offersFor(split, first !== undefined && isHidden(first));
@@ -163,21 +187,11 @@ export function PartsTogether({ tools }: { tools: PartTools }) {
             type="button"
             className={offer.primary ? "small primary" : "small"}
             onClick={() => {
-              if (offer.direction === "show") {
-                setPatchChoices(
-                  revealObjects(
-                    patchChoices,
-                    spots,
-                    split.hidden.map((part) => part.id),
-                  ),
-                );
-                return;
-              }
-              let next = patchChoices;
-              for (const part of split.hideable) {
-                next = chooseObject(next, part.id, true);
-              }
-              setPatchChoices(next);
+              setChoices(
+                offer.direction === "show"
+                  ? decisions.show(split.hidden.map((part) => part.id))
+                  : decisions.hide(split.hideable.map((part) => part.id)),
+              );
             }}
           >
             {offer.direction === "show" ? own.partsShow(offer.count) : own.partsHide(offer.count)}
@@ -215,16 +229,14 @@ export function FreeObjectActions({
   /** Whether `place` is an interior cell. */
   interior?: boolean;
 }) {
-  const { t, lang, spots, patchChoices, setPatchChoices } = useSession();
+  const { t, lang } = useSession();
+  const { decisions, setChoices } = useDecisions();
   const own = collisionsTexts[lang];
   const anchors = useAnchors(place, object.id);
-  const hidden = useHidden();
   // Without an answer, the two flags of the placed object decide as before.
   const locked = anchors === null ? object.anchored : anchors?.verdict === "locked";
   const careful = anchors?.verdict === "careful";
-  const isHidden = hidden.has(matchKey(object.id));
-  // A null choice is one shown again on purpose, not one hidden by itself.
-  const byItself = (patchChoices[objectChoiceKey(object.id)] ?? null) !== null;
+  const hiding = decisions.hiding(object.id);
   // The collisions and door spots it is part of, and which hiding it decided.
   const conflicts = <ObjectConflicts objects={[object.id]} />;
   const together = tools === undefined ? null : <PartsTogether tools={tools} />;
@@ -239,15 +251,17 @@ export function FreeObjectActions({
       around={tools?.layer?.area?.objects}
     />
   );
-  if (isHidden) {
+  if (hiding !== null) {
     return (
       <div className="relief-object-action">
         {action}
-        <p className="aside">{byItself ? own.hiddenByItself : own.hiddenByDecision}</p>
+        <p className="aside">
+          <HidingReason hiding={hiding} />
+        </p>
         <button
           type="button"
           className="small primary"
-          onClick={() => setPatchChoices(revealObjects(patchChoices, spots, [object.id]))}
+          onClick={() => setChoices(decisions.show([object.id]))}
         >
           {t.workObjectShow}
         </button>
@@ -289,10 +303,11 @@ export function FreeObjectActions({
         </>
       )}
       {isGameObject(object) && <p className="aside relief-object-warning">{t.workObjectGame}</p>}
+      <WaitingNote object={object.id} />
       <button
         type="button"
         className="small primary"
-        onClick={() => setPatchChoices(chooseObject(patchChoices, object.id, true))}
+        onClick={() => setChoices(decisions.hide([object.id]))}
       >
         {careful ? t.anchorHideAnyway : t.workObjectHide}
       </button>
@@ -317,10 +332,10 @@ export function NeededPart({
   object: ObjectRef;
   name: string;
 }) {
-  const { t, spots, patchChoices, setPatchChoices } = useSession();
+  const { t } = useSession();
+  const { decisions, setChoices } = useDecisions();
   const anchors = useAnchors(place, object);
-  const hidden = useHidden();
-  const isHidden = hidden.has(matchKey(object));
+  const isHidden = decisions.isHidden(object);
   return (
     <div className="needed-part">
       <strong>{name}</strong>
@@ -334,13 +349,7 @@ export function NeededPart({
         <button
           type="button"
           className="small"
-          onClick={() =>
-            setPatchChoices(
-              isHidden
-                ? revealObjects(patchChoices, spots, [object])
-                : chooseObject(patchChoices, object, true),
-            )
-          }
+          onClick={() => setChoices(isHidden ? decisions.show([object]) : decisions.hide([object]))}
         >
           {isHidden ? t.workObjectShow : t.anchorHideAnyway}
         </button>
@@ -376,14 +385,12 @@ export function MapObjectActions({
   tools: PartTools;
   place: string;
 }) {
-  const { t, spots, decideSpot, patchChoices } = useSession();
+  const { t, spots, decideSpot } = useSession();
+  const { decisions } = useDecisions();
   const spot = spotOf(spots, object);
   const key = spot === null ? null : spotKey(spot);
   // A collision still open can be pinned to solve later (ADR 0050).
-  const open =
-    spot !== null &&
-    key !== null &&
-    decisionAt(patchChoices, spot.finding, key, spot.parts ?? []) === undefined;
+  const open = spot !== null && key !== null && decisions.decisionOf(spot) === undefined;
   return (
     <>
       {spot !== null && (

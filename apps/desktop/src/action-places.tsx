@@ -7,7 +7,7 @@
 // characters still reach, or hidden too.
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useSession } from "./Actions";
+import { useDecisions, useSession } from "./Actions";
 import { actionPlaceTexts } from "./action-places-texts";
 import type { Api } from "./api";
 import type { ActionPlace, AreaObject, AreaObjects } from "./generated/area-objects";
@@ -18,7 +18,7 @@ import type { Destination } from "./generated/walkway-reach";
 import { type Move, moveOf, withMoves } from "./moves";
 import { useMovesTexts } from "./moves-texts";
 import { useAnchors } from "./object-actions";
-import { chooseObject, hiddenKeysOf, matchKey, revealObjects } from "./patch";
+import { chooseObject, matchKey, revealObjects } from "./patch";
 import "./action-places.css";
 
 /** What characters do at a place. */
@@ -411,12 +411,12 @@ export function ActionPlaceInfo({
   /** The other objects of the view, of which those the patch hides count. */
   around?: AreaObject[];
 }) {
-  const { lang, spots, patchChoices } = useSession();
+  const { lang, patchChoices } = useSession();
   const a = actionPlaceTexts[lang];
   const action = actionPlaceOf(object.id);
   const anchors = useAnchors(action === null ? null : worldOrCell, object.id);
   const move = moveOf(patchChoices, object.id);
-  const hiddenKeys = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+  const hiddenKeys = useDecisions().decisions.hiddenKeys;
   const at = action === null ? null : placedWith(action, move).at;
   const hidden = useMemo(
     () =>
@@ -540,7 +540,7 @@ export function FollowHiding({
     hidden,
   );
   const anchors = useAnchorsOfAll(gone.length === 0 ? null : place, gone);
-  const hiddenKeys = useMemo(() => hiddenKeysOf(spots, patchChoices), [spots, patchChoices]);
+  const hiddenKeys = useDecisions().decisions.hiddenKeys;
   if (gone.length === 0) {
     return null;
   }
