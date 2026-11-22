@@ -11,6 +11,7 @@ import type { AreaObjects } from "./generated/area-objects";
 import type { AssetVersions } from "./generated/asset-versions";
 import type { Catalogue } from "./generated/catalogue";
 import type { CreatedMoves } from "./generated/created-moves";
+import type { CreatedPaths } from "./generated/created-paths";
 import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
@@ -23,7 +24,14 @@ import type { ObjectAnchors } from "./generated/object-anchors";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
-import type { Action, Moves, ObjectRef, Patch, RenderedReport } from "./generated/rendered-report";
+import type {
+  Action,
+  Moves,
+  ObjectRef,
+  Patch,
+  PathRepairs,
+  RenderedReport,
+} from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { ScanProgress } from "./generated/scan-progress";
 import type { WalkwayReach } from "./generated/walkway-reach";
@@ -90,6 +98,8 @@ export interface Api {
   createPatch(patch: Patch): Promise<string>;
   /** Writes the plugin that moves objects a little (ADR 0060); says what it moves and what not. */
   createMoves(moves: Moves): Promise<CreatedMoves>;
+  /** Writes the plugin of repaired paths (ADR 0058) into Mod Mallet's own folder. */
+  createPaths(repairs: PathRepairs): Promise<CreatedPaths>;
   /** Writes the report of what the patch hides next to it, and returns where it is. */
   savePatchReport(text: string): Promise<string>;
   /** Shows one of Mod Mallet's own folders in the file explorer. */
@@ -236,6 +246,7 @@ const tauriApi: Api = {
   openPage: (url) => invoke<void>("open_page", { url }),
   createPatch: (patch) => invoke<string>("create_patch", { patch }),
   createMoves: (moves) => invoke<CreatedMoves>("create_moves", { moves }),
+  createPaths: (repairs) => invoke<CreatedPaths>("create_paths", { repairs }),
   savePatchReport: (text) => invoke<string>("save_patch_report", { text }),
   openFolder: (which) => invoke<void>("open_folder", { which }),
   logFile: () => invoke<string | null>("log_file"),

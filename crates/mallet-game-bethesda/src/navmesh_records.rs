@@ -21,7 +21,7 @@ use mallet_formats_bethesda::plugin::{self, GroupLabel, Signature, Subrecord, gr
 
 use crate::navmeshes::NAVMESH;
 use crate::objects::record_id;
-use crate::walkways::{Around, CHILDREN, holds_any, in_world, read_where};
+use crate::walkways::{Around, CHILDREN, holds_any, in_world};
 
 /// A navigation mesh repaired, ready to be written as an override.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +36,8 @@ pub struct NavmeshRecord {
     /// The record's flags in that plugin. Bit `0x0004_0000` says that it
     /// stored the record compressed; [`Self::fields`] are not.
     pub flags: u32,
+    /// The record format version it was written with.
+    pub form_version: u16,
     /// Where the mesh lies: its worldspace outside, its cell inside.
     pub place: Place,
     /// The cell whose children the record belongs to.
@@ -87,6 +89,29 @@ pub struct Repaired<'a> {
     pub water: &'a BTreeSet<u32>,
 }
 
+/// A record as read, with its form version.
+type Versioned = (plugin::Record, u16);
+
+/// The records `request` asks for in the plugin at `path`, through the
+/// groups `descend` enters, each with its form version, and the plugin's
+/// masters.
+fn read_versions(
+    path: &std::path::Path,
+    request: &plugin::Request<'_>,
+    descend: &dyn Fn(GroupLabel) -> bool,
+) -> Option<(Vec<String>, Vec<Versioned>)> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut records = Vec::new();
+    let (header, _) = plugin::read_request_versions(
+        &mut std::io::BufReader::new(file),
+        request,
+        descend,
+        &mut |_, record, version| records.push((record, version)),
+    )
+    .ok()?;
+    Some((header.masters, records))
+}
+
 /// One pass over a plugin: the top-level group, which nested groups to
 /// enter, and whether it is needed.
 type Pass<'a> = (Signature, &'a dyn Fn(GroupLabel) -> bool, bool);
@@ -131,10 +156,10 @@ pub fn repaired_records(
                 nested_records: &[*b"CELL", NAVMESH],
                 nested_overrides: &[],
             };
-            let Some(read) = read_where(path, &request, *descend) else {
+            let Some((masters, read)) = read_versions(path, &request, *descend) else {
                 continue;
             };
-            records.extend(records_of(name, &read, repaired));
+            records.extend(records_of(name, &masters, &read, repaired));
         }
     }
     records
@@ -142,11 +167,15 @@ pub fn repaired_records(
 
 /// The repaired records of `repaired` among those `read` from the plugin
 /// `name`.
-fn records_of(name: &str, read: &plugin::Plugin, repaired: &[Repaired<'_>]) -> Vec<NavmeshRecord> {
-    let masters = &read.header.masters;
+fn records_of(
+    name: &str,
+    masters: &[String],
+    read: &[Versioned],
+    repaired: &[Repaired<'_>],
+) -> Vec<NavmeshRecord> {
     let mut grids: HashMap<RecordId, (i32, i32)> = HashMap::new();
     let mut records = Vec::new();
-    for record in &read.records {
+    for (record, form_version) in read {
         if &record.signature == b"CELL" {
             if let Some(position) = crate::terrain::cell_position(record) {
                 grids.insert(record_id(record.form_id, masters, name), position);
@@ -200,8 +229,9 @@ fn records_of(name: &str, read: &plugin::Plugin, repaired: &[Repaired<'_>]) -> V
         records.push(NavmeshRecord {
             navmesh: id,
             plugin: name.to_owned(),
-            masters: masters.clone(),
+            masters: masters.to_vec(),
             flags: record.flags,
+            form_version: *form_version,
             place,
             cell,
             grid,
@@ -212,7 +242,7 @@ fn records_of(name: &str, read: &plugin::Plugin, repaired: &[Repaired<'_>]) -> V
 }
 
 /// The form ID of `id` in a plugin named `own` with `masters`.
-fn form_id_in(id: &RecordId, masters: &[String], own: &str) -> Option<u32> {
+pub(crate) fn form_id_in(id: &RecordId, masters: &[String], own: &str) -> Option<u32> {
     let index = masters
         .iter()
         .position(|master| master.eq_ignore_ascii_case(&id.plugin))
@@ -351,7 +381,7 @@ fn as_f32(value: i32) -> f32 {
 
 #[cfg(test)]
 #[allow(clippy::cast_possible_truncation)]
-mod tests {
+pub(crate) mod tests {
     use std::fs::File;
     use std::io::Write;
 
@@ -365,7 +395,7 @@ mod tests {
     /// The docks' mesh as `Docks.esp` writes it (masters: `Skyrim.esm`):
     /// two triangles side by side on the ground, a door on the second,
     /// which also leads onto triangle 5 of the game's mesh `0x0000_0AAA`.
-    fn docks() -> NavmeshData {
+    pub(crate) fn docks() -> NavmeshData {
         NavmeshData {
             version: SKYRIM_VERSION,
             checksum: 0xA5E9_A03C,
@@ -429,7 +459,7 @@ mod tests {
 
     /// The game and `Docks.esp`, which changes the game's mesh 0x210 in
     /// cell 5,3 of Tamriel; written into a folder.
-    fn setup() -> (tempfile::TempDir, Vec<(String, PathBuf)>) {
+    pub(crate) fn setup() -> (tempfile::TempDir, Vec<(String, PathBuf)>) {
         let world =
             RecordSpec::new(*b"WRLD", 0x0000_003C).with(*b"EDID", fixture::zstring("Tamriel"));
         let cell = || RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
@@ -469,7 +499,7 @@ mod tests {
         (directory, plugins)
     }
 
-    fn around() -> Around {
+    pub(crate) fn around() -> Around {
         Around {
             worlds: std::collections::BTreeMap::from([(
                 "Tamriel".to_owned(),

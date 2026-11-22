@@ -50,6 +50,7 @@ pub mod navmesh_records;
 pub mod navmeshes;
 pub mod npc;
 pub mod objects;
+pub mod paths_plugin;
 pub mod place_kinds;
 pub mod skse_log;
 pub mod swap;

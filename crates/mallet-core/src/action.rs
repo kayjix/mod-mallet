@@ -40,6 +40,13 @@ pub enum Action {
         /// The moves.
         moves: crate::moves::Moves,
     },
+    /// Repair the paths characters walk on over hidden objects, through a
+    /// plugin of navigation meshes that the mod manager installs (ADR
+    /// 0058). Removing it brings the old paths back.
+    RepairPaths {
+        /// The repairs.
+        repairs: crate::walkway_repair::PathRepairs,
+    },
     /// Load a plugin after another one, through a rule in the mod
     /// manager's plugin list, so that its version of what both change wins.
     /// The rule can be removed there again.

@@ -433,3 +433,59 @@ fn moves_that_find_nothing_or_lack_the_setup_ask_nothing_of_vortex() {
     assert_eq!(outcome.status, ActionStatus::Failed);
     assert_eq!(first_json(&vortex.link_dir().join("requests")), None);
 }
+
+/// A repair of the paths in Tamriel near the one object of
+/// [`game_with_one_object`], which carries none.
+fn repair_near_the_object() -> Action {
+    Action::RepairPaths {
+        repairs: mallet_core::walkway_repair::PathRepairs {
+            places: vec![mallet_core::walkway_repair::RepairPlace {
+                place: "Tamriel".to_owned(),
+                centre: Some([100, 200]),
+                navmeshes: vec!["skyrim.esm:000999".to_owned()],
+            }],
+            hidden: vec![mallet_core::ObjectRef {
+                plugin: "Skyrim.esm".to_owned(),
+                local_id: 0x812,
+            }],
+        },
+    }
+}
+
+#[test]
+fn repairs_that_repair_nothing_or_lack_the_setup_ask_nothing_of_vortex() {
+    let vortex = Vortex::new();
+    install_manager_link(&vortex.options()).unwrap();
+    vortex.start_extension();
+    let outcome = run_action(&repair_near_the_object(), &vortex.options());
+    assert_eq!(outcome.status, ActionStatus::Failed);
+
+    let options = ManagerOptions {
+        setup: Some(game_with_one_object(vortex.root.path())),
+        ..vortex.options()
+    };
+    let Action::RepairPaths { repairs } = repair_near_the_object() else {
+        unreachable!()
+    };
+    let created =
+        mallet_engine::create_paths(options.setup.as_ref().unwrap(), &repairs, &options).unwrap();
+    assert_eq!(created.path, "");
+    assert_eq!(
+        created.refused[0].reason,
+        mallet_core::walkway_repair::PathRefusal::NothingToRepair
+    );
+    let outcome = run_action(&repair_near_the_object(), &options);
+    assert_eq!(outcome.status, ActionStatus::Failed);
+    assert_eq!(first_json(&vortex.link_dir().join("requests")), None);
+}
+
+#[test]
+fn under_mod_organizer_a_repair_is_left_to_the_user() {
+    let vortex = Vortex::new();
+    let options = ManagerOptions {
+        by_hand: true,
+        ..vortex.options()
+    };
+    let outcome = run_action(&repair_near_the_object(), &options);
+    assert_eq!(outcome.status, ActionStatus::ByHand);
+}

@@ -103,6 +103,12 @@ action-move-objects = Install the moves in Vortex
        *[other] { $count } objects
     } a little to one side, and Vortex installs it. Remove the mod in Vortex to put them back where they were.
 
+action-repair-paths = Install the repaired paths in Vortex
+    .description = Mod Mallet writes a small plugin with { $count ->
+        [one] 1 repaired net
+       *[other] { $count } repaired nets
+    } of the paths characters walk on: the paths over what the patch hides are taken out, and new ones are laid on the ground below. Vortex installs it. Remove the mod in Vortex to bring the old paths back.
+
 action-load-after = Let { $plugin } win
     .description = Vortex gets a rule to load { $plugin } after { $after } and sorts your plugins again. What both change then comes from { $plugin }; whatever only { $after } changes stays. You find the rule, and can remove it, in Vortex's plugin list.
 
@@ -156,6 +162,12 @@ action-move-objects-mo2 = Moving objects: not with Mod Organizer yet
         [one] the object
        *[other] the { $count } objects
     } from the plugins in the game's data folder, and with Mod Organizer those stay in the mods' folders. Until that is supported, hide the objects with the patch instead, or move them in the Creation Kit.
+
+action-repair-paths-mo2 = Repairing paths: not with Mod Organizer yet
+    .description = Mod Mallet makes the plugin that repairs { $count ->
+        [one] the net
+       *[other] the { $count } nets
+    } of paths from the plugins in the game's data folder, and with Mod Organizer those stay in the mods' folders. Until that is supported, keep the objects that characters walk on, or hide them knowingly.
 
 action-load-after-mo2 = Let { $plugin } win
     .description = Mod Mallet cannot ask Mod Organizer for this. In Mod Organizer's list of plugins on the right, drag { $plugin } below { $after }. What both change then comes from { $plugin }; whatever only { $after } changes stays. Sorting with LOOT may move it back; then give LOOT the same rule.

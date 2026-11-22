@@ -132,6 +132,7 @@ pub fn run_action(action: &Action, options: &ManagerOptions) -> ActionOutcome {
         }
         Action::HideObjects { patch } => hide_objects(patch, options),
         Action::MoveObjects { moves } => move_objects(moves, options),
+        Action::RepairPaths { repairs } => repair_paths(repairs, options),
         Action::LoadAfter { plugin, after } => in_vortex(options, |link, timeout| {
             tracing::info!(plugin, after, "asking Vortex for a plugin rule");
             link.load_after(options.vortex_game(), plugin, after, timeout)
@@ -397,6 +398,45 @@ fn move_objects(moves: &mallet_core::moves::Moves, options: &ManagerOptions) -> 
     };
     let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
     tracing::info!(archive = created.path, "asking Vortex to install the moves");
+    outcome_of(Link::new(link_dir).install_archive(
+        options.vortex_game(),
+        std::path::Path::new(&created.path),
+        timeout,
+    ))
+}
+
+/// Writes the plugin of repaired paths (ADR 0058) and asks Vortex to
+/// install it.
+fn repair_paths(
+    repairs: &mallet_core::walkway_repair::PathRepairs,
+    options: &ManagerOptions,
+) -> ActionOutcome {
+    let failed = |error: EngineError| ActionOutcome {
+        status: ActionStatus::Failed,
+        detail: Some(error.to_string()),
+    };
+    let Some(scan) = options.setup.as_ref() else {
+        return failed(EngineError::SetupUnknown);
+    };
+    if !manager_link(options).installed {
+        return ActionOutcome::new(ActionStatus::LinkMissing);
+    }
+    let Some(link_dir) = options.link_dir() else {
+        return ActionOutcome::new(ActionStatus::ManagerNotRunning);
+    };
+    let created = match crate::paths::create_paths(scan, repairs, options) {
+        Ok(created) if !created.path.is_empty() => created,
+        Ok(_) => return failed(EngineError::NothingToRepair),
+        Err(error) => {
+            tracing::warn!(%error, "repaired paths not written");
+            return failed(error);
+        }
+    };
+    let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+    tracing::info!(
+        archive = created.path,
+        "asking Vortex to install the repaired paths"
+    );
     outcome_of(Link::new(link_dir).install_archive(
         options.vortex_game(),
         std::path::Path::new(&created.path),

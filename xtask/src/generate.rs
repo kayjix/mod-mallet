@@ -108,6 +108,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "schemas/walkway-repair.schema.json",
         "apps/desktop/src/generated/walkway-repair.ts",
     ),
+    (
+        "schemas/created-paths.schema.json",
+        "apps/desktop/src/generated/created-paths.ts",
+    ),
 ];
 
 /// A file and the content it should have.
@@ -147,6 +151,9 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::reach::WalkwayReach>("schemas/walkway-reach.schema.json")?,
         schema_of::<mallet_core::moves::CreatedMoves>("schemas/created-moves.schema.json")?,
         schema_of::<WalkwayRepair>("schemas/walkway-repair.schema.json")?,
+        schema_of::<mallet_core::walkway_repair::CreatedPaths>(
+            "schemas/created-paths.schema.json",
+        )?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),

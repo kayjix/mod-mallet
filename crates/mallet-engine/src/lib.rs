@@ -28,6 +28,7 @@ mod managers;
 mod mesh;
 mod moves;
 mod patch;
+mod paths;
 mod png;
 mod preview;
 mod reach;
@@ -67,8 +68,9 @@ pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use managers::ModManager;
 pub use mesh::mesh_view;
 pub use moves::{create_moves, moves_file};
+pub use paths::{create_paths, paths_file};
 pub use preview::file_preview;
-pub use reach::{walkway_reach, walkway_reach_after};
+pub use reach::{walkway_reach, walkway_reach_after, walkway_repair_reach};
 pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
     select_game, setup_fingerprint, update_settings,
@@ -226,6 +228,12 @@ pub enum EngineError {
     /// The plugin that moves objects could not be made.
     #[error("the plugin that moves the objects could not be made: {0}")]
     MovesNotWritten(String),
+    /// Repairs of paths were asked for that would repair nothing.
+    #[error("none of the paths chosen could be repaired")]
+    NothingToRepair,
+    /// The plugin of repaired paths could not be made.
+    #[error("the plugin of repaired paths could not be made: {0}")]
+    PathsNotWritten(String),
     /// An action needs to read the setup, but where it is was not given.
     #[error("the game's setup is not known here")]
     SetupUnknown,

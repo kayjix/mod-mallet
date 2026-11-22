@@ -345,6 +345,42 @@ fn create_moves(
     )
 }
 
+/// Writes the plugin of repaired paths (ADR 0058) into Mod Mallet's own
+/// folder and says what it repairs and what it could not. Nothing is
+/// installed. Only ever called because the user pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn create_paths(
+    repairs: mallet_core::walkway_repair::PathRepairs,
+) -> Result<mallet_core::walkway_repair::CreatedPaths, String> {
+    mallet_engine::create_paths(&settings()?.scan_options(), &repairs, &manager_options()).map_err(
+        |error| {
+            tracing::warn!(%error, "repaired paths not written");
+            error.to_string()
+        },
+    )
+}
+
+/// Whether characters reach where they go once the paths over objects
+/// about to be hidden are repaired (ADR 0058, 0059), asked as
+/// `walkway_repair`.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn walkway_repair_reach(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    objects: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::reach::WalkwayReach>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::walkway_repair_reach(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &objects,
+    ))
+}
+
 /// Shows one of Mod Mallet's own folders in the file explorer: `patches`
 /// or `logs`. Nothing else can be opened this way.
 #[tauri::command]
@@ -804,6 +840,7 @@ pub fn run() -> tauri::Result<()> {
             open_page,
             create_patch,
             create_moves,
+            create_paths,
             save_patch_report,
             open_folder,
             log_file,
@@ -832,6 +869,7 @@ pub fn run() -> tauri::Result<()> {
             hidden_walkways,
             walkway_reach,
             walkway_repair,
+            walkway_repair_reach,
             area_mesh,
             area_texture,
             ranking,

@@ -17,6 +17,16 @@ use mallet_core::{
     ScanLocation, ScanReport, Severity, Tool, ToolGroup, ToolNeed, ToolState, WorldMap,
 };
 
+/// How many navigation meshes a repair of paths writes.
+fn repair_count(repairs: &mallet_core::walkway_repair::PathRepairs) -> ArgValue {
+    let count: usize = repairs
+        .places
+        .iter()
+        .map(|place| place.navmeshes.len())
+        .sum();
+    ArgValue::Number(i64::try_from(count).unwrap_or(i64::MAX))
+}
+
 /// The mod manager that knows the mod an action is about, if the action is
 /// about a mod.
 fn action_source(action: &Action) -> Option<&str> {
@@ -31,7 +41,10 @@ fn action_source(action: &Action) -> Option<&str> {
             .chain(provide)
             .next()
             .map(|mod_ref| mod_ref.source.as_str()),
-        Action::HideObjects { .. } | Action::MoveObjects { .. } | Action::LoadAfter { .. } => None,
+        Action::HideObjects { .. }
+        | Action::MoveObjects { .. }
+        | Action::RepairPaths { .. }
+        | Action::LoadAfter { .. } => None,
     }
 }
 use schemars::JsonSchema;
@@ -444,6 +457,11 @@ impl Messages {
                     "count",
                     ArgValue::Number(i64::try_from(moves.moves.len()).unwrap_or(i64::MAX)),
                 )],
+                &no_ticks,
+            ),
+            Action::RepairPaths { repairs } => (
+                "action-repair-paths",
+                vec![("count", repair_count(repairs))],
                 &no_ticks,
             ),
             Action::LoadAfter { plugin, after } => (

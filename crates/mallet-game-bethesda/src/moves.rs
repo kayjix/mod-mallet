@@ -82,16 +82,16 @@ pub struct MovesPlugin {
 
 /// One version of a record, as a plugin of the load order has it.
 #[derive(Debug, Clone)]
-struct RecordVersion {
+pub(crate) struct RecordVersion {
     /// The plugin, by its place in the load order.
-    plugin: usize,
-    record: Record,
-    form_version: u16,
+    pub(crate) plugin: usize,
+    pub(crate) record: Record,
+    pub(crate) form_version: u16,
 }
 
 /// What a plugin says about itself that copying needs.
 #[derive(Debug, Clone, Default)]
-struct Source {
+pub(crate) struct Source {
     masters: Vec<String>,
     localized: bool,
 }
@@ -99,11 +99,11 @@ struct Source {
 /// The versions the game uses of the objects asked for, their cells and
 /// worldspaces.
 #[derive(Debug, Default)]
-struct Found {
-    sources: HashMap<usize, Source>,
+pub(crate) struct Found {
+    pub(crate) sources: HashMap<usize, Source>,
     objects: HashMap<RecordId, RecordVersion>,
-    cells: HashMap<RecordId, RecordVersion>,
-    worlds: HashMap<RecordId, RecordVersion>,
+    pub(crate) cells: HashMap<RecordId, RecordVersion>,
+    pub(crate) worlds: HashMap<RecordId, RecordVersion>,
 }
 
 impl Found {
@@ -419,7 +419,7 @@ fn find(plugins: &[(String, PathBuf)], moves: &[&ObjectMove]) -> Found {
 /// Reads one plugin's top-level groups `top` through the nested groups
 /// `descend` accepts, keeping the worldspaces, the cells and the objects
 /// in `wanted`.
-fn read_into(
+pub(crate) fn read_into(
     found: &mut Found,
     index: usize,
     name: &str,
@@ -515,7 +515,7 @@ fn rooms_named(plugins: &[(String, PathBuf)], rooms: &[String]) -> Vec<(usize, u
 /// Whether a nested group may hold the cells around `points` (cell
 /// columns and rows): blocks and sub-blocks are entered only near them,
 /// everything else always.
-fn near_points(group: GroupLabel, points: &[(i32, i32)]) -> bool {
+pub(crate) fn near_points(group: GroupLabel, points: &[(i32, i32)]) -> bool {
     let size = match group.group_type {
         group_type::EXTERIOR_BLOCK => 32,
         group_type::EXTERIOR_SUB_BLOCK => 8,
@@ -949,7 +949,11 @@ fn field_name(record: Signature, field: Signature) -> String {
 
 /// The plugins whose records `record` refers to, by name as `source`
 /// spells them; `Err` with the field that is not known.
-fn referenced(record: &Record, source: &Source, plugin_name: &str) -> Result<Vec<String>, String> {
+pub(crate) fn referenced(
+    record: &Record,
+    source: &Source,
+    plugin_name: &str,
+) -> Result<Vec<String>, String> {
     let mut names: Vec<String> = Vec::new();
     for field in &record.subrecords {
         let unknown = || field_name(record.signature, field.signature);
@@ -977,7 +981,7 @@ fn read_u32(data: &[u8], offset: usize) -> Option<u32> {
 /// A copy of `version` with its references rewritten for `masters`, names
 /// of a localized plugin written as text, and the worldspace's offset
 /// table left out.
-fn copied(
+pub(crate) fn copied(
     version: &RecordVersion,
     source: &Source,
     plugin_name: &str,

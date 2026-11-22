@@ -35,6 +35,10 @@ export type Action =
       type: "move-objects";
     }
   | {
+      repairs: PathRepairs;
+      type: "repair-paths";
+    }
+  | {
       /**
        * The plugin it is to load after.
        */
@@ -326,6 +330,10 @@ export interface DuelResolution {
         type: "move-objects";
       }
     | {
+        repairs: PathRepairs;
+        type: "repair-paths";
+      }
+    | {
         /**
          * The plugin it is to load after.
          */
@@ -581,6 +589,42 @@ export interface ObjectRef2 {
   plugin: string;
 }
 /**
+ * The repairs.
+ */
+export interface PathRepairs {
+  /**
+   * Every object the patch hides. The repair of a place takes those
+   * that stand there, so that it is the same whichever choice asked
+   * for it.
+   */
+  hidden: ObjectRef[];
+  /**
+   * Each place with meshes to repair.
+   */
+  places: RepairPlace[];
+}
+/**
+ * The meshes to repair in one place.
+ */
+export interface RepairPlace {
+  /**
+   * Outside, a point near the objects, in whole game units; inside,
+   * `None`.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  centre?: [number, number] | null;
+  /**
+   * The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].
+   */
+  navmeshes: string[];
+  /**
+   * The worldspace, or the interior cell by its editor ID.
+   */
+  place: string;
+}
+/**
  * The mod to switch off.
  */
 export interface ModRef1 {
@@ -747,6 +791,10 @@ export interface RenderedAction {
     | {
         moves: Moves;
         type: "move-objects";
+      }
+    | {
+        repairs: PathRepairs;
+        type: "repair-paths";
       }
     | {
         /**

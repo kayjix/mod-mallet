@@ -182,13 +182,34 @@ impl AreaReader {
     }
 
     /// The records of the navigation meshes in `repaired`, repaired, from
-    /// the cells `around` (ADR 0058).
+    /// the cells `around` (ADR 0058), as the plugins other than the plugin
+    /// of paths have them.
     pub fn navmesh_records(
         &self,
         around: &crate::walkways::Around,
         repaired: &[crate::navmesh_records::Repaired<'_>],
     ) -> Vec<crate::navmesh_records::NavmeshRecord> {
-        crate::navmesh_records::repaired_records(&self.plugins, around, repaired)
+        crate::navmesh_records::repaired_records(&self.without_paths(), around, repaired)
+    }
+
+    /// The navigation meshes and the ground of the cells `around`, every
+    /// version but that of the plugin of paths (ADR 0058): what a repair
+    /// starts from, so that it never repairs its own copy.
+    pub fn navmeshes_to_repair(
+        &self,
+        around: &crate::walkways::Around,
+    ) -> mallet_core::facts::navmeshes::NearHidden {
+        crate::walkways::read_plugins(&self.without_paths(), around)
+    }
+
+    /// The active plugins without the plugin of paths.
+    pub fn without_paths(&self) -> Vec<(String, PathBuf)> {
+        let own = crate::paths_plugin::file_name();
+        self.plugins
+            .iter()
+            .filter(|(name, _)| !name.eq_ignore_ascii_case(&own))
+            .cloned()
+            .collect()
     }
 
     /// The ground of the outside cells of the worldspace named `world`

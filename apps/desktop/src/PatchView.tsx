@@ -24,6 +24,7 @@ import {
   undoDecision,
 } from "./patch";
 import { type PatchTexts, patchTexts } from "./patch-texts";
+import { PathsPanel } from "./repair-paths";
 import { NOTHING_WAITS, splitWaiting } from "./switched-off";
 import { switchedOffTexts } from "./switched-off-texts";
 import "./wide-advice.css";
@@ -113,6 +114,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
           </button>
         </section>
         <MovesPanel />
+        <PathsPanel hidden={objects} />
       </>
     );
   }
@@ -147,6 +149,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
         {pausedNote}
         <p className="empty">{t.nothingHere}</p>
         <MovesPanel />
+        <PathsPanel hidden={objects} />
       </section>
     );
   }
@@ -306,6 +309,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
       )}
 
       <MovesPanel />
+      <PathsPanel hidden={objects} />
 
       <PairReport report={report} game={session.game} />
     </section>

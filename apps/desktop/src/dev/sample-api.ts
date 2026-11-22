@@ -1500,6 +1500,14 @@ export const sampleApi: Api = {
       light: true,
       refused: [],
     }),
+  createPaths: (repairs) =>
+    later({
+      path: "C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet - Paths.zip",
+      navmeshes: repairs.places.flatMap((place) => place.navmeshes),
+      masters: ["Skyrim.esm", "Water Mod.esp"],
+      light: true,
+      refused: [],
+    }),
   savePatchReport: () =>
     later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\patches\\Mod Mallet Patch - report.txt"),
   openFolder: async () => {},

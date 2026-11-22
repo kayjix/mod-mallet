@@ -108,16 +108,43 @@ definitions and the modding community's documentation:
    and changes its field as the repair says, everything else byte for
    byte; form IDs are rewritten for the patch's masters by
    `NavmeshRecord::fields_for`. Mod Mallet writes neither `NAVI` nor
-   cover. The plugin that carries the records is the patch plugin of ADR
-   0060; the records go into the temporary children of their cell, which
-   the record names with its worldspace and grid position.
-4. **The window shows it before it is chosen.** Where it warns that
+   cover. A repair always starts from the meshes without its own plugin,
+   so it never repairs its own copy.
+4. **The repaired paths are a plugin of their own,
+   `Mod Mallet - Paths.esp`,** written with the plugin writer of ADR 0060:
+   each mesh in the temporary children of its cell, inside copies of the
+   versions the game uses of the cell and its worldspace, copied as the
+   plugin of moves copies them (a field not known is refused, not copied
+   blindly). Its masters are the plugins whose versions it copies and
+   those they refer to, in load order. It is not shared with the moves:
+   each can be removed on its own, and neither has to be written again
+   when only the other changes. Both copy the winning cell, so whichever
+   loads last carries the same cell.
+   - The patch page lists the meshes chosen for repair, writes the plugin
+     into Mod Mallet's own folder, and `Action::RepairPaths` asks Vortex
+     to install it through the link, on the user's click only, as the
+     patch and the moves are installed (ADR 0020, 0025, 0060).
+   - Each place is repaired with **every object the patch hides there**,
+     not only those of the choice that asked for it, and the meshes chosen
+     for that place are kept; a mesh with nothing left to repair is
+     listed as refused.
+   - Under Mod Organizer the action is left to the user (`ByHand`), as for
+     the moves: the plugin is built from the plugins in the game's data
+     folder, which Mod Organizer keeps in the mods' folders.
+5. **The window shows it before it is chosen.** Where it warns that
    characters walk on what a choice hides (the spot on the collisions page,
    the guided review), "Repair the paths" asks the engine
    (`walkway_repair`) and draws the triangles taken out in red and the new
    ones in green over the 3D view. Choosing it stores `repair:<navmesh>`
-   among the patch choices for each mesh it changes; writers that do not
-   know the prefix leave the choice alone.
+   among the patch choices for each mesh it changes, its value the place
+   and point it was asked for (JSON); writers that do not know the prefix
+   leave the choice alone.
+6. **And whether characters still get where they go.** Beside the repair,
+   the window follows the ways to the doors, beds and markers around
+   (ADR 0059, `walkway_repair_reach`, `ReachAfter::Repaired`) on the
+   repaired meshes, taken-out triangles leading nowhere: what the repair
+   makes reachable again of what cutting would lose, and what stays lost,
+   such as a door that stood on a hidden deck.
 
 ## Consequences
 

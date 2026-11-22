@@ -103,6 +103,12 @@ action-move-objects = Verschiebungen in Vortex installieren
        *[other] { $count } Objekte
     } ein Stück zur Seite rückt, und Vortex installiert es. Entfernst du die Mod in Vortex, stehen sie wieder, wo sie waren.
 
+action-repair-paths = Reparierte Wege in Vortex installieren
+    .description = Mod Mallet schreibt ein kleines Plugin mit { $count ->
+        [one] 1 repariertem Netz
+       *[other] { $count } reparierten Netzen
+    } der Wege, auf denen Figuren laufen: Die Wege über dem, was der Patch versteckt, werden herausgenommen, und neue auf den Boden darunter gelegt. Vortex installiert es. Entfernst du die Mod in Vortex, sind die alten Wege wieder da.
+
 action-load-after = { $plugin } gewinnen lassen
     .description = Vortex bekommt eine Regel, { $plugin } nach { $after } zu laden, und sortiert deine Plugins neu. Was beide ändern, kommt dann aus { $plugin }; was nur { $after } ändert, bleibt. Die Regel findest du in Vortex' Plugin-Liste und kannst sie dort wieder entfernen.
 
@@ -147,6 +153,12 @@ action-move-objects-mo2 = Objekte verschieben: mit Mod Organizer noch nicht
         [one] das Objekt
        *[other] die { $count } Objekte
     } verschiebt, aus den Plugins im Datenordner des Spiels, und mit Mod Organizer bleiben die in den Ordnern der Mods. Bis das unterstützt wird, verstecke die Objekte stattdessen mit dem Patch oder verschiebe sie im Creation Kit.
+
+action-repair-paths-mo2 = Wege reparieren: mit Mod Organizer noch nicht
+    .description = Mod Mallet baut das Plugin, das { $count ->
+        [one] das Netz
+       *[other] die { $count } Netze
+    } der Wege repariert, aus den Plugins im Datenordner des Spiels, und mit Mod Organizer bleiben die in den Ordnern der Mods. Bis das unterstützt wird, behalte die Objekte, auf denen Figuren laufen, oder verstecke sie bewusst.
 
 action-load-after-mo2 = { $plugin } gewinnen lassen
     .description = Mod Mallet kann Mod Organizer nicht darum bitten. Zieh in Mod Organizers Plugin-Liste rechts { $plugin } unter { $after }. Was beide ändern, kommt dann aus { $plugin }; was nur { $after } ändert, bleibt. Sortieren mit LOOT kann es zurückschieben; gib LOOT dann dieselbe Regel.

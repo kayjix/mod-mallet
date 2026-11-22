@@ -10,6 +10,83 @@ use serde::{Deserialize, Serialize};
 /// leaves the choice alone.
 pub const REPAIR_CHOICE_PREFIX: &str = "repair:";
 
+/// The name of the plugin, and of the mod, that carries the repaired paths
+/// (ADR 0058); the plugin is `Mod Mallet - Paths.esp`.
+pub const PATHS_NAME: &str = "Mod Mallet - Paths";
+
+/// The repairs of paths to write into the plugin of paths: where, and the
+/// objects the patch hides, whose paths are repaired.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PathRepairs {
+    /// Each place with meshes to repair.
+    pub places: Vec<RepairPlace>,
+    /// Every object the patch hides. The repair of a place takes those
+    /// that stand there, so that it is the same whichever choice asked
+    /// for it.
+    pub hidden: Vec<crate::ObjectRef>,
+}
+
+/// The meshes to repair in one place.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RepairPlace {
+    /// The worldspace, or the interior cell by its editor ID.
+    pub place: String,
+    /// Outside, a point near the objects, in whole game units; inside,
+    /// `None`.
+    pub centre: Option<[i32; 2]>,
+    /// The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].
+    pub navmeshes: Vec<String>,
+}
+
+/// The plugin of paths as written into Mod Mallet's own folder.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatedPaths {
+    /// The archive that holds it, ready for the mod manager; empty if
+    /// nothing was written.
+    pub path: String,
+    /// The meshes it repairs.
+    pub navmeshes: Vec<String>,
+    /// The plugins it names as masters. It loads after them.
+    pub masters: Vec<String>,
+    /// Whether it is flagged as light.
+    pub light: bool,
+    /// The meshes chosen that it does not repair, and why.
+    pub refused: Vec<RefusedPath>,
+}
+
+/// A mesh that was chosen for repair but is not repaired.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedPath {
+    /// The mesh, as in [`RepairedPaths::navmesh`].
+    pub navmesh: String,
+    /// Why.
+    pub reason: PathRefusal,
+}
+
+/// Why a mesh is not repaired.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum PathRefusal {
+    /// Nothing over hidden objects runs on it any more, or it was not
+    /// found where the repair was asked for.
+    NothingToRepair,
+    /// Its cell or worldspace has a field Mod Mallet does not know how to
+    /// copy.
+    UnknownField {
+        /// The record type and the field, such as `CELL XCWT`.
+        field: String,
+    },
+    /// Its cell or worldspace was not found, or names a plugin the patch
+    /// cannot name.
+    NotFound,
+    /// The game is not one whose plugins Mod Mallet can write.
+    UnsupportedGame,
+}
+
 /// The navigation meshes the user chose to repair, from the window's patch
 /// choices: the keys with [`REPAIR_CHOICE_PREFIX`] that have a value.
 pub fn repair_choices<'a>(

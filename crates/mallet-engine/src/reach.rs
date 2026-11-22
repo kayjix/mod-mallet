@@ -45,7 +45,26 @@ pub fn walkway_reach(
         centre,
         objects,
         ReachAfter::Cut,
-        &|near, carried| reachability::cut(&near.navmeshes, carried),
+        &|near, _, carried| reachability::cut(&near.navmeshes, carried),
+    )
+}
+
+/// As [`walkway_reach`], with the paths over the objects repaired (ADR
+/// 0058) instead of cut out: taken out, and new ones laid on the ground
+/// below. Taken-out triangles lead nowhere, as cut ones do.
+pub fn walkway_repair_reach(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    objects: &[ObjectRef],
+) -> Option<WalkwayReach> {
+    walkway_reach_after(
+        options,
+        place,
+        centre,
+        objects,
+        ReachAfter::Repaired,
+        &|near, hidden, carried| crate::walkways::repaired_shapes(near, hidden, carried),
     )
 }
 
@@ -53,13 +72,14 @@ pub fn walkway_reach(
 /// every version of the meshes around the objects and the triangles that
 /// lie on them, such as the paths repaired with new triangles. `kind` says
 /// what `after` makes.
+#[allow(clippy::type_complexity)]
 pub fn walkway_reach_after(
     options: &ScanOptions,
     place: &str,
     centre: Option<[f32; 2]>,
     objects: &[ObjectRef],
     kind: ReachAfter,
-    after: &dyn Fn(&NearHidden, &[Carried]) -> Vec<NavmeshShape>,
+    after: &dyn Fn(&NearHidden, &[Hidden<'_>], &[Carried]) -> Vec<NavmeshShape>,
 ) -> Option<WalkwayReach> {
     let started = std::time::Instant::now();
     let Looked {
@@ -109,7 +129,7 @@ pub fn walkway_reach_after(
     let after_shapes = if carried.is_empty() {
         Vec::new()
     } else {
-        after(&near, &carried)
+        after(&near, &hidden, &carried)
     };
     let found = if carried.is_empty() {
         reachability::Reachability::default()

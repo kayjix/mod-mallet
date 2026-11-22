@@ -11,7 +11,7 @@ use mallet_analysis::path_repair;
 use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
-use mallet_core::facts::navmeshes::{NearHidden, PlacedDestination};
+use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
 use mallet_core::walkway_repair::{RepairedPaths, WalkwayRepair};
@@ -240,7 +240,12 @@ fn gather(
         }
     }
     if !gathered.placed.is_empty() {
-        gathered.near = reader.navmeshes(&around);
+        // A repair starts from the meshes without its own earlier copy.
+        gathered.near = if wider {
+            reader.navmeshes_to_repair(&around)
+        } else {
+            reader.navmeshes(&around)
+        };
     }
     gathered.around = around;
     Some(gathered)
@@ -333,6 +338,28 @@ pub fn repaired_navmeshes(
             })
             .collect(),
     )
+}
+
+/// The versions the game uses of the meshes in `near` with the paths over
+/// `hidden` repaired (ADR 0058), for following where characters go (ADR
+/// 0059). Triangles taken out stay, leading nowhere.
+pub(crate) fn repaired_shapes(
+    near: &NearHidden,
+    hidden: &[Hidden<'_>],
+    carried: &[Carried],
+) -> Vec<NavmeshShape> {
+    let repair = navmesh_repair::repair(near, hidden, carried);
+    let mut changed: BTreeMap<usize, NavmeshShape> = repair
+        .navmeshes
+        .into_iter()
+        .map(|mesh| (mesh.navmesh, mesh.after))
+        .collect();
+    near.navmeshes
+        .iter()
+        .enumerate()
+        .filter(|(_, shape)| shape.used)
+        .map(|(index, shape)| changed.remove(&index).unwrap_or_else(|| shape.clone()))
+        .collect()
 }
 
 /// The repair of the paths over `objects`, and the records it writes.
