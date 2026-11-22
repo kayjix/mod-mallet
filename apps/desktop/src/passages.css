@@ -24,26 +24,6 @@
   margin: 0;
 }
 
-.work-passages {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  margin-bottom: 6px;
-}
-
-.work-passages-head {
-  cursor: default;
-}
-
-.work-passages-hint {
-  margin: 0 8px 4px;
-  font-size: 0.8rem;
-}
-
-.work-passage-item[data-severity="doubled"] .work-item-names::before {
-  content: "◆ ";
-  color: var(--spot-duplicate);
-}
-
 .work-passage-note {
   display: flex;
   flex-wrap: wrap;
@@ -59,18 +39,4 @@
 
 .work-stage:has(> .work-passage-note):has(> .still-loaded-note) {
   grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
-.work-stage > .work-passage {
-  grid-row: 1 / -1;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-height: 0;
-  overflow: auto;
-}
-
-.work-passage-bar {
-  display: flex;
-  gap: 8px;
 }

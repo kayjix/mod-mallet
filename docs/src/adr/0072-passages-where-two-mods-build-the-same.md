@@ -99,6 +99,17 @@ two places:
    the stage's measure once read, and before that from the scan's (parts
    and the room of their boxes).
 
+*Amended 2026-11-22:* Map collisions no longer lists the passages above
+the spots or shows the three views; they laid out badly there and drew
+three scenes at once. The worklist groups by *Region*, *Mod pair* or
+*Passage* instead. Grouped by passage, each passage is a group with its
+spots, which stay decidable one by one; picking the passage's name frames
+it in the page's one 3D view. A switch in that view shows the place now or
+with one mod's version only, and the panel's first line keeps A's version,
+B's version or both for the whole passage, leaving parts the game ties in.
+A spot inside a passage links to it. The three views side by side stay in
+the review's collisions step, as decided in point 4.
+
 ## Consequences
 
 - On the reference setup 46 passages hold 1478 of 1599 spots. Sky Haven

@@ -91,6 +91,11 @@ interface MapView3DProps {
   /** Told about the objects of each area once they are read. */
   onArea?: (area: AreaObjects | null) => void;
   /**
+   * Told about the layer of objects the view draws, once it is made, and
+   * null when it goes: to measure the structures of what it shows.
+   */
+  onLayer?: (layer: AreaLayer | null) => void;
+  /**
    * Draws more over the relief after everything else, such as the ways
    * characters take (ADR 0059). `toScreen` gives where a point in game
    * units shows, or `null` where it does not.
@@ -494,6 +499,7 @@ export function MapView3D({
   spotDistance = NEAR * 0.7,
   plain = false,
   onArea,
+  onLayer,
   paint,
   paths = null,
 }: MapView3DProps) {
@@ -582,6 +588,8 @@ export function MapView3D({
             : LOOK.plain;
   const told = useRef(onArea);
   told.current = onArea;
+  const toldLayer = useRef(onLayer);
+  toldLayer.current = onLayer;
 
   // The camera looks at where the places and mods' cells are, which can
   // be a small part of the world's land.
@@ -1192,6 +1200,7 @@ export function MapView3D({
     } catch {
       area.current = null;
     }
+    toldLayer.current?.(area.current);
     tops.current = new RealTops(gl);
     const unwatch = watchView("map", gl, () => drawNow.current());
     try {
@@ -1246,6 +1255,7 @@ export function MapView3D({
       unwatch();
       lod.current?.dispose();
       lod.current = null;
+      toldLayer.current?.(null);
       area.current?.dispose();
       tops.current?.dispose();
       tops.current = null;

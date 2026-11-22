@@ -1378,7 +1378,7 @@ export function CollisionsStep({
 }
 
 /** The spots of a place, each with the parts its structures start from. */
-function groupsOf(cluster: Cluster): StageGroup[] {
+export function groupsOf(cluster: Cluster): StageGroup[] {
   const sides = cluster.plugins;
   return cluster.spots.map(({ item, key }): StageGroup => {
     const parts = item.spot.parts ?? [];

@@ -9,9 +9,6 @@ import type { Lang } from "./i18n";
 type Severity = MapPassage["severity"];
 
 export interface PassageTexts {
-  /** The heading of the passages in the worklist. */
-  listTitle: (count: number) => string;
-  listHint: string;
   /** What a passage is, by how serious it is, short. */
   kind: Record<Severity, string>;
   /** What a passage is and why one version has to go, by how serious it is. */
@@ -30,17 +27,35 @@ export interface PassageTexts {
   /** The way from a spot to the passage it lies in. */
   openPassage: string;
   inPassage: (title: string) => string;
-  back: string;
   /** Where the review is among the places, at a passage. */
   passageOf: (index: number, total: number) => string;
   /** The segment of a passage's parts that hang on no spot. */
   looseParts: (index: number) => string;
+  /** The worklist's grouping by passage, in Map collisions. */
+  groupBy: string;
+  groupByHint: string;
+  /** The switch in the 3D view: the place now, or with one mod's version only. */
+  versionNow: string;
+  version: (name: string) => string;
+  versionHint: string;
+  /** The sections of a passage, under its head. */
+  sections: (count: number) => string;
+  section: (
+    index: number,
+    first: string,
+    firstParts: number,
+    second: string,
+    secondParts: number,
+  ) => string;
+  measuring: string;
+  /** Why a passage is decided as a whole, short. */
+  whyShort: string;
+  /** Parts a decision of the whole passage left, as the game ties them in. */
+  held: (count: number) => string;
+  heldHint: string;
 }
 
 const en: PassageTexts = {
-  listTitle: (count) => (count === 1 ? "1 passage" : `${count} passages`),
-  listHint:
-    "Where two mods build the same thing twice. Keep one mod's version of the whole passage; the spots below stay for exceptions.",
   kind: {
     doubled: "Built twice",
     inside: "Inside each other",
@@ -70,15 +85,28 @@ const en: PassageTexts = {
   keepVersion: (name) => `Keep ${name}'s version here`,
   openPassage: "Decide the whole passage",
   inPassage: (title) => `Part of a passage: ${title}`,
-  back: "Back to the spots",
   passageOf: (index, total) => `Passage ${index} of ${total}`,
   looseParts: (index) => `Section ${index} · the passage's other parts`,
+  groupBy: "Passage",
+  groupByHint:
+    "Where two mods build the same thing twice, each passage is a group of its own: pick its name to decide it as a whole, or a spot in it to decide that one alone. The other spots follow by region.",
+  versionNow: "Now",
+  version: (name) => `${name}'s version`,
+  versionHint:
+    "How the place looks in the game: as the patch has it now, or with only one mod's version of the passage. Looking decides nothing.",
+  sections: (count) => (count === 1 ? "1 section" : `${count} sections`),
+  section: (index, first, firstParts, second, secondParts) =>
+    `Section ${index} · ${first}: ${firstParts} · ${second}: ${secondParts}`,
+  measuring: "Measuring the passage…",
+  whyShort: "Why as a whole",
+  held: (count) =>
+    count === 1
+      ? "1 part stays: the game relies on it"
+      : `${count} parts stay: the game relies on them`,
+  heldHint: "Pick such a part in the view to see why, and decide it on its own.",
 };
 
 const de: PassageTexts = {
-  listTitle: (count) => (count === 1 ? "1 Passage" : `${count} Passagen`),
-  listHint:
-    "Wo zwei Mods dasselbe doppelt bauen. Behalte die Fassung einer Mod für die ganze Passage; die Stellen darunter bleiben für Ausnahmen.",
   kind: {
     doubled: "Doppelt gebaut",
     inside: "Ineinander",
@@ -108,9 +136,25 @@ const de: PassageTexts = {
   keepVersion: (name) => `Hier die Fassung von ${name} behalten`,
   openPassage: "Die ganze Passage entscheiden",
   inPassage: (title) => `Teil einer Passage: ${title}`,
-  back: "Zurück zu den Stellen",
   passageOf: (index, total) => `Passage ${index} von ${total}`,
   looseParts: (index) => `Abschnitt ${index} · die übrigen Teile der Passage`,
+  groupBy: "Passage",
+  groupByHint:
+    "Wo zwei Mods dasselbe doppelt bauen, ist jede Passage eine eigene Gruppe: Wähl ihren Namen, um sie als Ganzes zu entscheiden, oder eine Stelle darin, um nur diese zu entscheiden. Die übrigen Stellen folgen nach Region.",
+  versionNow: "Jetzt",
+  version: (name) => `Fassung von ${name}`,
+  versionHint:
+    "Wie der Ort im Spiel aussieht: so, wie der Patch ihn jetzt hat, oder nur mit der Fassung einer Mod für die Passage. Anschauen entscheidet nichts.",
+  sections: (count) => (count === 1 ? "1 Abschnitt" : `${count} Abschnitte`),
+  section: (index, first, firstParts, second, secondParts) =>
+    `Abschnitt ${index} · ${first}: ${firstParts} · ${second}: ${secondParts}`,
+  measuring: "Die Passage wird vermessen…",
+  whyShort: "Warum als Ganzes",
+  held: (count) =>
+    count === 1
+      ? "1 Teil bleibt: Das Spiel stützt sich darauf"
+      : `${count} Teile bleiben: Das Spiel stützt sich darauf`,
+  heldHint: "Wähl so ein Teil in der Ansicht, um zu sehen, warum, und entscheide es einzeln.",
 };
 
 export const passageTexts: Record<Lang, PassageTexts> = { en, de };

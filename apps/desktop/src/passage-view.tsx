@@ -1,0 +1,326 @@
+// A passage (ADR 0072) in Map collisions: picked by its name in the
+// worklist, it is framed in the page's one 3D view. A switch in the view
+// shows the place now or with one mod's version only, and the panel above
+// keeps one version for the whole passage, or both. The side-by-side
+// comparison of three views stays in the guided review.
+
+import { useEffect, useRef, useState } from "react";
+import type { Api } from "./api";
+import { type AreaLayer, isGamePlugin, objectKey } from "./area-layer";
+import type { AreaObjects } from "./generated/area-objects";
+import type { MapPassage, MapSpot, ObjectRef, RenderedReport } from "./generated/rendered-report";
+import { LocateButton } from "./locate";
+import { usePassageTexts } from "./passage-texts";
+import { usePassageTitle } from "./passages";
+import { chooseObject, chooseSpot, type PatchChoices, revealObjects } from "./patch";
+import { groupsOf } from "./Review";
+import type { Cluster, Decided } from "./review-clusters";
+import { useReviewTexts } from "./review-texts";
+import { findSegments, type StageSegment } from "./segments";
+import { Note, NoteRow } from "./spot-notes";
+import "./passage-view.css";
+
+/** What the view shows of a passage: the place now, or one side's version only. */
+export type PassageVersion = "now" | 0 | 1;
+
+/** A plugin's name without its extension. */
+const short = (plugin: string) => plugin.replace(/\.(esp|esm|esl)$/i, "");
+
+/** How long the models of the place may take to arrive before measuring anyway, in steps of 400 ms. */
+const PATIENCE = 75;
+
+/**
+ * The sections of `cluster` in what the view's `layer` shows of `area`
+ * (see `segments.ts`), once its models are in; null until then.
+ */
+export function usePassageSegments(
+  cluster: Cluster | null,
+  layer: AreaLayer | null,
+  area: AreaObjects | null,
+): StageSegment[] | null {
+  const [found, setFound] = useState<{ key: string; segments: StageSegment[] } | null>(null);
+  const now = useRef(cluster);
+  now.current = cluster;
+  const key = cluster?.key ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the passage is compared by its key.
+  useEffect(() => {
+    const measured = now.current;
+    if (measured === null || layer === null || area === null) {
+      return;
+    }
+    let tries = 0;
+    let timer: number | null = null;
+    const tick = () => {
+      const progress = layer.progress;
+      if ((progress.total > 0 && progress.done >= progress.total) || tries >= PATIENCE) {
+        setFound({
+          key: measured.key,
+          segments: findSegments(
+            layer,
+            area,
+            groupsOf(measured),
+            measured.centre,
+            measured.radius + 2048,
+            measured.passage?.keys ?? null,
+          ),
+        });
+        return;
+      }
+      tries += 1;
+      timer = window.setTimeout(tick, 400);
+    };
+    tick();
+    return () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [key, layer, area]);
+  return found !== null && found.key === key ? found.segments : null;
+}
+
+/** One side's parts in the passage: its sections' parts once measured, else the scan's. */
+export function sideParts(
+  passage: MapPassage,
+  segments: StageSegment[] | null,
+  side: 0 | 1,
+): ObjectRef[] {
+  const measured = (segments ?? []).flatMap((segment) => segment.parts[side]);
+  return measured.length > 0
+    ? measured.map((object) => object.id)
+    : passage.parts[side].map((part) => part.object);
+}
+
+/**
+ * The choices with one side's version of the passage kept (`side`), or
+ * both (`null`): the other side's parts hidden where the patch may hide
+ * them, every spot of the passage decided alike, and the kept parts shown
+ * again however they were hidden. `held` are parts the game ties in (ADR
+ * 0046), by {@link objectKey}: they stay, to be decided one by one.
+ */
+export function keepPassage(
+  choices: PatchChoices,
+  spots: Map<string, MapSpot[]>,
+  cluster: Cluster,
+  segments: StageSegment[] | null,
+  side: 0 | 1 | null,
+  held: Set<string> = new Set(),
+): PatchChoices {
+  const passage = cluster.passage?.passage;
+  if (passage === undefined) {
+    return choices;
+  }
+  // What the scan says may not go (referred to from elsewhere, or the
+  // distant view), and what the game ties in.
+  const needed = new Set([
+    ...held,
+    ...passage.parts
+      .flat()
+      .filter((part) => !part.hideable)
+      .map((part) => objectKey(part.object.plugin, part.object.localId)),
+  ]);
+  if (side === null) {
+    let next = revealObjects(choices, spots, [
+      ...sideParts(passage, segments, 0),
+      ...sideParts(passage, segments, 1),
+    ]);
+    for (const { key } of cluster.spots) {
+      next = chooseSpot(next, key, null);
+    }
+    return next;
+  }
+  const other = side === 0 ? 1 : 0;
+  const loser = cluster.plugins[other];
+  let next = revealObjects(choices, spots, sideParts(passage, segments, side));
+  for (const object of sideParts(passage, segments, other)) {
+    if (!isGamePlugin(object.plugin) && !needed.has(objectKey(object.plugin, object.localId))) {
+      next = chooseObject(next, object, true);
+    }
+  }
+  for (const { key } of cluster.spots) {
+    next = chooseSpot(next, key, loser);
+  }
+  return next;
+}
+
+/**
+ * Of `objects` in the world or cell `place`, those the game ties in (ADR
+ * 0046) and that stay when a whole passage is decided, by
+ * {@link objectKey}. None where the ties cannot be read.
+ */
+export async function tiedIn(api: Api, place: string, objects: ObjectRef[]): Promise<Set<string>> {
+  const asked = objects.filter((object) => !isGamePlugin(object.plugin));
+  if (asked.length === 0) {
+    return new Set();
+  }
+  const found = await api.objectAnchors(place, asked).catch(() => null);
+  return new Set(
+    (found ?? [])
+      .filter((one) => one.verdict !== "free")
+      .map((one) => objectKey(one.object.plugin, one.object.localId)),
+  );
+}
+
+/** The switch in the 3D view's bar: the place now, or with one side's version only. */
+export function VersionSwitch({
+  plugins,
+  version,
+  onVersion,
+}: {
+  plugins: [string, string];
+  version: PassageVersion;
+  onVersion: (version: PassageVersion) => void;
+}) {
+  const p = usePassageTexts();
+  const options: { value: PassageVersion; label: string }[] = [
+    { value: "now", label: p.versionNow },
+    { value: 0, label: p.version(short(plugins[0])) },
+    { value: 1, label: p.version(short(plugins[1])) },
+  ];
+  return (
+    <fieldset
+      className="segmented segmented-small view-tool passage-versions"
+      title={p.versionHint}
+      aria-label={p.versionHint}
+    >
+      {options.map((option) => (
+        <button
+          type="button"
+          key={String(option.value)}
+          aria-pressed={version === option.value}
+          onClick={() => onVersion(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
+
+/**
+ * The head of a passage in the spot panel: what it is, where, how far it
+ * is decided, and the buttons that decide it as a whole; its sections
+ * below, folded.
+ */
+export function PassageHead({
+  cluster,
+  worlds,
+  decided,
+  segments,
+  held,
+  onKeep,
+}: {
+  cluster: Cluster;
+  worlds: RenderedReport["map"]["worlds"];
+  decided: Decided;
+  segments: StageSegment[] | null;
+  /** How many parts the last decision left because the game ties them in, if any. */
+  held: number;
+  /** Keeps one side's version (0 or 1), or both (null). */
+  onKeep: (side: 0 | 1 | null) => void;
+}) {
+  const p = usePassageTexts();
+  const r = useReviewTexts();
+  const title = usePassageTitle();
+  const passage = cluster.passage?.passage;
+  if (passage === undefined) {
+    return null;
+  }
+  const names = [short(passage.plugins[0]), short(passage.plugins[1])] as const;
+  const kept =
+    decided.type === "kept"
+      ? null
+      : decided.type === "hidden"
+        ? decided.plugin.toLowerCase() === passage.plugins[1].toLowerCase()
+          ? 0
+          : 1
+        : undefined;
+  const facts = [
+    p.sides(names[0], passage.parts[0].length, names[1], passage.parts[1].length),
+    p.spots(cluster.spots.length),
+    ...(passage.duplicates > 0 ? [p.twins(passage.duplicates)] : []),
+  ];
+  const state =
+    decided.type === "open"
+      ? r.stateOpen
+      : decided.type === "kept"
+        ? r.stateKept
+        : decided.type === "hidden"
+          ? r.stateHidden(short(decided.plugin))
+          : r.stateMixed(decided.open);
+  return (
+    <div className="passage-head">
+      <div className="work-nav passage-nav">
+        <span className="work-kind" data-kind={cluster.kind}>
+          {p.kind[passage.severity]}
+        </span>
+        <strong>{title(passage, worlds)}</strong>
+        <span className="aside">{facts.join(" · ")}</span>
+        <NoteRow>
+          <Note tone="info" summary={p.whyShort} hint={`${p.why[passage.severity]} ${p.bounded}`}>
+            <p className="aside">
+              {p.why[passage.severity]} {p.bounded}
+            </p>
+          </Note>
+          {held > 0 && (
+            <Note tone="warn" summary={p.held(held)} hint={`${p.held(held)}. ${p.heldHint}`}>
+              <p className="aside">
+                {p.held(held)}. {p.heldHint}
+              </p>
+            </Note>
+          )}
+        </NoteRow>
+        <span className="spacer" />
+        <span
+          className={`work-status ${decided.type === "open" ? "open" : decided.type === "kept" ? "kept" : "hidden"}`}
+        >
+          {state}
+        </span>
+        <span className="work-nav-group passage-keep">
+          {([0, 1] as const).map((side) => (
+            <button
+              type="button"
+              key={side}
+              className="small"
+              aria-pressed={kept === side}
+              onClick={() => onKeep(side)}
+            >
+              {p.keepVersion(names[side])}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="small"
+            aria-pressed={kept === null}
+            onClick={() => onKeep(null)}
+          >
+            {r.keepBoth}
+          </button>
+        </span>
+      </div>
+      <details className="passage-sections">
+        <summary>{segments === null ? p.measuring : p.sections(segments.length)}</summary>
+        {segments !== null && (
+          <ul>
+            {segments.map((segment, index) => (
+              <li key={segment.groups.join("|") || index}>
+                <span>
+                  {p.section(
+                    index + 1,
+                    names[0],
+                    segment.parts[0].length,
+                    names[1],
+                    segment.parts[1].length,
+                  )}
+                </span>
+                <LocateButton
+                  objects={[...segment.parts[0], ...segment.parts[1]].map((part) => part.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </div>
+  );
+}

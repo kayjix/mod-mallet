@@ -1,0 +1,48 @@
+/* A passage framed in Map collisions' one 3D view (ADR 0072). */
+
+.passage-head {
+  display: grid;
+  gap: 6px;
+}
+
+.passage-nav .note-row {
+  flex: 0 1 auto;
+}
+
+.passage-keep {
+  flex-wrap: wrap;
+}
+
+.passage-sections summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.passage-sections ul {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.passage-sections li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.passage-versions button {
+  white-space: nowrap;
+}
+
+/* The name of a passage in the worklist picks the passage itself. */
+.work-group-head[data-passage] .work-group-name {
+  font-weight: 600;
+}
+
+.work-group-head[aria-current="true"] {
+  box-shadow: inset 3px 0 0 var(--spot-focus);
+}

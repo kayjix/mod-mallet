@@ -47,6 +47,11 @@ export interface InteriorViewProps {
   onObject?: (object: AreaObject | null) => void;
   /** Told about the objects of the cell once they are read, `null` if they cannot be. */
   onArea?: (area: AreaObjects | null) => void;
+  /**
+   * Told about the layer of objects the view draws, once it is made, and
+   * null when it goes: to measure the structures of what it shows.
+   */
+  onLayer?: (layer: AreaLayer | null) => void;
   /** Shown over the view. */
   children?: ReactNode;
   /** More tools for the bar along the top of the view, after the magic wand. */
@@ -93,6 +98,7 @@ export function InteriorView({
   objectExtra,
   onObject,
   onArea,
+  onLayer,
   children,
   tools,
   paths = null,
@@ -135,6 +141,8 @@ export function InteriorView({
   const pending = useRef<number | null>(null);
   const told = useRef(onArea);
   told.current = onArea;
+  const toldLayer = useRef(onLayer);
+  toldLayer.current = onLayer;
   const seeInsideNow = useRef(seeInside);
   seeInsideNow.current = seeInside;
 
@@ -332,6 +340,7 @@ export function InteriorView({
     try {
       layer.current = new AreaLayer(gl, api, () => redrawNow.current());
       layer.current.setMoves(moveKeysOf(choicesNow.current));
+      toldLayer.current?.(layer.current);
     } catch {
       setFailed(true);
     }
@@ -344,6 +353,7 @@ export function InteriorView({
     const unwatch = watchView("interior", gl, () => drawNow.current());
     return () => {
       unwatch();
+      toldLayer.current?.(null);
       layer.current?.dispose();
       layer.current = null;
       pathsLayer.current?.dispose();
