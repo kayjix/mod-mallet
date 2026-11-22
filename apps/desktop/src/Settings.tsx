@@ -6,6 +6,7 @@ import { applyTheme, initialTheme, type Lang, languages, type Theme } from "./i1
 import { InfoTip } from "./info-tip";
 import { Places } from "./Places";
 import { graphicsCard } from "./render-stats";
+import { settingsTexts } from "./settings-texts";
 import { PageHeader, Segmented, Tabs } from "./ui/kit";
 
 interface SettingsProps {
@@ -46,6 +47,7 @@ export function SettingsView({
   onLive,
 }: SettingsProps) {
   const { t, api, lang } = useSession();
+  const s = settingsTexts[lang];
   const [tab, setTab] = useState<Tab>("general");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [logFile, setLogFile] = useState<string | null>(null);
@@ -65,14 +67,14 @@ export function SettingsView({
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "general", label: t.settingsTabGeneral },
-    { id: "places", label: t.settingsTabPlaces },
-    { id: "about", label: t.settingsTabAbout },
+    { id: "general", label: s.settingsTabGeneral },
+    { id: "places", label: s.settingsTabPlaces },
+    { id: "about", label: s.settingsTabAbout },
   ];
   const themes: { id: Theme; label: string }[] = [
-    { id: "system", label: t.themeSystem },
-    { id: "light", label: t.themeLight },
-    { id: "dark", label: t.themeDark },
+    { id: "system", label: s.themeSystem },
+    { id: "light", label: s.themeLight },
+    { id: "dark", label: s.themeDark },
   ];
 
   return (
@@ -85,9 +87,9 @@ export function SettingsView({
         <div className="stack">
           <section className="panel">
             <div className="panel-body">
-              <Row label={t.settingsLanguage}>
+              <Row label={s.settingsLanguage}>
                 <select
-                  aria-label={t.settingsLanguage}
+                  aria-label={s.settingsLanguage}
                   value={lang}
                   onChange={(event) => onLang(event.target.value as Lang)}
                 >
@@ -98,28 +100,28 @@ export function SettingsView({
                   ))}
                 </select>
               </Row>
-              <Row label={t.settingsTheme}>
+              <Row label={s.settingsTheme}>
                 <Segmented
-                  label={t.settingsTheme}
+                  label={s.settingsTheme}
                   items={themes}
                   value={theme}
                   onChange={changeTheme}
                 />
               </Row>
-              <Row label={t.settingsLive} note={t.liveNote}>
+              <Row label={s.settingsLive} note={t.liveNote}>
                 <label className="check">
                   <input
                     type="checkbox"
                     checked={live}
                     onChange={(event) => onLive(event.target.checked)}
                   />
-                  {t.settingsLiveLabel}
+                  {s.settingsLiveLabel}
                 </label>
               </Row>
-              <Row label={t.settingsLog} note={t.settingsLogNote}>
+              <Row label={s.settingsLog} note={s.settingsLogNote}>
                 {logFile !== null && <code className="path">{logFile}</code>}
                 <button type="button" onClick={() => api.openFolder("logs")}>
-                  {t.openLog}
+                  {s.openLog}
                 </button>
               </Row>
             </div>
@@ -130,7 +132,7 @@ export function SettingsView({
       {tab === "places" && places !== null && (
         <section className="panel">
           <div className="panel-head">
-            <h2>{t.settingsPlaces}</h2>
+            <h2>{s.settingsPlaces}</h2>
           </div>
           <div className="panel-body">
             <Places places={places} t={t} busy={busy} onConfirm={onConfirmPlaces} />
@@ -143,10 +145,10 @@ export function SettingsView({
           <div className="panel-body">
             <div className="about">
               <strong>Mod Mallet</strong>
-              <span className="brand-tagline">{t.tagline}</span>
-              <p>{t.aboutText}</p>
+              <span className="brand-tagline">{s.tagline}</span>
+              <p>{s.aboutText}</p>
               <p className="about-version">
-                {t.aboutVersion(
+                {s.aboutVersion(
                   __MALLET_VERSION__,
                   __MALLET_COMMIT__,
                   __MALLET_COMMIT_DATE__ === null
@@ -154,7 +156,7 @@ export function SettingsView({
                     : new Date(__MALLET_COMMIT_DATE__).toLocaleDateString(lang),
                 )}
               </p>
-              <p className="about-version">{t.aboutGraphics(card.renderer, card.software)}</p>
+              <p className="about-version">{s.aboutGraphics(card.renderer, card.software)}</p>
             </div>
           </div>
         </section>

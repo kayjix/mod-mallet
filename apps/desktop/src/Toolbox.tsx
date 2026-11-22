@@ -30,6 +30,7 @@ function toneOf({ tool }: RenderedTool): "ok" | "warning" | "error" | "muted" {
  */
 export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   const { t, api, lang, linkChanged } = useSession();
+  const texts = toolboxTexts[lang];
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -59,14 +60,14 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   const restart = () =>
     attempt(async () => {
       setPlaced(false);
-      setNote(t.restartingVortex);
+      setNote(texts.restartingVortex);
       await api.restartManager();
       // Vortex takes a few seconds before its link answers again.
       setTimeout(() => {
         refresh();
         linkChanged();
       }, 8000);
-      return t.restartedVortex;
+      return texts.restartedVortex;
     });
 
   const installLink = () =>
@@ -75,8 +76,6 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
       setPlaced(true);
       return done;
     });
-
-  const texts = toolboxTexts[lang];
 
   // Asks Vortex, through the link, to list Mod Mallet among its tools or to
   // take it off the list. Only on the click.
@@ -91,10 +90,10 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
           type="button"
           className={placed ? "primary tool-wanted" : undefined}
           disabled={busy}
-          title={t.restartHint}
+          title={texts.restartHint}
           onClick={restart}
         >
-          {tool.state === "stopped" ? t.startVortex : t.restartVortex}
+          {tool.state === "stopped" ? texts.startVortex : texts.restartVortex}
         </button>
       );
     }
@@ -116,7 +115,7 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
     if (tool.id === "mallet-link" && tool.state !== "ready" && tool.state !== "stopped") {
       return (
         <button type="button" disabled={busy} onClick={installLink}>
-          {tool.state === "missing" ? t.installLink : t.updateLink}
+          {tool.state === "missing" ? t.installLink : texts.updateLink}
         </button>
       );
     }
@@ -124,7 +123,7 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
       const page = tool.page;
       return (
         <button type="button" onClick={() => api.openPage(page)}>
-          {t.getIt}
+          {texts.getIt}
         </button>
       );
     }

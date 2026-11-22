@@ -30,7 +30,6 @@ export interface Texts {
   scan: string;
   scanning: string;
   scanningNote: string;
-  language: string;
   noScanYet: string;
   scanFailed: string;
   versionUnknown: string;
@@ -47,8 +46,6 @@ export interface Texts {
   compareSpots: (count: number) => string;
   compareToSpots: string;
   openFolder: string;
-  openLog: string;
-  tagline: string;
   managerRunning: string;
   managerOffline: string;
   managerMissing: string;
@@ -66,43 +63,14 @@ export interface Texts {
   /** A game Mod Mallet reads, but not yet with every check. */
   gameBasic: string;
   homeNoArt: string;
-  settingsTabGeneral: string;
-  settingsTabPlaces: string;
-  settingsTabAbout: string;
-  settingsTheme: string;
-  themeSystem: string;
-  themeLight: string;
-  themeDark: string;
-  aboutText: string;
-  /** The app's version, and which build of it this is (ADR 0057). */
-  aboutVersion: (version: string, commit: string | null, date: string | null) => string;
-  /** Which graphics card draws the 3D views, and whether it is one at all. */
-  aboutGraphics: (renderer: string | null, software: boolean) => string;
   viewToolbox: string;
   viewSettings: string;
-  restartVortex: string;
-  startVortex: string;
-  restartingVortex: string;
-  restartedVortex: string;
-  restartHint: string;
-  updateLink: string;
-  getIt: string;
-  settingsLanguage: string;
-  settingsLive: string;
-  settingsLiveLabel: string;
-  settingsPlaces: string;
-  settingsLog: string;
-  settingsLogNote: string;
   collisionsHint: string;
 
-  // Watching the setup.
-  live: string;
   liveNote: string;
   liveShort: string;
   changedRescanning: string;
 
-  // The overview at the top of the task list.
-  headline: (errors: number, warnings: number) => string;
   lastScan: string;
   scanStats: (stats: ScanStats) => string;
 
@@ -179,7 +147,6 @@ export interface Texts {
   rankingDone: (decided: number, hidden: number, failed: number) => string;
   rankingNothing: string;
   duelCompareFiles: (count: number) => string;
-  arrangeLabel: string;
   stageStop: string;
   stageTurn: string;
   stageReset: string;
@@ -195,7 +162,6 @@ export interface Texts {
   sceneSnow: string;
   whatItMeans: string;
   file: string;
-  mod: string;
   rescan: string;
   installLink: string;
   guideTitle: string;
@@ -336,12 +302,6 @@ export interface Texts {
   placesDistance: (metres: number) => string;
   placesPick: string;
 
-  // The mods.
-  modsSearch: string;
-  modsNone: string;
-
-  // The places a scan reads.
-  places: string;
   placesTitleFirst: string;
   placesTitle: string;
   placesIntro: string;
@@ -361,7 +321,6 @@ export const texts: Record<Lang, Texts> = {
     scan: "Scan",
     scanning: "Scanning…",
     scanningNote: "Reading your setup. This takes a few seconds.",
-    language: "Language",
     noScanYet: "No scan yet. Start one to see what Mod Mallet finds.",
     scanFailed: "The scan could not be completed",
     versionUnknown: "version unknown",
@@ -380,8 +339,6 @@ export const texts: Record<Lang, Texts> = {
         : `Objects of these two mods collide at ${count} spots. Look at them in 3D and decide there.`,
     compareToSpots: "Show the spots in 3D",
     openFolder: "Open folder",
-    openLog: "Open log",
-    tagline: "Hammering on",
     managerRunning: "running",
     managerOffline: "offline",
     managerMissing: "not installed",
@@ -409,58 +366,15 @@ export const texts: Record<Lang, Texts> = {
     gameNotInstalled: "not found on this computer",
     gameBasic: "the basics: load order, files, archives, map, toolbox",
     homeNoArt: "Vortex brings a picture of this game along; it is not installed here.",
-    settingsTabGeneral: "General",
-    settingsTabPlaces: "Places",
-    settingsTabAbout: "About",
-    settingsTheme: "Appearance",
-    themeSystem: "Like Windows",
-    themeLight: "Light",
-    themeDark: "Dark",
-    aboutText:
-      "Mod Mallet looks at a modded game, explains what is wrong in plain words and lets the mod manager carry out the fixes. It changes nothing by itself.",
-    aboutVersion: (version, commit, date) =>
-      commit === null
-        ? `Version ${version}, development build`
-        : `Version ${version}, build ${commit}${date === null ? "" : ` of ${date}`}`,
-    aboutGraphics: (renderer, software) =>
-      renderer === null
-        ? "3D views: no graphics card found to draw them"
-        : software
-          ? `3D views drawn without the graphics card, slowly: ${renderer}`
-          : `3D views drawn by: ${renderer}`,
     viewToolbox: "Toolbox",
     viewSettings: "Settings",
-    restartVortex: "Restart Vortex",
-    startVortex: "Start Vortex",
-    restartingVortex: "Closing Vortex and starting it again…",
-    restartedVortex: "Vortex is starting.",
-    restartHint:
-      "Closes Vortex the way its window's close button does, and starts it again. Vortex saves as usual first.",
-    updateLink: "Update the Vortex extension",
-    getIt: "Get it",
-    settingsLanguage: "Language",
-    settingsLive: "Live",
-    settingsLiveLabel: "Scan again by myself when the setup changes",
-    settingsPlaces: "Where Mod Mallet reads",
-    settingsLog: "Log",
-    settingsLogNote:
-      "What Mod Mallet did, line by line. Useful when something did not work, for you or for whoever helps you.",
     collisionsHint: "Objects of two mods in the same spot.",
 
-    live: "Live",
     liveNote:
       "Mod Mallet scans again by itself when your setup changes, for example after Vortex deploys.",
     liveShort: "Scans again by itself",
     changedRescanning: "Your setup changed. Scanning again…",
 
-    headline: (errors, warnings) => {
-      const fix = `${errors} ${plural(errors, "error", "errors")} to fix`;
-      const check = `${warnings} ${plural(warnings, "thing", "things")} to check`;
-      if (errors > 0 && warnings > 0) {
-        return `${fix}, ${check}`;
-      }
-      return errors > 0 ? fix : check;
-    },
     lastScan: "Last scan",
     scanStats: ({ plugins, archives, installers, meshes }) =>
       `${plugins} plugins · ${archives} archives · ${installers} installers · ${meshes} meshes`,
@@ -576,7 +490,6 @@ export const texts: Record<Lang, Texts> = {
         .join(" "),
     rankingNothing: "The ranking decides no open pair yet",
     duelCompareFiles: (count) => `Compare (${count === 1 ? "1 file" : `${count} files`})`,
-    arrangeLabel: "Arrange the tasks",
     stageStop: "Stop turning",
     stageTurn: "Turn",
     stageReset: "Reset",
@@ -592,7 +505,6 @@ export const texts: Record<Lang, Texts> = {
     sceneSnow: "Snow",
     whatItMeans: "What this means",
     file: "File",
-    mod: "Mod",
     rescan: "Scan again",
     installLink: "Install the Vortex extension",
     guideTitle: "Tick these in the installer",
@@ -806,10 +718,6 @@ export const texts: Record<Lang, Texts> = {
       metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${Math.round(metres)} m`,
     placesPick: "Pick a place, a collision or a cell on the map.",
 
-    modsSearch: "Search",
-    modsNone: "No mod matches.",
-
-    places: "Places",
     placesTitleFirst: "Before Mod Mallet reads anything",
     placesTitle: "Where Mod Mallet reads",
     placesIntro:
@@ -826,7 +734,6 @@ export const texts: Record<Lang, Texts> = {
     scan: "Scannen",
     scanning: "Scan läuft…",
     scanningNote: "Dein Setup wird gelesen. Das dauert ein paar Sekunden.",
-    language: "Sprache",
     noScanYet: "Noch kein Scan. Starte einen, um zu sehen, was Mod Mallet findet.",
     scanFailed: "Der Scan konnte nicht abgeschlossen werden",
     versionUnknown: "Version unbekannt",
@@ -845,8 +752,6 @@ export const texts: Record<Lang, Texts> = {
         : `Objekte dieser beiden Mods stoßen an ${count} Stellen zusammen. Sieh sie dir in 3D an und entscheide dort.`,
     compareToSpots: "Stellen in 3D ansehen",
     openFolder: "Ordner öffnen",
-    openLog: "Protokoll öffnen",
-    tagline: "Hammering on",
     managerRunning: "läuft",
     managerOffline: "offline",
     managerMissing: "nicht installiert",
@@ -878,58 +783,15 @@ export const texts: Record<Lang, Texts> = {
     gameNotInstalled: "auf diesem Computer nicht gefunden",
     gameBasic: "das Grundlegende: Ladereihenfolge, Dateien, Archive, Karte, Werkzeuge",
     homeNoArt: "Vortex bringt ein Bild dieses Spiels mit; hier ist es nicht installiert.",
-    settingsTabGeneral: "Allgemein",
-    settingsTabPlaces: "Orte",
-    settingsTabAbout: "Über",
-    settingsTheme: "Darstellung",
-    themeSystem: "Wie Windows",
-    themeLight: "Hell",
-    themeDark: "Dunkel",
-    aboutText:
-      "Mod Mallet schaut sich ein gemoddetes Spiel an, erklärt verständlich, was nicht stimmt, und lässt den Mod-Manager die Korrekturen ausführen. Selbst ändert es nichts.",
-    aboutVersion: (version, commit, date) =>
-      commit === null
-        ? `Version ${version}, Entwicklungsstand`
-        : `Version ${version}, Build ${commit}${date === null ? "" : ` vom ${date}`}`,
-    aboutGraphics: (renderer, software) =>
-      renderer === null
-        ? "3D-Ansichten: keine Grafikkarte gefunden, die sie zeichnet"
-        : software
-          ? `3D-Ansichten ohne Grafikkarte gezeichnet, langsam: ${renderer}`
-          : `3D-Ansichten gezeichnet von: ${renderer}`,
     viewToolbox: "Werkzeugkasten",
     viewSettings: "Einstellungen",
-    restartVortex: "Vortex neu starten",
-    startVortex: "Vortex starten",
-    restartingVortex: "Vortex wird geschlossen und wieder gestartet …",
-    restartedVortex: "Vortex startet.",
-    restartHint:
-      "Schließt Vortex wie über das Schließen-Kreuz des Fensters und startet es wieder. Vortex speichert vorher wie immer.",
-    updateLink: "Vortex-Erweiterung aktualisieren",
-    getIt: "Holen",
-    settingsLanguage: "Sprache",
-    settingsLive: "Live",
-    settingsLiveLabel: "Selbst neu prüfen, wenn sich das Setup ändert",
-    settingsPlaces: "Wo Mod Mallet liest",
-    settingsLog: "Protokoll",
-    settingsLogNote:
-      "Was Mod Mallet getan hat, Zeile für Zeile. Hilfreich, wenn etwas nicht geklappt hat – für dich oder für wen auch immer dir hilft.",
     collisionsHint: "Objekte zweier Mods an derselben Stelle.",
 
-    live: "Live",
     liveNote:
       "Mod Mallet scannt von selbst erneut, wenn sich dein Setup ändert, zum Beispiel nachdem Vortex bereitgestellt hat.",
     liveShort: "Scannt von selbst neu",
     changedRescanning: "Dein Setup hat sich geändert. Es wird neu gescannt…",
 
-    headline: (errors, warnings) => {
-      const fix = `${errors} Fehler zu beheben`;
-      const check = `${warnings} ${plural(warnings, "Punkt", "Punkte")} zu prüfen`;
-      if (errors > 0 && warnings > 0) {
-        return `${fix}, ${check}`;
-      }
-      return errors > 0 ? fix : check;
-    },
     lastScan: "Letzter Scan",
     scanStats: ({ plugins, archives, installers, meshes }) =>
       `${plugins} Plugins · ${archives} Archive · ${installers} Installer · ${meshes} Modelle`,
@@ -1041,7 +903,6 @@ export const texts: Record<Lang, Texts> = {
         .join(" "),
     rankingNothing: "Die Rangfolge entscheidet noch kein offenes Paar",
     duelCompareFiles: (count) => `Vergleichen (${count === 1 ? "1 Datei" : `${count} Dateien`})`,
-    arrangeLabel: "Aufgaben ordnen",
     stageStop: "Drehen anhalten",
     stageTurn: "Drehen",
     stageReset: "Zurücksetzen",
@@ -1057,7 +918,6 @@ export const texts: Record<Lang, Texts> = {
     sceneSnow: "Schnee",
     whatItMeans: "Was das bedeutet",
     file: "Datei",
-    mod: "Mod",
     rescan: "Erneut scannen",
     installLink: "Vortex-Erweiterung installieren",
     guideTitle: "Im Installer ankreuzen",
@@ -1277,10 +1137,6 @@ export const texts: Record<Lang, Texts> = {
         : `${Math.round(metres)} m`,
     placesPick: "Wähle einen Ort, einen Zusammenstoß oder eine Zelle auf der Karte.",
 
-    modsSearch: "Suchen",
-    modsNone: "Keine Mod passt.",
-
-    places: "Orte",
     placesTitleFirst: "Bevor Mod Mallet etwas liest",
     placesTitle: "Wo Mod Mallet liest",
     placesIntro:

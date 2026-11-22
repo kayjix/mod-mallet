@@ -20,6 +20,13 @@ export interface ToolboxTexts {
   placed: string;
   /** Why Vortex has to start again before the extension works. */
   placedHint: string;
+  restartVortex: string;
+  startVortex: string;
+  restartingVortex: string;
+  restartedVortex: string;
+  restartHint: string;
+  updateLink: string;
+  getIt: string;
 }
 
 export const toolboxTexts: Record<Lang, ToolboxTexts> = {
@@ -33,6 +40,14 @@ export const toolboxTexts: Record<Lang, ToolboxTexts> = {
     removeFromVortex: "Remove Mod Mallet from Vortex's tools",
     placed: "✓ Extension placed",
     placedHint: "Vortex loads the new extension when it starts again: restart Vortex.",
+    restartVortex: "Restart Vortex",
+    startVortex: "Start Vortex",
+    restartingVortex: "Closing Vortex and starting it again…",
+    restartedVortex: "Vortex is starting.",
+    restartHint:
+      "Closes Vortex the way its window's close button does, and starts it again. Vortex saves as usual first.",
+    updateLink: "Update the Vortex extension",
+    getIt: "Get it",
   },
   de: {
     optional: (count) => `Optional (${count})`,
@@ -44,5 +59,13 @@ export const toolboxTexts: Record<Lang, ToolboxTexts> = {
     removeFromVortex: "Mod Mallet aus Vortex' Werkzeugen entfernen",
     placed: "✓ Erweiterung hinterlegt",
     placedHint: "Vortex lädt die neue Erweiterung beim nächsten Start: Vortex neu starten.",
+    restartVortex: "Vortex neu starten",
+    startVortex: "Vortex starten",
+    restartingVortex: "Vortex wird geschlossen und wieder gestartet …",
+    restartedVortex: "Vortex startet.",
+    restartHint:
+      "Schließt Vortex wie über das Schließen-Kreuz des Fensters und startet es wieder. Vortex speichert vorher wie immer.",
+    updateLink: "Vortex-Erweiterung aktualisieren",
+    getIt: "Holen",
   },
 };
