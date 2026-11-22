@@ -71,11 +71,13 @@ not nice yet.
 7. **Keyboard:** the arrow keys move between rows across the page, Home and
    End to the first and last; the right arrow opens a row, the left one
    closes it.
-8. **The rows are components of their own** (`task-rows.tsx`: `TaskRow`,
-   `TaskGroup`, `TaskPart`, `SeverityMark`, `ModBadge`, `ModLine`; styles in
-   `task-rows.css`) that know nothing about findings, so that they can move
-   into the window's shared components. The ordering and grouping is pure
-   (`task-plan.ts`) and tested.
+8. **The rows are part of the UI kit** (ADR 0077): `ui/rows.tsx` holds
+   `TaskRow`, `TaskGroup`, `TaskPart`, `SeverityMark`, `ModBadge` and
+   `ModLine`, styled in `ui/rows.css`, with their pure helpers (initials,
+   colour, arrow keys) in `ui/row-helpers.ts`. They know nothing about
+   findings. The page's head, the note when nothing is to do and the undo
+   button are the kit's. The ordering and grouping is pure (`task-plan.ts`)
+   and tested.
 
 ## Consequences
 

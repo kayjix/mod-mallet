@@ -1,4 +1,4 @@
-/* The rows of a list of things to do (ADR 0076): task-rows.tsx. Uses the
+/* The rows of a list of things to do (ADR 0076), part of the UI kit (ADR 0077): rows.tsx. Uses the
  * tokens of App.css. A row is one line of text in a fixed grid: the mark,
  * the title with the mods under it, and the buttons at the right edge. */
 

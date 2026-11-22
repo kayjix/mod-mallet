@@ -1,12 +1,11 @@
 // The rows of a list of things to do (ADR 0076): one row per task, one row
 // for several tasks of one sort, the mark that says how bad it is and the
-// badges of the mods it is about. They know nothing about findings; the
-// task page and the other lists fill them in. Kept apart so that they can
-// move into the window's shared components.
+// badges of the mods it is about. Part of the UI kit (ADR 0077): they know
+// nothing about findings; the task page and the other lists fill them in.
 
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useId } from "react";
-import { hueOf, initialsOf, isRowKey, nextRow } from "./task-plan.ts";
-import "./task-rows.css";
+import { hueOf, initialsOf, isRowKey, nextRow } from "./row-helpers.ts";
+import "./rows.css";
 
 /** How bad a task is, as its mark shows it; `done` once it is handed on. */
 export type MarkLevel = "crash" | "broken" | "quality" | "scan" | "note" | "advice" | "done";

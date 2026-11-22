@@ -40,14 +40,10 @@ export interface TaskRowTexts {
   summaryScan: (count: number) => string;
   /** No task can crash the game. */
   summaryNoCrash: string;
-  /** Nothing at all to do. */
-  allClear: string;
   /** What is shown when nothing at all is to do. */
   allClearNote: string;
   /** A finding was set aside, with the way back. */
   setAside: (title: string) => string;
-  /** The button that brings it back. */
-  undo: string;
 }
 
 const en: TaskRowTexts = {
@@ -71,10 +67,8 @@ const en: TaskRowTexts = {
   summaryScan: (count) =>
     count === 1 ? "1 keeps checks from running" : `${count} keep checks from running`,
   summaryNoCrash: "None of them crashes the game.",
-  allClear: "Nothing to do",
   allClearNote: "Nothing Mod Mallet found crashes the game or looks wrong in it.",
   setAside: (title) => `Set aside: ${title}`,
-  undo: "Undo",
 };
 
 const de: TaskRowTexts = {
@@ -101,11 +95,9 @@ const de: TaskRowTexts = {
   summaryScan: (count) =>
     count === 1 ? "1 verhindert Prüfungen" : `${count} verhindern Prüfungen`,
   summaryNoCrash: "Nichts davon lässt das Spiel abstürzen.",
-  allClear: "Nichts zu tun",
   allClearNote:
     "Nichts, was Mod Mallet gefunden hat, lässt das Spiel abstürzen oder sieht darin falsch aus.",
   setAside: (title) => `Beiseitegelegt: ${title}`,
-  undo: "Rückgängig",
 };
 
 const taskRowTexts: Record<Lang, TaskRowTexts> = { en, de };

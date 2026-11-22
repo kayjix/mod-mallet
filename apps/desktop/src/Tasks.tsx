@@ -38,8 +38,9 @@ import {
   rowModsOf,
 } from "./task-plan";
 import { useTaskRowTexts } from "./task-row-texts";
-import { ModLine, SeverityMark, TaskGroup, TaskPart, TaskRow } from "./task-rows";
 import { ToolHint } from "./tool-hint";
+import { Note, PageHeader, UndoButton } from "./ui/kit";
+import { ModLine, SeverityMark, TaskGroup, TaskPart, TaskRow } from "./ui/rows";
 import { COLLIDES_WIDELY, toneOf, WideAdvice } from "./wide-advice";
 import "./overview.css";
 import "./tasks.css";
@@ -773,17 +774,20 @@ export function TasksPage({ report }: { report: RenderedReport }) {
   return (
     <AsideNotice.Provider value={(id, title) => setAside({ id, title })}>
       <section className="tasks-page" data-row-scope="" aria-live="polite">
-        <header className="tasks-top">
-          <h2 className="tasks-headline">
-            {open === 0 ? o.tasksHeadlineNone : o.tasksHeadline(open)}
-          </h2>
-          <Summary parts={parts} />
-        </header>
+        <PageHeader
+          status={
+            <>
+              <h2 className="tasks-headline">
+                {open === 0 ? o.tasksHeadlineNone : o.tasksHeadline(open)}
+              </h2>
+              <Summary parts={parts} />
+            </>
+          }
+        />
         {open === 0 && (
-          <div className="panel tasks-clear">
-            <SeverityMark level="done" label={r.allClear} />
-            <span>{r.allClearNote}</span>
-          </div>
+          <Note tone="ok" className="tasks-clear">
+            {r.allClearNote}
+          </Note>
         )}
         {!withDuels.some(({ id }) => id === "crash") && <CollisionsCard report={report} />}
         {withDuels.map(({ id, groups, count }) => {
@@ -807,16 +811,12 @@ export function TasksPage({ report }: { report: RenderedReport }) {
         {aside !== null && (
           <div className="task-undo" role="status">
             <span className="task-undo-text">{r.setAside(aside.title)}</span>
-            <button
-              type="button"
-              className="small"
+            <UndoButton
               onClick={() => {
                 setIgnored(aside.id, false);
                 setAside(null);
               }}
-            >
-              {r.undo}
-            </button>
+            />
           </div>
         )}
       </section>
