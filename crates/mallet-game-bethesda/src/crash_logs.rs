@@ -524,6 +524,43 @@ STACK:
         );
     }
 
+    /// A report in the shape of Buffout 4, the crash logger of Fallout 4,
+    /// which Crash Logger grew out of: made-up names and numbers.
+    const BUFFOUT_4: &str = "\nFallout 4 v1.10.163
+Buffout 4 v1.26.2
+
+Unhandled exception \"EXCEPTION_ACCESS_VIOLATION\" at 0x7FF600AB1234 Fallout4.exe+0AB1234	mov rax, [rcx]
+
+[Compatibility]
+	F4EE: false
+
+PROBABLE CALL STACK:
+	[0] 0x7FF600AB1234 Fallout4.exe+0AB1234
+	[1] 0x7FFD00C0FFEE Settlement Helper.dll+000FFEE
+
+REGISTERS:
+	RAX 0x1E200000000      (TESObjectREFR*) \"Wall\" [0x01001234] (\"Bigger Settlements.esp\")
+
+STACK:
+	[RSP+0  ] 0x0                (size_t) [0]
+";
+
+    #[test]
+    fn a_buffout_4_report_of_fallout_4_is_read_like_crash_loggers() {
+        let log = parse(
+            CrashLogger::CrashLogger,
+            "crash-2026-01-02-03-04-05.log",
+            BUFFOUT_4,
+        );
+        assert_eq!(log.exception.as_deref(), Some("EXCEPTION_ACCESS_VIOLATION"));
+        assert_eq!(log.module(), Some("Fallout4.exe"));
+        assert_eq!(log.stack_modules, ["Fallout4.exe", "Settlement Helper.dll"]);
+        assert!(is_report_name(
+            CrashLogger::CrashLogger,
+            &"Crash-2026-01-02-03-04-05.log".to_ascii_lowercase()
+        ));
+    }
+
     #[test]
     fn a_net_script_framework_report_is_read() {
         let log = parse(
