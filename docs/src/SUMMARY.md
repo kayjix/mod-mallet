@@ -83,6 +83,7 @@
   - [0067 Stacked doors are merged into one](adr/0067-stacked-doors-are-merged-into-one.md)
   - [0068 Which plugin needs which](adr/0068-which-plugin-needs-which.md)
   - [0069 Places where characters do something](adr/0069-places-where-characters-do-something.md)
+  - [0070 Several patches that say what they decide](adr/0070-several-patches-that-say-what-they-decide.md)
   - [0071 The paths mode of the 3D views](adr/0071-the-paths-mode-of-the-3d-views.md)
   - [0072 Passages where two mods build the same](adr/0072-passages-where-two-mods-build-the-same.md)
   - [0073 Switched-off mods are taken out through Vortex's plugin list](adr/0073-switched-off-mods-taken-out-through-vortex.md)
