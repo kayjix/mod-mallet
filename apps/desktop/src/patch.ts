@@ -8,7 +8,8 @@
 // patch that is installed. The patch page lists them by pair of mods and
 // turns them into a patch (ADR 0048).
 
-import { isCollision } from "./arrange";
+// With its ending, so that the tests of the patch logic run it in Node.
+import { isCollision } from "./arrange.ts";
 import type {
   MapSpot,
   ObjectRef,

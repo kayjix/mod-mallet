@@ -61,6 +61,10 @@ export interface PassageTexts {
   /** The kept side's parts hidden by hand, shown again with its whole version. */
   byHand: (count: number, name: string) => string;
   hideAgain: string;
+  /** A part the decision of its passage hides, in its card in the view. */
+  hiddenByPassage: string;
+  /** A passage decided as a whole, with some parts or spots decided otherwise. */
+  withExceptions: string;
 }
 
 const en: PassageTexts = {
@@ -121,6 +125,8 @@ const en: PassageTexts = {
       ? `1 part of ${name} you had hidden yourself is shown again, as its whole version stays.`
       : `${count} parts of ${name} you had hidden yourself are shown again, as its whole version stays.`,
   hideAgain: "Hide them again",
+  hiddenByPassage: "Hidden by the passage decision here.",
+  withExceptions: "decided, with exceptions",
 };
 
 const de: PassageTexts = {
@@ -181,6 +187,8 @@ const de: PassageTexts = {
       ? `1 Teil von ${name}, das du selbst ausgeblendet hattest, ist wieder zu sehen: Die ganze Fassung bleibt.`
       : `${count} Teile von ${name}, die du selbst ausgeblendet hattest, sind wieder zu sehen: Die ganze Fassung bleibt.`,
   hideAgain: "Wieder ausblenden",
+  hiddenByPassage: "Von der Passagen-Entscheidung hier ausgeblendet.",
+  withExceptions: "entschieden, mit Ausnahmen",
 };
 
 export const passageTexts: Record<Lang, PassageTexts> = { en, de };

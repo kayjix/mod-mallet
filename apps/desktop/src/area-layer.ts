@@ -9,6 +9,7 @@
 
 import { rememberActions } from "./action-places";
 import type { Api } from "./api";
+import { isGamePlugin } from "./game-plugins";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { Mat4, Vec3 } from "./gl";
@@ -419,15 +420,6 @@ export const TOUCHING = 14;
  */
 const NATURE =
   /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
-
-/** The plugins of the games themselves. */
-const GAME_PLUGIN =
-  /^(skyrim|update|dawnguard|hearthfires|dragonborn|fallout4|dlc\w*|oblivion|fallout3|falloutnv)\.esm$|^cc\w*\.es[lm]$/i;
-
-/** Whether a plugin is one of the game's own. */
-export function isGamePlugin(plugin: string): boolean {
-  return GAME_PLUGIN.test(plugin);
-}
 
 /**
  * The mod an object belongs to, by plugin: the one that placed it, or,
@@ -1936,3 +1928,5 @@ export class AreaLayer {
     gl.deleteProgram(this.tops.program);
   }
 }
+
+export { isGamePlugin };

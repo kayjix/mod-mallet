@@ -40,14 +40,12 @@ import { MapView3D } from "./MapView3D";
 import { CELL, kindOf, nearest, type Picked, spotPosition, type WorkKind } from "./map-places";
 import { MoveControls, SpotMoves } from "./move-controls";
 import { FreeObjectActions, NeededPart, PartsTogether, spotOf } from "./object-actions";
-import { usePassageTexts } from "./passage-texts";
+import { hiddenByHand, keepPassage, sideParts } from "./passage-choices";
+import { passageTexts, usePassageTexts } from "./passage-texts";
 import {
-  hiddenByHand,
-  keepPassage,
   PassageHead,
   type PassageOutcome,
   type PassageVersion,
-  sideParts,
   tiedIn,
   usePassageSegments,
   VersionSwitch,
@@ -60,6 +58,7 @@ import {
   decisionAt,
   hiddenKeysOf,
   matchKey,
+  objectChoiceKey,
   objectsOf,
   type Pair,
   type PatchChoices,
@@ -888,8 +887,7 @@ export function Collisions({
           key: cluster.key,
           side,
           hidden: losing.filter((object) => hiddenNow.has(matchKey(object))).length,
-          held: losing.filter((object) => tied.has(objectKey(object.plugin, object.localId)))
-            .length,
+          held: losing.filter((object) => tied.has(matchKey(object))).length,
           byHand,
         },
       });
@@ -2257,7 +2255,8 @@ function Stage({
   }, [hiddenObjects, parts, preview, previewObjects, looked]);
 
   // An object of another collision picked in the view opens that collision.
-  const { spots: spotsByFinding, lang } = useSession();
+  const { spots: spotsByFinding, lang, setPatchChoices } = useSession();
+  const own = collisionsTexts[lang];
   const hiddenKeys = useMemo(
     () => hiddenKeysOf(spotsByFinding, choices),
     [spotsByFinding, choices],
@@ -2286,6 +2285,11 @@ function Stage({
       // A door of stacked doors goes through the door decision (ADR 0067).
       const door = item.spot.doors !== null && item.spot.doors !== undefined;
       const doorHidden = door && hiddenKeys.has(key);
+      // Hidden otherwise: by itself, by the spot's choice, or by the
+      // decision of its passage (ADR 0072). Shown again the same way as
+      // anywhere, the spot then keeping both.
+      const partHidden = !door && hiddenKeys.has(matchKey(part.object));
+      const byItself = (choices[objectChoiceKey(part.object)] ?? null) !== null;
       return (
         <>
           <ActionPlaceInfo
@@ -2301,6 +2305,23 @@ function Stage({
                 {doorTexts[lang].showAgain}
               </button>
             </p>
+          ) : partHidden ? (
+            <p className="aside relief-object-action">
+              {byItself
+                ? own.hiddenByItself
+                : item.passageGroup.passage !== undefined
+                  ? passageTexts[lang].hiddenByPassage
+                  : own.hiddenByDecision}{" "}
+              <button
+                type="button"
+                className="small primary"
+                onClick={() =>
+                  setPatchChoices(revealObjects(choices, spotsByFinding, [part.object]))
+                }
+              >
+                {t.workObjectShow}
+              </button>
+            </p>
           ) : part.hideable ? (
             <button
               type="button"
@@ -2310,7 +2331,7 @@ function Stage({
               {t.workHideObject}
             </button>
           ) : (
-            <p className="aside relief-object-action">t.workCannotHide</p>
+            <p className="aside relief-object-action">{t.workCannotHide}</p>
           )}
           <PartsTogether tools={tools} />
           <MoveControls
