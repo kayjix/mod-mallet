@@ -25,6 +25,8 @@ import {
   chooseDuel,
   type DecisionWorld,
   decidedOf,
+  keepSide,
+  leftoversOf,
   mergeDoors,
   snapshotOf,
   spotsByFinding,
@@ -172,7 +174,16 @@ class Window {
       // The 3D views of the map, the collisions and the review draw it as a ghost.
       ghost: d.hiddenKeys.has(matchKey(object)),
       // The patch that is written hides it.
-      patch: objectsOf(pairsOf(reportWith(), this.world.ignored as Set<string>), d.choices)
+      patch: objectsOf(
+        pairsOf(
+          {
+            findings: [finding(PAIR), finding(DOORS)],
+            map: { spots: [...this.world.spots.values()].flat() },
+          } as never,
+          this.world.ignored as Set<string>,
+        ),
+        d.choices,
+      )
         .map(matchKey)
         .includes(matchKey(object)),
       by: d.hiding(object)?.by ?? null,
@@ -417,4 +428,124 @@ test("picks kept outside the patches go into the first patch once", () => {
   // A pick a patch already has stays as the patch has it.
   assert.deepEqual(moved.patches[0]?.decisions, { "duel:kept": "1", "duel:new": "1" });
   assert.equal(withLegacyDuels(moved, { kept: 0, new: 1 }), moved);
+});
+
+// The ladder as a part the game needs, which the patch may not hide.
+const neededLadder = { ...ladder, hideable: false };
+const topNeeded = spotAt(PAIR, [roof, neededLadder]);
+const neededWorld = () => ({ ...worldOf(), spots: spotsByFinding([walls, topNeeded, doorway]) });
+
+/** The bunkhouse as Go through it reads it: its two spots, and its sections. */
+function reviewPlace(accepted: Set<string> = new Set()) {
+  const entries = [walls, topNeeded].map((spot) => ({
+    key: spotKey(spot as never) as string,
+    spot: spot as never,
+    finding: PAIR,
+  }));
+  return {
+    sides: passage.plugins,
+    spots: entries,
+    partOf: (part: { object: { plugin: string; localId: number } }) => ({ id: part.object }),
+    // The walls with their spot, and a section of the crate alone, without spots.
+    sections: [
+      {
+        spots: [entries[0] as (typeof entries)[number]],
+        parts: [[{ id: wall.object }], [{ id: townWall.object }]] as const,
+      },
+      { spots: [], parts: [[], [{ id: crate.object }]] as const },
+    ],
+    accepted,
+  };
+}
+
+const keys = [walls, top].map((spot) => spotKey(spot as never) as string);
+
+test("a side kept in the review shows on every page, and the leftover line names what still collides", () => {
+  const window = new Window(bookFromChoices({}), neededWorld());
+  // House kept; the ladder is one the game needs, so it does not go.
+  window.change((d) =>
+    d.keepSide({
+      kept: [wall.object, roof.object],
+      gone: [townWall.object, crate.object],
+      spots: keys,
+      loser: TOWN,
+    }),
+  );
+  // The map, the collisions and the patch agree.
+  assert.deepEqual(window.look(townWall.object), hiddenBy("passage"));
+  assert.deepEqual(window.look(crate.object), hiddenBy("passage"));
+  assert.deepEqual(window.look(ladder.object), shown);
+  assert.deepEqual(window.decisions.decisionOfPassage(passage as never), {
+    type: "hidden",
+    plugin: TOWN,
+  });
+  // The review's leftover line: the ladder still meets the roof.
+  const left = leftoversOf(window.decisions, reviewPlace());
+  assert.equal(left?.loser, TOWN);
+  assert.equal(left?.side, 1);
+  assert.deepEqual(
+    left?.parts.map((part) => matchKey(part.id)),
+    [matchKey(ladder.object)],
+  );
+  // Left as it is: the line goes.
+  assert.equal(
+    leftoversOf(window.decisions, reviewPlace(new Set([matchKey(ladder.object)]))),
+    null,
+  );
+  // Hidden from the map's object card after all: the line goes there too.
+  window.change((d) => d.hide([ladder.object]));
+  assert.equal(leftoversOf(window.decisions, reviewPlace()), null);
+  // The crate shown again on the map: the review names it, the passage has an exception.
+  window.change((d) => d.show([crate.object]));
+  assert.deepEqual(
+    leftoversOf(window.decisions, reviewPlace())?.parts.map((part) => matchKey(part.id)),
+    [matchKey(crate.object)],
+  );
+  assert.deepEqual(window.decisions.decisionOfPassage(passage as never), {
+    type: "mixed",
+    open: 0,
+  });
+});
+
+test("both kept in the review: nothing hidden on any page, nothing left over", () => {
+  const window = new Window(bookFromChoices({}), neededWorld());
+  window.change((d) =>
+    d.keepSide({ kept: [ladder.object], gone: [ladder.object], spots: keys, loser: TOWN }),
+  );
+  window.change((d) =>
+    d.keepSide({
+      kept: [wall.object, roof.object, townWall.object, ladder.object, crate.object],
+      gone: [],
+      spots: keys,
+      loser: null,
+    }),
+  );
+  for (const part of [wall, roof, townWall, ladder, crate]) {
+    assert.deepEqual(window.look(part.object), shown, part.name);
+  }
+  assert.deepEqual(window.decisions.decisionOfPassage(passage as never), { type: "kept" });
+  assert.equal(leftoversOf(window.decisions, reviewPlace()), null);
+});
+
+test("asking 'what if' keeps the world: set-aside findings and waiting decisions count as they do now", () => {
+  const window = fresh();
+  window.change((d) => d.hide([doorC.object]));
+  window.world = worldOf(reportWith([], [THIRD]), new Set([DOORS]));
+  const now = window.decisions;
+  // A review's decision not yet made, as the leftover line asks it.
+  const then = now.whatIf(
+    keepSide(now.choices, now.spots, {
+      kept: [],
+      gone: [townWall.object],
+      spots: [keys[0] as string],
+      loser: TOWN,
+    }),
+  );
+  assert.equal(then.isHidden(townWall.object), true);
+  assert.equal(now.isHidden(townWall.object), false);
+  // The door's decision still waits, and its finding is still set aside.
+  assert.equal(then.isHidden(doorC.object), false);
+  assert.equal(then.waits(doorC.object), true);
+  assert.equal(then.spots.has(DOORS), false);
+  assert.equal(now.whatIf(now.choices), now);
 });

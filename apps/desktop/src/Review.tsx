@@ -15,7 +15,7 @@ import {
 } from "./CompareStage3D";
 import { useCollisionStepTexts } from "./collision-step-texts";
 import { DuelLine } from "./Duels";
-import { mergeDoors } from "./decisions";
+import { keepSide, leftoversOf, mergeDoors } from "./decisions";
 import { DoorPanel } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
@@ -33,19 +33,10 @@ import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
-import { stillColliding } from "./part-groups";
 import { type ListedPart, PartList } from "./part-list";
 import { usePassageTexts } from "./passage-texts";
 import { PassageSummary } from "./passages";
-import {
-  chooseObject,
-  chooseSpot,
-  hiddenKeysOf,
-  matchKey,
-  type PatchChoices,
-  pinsOf,
-  revealObjects,
-} from "./patch";
+import { matchKey, type PatchChoices, pinsOf } from "./patch";
 import type { PathsOverlay } from "./paths-layer";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { ReachNote, useReach } from "./reach";
@@ -728,64 +719,35 @@ export function CollisionsStep({
    * given up and among the passage's other parts. Parts the user said to
    * leave as they are no longer count.
    */
-  const leftoversIn = (choices: PatchChoices) => {
-    const hiddenThen = hiddenKeysOf(spots, choices);
-    for (const side of [0, 1] as const) {
-      const loser = sides[side];
-      const givenUp = (decided: Decided) =>
-        decided.type === "hidden" && decided.plugin.toLowerCase() === loser.toLowerCase();
-      const decidedSpots = cluster.spots.filter((spot) => givenUp(decidedOf([spot], choices)));
-      if (decidedSpots.length === 0) {
-        continue;
-      }
-      const found = new Map<string, Part>();
-      const atSpots = new Set(
-        stillColliding(
-          decidedSpots.map(({ key, item }) => ({
-            key,
-            parts: (item.spot.parts ?? []).map((part) => ({
-              key: objectKey(part.object.plugin, part.object.localId),
-              plugin: part.object.plugin,
-            })),
-          })),
-          loser,
-          hiddenThen,
-        ).parts,
-      );
-      for (const { item } of decidedSpots) {
-        for (const part of item.spot.parts ?? []) {
-          const key = objectKey(part.object.plugin, part.object.localId);
-          if (atSpots.has(key)) {
-            found.set(key, {
-              id: part.object,
-              game: isGameObject({ id: part.object }),
-              name: part.name,
-              hideable: part.hideable,
-            });
-          }
-        }
-      }
-      if (cluster.passage !== undefined) {
-        for (const segment of shownSegments) {
-          const given =
-            segment.groups.length === 0 || givenUp(decidedOf(spotsOf(segment), choices));
-          for (const part of given ? partsOf([segment], side) : []) {
-            const key = keyOfPart(part);
-            if (!hiddenThen.has(key)) {
-              found.set(key, part);
-            }
-          }
-        }
-      }
-      for (const key of accepted) {
-        found.delete(key);
-      }
-      if (found.size > 0) {
-        return { loser, side, parts: [...found.values()] };
-      }
-    }
-    return null;
-  };
+  const leftoversIn = (choices: PatchChoices) =>
+    leftoversOf(shared.whatIf(choices), {
+      sides,
+      spots: cluster.spots.map(({ key, item }) => ({
+        key,
+        spot: item.spot,
+        finding: item.finding,
+      })),
+      partOf: (part): Part => ({
+        id: part.object,
+        game: isGameObject({ id: part.object }),
+        name: part.name,
+        hideable: part.hideable,
+      }),
+      // A section whose spots are not known is not counted as given up.
+      sections:
+        cluster.passage === undefined
+          ? undefined
+          : shownSegments
+              .filter((segment) => segment.groups.length === 0 || spotsOf(segment).length > 0)
+              .map((segment) => ({
+                spots: spotsOf(segment).map(({ item }) => ({
+                  spot: item.spot,
+                  finding: item.finding,
+                })),
+                parts: [partsOf([segment], 0), partsOf([segment], 1)] as const,
+              })),
+      accepted,
+    });
   /**
    * Keeps the choices; deciding the whole place moves on to the next open
    * one, unless parts of the mod given up still collide here.
@@ -812,35 +774,30 @@ export function CollisionsStep({
    * `anyway`; what the game needs stays.
    */
   const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean, anyway = false) => {
-    const loser = sides[side === 0 ? 1 : 0];
     const effect = effectOf(side, chosen);
-    let next = revealObjects(
-      patchChoices,
-      spots,
-      partsOf(chosen, side).map((part) => part.id),
-    );
-    for (const part of anyway ? [...effect.go, ...effect.careful, ...effect.walked] : effect.go) {
-      next = chooseObject(next, part.id, true);
-    }
+    const gone = anyway ? [...effect.go, ...effect.careful, ...effect.walked] : effect.go;
     // Every spot of the segments is decided, also where the losing side's
     // parts there are the game's own and stay.
-    for (const segment of chosen) {
-      for (const { key } of spotsOf(segment)) {
-        next = chooseSpot(next, key, loser);
-      }
-    }
-    apply(next, moveOn);
+    apply(
+      shared.keepSide({
+        kept: partsOf(chosen, side).map((part) => part.id),
+        gone: gone.map((part) => part.id),
+        spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
+        loser: sides[side === 0 ? 1 : 0],
+      }),
+      moveOn,
+    );
   };
-  const keepBoth = (chosen: StageSegment[], moveOn: boolean) => {
-    const both = [...partsOf(chosen, 0), ...partsOf(chosen, 1)].map((part) => part.id);
-    let next = revealObjects(patchChoices, spots, both);
-    for (const segment of chosen) {
-      for (const { key } of spotsOf(segment)) {
-        next = chooseSpot(next, key, null);
-      }
-    }
-    apply(next, moveOn);
-  };
+  const keepBoth = (chosen: StageSegment[], moveOn: boolean) =>
+    apply(
+      shared.keepSide({
+        kept: [...partsOf(chosen, 0), ...partsOf(chosen, 1)].map((part) => part.id),
+        gone: [],
+        spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
+        loser: null,
+      }),
+      moveOn,
+    );
   const focused = focus === null ? null : shownSegments[focus];
   const focusKeys =
     focused == null
@@ -1021,17 +978,12 @@ export function CollisionsStep({
         }
         continue;
       }
-      next = revealObjects(
-        next,
-        spots,
-        keeping.map((object) => object.id),
-      );
-      for (const object of go) {
-        next = chooseObject(next, object.id, true);
-      }
-      for (const { key } of candidate.spots) {
-        next = chooseSpot(next, key, loser);
-      }
+      next = keepSide(next, shared.spots, {
+        kept: keeping.map((object) => object.id),
+        gone: go.map((object) => object.id),
+        spots: candidate.spots.map(({ key }) => key),
+        loser,
+      });
       taken += 1;
     }
     if (taken > 0) {
@@ -1133,22 +1085,11 @@ export function CollisionsStep({
       walked: walked?.get(key) ?? 0,
     };
   };
-  const hideParts = (chosen: ListedPart[]) => {
-    let next = patchChoices;
-    for (const part of chosen) {
-      next = chooseObject(next, part.id, true);
-    }
-    apply(next, false);
-  };
+  // Hidden and shown again as on every page (ADR 0081).
+  const hideParts = (chosen: ListedPart[]) =>
+    apply(shared.hide(chosen.map((part) => part.id)), false);
   const showParts = (chosen: ListedPart[]) =>
-    apply(
-      revealObjects(
-        patchChoices,
-        spots,
-        chosen.map((part) => part.id),
-      ),
-      false,
-    );
+    apply(shared.show(chosen.map((part) => part.id)), false);
   const partList = (parts: Part[], side: 0 | 1) => (
     <PartList
       parts={parts.map(listed)}

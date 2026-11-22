@@ -33,8 +33,10 @@ import type {
   MapSpot,
   ObjectRef,
   RenderedReport,
+  SpotPart,
   SwitchedOffPlugin,
 } from "./generated/rendered-report";
+import { stillColliding } from "./part-groups.ts";
 import {
   choicesOf,
   chooseObject,
@@ -142,6 +144,17 @@ export interface Decisions {
   readonly duels: Record<string, number>;
   /** The patches that count and make a choice, by its key, in the order they count. */
   patchesOf(key: string): PatchRef[];
+  /**
+   * The snapshot the choices `next` would make, as a page asks "what if"
+   * before it changes anything: the same spots, findings set aside,
+   * waiting decisions and patches as this one.
+   */
+  whatIf(next: PatchChoices): Decisions;
+  /**
+   * The choices with one side kept at some spots (see {@link keepSide}), or
+   * both kept where `plan.loser` is null.
+   */
+  keepSide(plan: SidePlan): PatchChoices;
   /** The choices with `objects` shown again, whatever hid them. */
   show(objects: ObjectRef[]): PatchChoices;
   /**
@@ -436,7 +449,9 @@ export function decisionsOf(input: DecisionInput): Decisions {
     }
   }
 
-  return {
+  const snapshot: Decisions = {
+    whatIf: (next) => (next === choices ? snapshot : decisionsOf({ ...input, choices: next })),
+    keepSide: (plan) => keepSide(choices, spots, plan),
     choices,
     spots,
     duels,
@@ -486,6 +501,138 @@ export function decisionsOf(input: DecisionInput): Decisions {
       return next;
     },
   };
+  return snapshot;
+}
+
+/**
+ * One side of a place kept against the other (ADR 0050, 0080): the kept
+ * side's parts shown again however they were hidden, the parts of the side
+ * given up that may go hidden on their own, and the spots of the place
+ * decided against that side. With `loser` null both sides stay: every part
+ * of `kept` is shown again, and the spots keep both.
+ */
+export interface SidePlan {
+  /** The parts that stay, shown again however they were hidden. */
+  kept: ObjectRef[];
+  /** The parts that go; what the game needs is left out of them by the caller. */
+  gone: ObjectRef[];
+  /** The keys of the spots decided by it. */
+  spots: string[];
+  /** The plugin given up, or null to keep both. */
+  loser: string | null;
+}
+
+/** The choices with a {@link SidePlan} applied. */
+export function keepSide(
+  choices: PatchChoices,
+  spots: Map<string, MapSpot[]>,
+  plan: SidePlan,
+): PatchChoices {
+  let next = revealObjects(choices, spots, plan.kept);
+  for (const object of plan.loser === null ? [] : plan.gone) {
+    next = chooseObject(next, object, true);
+  }
+  for (const key of plan.spots) {
+    next = chooseSpot(next, key, plan.loser);
+  }
+  return next;
+}
+
+/** A part of a place as the review lists it. */
+export interface PlacePart {
+  id: ObjectRef;
+}
+
+/** What of a mod given up still collides at a place, after some choices. */
+export interface Leftovers<P extends PlacePart> {
+  /** The plugin given up. */
+  loser: string;
+  /** Its index among the place's two plugins. */
+  side: 0 | 1;
+  /** Its parts still there, each once. */
+  parts: P[];
+}
+
+/** A place as {@link leftoversOf} reads it. */
+export interface LeftoverPlace<P extends PlacePart> {
+  /** The place's two plugins. */
+  sides: readonly [string, string];
+  /** Its spots. */
+  spots: readonly { key: string; spot: MapSpot; finding: string }[];
+  /** A part of a spot as the page lists it. */
+  partOf: (part: SpotPart) => P;
+  /**
+   * Where the place is a passage (ADR 0072): its sections, each with its
+   * spots and each side's parts. A section without spots counts as given
+   * up with its side.
+   */
+  sections?: readonly {
+    spots: readonly { spot: MapSpot; finding: string }[];
+    parts: readonly [readonly P[], readonly P[]];
+  }[];
+  /** The parts the user said to leave as they are, by {@link matchKey}. */
+  accepted: ReadonlySet<string>;
+}
+
+/**
+ * What of a mod given up still collides at a place after the choices of
+ * `then` (ADR 0080): parts the game needs or characters walk on, tied ones
+ * and parts kept by hand. At its spots, where a part of the other mod is
+ * left too; in a passage, every part left in the sections given up. Parts
+ * the user said to leave as they are no longer count. Null when nothing is
+ * left; the first side given up with something left otherwise.
+ */
+export function leftoversOf<P extends PlacePart>(
+  then: Decisions,
+  place: LeftoverPlace<P>,
+): Leftovers<P> | null {
+  const hidden = then.hiddenKeys;
+  for (const side of [0, 1] as const) {
+    const loser = place.sides[side];
+    const givenUp = (decided: Decided) =>
+      decided.type === "hidden" && decided.plugin.toLowerCase() === loser.toLowerCase();
+    const decidedSpots = place.spots.filter((entry) => givenUp(decidedOf([entry], then.choices)));
+    if (decidedSpots.length === 0) {
+      continue;
+    }
+    const found = new Map<string, P>();
+    const atSpots = new Set(
+      stillColliding(
+        decidedSpots.map(({ key, spot }) => ({
+          key,
+          parts: (spot.parts ?? []).map((part) => ({
+            key: matchKey(part.object),
+            plugin: part.object.plugin,
+          })),
+        })),
+        loser,
+        hidden,
+      ).parts,
+    );
+    for (const { spot } of decidedSpots) {
+      for (const part of spot.parts ?? []) {
+        if (atSpots.has(matchKey(part.object))) {
+          found.set(matchKey(part.object), place.partOf(part));
+        }
+      }
+    }
+    for (const section of place.sections ?? []) {
+      const given =
+        section.spots.length === 0 || givenUp(decidedOf([...section.spots], then.choices));
+      for (const part of given ? section.parts[side] : []) {
+        if (!hidden.has(matchKey(part.id))) {
+          found.set(matchKey(part.id), part);
+        }
+      }
+    }
+    for (const key of place.accepted) {
+      found.delete(key);
+    }
+    if (found.size > 0) {
+      return { loser, side, parts: [...found.values()] };
+    }
+  }
+  return null;
 }
 
 /** What the window knows besides the book that the decisions depend on. */

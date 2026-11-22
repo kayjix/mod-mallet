@@ -100,9 +100,15 @@ into the patch being edited, with the waiting decisions put back
 (`bookWith`). The choices at the first start, from the patch in the game
 and what was kept before, are made by `choicesAtStart`.
 
-Pages may still compute with the pure functions of `patch.ts` where they
-build a change from several steps (deciding a passage, keeping one side of
-a section). They read what is hidden only from the snapshot.
+A page that asks "what if" before it changes anything, such as the
+leftover line of Go through it (ADR 0080), asks `whatIf(choices)`: a
+snapshot of those choices in the same world, with the same findings set
+aside, waiting decisions and patches. Keeping one side of a place, or
+both, is `keepSide`; what of a mod given up still collides there is
+`leftoversOf`. Pages may still compute with the pure functions of
+`patch.ts` where they build a change of their own from several steps
+(deciding a passage as a whole). They read what is hidden only from the
+snapshot.
 
 The tests in `apps/desktop/test/decisions.test.ts` replay sequences across
 pages through the same functions the window uses, and check what each page

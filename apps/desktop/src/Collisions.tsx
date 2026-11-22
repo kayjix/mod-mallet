@@ -63,7 +63,6 @@ import {
   chooseObject,
   chooseSpot,
   decisionAt,
-  hiddenKeysOf,
   matchKey,
   type Pair,
   type PatchChoices,
@@ -891,7 +890,7 @@ export function Collisions({
         side === null ? [] : hiddenByHand(before, passage, passageSegments, passageArea, side);
       next = revealObjects(next, spotsByFinding, byHand);
       const losing = side === null ? [] : sideParts(passage, passageSegments, side === 0 ? 1 : 0);
-      const hiddenNow = hiddenKeysOf(spotsByFinding, next);
+      const hiddenNow = shared.whatIf(next).hiddenKeys;
       setPatchChoices(next);
       setVersion("now");
       setPreview(new Set());
