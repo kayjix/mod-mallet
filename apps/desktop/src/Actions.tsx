@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from "react";
 import type { Api } from "./api";
 import type { DependencyTarget } from "./dependencies";
+import type { PatchBook } from "./generated/patch-book";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { Action, MapSpot, ModInfo } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
@@ -31,16 +32,27 @@ export interface Session {
   mods: Map<string, ModInfo>;
   /** The spots of each finding about placed objects, by finding. */
   spots: Map<string, MapSpot[]>;
-  /** Switches to the map and shows a spot there. */
-  showOnMap: (spot: MapSpot) => void;
+  /**
+   * Switches to the map and shows a spot there; `from` is the entry of a
+   * patch the user came from, for the way back (ADR 0070).
+   */
+  showOnMap: (spot: MapSpot, from?: PatchAt) => void;
   /** Switches to the collisions' worklist and opens a spot there. */
-  decideSpot: (spot: MapSpot) => void;
+  decideSpot: (spot: MapSpot, from?: PatchAt) => void;
   /** What the patch is to hide, per collision; shared by all views. */
   patchChoices: PatchChoices;
   /** Replaces the patch's choice. */
   setPatchChoices: (choices: PatchChoices) => void;
   /** Switches to the patch view. */
   showPatch: () => void;
+  /** Switches to the patch view, at a patch and an entry of it (ADR 0070). */
+  openPatch: (at: PatchAt) => void;
+  /** The user's patches (ADR 0070); null until read. */
+  book: PatchBook | null;
+  /** Replaces the user's patches, and keeps them. */
+  setBook: (book: PatchBook) => void;
+  /** The patch and entry the patch page is to open at, until the user goes elsewhere. */
+  patchAt: PatchAt | null;
   /** The tools the setup has, once looked at; null until then. */
   toolbox: RenderedToolbox | null;
   /** The decisions that wait for mods that are switched off (ADR 0061). */
@@ -56,12 +68,12 @@ export interface Session {
   /** Keeps a new order of preference. */
   setRanking: (ranking: string[]) => void;
   /** Switches to the assets page, the comparison of two mods' files, at one duel if given. */
-  openCompare: (duel: string | null) => void;
+  openCompare: (duel: string | null, from?: PatchAt) => void;
   /**
    * Switches to the collisions' pairs of mods and opens the pair of two
    * mods there, by the names the mod manager shows for them (ADR 0048).
    */
-  openPair: (first: string, second: string) => void;
+  openPair: (first: string, second: string, from?: PatchAt) => void;
   /** The pair the collisions are to open with, until the user goes elsewhere. */
   pairAt: [string, string] | null;
   /** Switches to the map, filtered to what one mod places, by its name. */
@@ -79,6 +91,16 @@ export interface Session {
    * dependency diagram (ADR 0068). Absent where the window has no Mods page.
    */
   showDependency?: (target: DependencyTarget) => void;
+}
+
+/** An entry of a patch, as the patch page opens at it and the way back names it. */
+export interface PatchAt {
+  /** The patch, by its identity. */
+  patch: string;
+  /** The entry, by its key on the patch page; null for the patch as a whole. */
+  entry: string | null;
+  /** The patch's name and the entry in words, for the way back. */
+  label: string;
 }
 
 export const SessionContext = createContext<Session | null>(null);

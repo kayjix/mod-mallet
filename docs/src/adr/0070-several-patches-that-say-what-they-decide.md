@@ -55,19 +55,23 @@ for it.
   Its decisions use the keys the pages already use (ADR 0040, 0050, 0060,
   0058, 0067): a collision finding, a spot, an object hidden on its own, a
   move (which carries a merged door's new target), a repaired navigation
-  mesh; and two new ones for file choices of Asset collisions:
-  `duel:<duel>` for the side picked in a duel and `version:<thing>` for the
-  version of a thing of the catalogue (ADR 0054).
+  mesh; and a new one for the file choices of Asset collisions,
+  `duel:<duel>` for the side picked in a duel. The versions of things of the
+  catalogue (ADR 0054) join later, as `version:<thing>`.
 - Pins are no decisions (ADR 0050) and stay outside every patch.
 - A patch is **counted** unless the user switched it off. What counts is
-  the decisions of every counted patch, ticked, in the order of the book: on
-  the same key the later patch wins. Every page reads and writes these, as
-  before; nothing on Map collisions, Asset collisions or the 3D views needs
-  to know about patches.
+  the ticked decisions of every counted patch: first the patches by someone
+  else, then the user's own, each in the order of the book; on the same key
+  the later patch wins, so the user's own decisions win over loaded ones.
+  Every page reads and writes these, as before; nothing on Map collisions,
+  Asset collisions or the 3D views needs to know about patches.
 - A page's change goes to the patch that holds the key if that is one of
   the user's own; otherwise to the **active** patch, which is always one of
   the user's own. New decisions go to the active one. The patch page moves
   or copies decisions between patches.
+- A decision taken back on a page is taken out of the user's own patches;
+  in a patch by someone else it is unticked, which leaves that patch's
+  decisions as its author made them.
 - Unticking keeps the decision in its patch but takes it out of what counts;
   the views show the object again at once.
 
@@ -81,8 +85,9 @@ for it.
   places, each linked to where it is decided. In the game both patches
   apply; the page says what that does (both objects gone, or the object
   stays hidden).
-- Where both patches are the user's own, a disagreement is settled by
-  keeping one side: the other side's decision is unticked in its patch.
+- Where the losing patch is one of the user's own, a disagreement is
+  settled by keeping one side: the losing patch takes the winning decision
+  at those places.
 - Where a patch is someone else's, it is not changed. The way to settle is
   a **compatibility patch**: an own patch, named after the two, that holds
   the winning decisions and is written so that it wins in the game. Its
@@ -102,10 +107,12 @@ for it.
   patch again by that name among the mods of the report.
 - The archive holds:
   - the swap files of its parts with the installer, as in ADR 0053;
-  - when it moves objects or merges doors, the plugin `<name> - Moves.esp`,
-    and when it repairs paths, `<name> - Paths.esp`, each light where it
+  - when it moves objects or merges doors, the plugin `<name> - Mod Mallet Moves.esp`,
+    and when it repairs paths, `<name> - Mod Mallet Paths.esp`, each light where it
     fits, as files the installer always installs. A patch is switched on or
     off with everything it does;
+    Mod Mallet knows its own plugins of moves and paths by these endings, and
+    a new one never copies from them;
   - its **manifest**, `mod-mallet-patch.json`, at the top of the archive,
     which the installer does not copy into the game.
 - The old separate mods "Mod Mallet - Moves" and "Mod Mallet - Paths"

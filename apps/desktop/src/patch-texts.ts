@@ -1,175 +1,429 @@
-// The texts of the patch page, in every language of the app.
+// The texts of the patch page (ADR 0070), in every language of the app.
 
 import type { Lang } from "./i18n";
 
 /** What the patch page says. */
 export interface PatchTexts {
   needsSwapper: string;
-  /** The objects the decisions hide, installed and not yet, in one line. */
-  summary: (chosen: number, installed: number | null, waiting: number) => string;
-  installedBy: (mod: string) => string;
-  create: string;
+  shelf: string;
+  newPatch: string;
+  newPatchName: string;
+  newPatchHint: string;
+  load: string;
+  loadHint: string;
+  loadFailed: (reason: string) => string;
+  loaded: (name: string) => string;
+  active: string;
+  activeHint: string;
+  by: (author: string) => string;
+  decisions: (count: number) => string;
+  state: Record<"in-game" | "switched-off" | "not-installed" | "off-here" | "differs", string>;
+
+  does: (hidden: number, moved: number, paths: number, files: number) => string;
+  nothing: string;
+  activeNote: string;
+  makeActive: string;
+  makeActiveHint: string;
+  foreignNote: (author: string, version: string | null) => string;
+  authorUnproven: string;
+  loadedFrom: (archive: string) => string;
+  makeOwn: string;
+  makeOwnHint: string;
+  stateInGame: (mod: string) => string;
+  stateSwitchedOff: (mod: string) => string;
+  stateNotInstalled: string;
+  stateOffHere: string;
+  differs: (objects: number) => string;
   install: string;
+  update: string;
   installHint: string;
-  clear: string;
-  clearHint: string;
-  created: string;
-  stale: string;
-  useInstalled: string;
-  useInstalledHint: string;
-  differsHow: string;
-  confirmClear: (objects: number) => string;
-  confirmClearYes: string;
-  confirmInstalled: (waiting: number) => string;
-  confirmInstalledYes: string;
+  write: string;
+  writeHint: string;
+  written: string;
+  switchOff: string;
+  switchOffHint: string;
+  switchOn: string;
+  switchOnHint: string;
+  rename: string;
+  save: string;
   cancel: string;
-  replaced: string;
-  undoReplace: string;
-  decided: string;
-  nothingDecided: string;
-  /** What was decided for a pair as a whole. */
-  hide: (plugin: string) => string;
-  keepBoth: string;
-  mixed: string;
-  spotsOnly: string;
-  objects: (count: number) => string;
-  ownSpots: (count: number) => string;
-  change: string;
-  changeHint: string;
+  remove: string;
+  confirmRemove: (name: string, decisions: number, inGame: boolean) => string;
+  removed: (name: string) => string;
   undo: string;
-  inPatch: string;
-  waitingMark: string;
-  /** Decided, but not in the installed patch yet. */
-  waiting: (objects: number, pairs: number) => string;
-  /** Not decided yet. */
+  forget: string;
+  forgetHint: string;
+  confirmForget: (decisions: number) => string;
+  forgotten: string;
+
+  modsTitle: string;
+  modsNote: string;
+  modMissing: (mod: string, decisions: number) => string;
+  modOff: (mod: string, decisions: number) => string;
+  modCount: (decisions: number) => string;
+
+  groups: Record<"collisions" | "objects" | "moves" | "paths" | "files" | "other", string>;
+  everywhere: (places: number, text: string) => string;
+  kept: (kept: string, hidden: string, things: string) => string;
+  bothKept: (first: string, second: string) => string;
+  theirObjects: string;
+  objectHidden: (mod: string, name: string) => string;
+  objectShown: (mod: string, name: string) => string;
+  moved: (mod: string, name: string, centimetres: number, degrees: number) => string;
+  doorMerged: (mod: string, name: string) => string;
+  pathsRepaired: (place: string) => string;
+  fileChoice: (winner: string, loser: string) => string;
+  unknownDuel: string;
+  notScanned: string;
+  numbered: (number: string) => string;
+  notFound: string;
+  waits: string;
+  waitsHint: string;
+  tickHint: string;
+  goHint: string;
+  moveMenu: string;
+  moveTo: (name: string) => string;
+  copyTo: (name: string) => string;
+  moveAll: string;
+
+  conflictsTitle: string;
+  conflict: (first: string, second: string, places: number) => string;
+  conflictNote: string;
+  keep: (name: string) => string;
+  keepHint: (other: string) => string;
+  foreignConflict: (name: string) => string;
+  thisPatch: string;
+
+  unknownInstalled: (name: string, objects: number) => string;
+  takeInstalled: string;
+  oldMod: (mod: string) => string;
+  switchOldOff: string;
   open: (spots: number, pairs: number) => string;
   toCollisions: string;
-  own: (count: number) => string;
-  ownNote: string;
-  showAgain: string;
+  emptyBook: string;
+  patchLabel: (name: string) => string;
 }
+
+const plural = (count: number, one: string, many: string) =>
+  count === 1 ? `1 ${one}` : `${count} ${many}`;
 
 const en: PatchTexts = {
   needsSwapper:
-    "A patch hides objects with Base Object Swapper, a script extender plugin that is not installed.",
-  summary: (chosen, installed, waiting) =>
-    [
-      chosen === 1 ? "1 object hidden" : `${chosen} objects hidden`,
-      installed === null ? "no patch installed" : `installed: ${installed}`,
-      ...(waiting > 0 ? [`${waiting} not in the game yet`] : []),
-    ].join(" · "),
-  installedBy: (mod) => `The installed patch is the mod “${mod}”.`,
-  create: "Create",
-  install: "Install through Vortex",
+    "Hiding objects needs Base Object Swapper, a script extender plugin that is not installed. Moves and repaired paths work without it.",
+  shelf: "Your patches",
+  newPatch: "New patch",
+  newPatchName: "New patch",
+  newPatchHint:
+    "Starts an empty patch and makes it the active one: what you decide from now on goes into it. The other patches keep their decisions.",
+  load: "Load a patch…",
+  loadHint:
+    "Reads a patch archive, your own or one somebody shared, back into Mod Mallet as decisions you can look at, change and install. Nothing is installed by loading.",
+  loadFailed: (reason) => `The patch could not be loaded: ${reason}`,
+  loaded: (name) => `Loaded “${name}”.`,
+  active: "active",
+  activeHint: "New decisions go into this patch.",
+  by: (author) => `by ${author}`,
+  decisions: (count) => plural(count, "decision", "decisions"),
+  state: {
+    "in-game": "in the game",
+    "switched-off": "switched off in Vortex",
+    "not-installed": "not installed yet",
+    "off-here": "switched off",
+    differs: "changed since installing",
+  },
+
+  does: (hidden, moved, paths, files) => {
+    const parts = [
+      ...(hidden > 0 ? [`hides ${plural(hidden, "object", "objects")}`] : []),
+      ...(moved > 0 ? [`moves ${plural(moved, "object", "objects")}`] : []),
+      ...(paths > 0 ? [`repairs the paths in ${plural(paths, "place", "places")}`] : []),
+      ...(files > 0 ? [`keeps ${plural(files, "file choice", "file choices")}`] : []),
+    ];
+    if (parts.length === 0) {
+      return "";
+    }
+    const last = parts.pop();
+    const text = parts.length === 0 ? last : `${parts.join(", ")} and ${last}`;
+    return `This patch ${text}.`;
+  },
+  nothing:
+    "This patch decides nothing yet. While it is the active patch, what you decide in Map collisions, Asset collisions and the 3D views goes into it.",
+  activeNote: "Active: what you decide anywhere in Mod Mallet goes into this patch.",
+  makeActive: "Make active",
+  makeActiveHint: "New decisions go into this patch from now on.",
+  foreignNote: (author, version) =>
+    `Made by ${author}${version === null ? "" : `, version ${version}`}. Mod Mallet does not change its decisions: untick what you don't want, decide over it in a patch of your own, or make it yours.`,
+  authorUnproven: "Anybody can write any name as the author; nothing proves it yet.",
+  loadedFrom: (archive) => `Loaded from ${archive}.`,
+  makeOwn: "Make it mine",
+  makeOwnHint:
+    "Turns it into your own patch, which you can change. It keeps its name; give it another one before you share it.",
+  stateInGame: (mod) => `In the game, as the mod “${mod}” in Vortex.`,
+  stateSwitchedOff: (mod) =>
+    `Switched off in Vortex (“${mod}”): it does nothing in the game. Its decisions are kept here.`,
+  stateNotInstalled: "Not installed yet: nothing of it is in the game.",
+  stateOffHere:
+    "Switched off: its decisions are kept, but they do not count and the views do not show them.",
+  differs: (objects) =>
+    `${plural(objects, "decided object is", "decided objects are")} not in the installed version yet. Update it in Vortex to bring them into the game.`,
+  install: "Install in Vortex",
+  update: "Update in Vortex",
   installHint:
-    "Mod Mallet writes a small mod that shows an invisible marker in place of these objects while the game runs. Remove the mod in Vortex to bring them back.",
-  clear: "Clear",
-  clearHint: "Forget every decision; the patch then hides nothing.",
-  created: "Created:",
-  stale: "The decisions changed since. Create the patch again before installing it.",
-  useInstalled: "Go back to the installed patch",
-  useInstalledHint:
-    "Throws away what you decided since the patch was installed, and takes the installed patch's choices instead.",
-  differsHow:
-    "Your decisions differ from the installed patch. To bring them into the game: Create, then Install through Vortex.",
-  confirmClear: (objects) =>
-    `Forget every decision? The patch would then hide nothing instead of ${objects} objects. You can undo it right after.`,
-  confirmClearYes: "Forget every decision",
-  confirmInstalled: (waiting) =>
-    `Throw away what you decided since the patch was installed (${waiting} objects not in the game yet), and go back to it? To keep your decisions instead, create and install the patch. You can undo it right after.`,
-  confirmInstalledYes: "Go back to the installed patch",
+    "Mod Mallet writes this patch as a small mod of its own and asks Vortex to install it. Switch the mod off in Vortex to bring everything back.",
+  write: "Only write the archive",
+  writeHint:
+    "Writes the patch's archive into Mod Mallet's folder without installing it, for example to share it or to install it by hand.",
+  written: "Written:",
+  switchOff: "Switch off",
+  switchOffHint:
+    "Takes the patch out of the game through Vortex, and its decisions stop counting here. They are kept: switch it on again any time.",
+  switchOn: "Switch on",
+  switchOnHint:
+    "Its decisions count again, and Vortex switches its mod on again if it is installed.",
+  rename: "Rename",
+  save: "Save",
   cancel: "Cancel",
-  replaced: "Your decisions were replaced.",
-  undoReplace: "Undo",
-  decided: "Decided",
-  nothingDecided:
-    "Nothing is decided yet. Decide the collisions in Collisions; what you decide is listed here.",
-  hide: (plugin) => `hide ${plugin}’s objects`,
-  keepBoth: "keep both",
-  mixed: "decided differently for its kinds of collision",
-  spotsOnly: "decided spot by spot",
-  objects: (count) => (count === 1 ? "1 object" : `${count} objects`),
-  ownSpots: (count) =>
-    count === 1 ? "1 spot decided on its own" : `${count} spots decided on their own`,
-  change: "Change",
-  changeHint: "Open it in Collisions",
+  remove: "Remove",
+  confirmRemove: (name, decisions, inGame) =>
+    `Remove “${name}” and its ${plural(decisions, "decision", "decisions")} from Mod Mallet?${
+      inGame
+        ? " Its mod stays in Vortex: switch the patch off first to take it out of the game."
+        : ""
+    } You can undo it right after.`,
+  removed: (name) => `“${name}” was removed.`,
   undo: "Undo",
-  inPatch: "in the patch",
-  waitingMark: "waiting",
-  waiting: (objects, pairs) =>
-    `Waiting: ${objects === 1 ? "1 decided object is" : `${objects} decided objects are`} not in the installed patch yet${
-      pairs > 0 ? `, in ${pairs === 1 ? "1 pair" : `${pairs} pairs`} of mods` : ""
-    }. Create the patch and install it.`,
+  forget: "Forget all decisions",
+  forgetHint: "Empties this patch; the other patches stay as they are.",
+  confirmForget: (decisions) =>
+    `Forget all ${plural(decisions, "decision", "decisions")} of this patch? The views then show these places as undecided. You can undo it right after.`,
+  forgotten: "The decisions of this patch were forgotten.",
+
+  modsTitle: "Mods this patch is about",
+  modsNote:
+    "A decision about a mod you don't have, or have switched off, does nothing in the game and needs nothing from you.",
+  modMissing: (mod, decisions) =>
+    `You don't have ${mod}; its ${plural(decisions, "decision", "decisions")} in this patch do nothing and need no decision.`,
+  modOff: (mod, decisions) =>
+    `${mod} is switched off; its ${plural(decisions, "decision", "decisions")} in this patch wait until you switch it on again.`,
+  modCount: (decisions) => plural(decisions, "decision", "decisions"),
+
+  groups: {
+    collisions: "Places where mods collide",
+    objects: "Objects hidden or shown on their own",
+    moves: "Moved objects and merged doors",
+    paths: "Repaired paths",
+    files: "File choices",
+    other: "Other decisions",
+  },
+  everywhere: (places, text) =>
+    `Everywhere they collide (${plural(places, "place", "places")}): ${text}`,
+  kept: (kept, hidden, things) => `${kept} kept, ${hidden}’s ${things} hidden`,
+  bothKept: (first, second) => `${first} and ${second} both kept`,
+  theirObjects: "objects",
+  objectHidden: (mod, name) => `${mod}’s ${name} hidden`,
+  objectShown: (mod, name) => `${mod}’s ${name} shown again`,
+  moved: (mod, name, centimetres, degrees) =>
+    `${mod}’s ${name} moved by ${centimetres} cm${degrees === 0 ? "" : ` and turned by ${degrees}°`}`,
+  doorMerged: (mod, name) => `${mod}’s ${name} merged with the doors stacked on it`,
+  pathsRepaired: (place) => `Paths repaired in ${place}`,
+  fileChoice: (winner, loser) => `${winner}’s files used where ${loser} brings the same ones`,
+  unknownDuel: "A file choice the last scan did not find",
+  notScanned: "not in the last scan",
+  numbered: (number) => `object ${number}`,
+  notFound: "the last scan did not find this place",
+  waits: "waits",
+  waitsHint: "A mod it is about is switched off; the decision counts again when you switch it on.",
+  tickHint:
+    "Untick to keep the decision without it counting; Map collisions and the 3D views show the result at once.",
+  goHint: "Show where it was decided",
+  moveMenu: "Move or copy…",
+  moveTo: (name) => `Move to “${name}”`,
+  copyTo: (name) => `Copy to “${name}”`,
+  moveAll: "Move or copy all…",
+
+  conflictsTitle: "Patches that disagree",
+  conflict: (first, second, places) =>
+    `“${first}” and “${second}” decide ${plural(places, "place", "places")} differently.`,
+  conflictNote:
+    "In the game both patches apply: where one hides an object and the other keeps it, it stays hidden; where each hides the other’s object, both are gone.",
+  keep: (name) => `Keep “${name}”`,
+  keepHint: (other) => `Unticks these decisions in “${other}”.`,
+  foreignConflict: (name) =>
+    `“${name}” is somebody else’s patch; Mod Mallet does not change it. Keep your own decision with the button, or switch one of the two patches off. A compatibility patch that settles this in the game comes later.`,
+  thisPatch: "this patch",
+
+  unknownInstalled: (name, objects) =>
+    `The game has the patch “${name}” (${plural(objects, "object", "objects")}), which Mod Mallet does not list yet.`,
+  takeInstalled: "Take it into Mod Mallet",
+  oldMod: (mod) =>
+    `The old mod “${mod}” is still on. Its moves and paths are part of your patch now; once that is installed, switch the old mod off so that nothing is done twice.`,
+  switchOldOff: "Switch the old mod off",
+  emptyBook: "No patch yet. Start one, or load one somebody shared.",
+  patchLabel: (name) => `patch “${name}”`,
   open: (spots, pairs) =>
-    `Not decided yet: ${spots === 1 ? "1 spot" : `${spots} spots`} in ${pairs === 1 ? "1 pair" : `${pairs} pairs`} of mods.`,
-  toCollisions: "To Collisions",
-  own: (count) =>
-    count === 1 ? "1 object hidden on its own" : `${count} objects hidden on their own`,
-  ownNote:
-    "Picked one by one in the 3D view, or in the installed patch without a collision of this scan.",
-  showAgain: "Show again",
+    `Not decided yet: ${plural(spots, "place", "places")} in ${plural(pairs, "pair", "pairs")} of mods.`,
+  toCollisions: "Decide them",
 };
 
 const de: PatchTexts = {
   needsSwapper:
-    "Ein Patch blendet Objekte mit Base Object Swapper aus, einem Script-Extender-Plugin, das nicht installiert ist.",
-  summary: (chosen, installed, waiting) =>
-    [
-      chosen === 1 ? "1 Objekt ausgeblendet" : `${chosen} Objekte ausgeblendet`,
-      installed === null ? "kein Patch installiert" : `installiert: ${installed}`,
-      ...(waiting > 0 ? [`${waiting} noch nicht im Spiel`] : []),
-    ].join(" · "),
-  installedBy: (mod) => `Der installierte Patch ist die Mod „${mod}“.`,
-  create: "Erstellen",
-  install: "Über Vortex installieren",
+    "Zum Ausblenden braucht es Base Object Swapper, ein Script-Extender-Plugin, das nicht installiert ist. Verschiebungen und reparierte Wege gehen ohne.",
+  shelf: "Deine Patches",
+  newPatch: "Neuer Patch",
+  newPatchName: "Neuer Patch",
+  newPatchHint:
+    "Beginnt einen leeren Patch und macht ihn zum aktiven: Was du ab jetzt entscheidest, kommt hinein. Die anderen Patches behalten ihre Entscheidungen.",
+  load: "Patch laden…",
+  loadHint:
+    "Liest ein Patch-Archiv – dein eigenes oder eines, das jemand geteilt hat – zurück in Mod Mallet, als Entscheidungen, die du ansehen, ändern und installieren kannst. Beim Laden wird nichts installiert.",
+  loadFailed: (reason) => `Der Patch konnte nicht geladen werden: ${reason}`,
+  loaded: (name) => `„${name}“ geladen.`,
+  active: "aktiv",
+  activeHint: "Neue Entscheidungen kommen in diesen Patch.",
+  by: (author) => `von ${author}`,
+  decisions: (count) => (count === 1 ? "1 Entscheidung" : `${count} Entscheidungen`),
+  state: {
+    "in-game": "im Spiel",
+    "switched-off": "in Vortex ausgeschaltet",
+    "not-installed": "noch nicht installiert",
+    "off-here": "ausgeschaltet",
+    differs: "seit dem Installieren geändert",
+  },
+
+  does: (hidden, moved, paths, files) => {
+    const parts = [
+      ...(hidden > 0 ? [`blendet ${hidden === 1 ? "1 Objekt" : `${hidden} Objekte`} aus`] : []),
+      ...(moved > 0 ? [`verschiebt ${moved === 1 ? "1 Objekt" : `${moved} Objekte`}`] : []),
+      ...(paths > 0 ? [`repariert die Wege an ${paths === 1 ? "1 Ort" : `${paths} Orten`}`] : []),
+      ...(files > 0
+        ? [`hält ${files === 1 ? "1 Dateientscheidung" : `${files} Dateientscheidungen`} fest`]
+        : []),
+    ];
+    if (parts.length === 0) {
+      return "";
+    }
+    const last = parts.pop();
+    const text = parts.length === 0 ? last : `${parts.join(", ")} und ${last}`;
+    return `Dieser Patch ${text}.`;
+  },
+  nothing:
+    "Dieser Patch entscheidet noch nichts. Solange er der aktive Patch ist, kommt hinein, was du unter Karten-Kollisionen, Asset-Kollisionen und in den 3D-Ansichten entscheidest.",
+  activeNote: "Aktiv: Was du irgendwo in Mod Mallet entscheidest, kommt in diesen Patch.",
+  makeActive: "Aktiv machen",
+  makeActiveHint: "Neue Entscheidungen kommen ab jetzt in diesen Patch.",
+  foreignNote: (author, version) =>
+    `Gemacht von ${author}${version === null ? "" : `, Version ${version}`}. Mod Mallet ändert seine Entscheidungen nicht: Hake ab, was du nicht willst, entscheide in einem eigenen Patch darüber, oder mach ihn zu deinem.`,
+  authorUnproven: "Als Autor kann jeder jeden Namen eintragen; noch beweist nichts, wer es war.",
+  loadedFrom: (archive) => `Geladen aus ${archive}.`,
+  makeOwn: "Zu meinem machen",
+  makeOwnHint:
+    "Macht ihn zu deinem eigenen Patch, den du ändern kannst. Er behält seinen Namen; gib ihm einen anderen, bevor du ihn teilst.",
+  stateInGame: (mod) => `Im Spiel, als Mod „${mod}“ in Vortex.`,
+  stateSwitchedOff: (mod) =>
+    `In Vortex ausgeschaltet („${mod}“): Im Spiel bewirkt er nichts. Seine Entscheidungen bleiben hier.`,
+  stateNotInstalled: "Noch nicht installiert: Nichts davon ist im Spiel.",
+  stateOffHere:
+    "Ausgeschaltet: Seine Entscheidungen bleiben, zählen aber nicht, und die Ansichten zeigen sie nicht.",
+  differs: (objects) =>
+    `${objects === 1 ? "1 entschiedenes Objekt ist" : `${objects} entschiedene Objekte sind`} noch nicht in der installierten Fassung. Aktualisiere ihn in Vortex, um sie ins Spiel zu bringen.`,
+  install: "In Vortex installieren",
+  update: "In Vortex aktualisieren",
   installHint:
-    "Mod Mallet schreibt eine kleine Mod, die diese Objekte im Spiel durch einen unsichtbaren Marker ersetzt. Entfernst du die Mod in Vortex, sind sie wieder da.",
-  clear: "Zurücksetzen",
-  clearHint: "Alle Entscheidungen vergessen; der Patch blendet dann nichts aus.",
-  created: "Erstellt:",
-  stale:
-    "Die Entscheidungen haben sich seitdem geändert. Erstelle den Patch neu, bevor du ihn installierst.",
-  useInstalled: "Zurück zum installierten Patch",
-  useInstalledHint:
-    "Verwirft, was du seit dem Installieren entschieden hast, und nimmt stattdessen die Auswahl des installierten Patches.",
-  differsHow:
-    "Deine Entscheidungen weichen vom installierten Patch ab. Um sie ins Spiel zu bringen: Erstellen, dann Über Vortex installieren.",
-  confirmClear: (objects) =>
-    `Alle Entscheidungen vergessen? Der Patch würde dann nichts mehr ausblenden statt ${objects} Objekte. Du kannst es direkt danach rückgängig machen.`,
-  confirmClearYes: "Alle Entscheidungen vergessen",
-  confirmInstalled: (waiting) =>
-    `Verwerfen, was du seit dem Installieren entschieden hast (${waiting} Objekte noch nicht im Spiel), und zum installierten Patch zurück? Um deine Entscheidungen zu behalten, erstelle und installiere stattdessen den Patch. Du kannst es direkt danach rückgängig machen.`,
-  confirmInstalledYes: "Zurück zum installierten Patch",
+    "Mod Mallet schreibt diesen Patch als eigene kleine Mod und bittet Vortex, sie zu installieren. Schaltest du die Mod in Vortex aus, ist alles wieder wie vorher.",
+  write: "Nur das Archiv schreiben",
+  writeHint:
+    "Schreibt das Archiv des Patches in den Ordner von Mod Mallet, ohne es zu installieren – etwa zum Teilen oder um es selbst zu installieren.",
+  written: "Geschrieben:",
+  switchOff: "Ausschalten",
+  switchOffHint:
+    "Nimmt den Patch über Vortex aus dem Spiel, und seine Entscheidungen zählen hier nicht mehr. Sie bleiben erhalten: Schalte ihn jederzeit wieder ein.",
+  switchOn: "Einschalten",
+  switchOnHint:
+    "Seine Entscheidungen zählen wieder, und Vortex schaltet seine Mod wieder ein, wenn sie installiert ist.",
+  rename: "Umbenennen",
+  save: "Speichern",
   cancel: "Abbrechen",
-  replaced: "Deine Entscheidungen wurden ersetzt.",
-  undoReplace: "Rückgängig",
-  decided: "Entschieden",
-  nothingDecided:
-    "Noch ist nichts entschieden. Entscheide die Kollisionen unter Kollisionen; was du entscheidest, steht dann hier.",
-  hide: (plugin) => `Objekte von ${plugin} ausblenden`,
-  keepBoth: "beide behalten",
-  mixed: "je nach Art der Kollision anders entschieden",
-  spotsOnly: "Stelle für Stelle entschieden",
-  objects: (count) => (count === 1 ? "1 Objekt" : `${count} Objekte`),
-  ownSpots: (count) =>
-    count === 1 ? "1 Stelle einzeln entschieden" : `${count} Stellen einzeln entschieden`,
-  change: "Ändern",
-  changeHint: "Unter Kollisionen öffnen",
+  remove: "Entfernen",
+  confirmRemove: (name, decisions, inGame) =>
+    `„${name}“ mit ${decisions === 1 ? "1 Entscheidung" : `${decisions} Entscheidungen`} aus Mod Mallet entfernen?${
+      inGame
+        ? " Seine Mod bleibt in Vortex: Schalte den Patch vorher aus, um ihn aus dem Spiel zu nehmen."
+        : ""
+    } Du kannst es direkt danach rückgängig machen.`,
+  removed: (name) => `„${name}“ wurde entfernt.`,
   undo: "Rückgängig",
-  inPatch: "im Patch",
-  waitingMark: "wartet",
-  waiting: (objects, pairs) =>
-    `Wartet: ${objects === 1 ? "1 entschiedenes Objekt ist" : `${objects} entschiedene Objekte sind`} noch nicht im installierten Patch${
-      pairs > 0 ? `, in ${pairs === 1 ? "1 Mod-Paar" : `${pairs} Mod-Paaren`}` : ""
-    }. Erstelle den Patch und installiere ihn.`,
+  forget: "Alle Entscheidungen vergessen",
+  forgetHint: "Leert diesen Patch; die anderen Patches bleiben, wie sie sind.",
+  confirmForget: (decisions) =>
+    `Alle ${decisions === 1 ? "1 Entscheidung" : `${decisions} Entscheidungen`} dieses Patches vergessen? Die Ansichten zeigen diese Stellen dann als nicht entschieden. Du kannst es direkt danach rückgängig machen.`,
+  forgotten: "Die Entscheidungen dieses Patches wurden vergessen.",
+
+  modsTitle: "Mods, um die es in diesem Patch geht",
+  modsNote:
+    "Eine Entscheidung über eine Mod, die du nicht hast oder ausgeschaltet hast, bewirkt im Spiel nichts und braucht nichts von dir.",
+  modMissing: (mod, decisions) =>
+    `Du hast ${mod} nicht; ${decisions === 1 ? "seine 1 Entscheidung" : `seine ${decisions} Entscheidungen`} in diesem Patch bewirken nichts und brauchen keine Entscheidung.`,
+  modOff: (mod, decisions) =>
+    `${mod} ist ausgeschaltet; ${decisions === 1 ? "seine 1 Entscheidung" : `seine ${decisions} Entscheidungen`} in diesem Patch warten, bis du die Mod wieder einschaltest.`,
+  modCount: (decisions) => (decisions === 1 ? "1 Entscheidung" : `${decisions} Entscheidungen`),
+
+  groups: {
+    collisions: "Stellen, an denen Mods kollidieren",
+    objects: "Einzeln aus- oder wieder eingeblendete Objekte",
+    moves: "Verschobene Objekte und zusammengelegte Türen",
+    paths: "Reparierte Wege",
+    files: "Dateientscheidungen",
+    other: "Andere Entscheidungen",
+  },
+  everywhere: (places, text) =>
+    `Überall, wo sie kollidieren (${places === 1 ? "1 Stelle" : `${places} Stellen`}): ${text}`,
+  kept: (kept, hidden, things) => `${kept} behalten, ${things} von ${hidden} ausgeblendet`,
+  bothKept: (first, second) => `${first} und ${second} beide behalten`,
+  theirObjects: "die Objekte",
+  objectHidden: (mod, name) => `${name} von ${mod} ausgeblendet`,
+  objectShown: (mod, name) => `${name} von ${mod} wieder eingeblendet`,
+  moved: (mod, name, centimetres, degrees) =>
+    `${name} von ${mod} um ${centimetres} cm verschoben${degrees === 0 ? "" : ` und um ${degrees}° gedreht`}`,
+  doorMerged: (mod, name) => `${name} von ${mod} mit den Türen darüber zusammengelegt`,
+  pathsRepaired: (place) => `Wege repariert in ${place}`,
+  fileChoice: (winner, loser) => `Dateien von ${winner} genommen, wo ${loser} dieselben mitbringt`,
+  unknownDuel: "Eine Dateientscheidung, die der letzte Scan nicht gefunden hat",
+  notScanned: "nicht im letzten Scan",
+  numbered: (number) => `Objekt ${number}`,
+  notFound: "diese Stelle hat der letzte Scan nicht gefunden",
+  waits: "wartet",
+  waitsHint:
+    "Eine Mod, um die es geht, ist ausgeschaltet; die Entscheidung zählt wieder, wenn du sie einschaltest.",
+  tickHint:
+    "Abhaken behält die Entscheidung, ohne dass sie zählt; Karten-Kollisionen und die 3D-Ansichten zeigen das Ergebnis sofort.",
+  goHint: "Zeigen, wo das entschieden wurde",
+  moveMenu: "Verschieben oder kopieren…",
+  moveTo: (name) => `Nach „${name}“ verschieben`,
+  copyTo: (name) => `Nach „${name}“ kopieren`,
+  moveAll: "Alle verschieben oder kopieren…",
+
+  conflictsTitle: "Patches, die sich widersprechen",
+  conflict: (first, second, places) =>
+    `„${first}“ und „${second}“ entscheiden ${places === 1 ? "1 Stelle" : `${places} Stellen`} verschieden.`,
+  conflictNote:
+    "Im Spiel gelten beide Patches: Wo der eine ein Objekt ausblendet und der andere es behält, bleibt es ausgeblendet; wo jeder das Objekt des anderen ausblendet, sind beide weg.",
+  keep: (name) => `„${name}“ behalten`,
+  keepHint: (other) => `Hakt diese Entscheidungen in „${other}“ ab.`,
+  foreignConflict: (name) =>
+    `„${name}“ ist der Patch von jemand anderem; Mod Mallet ändert ihn nicht. Behalte mit dem Knopf deine eigene Entscheidung, oder schalte einen der beiden Patches aus. Ein Kompatibilitäts-Patch, der das im Spiel regelt, kommt später.`,
+  thisPatch: "diesen Patch",
+
+  unknownInstalled: (name, objects) =>
+    `Im Spiel ist der Patch „${name}“ (${objects === 1 ? "1 Objekt" : `${objects} Objekte`}), den Mod Mallet noch nicht aufführt.`,
+  takeInstalled: "In Mod Mallet übernehmen",
+  oldMod: (mod) =>
+    `Die alte Mod „${mod}“ ist noch eingeschaltet. Ihre Verschiebungen und Wege gehören jetzt zu deinem Patch; sobald der installiert ist, schalte die alte Mod aus, damit nichts doppelt geschieht.`,
+  switchOldOff: "Alte Mod ausschalten",
+  emptyBook: "Noch kein Patch. Beginne einen, oder lade einen, den jemand geteilt hat.",
+  patchLabel: (name) => `Patch „${name}“`,
   open: (spots, pairs) =>
     `Noch nicht entschieden: ${spots === 1 ? "1 Stelle" : `${spots} Stellen`} in ${pairs === 1 ? "1 Mod-Paar" : `${pairs} Mod-Paaren`}.`,
-  toCollisions: "Zu den Kollisionen",
-  own: (count) =>
-    count === 1 ? "1 Objekt einzeln ausgeblendet" : `${count} Objekte einzeln ausgeblendet`,
-  ownNote:
-    "Einzeln in der 3D-Ansicht gewählt, oder im installierten Patch ohne Kollision dieses Scans.",
-  showAgain: "Wieder zeigen",
+  toCollisions: "Entscheiden",
 };
 
 export const patchTexts: Record<Lang, PatchTexts> = { en, de };

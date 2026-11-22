@@ -1,0 +1,31 @@
+/* The way back (ADR 0070): back and forward, and back to a patch's entry. */
+
+/* It stays at the top while the page scrolls, so the way back is always in reach. */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -20px -28px 10px;
+  padding: 8px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.nav-bar .nav-step {
+  min-width: 32px;
+  padding: 2px 8px;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.nav-bar .nav-return {
+  margin-left: 6px;
+  border-color: var(--accent);
+  overflow: hidden;
+  max-width: 70%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

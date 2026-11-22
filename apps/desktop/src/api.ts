@@ -17,11 +17,13 @@ import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
 import type { HiddenWalkways } from "./generated/hidden-walkways";
+import type { LoadedPatch } from "./generated/loaded-patch";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { LodTiles } from "./generated/lod-tiles";
 import type { MapImage } from "./generated/map-image";
 import type { MeshView } from "./generated/mesh-view";
 import type { ObjectAnchors } from "./generated/object-anchors";
+import type { PatchBook } from "./generated/patch-book";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
@@ -241,6 +243,12 @@ export interface Api {
   patchChoices(): Promise<Record<string, string | null> | null>;
   /** Remembers what the user chose for the patch that hides objects. */
   setPatchChoices(choices: Record<string, string | null>): Promise<void>;
+  /** The user's patches for the game in use (ADR 0070); null until made. */
+  patchBook(): Promise<PatchBook | null>;
+  /** Remembers the user's patches. */
+  setPatchBook(book: PatchBook): Promise<void>;
+  /** Reads the patch in an archive the user picked; nothing is installed. */
+  loadPatchArchive(name: string, bytes: number[]): Promise<LoadedPatch>;
   /** The sides the user picked in duels between mods, by duel. */
   decisions(): Promise<Record<string, number>>;
   /** Remembers the side picked in a duel, or forgets it with null. */
@@ -324,6 +332,9 @@ const tauriApi: Api = {
   setRanking: (ranking) => invoke<string[]>("set_ranking", { ranking }),
   patchChoices: () => invoke<Record<string, string | null> | null>("patch_choices"),
   setPatchChoices: (choices) => invoke<void>("set_patch_choices", { choices }),
+  patchBook: () => invoke<PatchBook | null>("patch_book"),
+  setPatchBook: (book) => invoke<void>("set_patch_book", { book }),
+  loadPatchArchive: (name, bytes) => invoke<LoadedPatch>("load_patch_archive", { name, bytes }),
   decisions: () => invoke<Record<string, number>>("decisions"),
   setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),
   games: () => invoke<GameChoice>("games"),

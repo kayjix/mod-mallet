@@ -1,0 +1,328 @@
+/* The patch page (ADR 0070): the patches on the left, the chosen one on the right. */
+
+.patches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.patches-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (width < 900px) {
+  .patches-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.patch-shelf {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.patch-shelf h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.patch-shelf ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patch-shelf-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  text-align: left;
+}
+
+.patch-shelf-row:hover {
+  background: var(--sunken);
+}
+
+.patch-shelf-row.chosen {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.patch-shelf-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.patch-shelf-line {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.patch-shelf-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.patch-chip {
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.patch-chip.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+}
+
+.patch-chip.warn {
+  color: var(--warning);
+}
+
+.patch-state.in-game {
+  color: var(--ok);
+}
+
+.patch-state.switched-off,
+.patch-state.off-here {
+  color: var(--muted);
+}
+
+.patch-state.not-installed,
+.patch-state.differs {
+  color: var(--warning);
+}
+
+.patch-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.patch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.patch-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.patch-card-head h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.patch-card-head p {
+  margin: 0;
+}
+
+.patch-does {
+  font-size: 1rem;
+}
+
+.patch-state-line {
+  padding-left: 8px;
+  border-left: 3px solid var(--border);
+}
+
+.patch-state-line.in-game {
+  border-left-color: var(--ok);
+}
+
+.patch-state-line.not-installed {
+  border-left-color: var(--warning);
+}
+
+.patch-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.patch-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.patch-rename input {
+  min-width: 240px;
+  font-size: 1.05rem;
+}
+
+.patch-mods,
+.patch-conflicts,
+.patch-group {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.patch-mods h3,
+.patch-conflicts h3,
+.patch-group h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.patch-mods ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.patch-mod.missing,
+.patch-mod.switched-off {
+  color: var(--muted);
+}
+
+.patch-mod.missing::before,
+.patch-mod.switched-off::before {
+  content: "○ ";
+}
+
+.patch-mod.loaded::before {
+  content: "● ";
+  color: var(--ok);
+}
+
+.patch-conflicts {
+  border-color: var(--warning);
+}
+
+.patch-conflict + .patch-conflict {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.patch-conflict p {
+  margin: 0 0 6px;
+}
+
+.patch-conflict-places {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+
+.patch-section + .patch-section {
+  margin-top: 10px;
+}
+
+.patch-section h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.patch-entries {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patch-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.patch-entry:hover {
+  background: var(--sunken);
+}
+
+.patch-entry-text {
+  overflow-wrap: anywhere;
+}
+
+.patch-entry.unticked .patch-entry-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.patch-entry.marked {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+button.link:hover {
+  color: var(--brand);
+}
+
+.patch-entry-where {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.patch-move {
+  max-width: 170px;
+  font-size: 0.8rem;
+}

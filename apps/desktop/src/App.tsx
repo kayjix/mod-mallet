@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import "./App.css";
 import "./journey.css";
 import "./review.css";
-import { type Session, SessionContext, useSession } from "./Actions";
+import { type PatchAt, type Session, SessionContext, useSession } from "./Actions";
 import { AllGames, useGameArt } from "./AllGames";
 import type { Api, NamedPlaces } from "./api";
 import { type Counts, countFindings, modsByName } from "./arrange";
@@ -12,6 +12,7 @@ import { CompareView } from "./Compare";
 import { catalogueTexts } from "./catalogue-texts";
 import type { DependencyTarget } from "./dependencies";
 import { type Games, useGames } from "./games";
+import type { PatchBook } from "./generated/patch-book";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
 import type { MapSpot, RenderedReport } from "./generated/rendered-report";
@@ -24,6 +25,7 @@ import { LoadingMallet, LoadingScreen } from "./LoadingMallet";
 import { Mallet } from "./Mallet";
 import { MapView } from "./MapView";
 import { ModsView } from "./ModsView";
+import { NavBar } from "./nav-bar";
 import { Overview, openFileDuels } from "./Overview";
 import { reportFile } from "./PairReport";
 import { PatchView } from "./PatchView";
@@ -37,6 +39,7 @@ import {
   withoutDecidedPins,
   withoutMisspelt,
 } from "./patch";
+import { bookFromChoices, countedChoices, DUEL, withChange } from "./patch-book";
 import { pinTexts } from "./pins";
 import { Review } from "./Review";
 import { useReviewTexts } from "./review-texts";
@@ -73,6 +76,32 @@ type ViewName =
   | "settings"
   | "places";
 
+/** How many places the history keeps to go back to. */
+const HISTORY_LENGTH = 100;
+
+/** Where the window is: a page, and what it opened at (ADR 0070). */
+interface Place {
+  view: ViewName;
+  /** The spot the map shows. */
+  focus?: MapSpot | null;
+  /** The spot the collisions' worklist opens. */
+  workSpot?: MapSpot | null;
+  /** The duel the assets page opens. */
+  compareAt?: string | null;
+  /** The pair of mods the collisions open. */
+  pairAt?: [string, string] | null;
+  /** The mod the map is filtered to. */
+  mapMod?: string | null;
+  /** Where the Mods page opens. */
+  modsAt?: DependencyTarget | null;
+  /** Whether the collisions open with only the pinned spots. */
+  pinnedAsked?: boolean;
+  /** The patch, and the entry of it, the patch page opens at. */
+  patchAt?: PatchAt | null;
+  /** The entry of a patch this place was opened from, for the way back. */
+  from?: PatchAt | null;
+}
+
 /** How often the window looks whether the setup changed, in milliseconds. */
 const WATCH_EVERY = 5000;
 
@@ -84,7 +113,6 @@ const SAVE_CHOICES_AFTER = 400;
 
 export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
-  const [view, setView] = useState<ViewName>("overview");
   const [places, setPlaces] = useState<RenderedPlaces | null>(null);
   const [report, setReport] = useState<RenderedReport | null>(null);
   const reportRef = useRef(report);
@@ -92,50 +120,68 @@ export default function App({ api, startLang }: AppProps) {
   // What became of pins when their spots were decided, shown a moment.
   const [pinNote, setPinNote] = useState<number | null>(null);
   const pinNoteTimer = useRef<number | undefined>(undefined);
-  // Whether the collisions are to open with only the pinned spots.
-  const [pinnedAsked, setPinnedAsked] = useState(false);
   const [link, setLink] = useState<RenderedLink | null>(null);
   const [ignored, setIgnoredList] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
   const scanProgress = useScanProgress(api, scanning);
   const [changed, setChanged] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [focus, setFocus] = useState<MapSpot | null>(null);
-  // The spot to open the collisions' worklist with.
-  const [workSpot, setWorkSpot] = useState<MapSpot | null>(null);
   const [toolbox, setToolbox] = useState<RenderedToolbox | null>(null);
   const [liveWanted, setLiveWanted] = useState(initialLive);
   const games = useGames(api);
-  // What the user chose for the patch is kept in the settings. Where nothing
-  // is kept yet, it starts from the patch in the game, once; later scans
-  // keep what the user chose since.
-  const [patchChoices, setPatchChoicesNow] = useState<PatchChoices | null>(null);
+  // The user's patches are kept in the settings (ADR 0070). Where none are
+  // kept yet, the first is made once from the choices kept before there
+  // were several patches, over what the patch in the game hides; later
+  // scans keep what the user chose since.
+  const [book, setBookNow] = useState<PatchBook | null>(null);
+  const bookRef = useRef(book);
+  bookRef.current = book;
   // What the settings keep: undefined until read, null if nothing.
+  const [storedBook, setStoredBook] = useState<PatchBook | null | undefined>(undefined);
   const [storedChoices, setStoredChoices] = useState<PatchChoices | null | undefined>(undefined);
   useEffect(() => {
+    api
+      .patchBook()
+      .then(setStoredBook)
+      .catch(() => setStoredBook(null));
     api
       .patchChoices()
       .then(setStoredChoices)
       .catch(() => setStoredChoices(null));
   }, [api]);
-  // Saving waits until the choices rest a moment, and saves go out one
-  // after the other, so that the last choice is the one kept.
+  // Saving waits until the patches rest a moment, and saves go out one
+  // after the other, so that the last change is the one kept.
   const saveTimer = useRef<number | undefined>(undefined);
-  const unsaved = useRef<PatchChoices | null>(null);
+  const unsaved = useRef<PatchBook | null>(null);
   const saving = useRef<Promise<void>>(Promise.resolve());
-  const saveChoices = useCallback(() => {
+  const saveBook = useCallback(() => {
     window.clearTimeout(saveTimer.current);
-    const choices = unsaved.current;
-    if (choices === null) {
+    const next = unsaved.current;
+    if (next === null) {
       return;
     }
     unsaved.current = null;
     saving.current = saving.current
-      .then(() => api.setPatchChoices(choices))
+      .then(() => api.setPatchBook(next))
       .catch((error: unknown) => setFailure(String(error)));
   }, [api]);
+  const setBook = useCallback(
+    (next: PatchBook) => {
+      setBookNow(next);
+      unsaved.current = next;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(saveBook, SAVE_CHOICES_AFTER);
+    },
+    [saveBook],
+  );
+  // What every page reads: the decisions of the patches that count.
+  const patchChoices = useMemo(() => (book === null ? null : countedChoices(book)), [book]);
   const setPatchChoices = useCallback(
     (wanted: PatchChoices) => {
+      const now = bookRef.current;
+      if (now === null) {
+        return;
+      }
       // A pin marks a spot to solve later; once the spot is decided, the
       // pin has done its work and goes, with a short note (ADR 0050).
       const { choices: next, cleared } = withoutDecidedPins(
@@ -147,12 +193,9 @@ export default function App({ api, startLang }: AppProps) {
         window.clearTimeout(pinNoteTimer.current);
         pinNoteTimer.current = window.setTimeout(() => setPinNote(null), 6000);
       }
-      setPatchChoicesNow(next);
-      unsaved.current = next;
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = window.setTimeout(saveChoices, SAVE_CHOICES_AFTER);
+      setBook(withChange(now, countedChoices(now), next));
     },
-    [saveChoices],
+    [setBook],
   );
   // Decisions about mods that are switched off wait (ADR 0061): the pages
   // see the others, and what they change is kept together with them.
@@ -171,11 +214,11 @@ export default function App({ api, startLang }: AppProps) {
     (wanted: PatchChoices) => setPatchChoices(withWaiting(wanted, waitingRef.current)),
     [setPatchChoices],
   );
-  // A choice made just before the window closes is still kept.
+  // A change made just before the window closes is still kept.
   useEffect(() => {
-    window.addEventListener("pagehide", saveChoices);
-    return () => window.removeEventListener("pagehide", saveChoices);
-  }, [saveChoices]);
+    window.addEventListener("pagehide", saveBook);
+    return () => window.removeEventListener("pagehide", saveBook);
+  }, [saveBook]);
   const [decisions, setDecisions] = useState<Record<string, number>>({});
   useEffect(() => {
     api
@@ -183,14 +226,28 @@ export default function App({ api, startLang }: AppProps) {
       .then(setDecisions)
       .catch(() => {});
   }, [api]);
+  // A file choice of a duel is also kept in the patch that decides it, or
+  // in the active one (ADR 0070).
   const decide = useCallback(
     (id: string, side: number | null) => {
       api
         .setDecision(id, side)
         .then(setDecisions)
         .catch((error: unknown) => setFailure(String(error)));
+      const now = bookRef.current;
+      if (now !== null) {
+        const key = `${DUEL}${id}`;
+        const before = countedChoices(now);
+        const after = { ...before };
+        if (side === null) {
+          delete after[key];
+        } else {
+          after[key] = String(side);
+        }
+        setBook(withChange(now, before, after));
+      }
     },
-    [api],
+    [api, setBook],
   );
   const [ranking, setRankingList] = useState<string[]>([]);
   useEffect(() => {
@@ -209,28 +266,46 @@ export default function App({ api, startLang }: AppProps) {
     },
     [api],
   );
-  // The duel the assets page is to open at.
-  const [compareAt, setCompareAt] = useState<string | null>(null);
-  // Where the collisions and the map are to open, when another page led there.
-  const [pairAt, setPairAt] = useState<[string, string] | null>(null);
-  const [mapMod, setMapMod] = useState<string | null>(null);
-  const [modsAt, setModsAt] = useState<DependencyTarget | null>(null);
+  // Where the window is, and where it was, for going back (ADR 0070).
+  const [history, setHistory] = useState<{ places: Place[]; at: number }>({
+    places: [{ view: "overview" }],
+    at: 0,
+  });
+  const place: Place = history.places[history.at] ?? { view: "overview" };
+  const view = place.view;
+  const focus = place.focus ?? null;
+  const workSpot = place.workSpot ?? null;
+  const compareAt = place.compareAt ?? null;
+  const pairAt = place.pairAt ?? null;
+  const mapMod = place.mapMod ?? null;
+  const modsAt = place.modsAt ?? null;
+  const pinnedAsked = place.pinnedAsked === true;
+  const patchAt = place.patchAt ?? null;
   useEffect(() => {
-    if (patchChoices !== null || storedChoices === undefined || report === null) {
+    if (book !== null || storedBook === undefined) {
+      return;
+    }
+    if (storedBook !== null) {
+      setBookNow(storedBook);
+      return;
+    }
+    if (storedChoices === undefined || report === null) {
       return;
     }
     // What the installed patch hides counts as decided; what the user chose
-    // since, and kept, wins over it.
+    // since, and kept, wins over it. Objects an earlier reading of the patch
+    // kept under another spelling go.
     const installed = choicesOf(
       pairsOf(report, ignored),
       installedKeys(report),
       report.installedPatch?.objects ?? [],
     );
-    // Objects an earlier reading of the patch kept under another spelling go.
-    setPatchChoicesNow(
-      withoutMisspelt(mergeChoices(installed, storedChoices ?? {}), pairsOf(report, ignored)),
+    setBook(
+      bookFromChoices(
+        withoutMisspelt(mergeChoices(installed, storedChoices ?? {}), pairsOf(report, ignored)),
+      ),
     );
-  }, [patchChoices, storedChoices, report, ignored]);
+  }, [book, storedBook, storedChoices, report, ignored, setBook]);
   const t = texts[lang];
   const j = journeyTexts[lang];
 
@@ -355,7 +430,7 @@ export default function App({ api, startLang }: AppProps) {
   const confirmPlaces = async (named: NamedPlaces, manager: string | null) => {
     try {
       setPlaces(await api.confirmPlaces(named, manager, lang));
-      setView("overview");
+      go("overview");
       await scan();
     } catch (error: unknown) {
       setFailure(String(error));
@@ -372,74 +447,105 @@ export default function App({ api, startLang }: AppProps) {
     [api],
   );
 
-  // Going to a page: whatever another page asked it to open with is
-  // forgotten.
-  const go = useCallback((next: ViewName) => {
-    setFocus(null);
-    setWorkSpot(null);
-    setPairAt(null);
-    setMapMod(null);
-    setModsAt(null);
-    setCompareAt(null);
-    setPinnedAsked(false);
-    setView(next);
+  // Going somewhere: a page and what it opens at, kept in the history so
+  // that the user can go back the whole way (ADR 0070). Whatever another
+  // page asked the page before to open with is forgotten.
+  const navigate = useCallback((next: Place) => {
+    setHistory(({ places: list, at }) => {
+      const kept = list.slice(Math.max(0, at + 1 - HISTORY_LENGTH), at + 1);
+      return { places: [...kept, next], at: kept.length };
+    });
   }, []);
+  const go = useCallback((next: ViewName) => navigate({ view: next }), [navigate]);
+  const goBack = useCallback(
+    () => setHistory(({ places: list, at }) => ({ places: list, at: Math.max(0, at - 1) })),
+    [],
+  );
+  const goForward = useCallback(
+    () =>
+      setHistory(({ places: list, at }) => ({
+        places: list,
+        at: Math.min(list.length - 1, at + 1),
+      })),
+    [],
+  );
+  // The mouse's back and forward buttons and Alt+← / Alt+→ go back and
+  // forward, as in a browser.
+  useEffect(() => {
+    const onMouse = (event: MouseEvent) => {
+      if (event.button === 3 || event.button === 4) {
+        event.preventDefault();
+        if (event.button === 3) {
+          goBack();
+        } else {
+          goForward();
+        }
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goBack();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goForward();
+      }
+    };
+    window.addEventListener("mouseup", onMouse);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mouseup", onMouse);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [goBack, goForward]);
 
-  const showPinned = useCallback(() => {
-    go("collisions");
-    setPinnedAsked(true);
-  }, [go]);
+  const showPinned = useCallback(
+    () => navigate({ view: "collisions", pinnedAsked: true }),
+    [navigate],
+  );
 
   const showPatch = useCallback(() => go("patch"), [go]);
+  const openPatch = useCallback(
+    (at: PatchAt) => navigate({ view: "patch", patchAt: at }),
+    [navigate],
+  );
 
   const openCompare = useCallback(
-    (duel: string | null) => {
-      go("assets");
-      setCompareAt(duel);
-    },
-    [go],
+    (duel: string | null, from?: PatchAt) =>
+      navigate({ view: "assets", compareAt: duel, from: from ?? null }),
+    [navigate],
   );
 
   const showOnMap = useCallback(
-    (spot: MapSpot) => {
-      go("map");
-      setFocus(spot);
-    },
-    [go],
+    (spot: MapSpot, from?: PatchAt) => navigate({ view: "map", focus: spot, from: from ?? null }),
+    [navigate],
   );
 
   const showToolbox = useCallback(() => go("toolbox"), [go]);
 
   const showDependency = useCallback(
-    (target: DependencyTarget) => {
-      go("mods");
-      setModsAt({ ...target });
-    },
-    [go],
+    (target: DependencyTarget) => navigate({ view: "mods", modsAt: { ...target } }),
+    [navigate],
   );
 
   const showModOnMap = useCallback(
-    (mod: string) => {
-      go("map");
-      setMapMod(mod);
-    },
-    [go],
+    (mod: string) => navigate({ view: "map", mapMod: mod }),
+    [navigate],
   );
 
   const decideSpot = useCallback(
-    (spot: MapSpot) => {
-      go("collisions");
-      setWorkSpot(spot);
-    },
-    [go],
+    (spot: MapSpot, from?: PatchAt) =>
+      navigate({ view: "collisions", workSpot: spot, from: from ?? null }),
+    [navigate],
   );
 
   const openPair = useCallback(
-    (first: string, second: string) => {
-      go("collisions");
-      setPairAt([first, second]);
-    },
-    [go],
+    (first: string, second: string, from?: PatchAt) =>
+      navigate({ view: "collisions", pairAt: [first, second], from: from ?? null }),
+    [navigate],
   );
 
   // Creating the patch also writes the report of what it does next to it
@@ -484,6 +590,7 @@ export default function App({ api, startLang }: AppProps) {
       waiting: split.waiting,
       showReview: () => go("review"),
       showPatch,
+      openPatch,
       decisions,
       decide,
       ranking,
@@ -498,6 +605,9 @@ export default function App({ api, startLang }: AppProps) {
       toolbox,
       showPinned,
       pinnedAsked,
+      book,
+      setBook,
+      patchAt,
     }),
     [
       sessionApi,
@@ -515,6 +625,7 @@ export default function App({ api, startLang }: AppProps) {
       setActiveChoices,
       go,
       showPatch,
+      openPatch,
       decisions,
       decide,
       ranking,
@@ -529,6 +640,9 @@ export default function App({ api, startLang }: AppProps) {
       toolbox,
       showPinned,
       pinnedAsked,
+      book,
+      setBook,
+      patchAt,
     ],
   );
   const counts = useMemo(
@@ -583,6 +697,15 @@ export default function App({ api, startLang }: AppProps) {
           }
         />
         <main className="content" data-view={current}>
+          <NavBar
+            lang={lang}
+            canBack={history.at > 0}
+            canForward={history.at < history.places.length - 1}
+            onBack={goBack}
+            onForward={goForward}
+            from={place.from ?? null}
+            onReturn={openPatch}
+          />
           {/* The sidebar says where the user is; only the first run needs a title. */}
           {current === "places" && (
             <header className="pagehead">

@@ -13,6 +13,7 @@ import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { LodMesh } from "../generated/lod-mesh";
 import type { MeshView } from "../generated/mesh-view";
 import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
+import type { PatchBook } from "../generated/patch-book";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
   Finding,
@@ -1483,6 +1484,9 @@ let linkInstalled = false;
 const ignoredIds = new Set<string>();
 let decided: Record<string, number> = {};
 let ranked: string[] = [];
+// The user's patches, as the settings keep them (ADR 0070); none yet, so
+// the first is made from the choices below.
+let book: PatchBook | null = null;
 // A decision made while Gone Mod was on; it waits while the mod is off.
 let chosen: Record<string, string | null> | null = {
   "objects.overlapping:pair:file:data/gone mod.esp+file:data/old town.esp": "Gone Mod.esp",
@@ -1886,6 +1890,26 @@ export const sampleApi: Api = {
     chosen = { ...choices };
     return later(undefined);
   },
+  patchBook: () => later(book === null ? null : structuredClone(book)),
+  setPatchBook: (next) => {
+    book = structuredClone(next);
+    return later(undefined);
+  },
+  // The sample reads every archive as a small patch by someone else.
+  loadPatchArchive: (name) =>
+    later({
+      archive: name,
+      manifest: {
+        format: 1,
+        name: name.replace(/\.[^.]+$/, ""),
+        author: "A modder",
+        version: "1.0",
+        decisions: { "object:Lux Via.esp|4660": "Lux Via.esp" },
+        plugins: ["Lux Via.esp"],
+        mods: ["Lux Via"],
+      },
+      patch: { name: name.replace(/\.[^.]+$/, ""), parts: [] },
+    }),
   decisions: () => later({ ...decided }),
   setDecision: (id, side) => {
     const next = { ...decided };
