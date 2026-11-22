@@ -34,7 +34,7 @@ static FILES: Mutex<Option<(String, Arc<LodLibrary>)>> = Mutex::new(None);
 static LAND_TEXTURES: Mutex<Option<(String, Arc<LandTextures>)>> = Mutex::new(None);
 
 /// A key for the setup `options` describe.
-fn setup_key(options: &ScanOptions) -> Option<String> {
+pub(crate) fn setup_key(options: &ScanOptions) -> Option<String> {
     let game = options.game().ok()?;
     let (game_dir, _) = options.located_game_dir()?;
     Some(format!("{}|{}", game.id(), game_dir.display()))

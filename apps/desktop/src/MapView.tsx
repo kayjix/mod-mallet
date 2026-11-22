@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { CopyButton, useSession } from "./Actions";
+import type { AreaObjects } from "./generated/area-objects";
 import type {
   MapCell,
   MapMarker,
@@ -49,6 +50,7 @@ import {
 } from "./map-places";
 import { MapObjectActions } from "./object-actions";
 import { pinsOf, spotKey } from "./patch";
+import { useHiddenBySpots, usePathsMode, withPaths } from "./paths-mode";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { type WorldTexts, worldTexts } from "./world-texts";
 
@@ -85,7 +87,7 @@ const cellOf = (coordinate: number) => Math.floor(coordinate / CELL);
  * collide. Drawn flat or as a relief in 3D.
  */
 export function MapView({ map, headlines, focus }: MapViewProps) {
-  const { t, lang, mapMod } = useSession();
+  const { t, lang, mapMod, decideSpot } = useSession();
   const own = worldTexts[lang];
   const focusWorld =
     focus?.location.type === "exterior"
@@ -135,6 +137,17 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
     [map.spots, world],
   );
   const shownSpots = filter.collisions ? worldSpots : [];
+  // The paths mode (ADR 0071), where the relief shows the objects up close.
+  const [area, setArea] = useState<AreaObjects | null>(null);
+  const hiddenBySpots = useHiddenBySpots(map.spots);
+  const pathsMode = usePathsMode({
+    area,
+    interior: false,
+    hidden: hiddenBySpots,
+    spots: worldSpots,
+    onOpen: decideSpot,
+  });
+  const shownPaths = useMemo(() => withPaths(pathsMode.overlay, null), [pathsMode.overlay]);
 
   if (world === undefined) {
     return <p className="empty">{t.mapEmpty}</p>;
@@ -218,7 +231,12 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             objectExtra={(object, tools) => (
               <MapObjectActions object={object} tools={tools} place={world.name} />
             )}
-          />
+            onArea={setArea}
+            tools={pathsMode.tool}
+            paths={shownPaths}
+          >
+            {pathsMode.legend}
+          </MapView3D>
         ) : (
           <div className="map-frame map-missing">
             <p className="empty">{t.mapNoRelief}</p>

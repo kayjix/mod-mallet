@@ -194,20 +194,7 @@ fn gather(
 
     // Their models, from the files the game uses.
     let library = library(options)?;
-    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
-    let mut models: Vec<Option<String>> = Vec::new();
-    for object in &found {
-        let model = reader.base(&object.base).map(|base| base.model.clone());
-        if let Some(model) = &model
-            && !meshes.contains_key(model)
-            && let Some(mesh) = library
-                .read(model)
-                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
-        {
-            meshes.insert(model.clone(), mesh);
-        }
-        models.push(model);
-    }
+    let (models, meshes) = models_of(&mut reader, &library, &found);
 
     let placed: Vec<PlacedObject> = found
         .iter()
@@ -249,6 +236,30 @@ fn gather(
     }
     gathered.around = around;
     Some(gathered)
+}
+
+/// The models of `objects`, from the files the game uses: each object's
+/// model, and the shape of every model that could be read.
+pub(crate) fn models_of(
+    reader: &mut mallet_game_bethesda::area::AreaReader,
+    library: &mallet_game_bethesda::lod_library::LodLibrary,
+    objects: &[AreaObject],
+) -> (Vec<Option<String>>, BTreeMap<String, ModelMesh>) {
+    let mut meshes: BTreeMap<String, ModelMesh> = BTreeMap::new();
+    let mut models: Vec<Option<String>> = Vec::new();
+    for object in objects {
+        let model = reader.base(&object.base).map(|base| base.model.clone());
+        if let Some(model) = &model
+            && !meshes.contains_key(model)
+            && let Some(mesh) = library
+                .read(model)
+                .and_then(|bytes| mallet_game_bethesda::models::model_mesh(&bytes))
+        {
+            meshes.insert(model.clone(), mesh);
+        }
+        models.push(model);
+    }
+    (models, meshes)
 }
 
 /// What repairing the paths over `objects` does (ADR 0058), for the

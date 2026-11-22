@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AreaPaths",
+  "description": "The paths of the cells around a point of a worldspace, or of an\ninterior cell.",
+  "type": "object",
+  "properties": {
+    "cells": {
+      "description": "Outside, the cells read, as column and row; inside, empty.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxItems": 2,
+        "minItems": 2
+      }
+    },
+    "makers": {
+      "description": "The plugins that made a version of a navigation mesh here, in load\norder. Triangles name their maker by its place in this list.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PathsMaker"
+      }
+    },
+    "navmeshes": {
+      "description": "The navigation meshes, in the version the game uses.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AreaNavmesh"
+      }
+    },
+    "overHidden": {
+      "description": "Where the objects asked about would leave paths over nothing: the\npaths the game uses that run over them.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PathsOverHidden"
+      }
+    },
+    "place": {
+      "description": "The worldspace or interior cell asked about.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "place",
+    "cells",
+    "makers",
+    "navmeshes",
+    "overHidden"
+  ],
+  "$defs": {
+    "AreaNavmesh": {
+      "description": "One navigation mesh in the version the game uses, with who made each\nof its triangles.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "Where it lies, for people: an interior cell's internal name, or the\nworldspace and the cell's grid position.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doors": {
+          "description": "Where characters step through a door: the middle of each door\ntriangle, in whole game units.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        },
+        "gone": {
+          "description": "How many triangles of the game's own last version this one no\nlonger has in the same place.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "links": {
+          "description": "Where the paths lead on into a neighbouring mesh: the middle of each\nlinked edge, in whole game units.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        },
+        "madeBy": {
+          "description": "For each triangle, who made it as it is, by its place in\n[`AreaPaths::makers`]: the first plugin from which on every version\nhas it unchanged.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          }
+        },
+        "navmesh": {
+          "description": "The mesh, by the plugin that first defined it, as `plugin:number`.",
+          "type": "string"
+        },
+        "takenOut": {
+          "description": "The triangles the version the game uses takes out of the paths:\nstill there, but leading nowhere, as a repair leaves them.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "triangles": {
+          "description": "Its triangles: three corner numbers each.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "versions": {
+          "description": "The plugins with a version of it, in load order, by their place in\n[`AreaPaths::makers`]; the last is the one the game uses.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          }
+        },
+        "vertices": {
+          "description": "The corners of its triangles: three whole game units each.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "required": [
+        "navmesh",
+        "versions",
+        "vertices",
+        "triangles",
+        "madeBy",
+        "takenOut",
+        "gone",
+        "doors",
+        "links"
+      ]
+    },
+    "MakerKind": {
+      "description": "Who made a version of a navigation mesh.",
+      "oneOf": [
+        {
+          "description": "The game itself: one of its own plugins.",
+          "type": "string",
+          "const": "game"
+        },
+        {
+          "description": "A mod.",
+          "type": "string",
+          "const": "mod"
+        },
+        {
+          "description": "Mod Mallet's plugin of repaired paths (ADR 0058).",
+          "type": "string",
+          "const": "repair"
+        }
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "PathsMaker": {
+      "description": "A plugin that made a version of a navigation mesh in the area.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Who it is.",
+          "$ref": "#/$defs/MakerKind"
+        },
+        "plugin": {
+          "description": "The plugin, in the spelling of the load order.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "kind"
+      ]
+    },
+    "PathsOverHidden": {
+      "description": "The paths the game uses over one object asked about.",
+      "type": "object",
+      "properties": {
+        "navmesh": {
+          "description": "The mesh, as in [`AreaNavmesh::navmesh`].",
+          "type": "string"
+        },
+        "object": {
+          "description": "The object, as it was asked about.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "triangles": {
+          "description": "The triangles over it, by their numbers in that mesh. Triangles\nalready taken out are left out.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        }
+      },
+      "required": [
+        "object",
+        "navmesh",
+        "triangles"
+      ]
+    }
+  }
+}

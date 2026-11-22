@@ -6,6 +6,7 @@
 
 import type { Api } from "../api";
 import type { ActionPlace, AreaObject, AreaObjects } from "../generated/area-objects";
+import type { AreaNavmesh, AreaPaths } from "../generated/area-paths";
 import type { AssetVersion, AssetVersions } from "../generated/asset-versions";
 import type { Catalogue, CatalogueItem } from "../generated/catalogue";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
@@ -1638,6 +1639,10 @@ export const sampleApi: Api = {
   areaMesh: (name) => later(sampleBox(name)),
   areaTexture: () => later(null),
   objectAnchors: (_world, objects) => later(objects.map(sampleAnchors)),
+  // The paths around the point (made up): the game's, a band Water Mod
+  // changed, a few pieces Mod Mallet repaired, and the planks of the dock.
+  areaPaths: (worldOrCell, x, y, _radius, hidden) =>
+    later(sampleAreaPaths(worldOrCell, x, y, hidden)),
   // In the sample, a path of the game runs over the first object to hide.
   // Characters walk on the planks of Water Mod's dock at the docks (made
   // up): hiding them would leave them on thin air.
@@ -2634,4 +2639,86 @@ function sampleLoadOrder(): LoadedPlugin[] {
   ]);
   add("Face Overhaul.esp", "Face Overhaul", ["Skyrim.esm", "Update.esm", "Cut Content.esp"]);
   return order;
+}
+
+/**
+ * Made-up paths around a point (ADR 0071): a net of squares of the game,
+ * a band Water Mod changed, two pieces the repair laid and one it took
+ * out, and the pieces over Water Mod's planks when they are to be hidden.
+ */
+function sampleAreaPaths(
+  world: string,
+  x: number | null,
+  y: number | null,
+  hidden: { plugin: string; localId: number }[],
+): AreaPaths {
+  const [cx, cy] = [x ?? 0, y ?? 0];
+  const ground = x === null ? 0 : sampleHeight(sampleTerrain(), cx / 4096, cy / 4096);
+  const side = 12;
+  const step = 256;
+  const vertices: number[] = [];
+  for (let row = 0; row <= side; row++) {
+    for (let column = 0; column <= side; column++) {
+      vertices.push(
+        Math.round(cx + (column - side / 2) * step),
+        Math.round(cy + (row - side / 2) * step),
+        Math.round(ground),
+      );
+    }
+  }
+  const triangles: number[] = [];
+  const madeBy: number[] = [];
+  for (let row = 0; row < side; row++) {
+    for (let column = 0; column < side; column++) {
+      const a = row * (side + 1) + column;
+      triangles.push(a, a + 1, a + side + 2, a, a + side + 2, a + side + 1);
+      const maker = row === 4 || row === 5 ? 1 : row === 6 && column < 2 ? 2 : 0;
+      madeBy.push(maker, maker);
+    }
+  }
+  const middle = (number: number): [number, number, number] => {
+    const at: [number, number, number] = [0, 0, 0];
+    for (let corner = 0; corner < 3; corner++) {
+      const vertex = triangles[number * 3 + corner] ?? 0;
+      for (let axis = 0; axis < 3; axis++) {
+        at[axis] = (at[axis] ?? 0) + (vertices[vertex * 3 + axis] ?? 0) / 3;
+      }
+    }
+    return at.map(Math.round) as [number, number, number];
+  };
+  const navmesh: AreaNavmesh = {
+    navmesh: "skyrim.esm:00A1B2",
+    cell: x === null ? world : `${world} ${Math.floor(cx / 4096)},${Math.floor(cy / 4096)}`,
+    versions: [0, 1, 2],
+    vertices,
+    triangles,
+    madeBy,
+    takenOut: [2 * (6 * side + 3)],
+    gone: 24,
+    doors: [middle(2 * (8 * side + 6))],
+    links: Array.from({ length: side }, (_, column) => middle(2 * column)),
+  };
+  const planks = hidden.filter(
+    (object) =>
+      object.plugin === "Water Mod.esp" &&
+      (object.localId === 0xa11 ||
+        object.localId === 0xa21 ||
+        (object.localId >= 0x6000 && object.localId <= 0x6008)),
+  );
+  return {
+    place: world,
+    cells: x === null ? [] : [[Math.floor(cx / 4096), Math.floor(cy / 4096)]],
+    makers: [
+      { plugin: "Skyrim.esm", kind: "game" },
+      { plugin: "Water Mod.esp", kind: "mod" },
+      { plugin: "Mod Mallet - Paths.esp", kind: "repair" },
+      { plugin: "Old Bridges.esp", kind: "mod" },
+    ],
+    navmeshes: [navmesh],
+    overHidden: planks.slice(0, 1).map((object) => ({
+      object,
+      navmesh: navmesh.navmesh,
+      triangles: [2 * (8 * side + 8), 2 * (8 * side + 8) + 1, 2 * (8 * side + 9)],
+    })),
+  };
 }

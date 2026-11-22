@@ -18,6 +18,7 @@
 pub mod action;
 pub mod action_places;
 pub mod anchors;
+pub mod area_paths;
 pub mod cache;
 pub mod catalogue;
 pub mod compare;

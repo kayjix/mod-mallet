@@ -39,6 +39,7 @@ pub mod navmesh_repair;
 pub mod navmeshes;
 pub mod objects;
 pub mod path_repair;
+pub mod paths_origin;
 mod places;
 pub mod reachability;
 pub mod recommendations;

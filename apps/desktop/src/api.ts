@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
+import type { AreaPaths } from "./generated/area-paths";
 import type { AssetVersions } from "./generated/asset-versions";
 import type { Catalogue } from "./generated/catalogue";
 import type { CreatedMoves } from "./generated/created-moves";
@@ -203,6 +204,19 @@ export interface Api {
     spots: { object: ObjectRef; at: [number, number, number] }[],
     hidden: ObjectRef[],
   ): Promise<SpotsReach | null>;
+  /**
+   * Where characters walk in the worldspace `worldOrCell` within `radius`
+   * game units of `x`, `y`, or, with `x` and `y` null, in that interior cell
+   * (ADR 0071): who made each piece of the paths, and where they run over
+   * `hidden`. `null` if the setup cannot be read.
+   */
+  areaPaths(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    radius: number,
+    hidden: ObjectRef[],
+  ): Promise<AreaPaths | null>;
   /** The blocks of the game's level of detail a worldspace has. */
   lodTiles(world: string): Promise<LodTiles>;
   /** The land of a block of level of detail, or with `objects` its objects. */
@@ -299,6 +313,8 @@ const tauriApi: Api = {
     invoke<WalkwayReach | null>("walkway_repair_reach", { worldOrCell, x, y, objects }),
   spotsReach: (worldOrCell, x, y, spots, hidden) =>
     invoke<SpotsReach | null>("spots_reach", { worldOrCell, x, y, spots, hidden }),
+  areaPaths: (worldOrCell, x, y, radius, hidden) =>
+    invoke<AreaPaths | null>("area_paths", { worldOrCell, x, y, radius, hidden }),
   lodTiles: (world) => invoke<LodTiles>("lod_tiles", { world }),
   lodMesh: (world, level, x, y, objects) =>
     invoke<LodMesh | null>("lod_mesh", { world, level, x, y, objects }),

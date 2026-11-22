@@ -17,6 +17,7 @@
 mod actions;
 mod anchors;
 mod area;
+mod area_paths;
 mod catalogue;
 mod compare;
 mod dashboard;
@@ -60,6 +61,7 @@ pub use actions::{
 };
 pub use anchors::object_anchors;
 pub use area::{area_land, area_mesh, area_objects, area_texture, interior_objects, world_land};
+pub use area_paths::area_paths;
 pub use catalogue::catalogue;
 pub use compare::compare_files;
 pub use dashboard::announce_app;

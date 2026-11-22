@@ -95,5 +95,6 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0067](0067-stacked-doors-are-merged-into-one.md) | Stacked doors are found and merged into one | accepted |
 | [0068](0068-which-plugin-needs-which.md) | The report carries which plugin needs which, drawn as arcs | accepted |
 | [0069](0069-places-where-characters-do-something.md) | Places where characters do something can be seen, removed and moved | accepted |
+| [0071](0071-the-paths-mode-of-the-3d-views.md) | The paths mode of the 3D views shows where characters walk | accepted |
 | [0072](0072-passages-where-two-mods-build-the-same.md) | Passages: where two mods build the same thing, decided as one | accepted |
 | [0073](0073-switched-off-mods-taken-out-through-vortex.md) | Switched-off mods still loaded are taken out through Vortex's plugin list | accepted |

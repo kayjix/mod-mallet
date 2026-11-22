@@ -584,6 +584,29 @@ fn hidden_walkways(
     ))
 }
 
+/// Where characters walk in the worldspace `world_or_cell` within `radius`
+/// game units of the point `x`, `y`, or, without a point, in that interior
+/// cell (ADR 0071): who made each piece of the paths, where they run over
+/// `hidden`, and where characters sit, lean, sleep or work.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn area_paths(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    radius: f32,
+    hidden: Vec<ObjectRef>,
+) -> Result<Option<mallet_core::area_paths::AreaPaths>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::area_paths(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        radius,
+        &hidden,
+    ))
+}
+
 /// Whether characters still reach where they go once `objects` are hidden
 /// and the paths over them cut out (ADR 0059): in a worldspace near the
 /// point `x`, `y`, or, without a point, in an interior cell by its editor
@@ -936,6 +959,7 @@ pub fn run() -> tauri::Result<()> {
             spots_reach,
             walkway_repair,
             walkway_repair_reach,
+            area_paths,
             area_mesh,
             area_texture,
             ranking,

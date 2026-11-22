@@ -21,6 +21,10 @@ use crate::tools;
 /// TypeScript types are written to.
 const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
     (
+        "schemas/area-paths.schema.json",
+        "apps/desktop/src/generated/area-paths.ts",
+    ),
+    (
         "schemas/rendered-report.schema.json",
         "apps/desktop/src/generated/rendered-report.ts",
     ),
@@ -149,6 +153,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::mesh::LodMesh>("schemas/lod-mesh.schema.json")?,
         schema_of::<mallet_core::mesh::AreaObjects>("schemas/area-objects.schema.json")?,
         schema_of::<mallet_core::mesh::AreaLand>("schemas/area-land.schema.json")?,
+        schema_of::<mallet_core::area_paths::AreaPaths>("schemas/area-paths.schema.json")?,
         schema_of::<mallet_core::anchors::ObjectAnchors>("schemas/object-anchors.schema.json")?,
         schema_of::<mallet_core::mesh::HiddenWalkways>("schemas/hidden-walkways.schema.json")?,
         schema_of::<mallet_core::ScanProgress>("schemas/scan-progress.schema.json")?,

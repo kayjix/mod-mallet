@@ -59,6 +59,7 @@ import {
   undecideSpot,
 } from "./patch";
 import type { PathsOverlay } from "./paths-layer";
+import { usePathsMode, withPaths } from "./paths-mode";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
 import { CollisionsStep } from "./Review";
 import { ReachNote, usePaintReach, useReach } from "./reach";
@@ -1493,6 +1494,19 @@ function Spot(props: SpotProps) {
     leftWalked === undefined ? [] : walkedOf(leftWalked).parts.map((part) => part.object),
   );
   const paintReach = usePaintReach(leftReach);
+  // The paths mode (ADR 0071): where characters walk around the spot.
+  const listedSpots = useMemo(() => props.ordered.map((entry) => entry.spot), [props.ordered]);
+  const pathsMode = usePathsMode({
+    area,
+    interior: location.type === "interior",
+    hidden: props.hiddenObjects,
+    spots: listedSpots,
+    onOpen: props.onPick,
+  });
+  const shownPaths = useMemo(
+    () => withPaths(pathsMode.overlay, repairShown),
+    [pathsMode.overlay, repairShown],
+  );
 
   /** One mod's column: hiding its part here, in the passage and around, and what ties it. */
   const sideColumn = (side: Side, at: number) => {
@@ -1788,11 +1802,17 @@ function Spot(props: SpotProps) {
         {...props}
         onArea={setArea}
         previewObjects={previewObjects}
-        tools={viewTools}
+        tools={
+          <>
+            {viewTools}
+            {pathsMode.tool}
+          </>
+        }
         paint={paintReach}
-        paths={repairShown}
+        paths={shownPaths}
         lookAt={doorLook}
         locate={locating === null ? null : { ...locating, on: blink }}
+        legend={pathsMode.legend}
       />
     </>
   );
@@ -1876,6 +1896,7 @@ function Stage({
   paths = null,
   lookAt = null,
   locate = null,
+  legend,
 }: SpotProps & {
   onArea: (area: AreaObjects | null) => void;
   /** Objects left out to look at, without deciding. */
@@ -1890,6 +1911,8 @@ function Stage({
   lookAt?: ObjectRef | null;
   /** One part made to blink, the view turned to it: lit while `on`. */
   locate?: { object: ObjectRef; position: [number, number, number]; on: boolean } | null;
+  /** Shown over the view, such as the legend of the paths mode (ADR 0071). */
+  legend?: ReactNode;
 }) {
   const { t } = useSession();
   const location = item.spot.location;
@@ -2065,7 +2088,9 @@ function Stage({
         onArea={onArea}
         tools={tools}
         paths={paths}
-      />
+      >
+        {legend}
+      </InteriorView>
     );
   }
   if (world === undefined || !world.terrain) {
@@ -2109,7 +2134,9 @@ function Stage({
       tools={tools}
       paint={paint}
       paths={paths}
-    />
+    >
+      {legend}
+    </MapView3D>
   );
 }
 

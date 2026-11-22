@@ -1,0 +1,226 @@
+/* The paths mode of the 3D views (ADR 0071): its switch, legend and problems. */
+
+.paths-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paths-mode-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+
+.paths-mode-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.paths-mode-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paths-legend {
+  position: absolute;
+  right: 10px;
+  bottom: 54px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(330px, calc(100% - 20px));
+  max-height: calc(100% - 130px);
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+}
+
+.paths-legend p {
+  margin: 0;
+}
+
+.paths-legend ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paths-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paths-legend-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.paths-legend li.paths-legend-mods {
+  flex-direction: column;
+  align-items: stretch;
+  padding-left: 22px;
+}
+
+.paths-legend-mod {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paths-legend-mod:hover:not(:disabled),
+.paths-legend-mod:focus-visible,
+.paths-legend-mod[aria-pressed="true"] {
+  border-color: rgb(240 228 66);
+  background: rgb(240 228 66 / 18%);
+}
+
+.paths-legend-mod:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.paths-legend-mod-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The swatches show the colour and the pattern the view draws. */
+.paths-swatch {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 12px;
+  border: 1px solid var(--swatch);
+  border-radius: 2px;
+}
+
+.paths-swatch[data-style="game"] {
+  --swatch: rgb(86 180 233);
+  background: rgb(86 180 233 / 45%);
+}
+
+.paths-swatch[data-style="mod"] {
+  --swatch: rgb(230 159 0);
+  background: repeating-linear-gradient(45deg, rgb(230 159 0) 0 3px, rgb(230 159 0 / 20%) 3px 6px);
+}
+
+.paths-swatch[data-style="repaired"] {
+  --swatch: rgb(0 158 115);
+  background: radial-gradient(circle, rgb(0 158 115) 1.5px, rgb(0 158 115 / 20%) 2px) 0 0 / 5px 5px;
+}
+
+.paths-swatch[data-style="takenOut"] {
+  --swatch: rgb(213 94 0);
+  border-width: 2px;
+  background: none;
+}
+
+.paths-swatch[data-style="overNothing"] {
+  --swatch: rgb(204 121 167);
+  background:
+    repeating-linear-gradient(45deg, rgb(204 121 167) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(-45deg, rgb(204 121 167) 0 2px, rgb(204 121 167 / 18%) 2px 5px);
+}
+
+.paths-legend ul.paths-legend-marks {
+  flex-flow: row wrap;
+  gap: 3px 12px;
+}
+
+/* The marks, in the shapes the view draws. */
+.paths-mark {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #141414;
+  background: var(--mark);
+}
+
+.paths-mark[data-mark="door"] {
+  --mark: #ffffff;
+}
+
+.paths-mark[data-mark="link"] {
+  --mark: rgb(191 209 230);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.paths-mark[data-mark="sit"] {
+  --mark: rgb(240 228 66);
+  border-radius: 50%;
+}
+
+.paths-mark[data-mark="lean"] {
+  --mark: rgb(153 204 255);
+  border: none;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.paths-mark[data-mark="sleep"] {
+  --mark: rgb(0 114 178);
+  transform: rotate(45deg) scale(0.8);
+}
+
+.paths-mark[data-mark="work"] {
+  --mark: rgb(213 94 0);
+}
+
+.paths-mark[data-mark="other"] {
+  --mark: rgb(204 204 204);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.paths-problems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.paths-problem-mark {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 3px solid rgb(204 121 167);
+  border-radius: 50%;
+}
+
+.paths-problem-mark[data-chosen] {
+  border-color: rgb(0 158 115);
+}
+
+.paths-problem-chosen {
+  color: var(--muted);
+}
+
+.paths-problems li button {
+  margin-left: auto;
+}
