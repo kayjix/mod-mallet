@@ -249,8 +249,6 @@ export interface Texts {
   spotKinds: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
   spotKindHints: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
   workTabSpots: string;
-  workMarks: string;
-  workMarksHint: string;
   workPreviewWithout: (name: string) => string;
   workPairMany: (first: string, second: string, spots: number) => string;
   workShowSpots: string;
@@ -321,7 +319,6 @@ export interface Texts {
   workAfterDecide: string;
   /** What the fast forward checkbox does, as its tooltip. */
   workAfterDecideHint: string;
-  mapTopView: string;
   mapPlaces: string;
   placesShowAll: string;
   placesHideAll: string;
@@ -659,8 +656,6 @@ export const texts: Record<Lang, Texts> = {
       touch: "Two objects reach into each other a little; often harmless.",
     },
     workTabSpots: "Spots",
-    workMarks: "Markings",
-    workMarksHint: "Off: the place as the game would show it, with what you hide left out. Key V.",
     workPreviewWithout: (name) => `Look at it without ${name}, without deciding`,
     workPairMany: (first, second, spots) =>
       `${first} and ${second} collide at ${spots} spots. Usually it is better to choose one of them:`,
@@ -738,7 +733,6 @@ export const texts: Record<Lang, Texts> = {
     workDecideHere: "Decide in the worklist",
     workAfterDecide: "Fast forward",
     workAfterDecideHint: "After deciding, go on to the next open spot",
-    mapTopView: "From above",
     mapPlaces: "Places",
     placesShowAll: "Show all",
     placesHideAll: "Hide all",
@@ -1128,9 +1122,6 @@ export const texts: Record<Lang, Texts> = {
       touch: "Zwei Objekte ragen ein wenig ineinander; oft harmlos.",
     },
     workTabSpots: "Stellen",
-    workMarks: "Markierungen",
-    workMarksHint:
-      "Aus: die Stelle so, wie das Spiel sie zeigen würde, ohne das, was du ausblendest. Taste V.",
     workPreviewWithout: (name) => `Ohne ${name} ansehen, ohne zu entscheiden`,
     workPairMany: (first, second, spots) =>
       `${first} und ${second} stoßen an ${spots} Stellen zusammen. Meist ist es besser, dich für eine zu entscheiden:`,
@@ -1210,7 +1201,6 @@ export const texts: Record<Lang, Texts> = {
     workDecideHere: "In der Arbeitsliste entscheiden",
     workAfterDecide: "Vorspulen",
     workAfterDecideHint: "Nach dem Entscheiden zur nächsten offenen Stelle",
-    mapTopView: "Von oben",
     mapPlaces: "Orte",
     placesShowAll: "Alle zeigen",
     placesHideAll: "Alle ausblenden",

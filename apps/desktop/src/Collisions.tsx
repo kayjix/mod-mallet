@@ -85,6 +85,7 @@ import { spotNotesTexts } from "./spot-notes-texts";
 import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
+import { Eye, useMarkings } from "./view-tools";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
 import { WideAdvice, wideFindings } from "./wide-advice";
 
@@ -537,7 +538,8 @@ export function Collisions({
     remembered("mallet.workNotes", false, (value) => value === "on"),
   );
   // Tinted parts and ghosts, or the place as the game would show it.
-  const [marks, setMarks] = useState(true);
+  // The markings, the same in every 3D view (see `view-tools.tsx`).
+  const [marks, setMarks] = useMarkings();
 
   const decision = useCallback(
     (item: Item, from: PatchChoices = choices) =>
@@ -1247,7 +1249,6 @@ export function Collisions({
               preview={preview}
               marks={marks}
               advance={advance}
-              onMarks={setMarks}
               onAdvance={(next) => {
                 setAdvance(next);
                 remember("mallet.workAdvance2", next ? "on" : "off");
@@ -1499,7 +1500,6 @@ interface SpotProps {
   preview: Set<string>;
   marks: boolean;
   advance: boolean;
-  onMarks: (marks: boolean) => void;
   onAdvance: (advance: boolean) => void;
   /** Whether the notes are shown in full rather than as badges in their cards. */
   notesInFull: boolean;
@@ -1869,23 +1869,6 @@ function Spot(props: SpotProps & SpotFrameProps) {
           <span className="view-tool-value">{own.metres(metres)}</span>
         </label>
       )}
-      <span className="view-tool">
-        <button
-          type="button"
-          className="small work-marks"
-          aria-pressed={marks}
-          title={t.workMarksHint}
-          onClick={() => props.onMarks(!marks)}
-        >
-          <Eye open={marks} /> {t.workMarks}
-        </button>
-        {marks && (
-          <span className="view-legend" aria-hidden="true">
-            <span className="work-legend-focus" /> {t.workThisSpot}
-            <span className="work-legend-ghost" /> {t.workGhost}
-          </span>
-        )}
-      </span>
     </>
   );
 
@@ -2113,17 +2096,6 @@ function objectsAround(
   return { free, tied };
 }
 
-/** An eye, open or struck through. */
-function Eye({ open }: { open: boolean }) {
-  return (
-    <svg className="eye" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-      <circle cx="12" cy="12" r="3" />
-      {!open && <path d="M4 4l16 16" />}
-    </svg>
-  );
-}
-
 /** The spot in 3D, up close, with what is hidden drawn as ghosts or left out. */
 function Stage({
   report,
@@ -2213,6 +2185,13 @@ function Stage({
   );
   const viewCentre = frame?.centre ?? null;
   // Framed, the camera stays on the frame whichever of its spots is open.
+  // What the markings mean here: the spot's parts, and what the patch hides.
+  const markingsLegend = (
+    <>
+      <span className="work-legend-focus" /> {t.workThisSpot}
+      <span className="work-legend-ghost" /> {t.workGhost}
+    </>
+  );
   const framedPick = useMemo<Picked | null>(
     () =>
       frame === null ? null : { type: "spot", spot: { ...frame.spot, position: frame.centre } },
@@ -2369,6 +2348,7 @@ function Stage({
         focus={focus}
         hidden={ghosts}
         plain={plain}
+        markingsLegend={markingsLegend}
         objectExtra={extra}
         onObject={openSpotOf}
         onArea={onArea}
@@ -2417,6 +2397,7 @@ function Stage({
       onObject={openSpotOf}
       spotDistance={frame?.distance ?? CLOSE}
       plain={plain}
+      markingsLegend={markingsLegend}
       onArea={onArea}
       onLayer={onLayer}
       tools={tools}

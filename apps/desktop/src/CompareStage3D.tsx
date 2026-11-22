@@ -7,7 +7,6 @@ import { type PointerEvent, useCallback, useEffect, useRef, useState } from "rea
 import { useSession } from "./Actions";
 import {
   type ActionHit,
-  ActionIconsToggle,
   actionAt,
   asAreaObject,
   paintActionPlaces,
@@ -24,7 +23,16 @@ import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { noteSegments, watchView } from "./render-stats";
 import { useReviewTexts } from "./review-texts";
 import { findSegments, STRUCTURE_REACH, type StageGroup, type StageSegment } from "./segments";
+import {
+  ActionsTool,
+  CameraTools,
+  MarkingsTool,
+  TreesTool,
+  useMarkings,
+  useTreesShown,
+} from "./view-tools";
 import { drawPathSign, PathIcon, useWalkTexts } from "./walkways";
+import { ViewToolbar } from "./wand";
 
 export type { StageGroup, StageSegment } from "./segments";
 
@@ -137,9 +145,9 @@ export function CompareStage3D({
   pathsNow.current = paths;
   const pending = useRef<number | null>(null);
   const [state, setState] = useState<"loading" | "missing" | "shown">("loading");
-  const [markings, setMarkings] = useState(true);
-  // Trees around a building hide it; they are left out unless wanted.
-  const [trees, setTrees] = useState(false);
+  // The markings and the trees, the same in every 3D view (see `view-tools.tsx`).
+  const [markings] = useMarkings();
+  const [trees] = useTreesShown();
   const [failed, setFailed] = useState(false);
   const structures = useRef<[Set<string>, Set<string>]>([new Set(), new Set()]);
   const [counts, setCounts] = useState<[number, number]>([0, 0]);
@@ -727,6 +735,32 @@ export function CompareStage3D({
   const labels = [r.viewNow, r.viewOnly(names[0]), r.viewOnly(names[1])];
   return (
     <div className="stage3">
+      <ViewToolbar
+        tools={
+          <>
+            <MarkingsTool legend={null} />
+            <TreesTool />
+            <ActionsTool />
+          </>
+        }
+        camera={
+          <CameraTools
+            onZoom={(factor) => {
+              camera.current = {
+                ...camera.current,
+                distance: Math.min(4, Math.max(MIN_DISTANCE, camera.current.distance * factor)),
+              };
+              redraw();
+            }}
+            onTop={() => {
+              camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
+              redraw();
+            }}
+            onFit={fit}
+            fitLabel={r.fit}
+          />
+        }
+      />
       <div className="stage3-frame">
         <canvas
           ref={canvas}
@@ -750,24 +784,6 @@ export function CompareStage3D({
         )}
       </div>
       <div className="stage3-controls">
-        <button
-          type="button"
-          className="small stage3-eye"
-          aria-pressed={markings}
-          title={r.markingsHint}
-          onClick={() => setMarkings(!markings)}
-        >
-          <Eye open={markings} /> {r.markings}
-        </button>
-        <label className="control-check">
-          <input
-            type="checkbox"
-            checked={trees}
-            onChange={(event) => setTrees(event.target.checked)}
-          />
-          {r.showTrees}
-        </label>
-        <ActionIconsToggle className="control-check" />
         <span className="stage3-swatch" data-side="0">
           {r.parts(names[0], counts[0])}
         </span>
@@ -775,19 +791,6 @@ export function CompareStage3D({
           {r.parts(names[1], counts[1])}
         </span>
         <span className="spacer" />
-        <button type="button" className="small quiet" onClick={fit}>
-          {r.fit}
-        </button>
-        <button
-          type="button"
-          className="small quiet"
-          onClick={() => {
-            camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
-            redraw();
-          }}
-        >
-          {r.topView}
-        </button>
         <InfoTip text={r.stageHint} />
       </div>
       {markings && (
@@ -880,17 +883,6 @@ function othersAmong(
   return [...found.entries()]
     .map(([plugin, keys]) => ({ plugin, keys }))
     .sort((a, b) => b.keys.length - a.keys.length || a.plugin.localeCompare(b.plugin));
-}
-
-/** An eye, open or struck through, as on the collisions page. */
-function Eye({ open }: { open: boolean }) {
-  return (
-    <svg className="eye" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-      <circle cx="12" cy="12" r="3" />
-      {!open && <path d="M4 4l16 16" />}
-    </svg>
-  );
 }
 
 /**

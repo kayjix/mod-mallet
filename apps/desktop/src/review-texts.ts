@@ -30,9 +30,6 @@ export interface ReviewTexts {
   /** The stage. */
   viewNow: string;
   viewOnly: (name: string) => string;
-  markings: string;
-  showTrees: string;
-  markingsHint: string;
   legendHidden: string;
   othersHere: (count: number) => string;
   othersShow: (name: string) => string;
@@ -112,7 +109,6 @@ export interface ReviewTexts {
   stepBack: (step: string) => string;
   stepNext: (step: string) => string;
   fit: string;
-  topView: string;
   loading: string;
   missing: string;
   stageHint: string;
@@ -163,10 +159,6 @@ const en: ReviewTexts = {
       : `${count} parts belong to the game and stay`,
   viewNow: "Now",
   viewOnly: (name) => `Only ${name}`,
-  markings: "Markings",
-  showTrees: "Show trees",
-  markingsHint:
-    "With the eye closed, the place looks as the game would show it: nothing tinted, and what is hidden left out.",
   legendHidden: "red: already hidden, by this or your other decisions",
   othersHere: (count) =>
     count === 1 ? "One more mod built here:" : `${count} more mods built here:`,
@@ -261,7 +253,6 @@ const en: ReviewTexts = {
   stepBack: (step) => `‹ Step back: ${step}`,
   stepNext: (step) => `Next step: ${step} ›`,
   fit: "Fit",
-  topView: "From above",
   loading: "Reading what stands here…",
   missing: "What stands here cannot be read.",
   stageHint: "Drag to turn · right-drag to move · wheel to zoom",
@@ -312,10 +303,6 @@ const de: ReviewTexts = {
       : `${count} Teile gehören zum Spiel und bleiben`,
   viewNow: "Jetzt",
   viewOnly: (name) => `Nur ${name}`,
-  markings: "Markierungen",
-  showTrees: "Bäume zeigen",
-  markingsHint:
-    "Mit geschlossenem Auge sieht die Stelle aus, wie das Spiel sie zeigt: nichts eingefärbt, Ausgeblendetes weggelassen.",
   legendHidden: "rot: schon ausgeblendet, durch diese oder deine anderen Entscheidungen",
   othersHere: (count) =>
     count === 1 ? "Ein weiterer Mod baut hier:" : `${count} weitere Mods bauen hier:`,
@@ -414,7 +401,6 @@ const de: ReviewTexts = {
   stepBack: (step) => `‹ Schritt zurück: ${step}`,
   stepNext: (step) => `Nächster Schritt: ${step} ›`,
   fit: "Einpassen",
-  topView: "Von oben",
   loading: "Lese, was hier steht …",
   missing: "Was hier steht, lässt sich nicht lesen.",
   stageHint: "Ziehen dreht · rechts ziehen verschiebt · Rad zoomt",

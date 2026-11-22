@@ -10,13 +10,12 @@ import {
 import { useSession } from "./Actions";
 import {
   type ActionHit,
-  ActionIconsToggle,
   actionAt,
   asAreaObject,
   paintActionPlaces,
   useActionIconsShown,
 } from "./action-places";
-import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
+import { AreaLayer, isFlora, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { MapMarker, MapSpot, MapTerrain, MapWorld } from "./generated/rendered-report";
 import {
@@ -54,6 +53,14 @@ import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { RealTops } from "./real-tops";
 import { watchView } from "./render-stats";
+import {
+  ActionsTool,
+  CameraTools,
+  MarkingsTool,
+  TreesTool,
+  useMarkings,
+  useTreesShown,
+} from "./view-tools";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 interface MapView3DProps {
@@ -88,6 +95,8 @@ interface MapView3DProps {
    * hidden left out rather than drawn as a ghost.
    */
   plain?: boolean;
+  /** What the markings mean here, beside their switch; a general sentence where none. */
+  markingsLegend?: ReactNode;
   /** Told about the objects of each area once they are read. */
   onArea?: (area: AreaObjects | null) => void;
   /**
@@ -497,7 +506,8 @@ export function MapView3D({
   children,
   tools,
   spotDistance = NEAR * 0.7,
-  plain = false,
+  plain: plainGiven,
+  markingsLegend,
   onArea,
   onLayer,
   paint,
@@ -573,19 +583,27 @@ export function MapView3D({
       ),
     [spots],
   );
+  // The markings and the trees, the same in every view; a page may set
+  // how plain the view is itself.
+  const [marks] = useMarkings();
+  const plain = plainGiven ?? !marks;
+  const [treesShown] = useTreesShown();
+  const flora = useRef<Set<string>>(new Set());
   const lookOf = useRef<(key: string) => Look>(() => LOOK.plain);
   lookOf.current = (key) =>
-    hidden.has(key)
-      ? plain
-        ? LOOK.gone
-        : LOOK.ghost
-      : plain
-        ? LOOK.plain
-        : focus.has(key)
-          ? LOOK.focus
-          : marked.has(key)
-            ? LOOK.marked
-            : LOOK.plain;
+    !treesShown && flora.current.has(key)
+      ? LOOK.gone
+      : hidden.has(key)
+        ? plain
+          ? LOOK.gone
+          : LOOK.ghost
+        : plain
+          ? LOOK.plain
+          : focus.has(key)
+            ? LOOK.focus
+            : marked.has(key)
+              ? LOOK.marked
+              : LOOK.plain;
   const told = useRef(onArea);
   told.current = onArea;
   const toldLayer = useRef(onLayer);
@@ -696,6 +714,7 @@ export function MapView3D({
           if (found === null || area.current !== layer) {
             return;
           }
+          flora.current = floraOf(found);
           layer.show(found, lookOf.current);
           told.current?.(found);
           setAreaState(found.objects.length);
@@ -1442,7 +1461,7 @@ export function MapView3D({
   useEffect(() => {
     area.current?.restyle(lookOf.current);
     redraw();
-  }, [focus, hidden, marked, plain, redraw]);
+  }, [focus, hidden, marked, plain, treesShown, redraw]);
 
   // The drawing follows size, highlights and the controls, which it reads
   // from a ref so that drawing need not be made anew for each.
@@ -1765,39 +1784,17 @@ export function MapView3D({
             <>
               <WandControl level={level} onLevel={setLevel} />
               {tools}
+              <MarkingsTool legend={markingsLegend} />
+              {withObjects && <TreesTool />}
+              {withObjects && <ActionsTool />}
             </>
           }
           camera={
-            <>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => zoom(1 / 1.5)}
-                aria-label={t.mapZoomIn}
-                title={t.mapZoomIn}
-              >
-                +
-              </button>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => zoom(1.5)}
-                aria-label={t.mapZoomOut}
-                title={t.mapZoomOut}
-              >
-                −
-              </button>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => fly({ ...camera.current, yaw: 0, pitch: MAX_PITCH })}
-              >
-                {t.mapTopView}
-              </button>
-              <button type="button" className="map-zoom-button" onClick={() => fly(fitted())}>
-                {t.mapFit}
-              </button>
-            </>
+            <CameraTools
+              onZoom={zoom}
+              onTop={() => fly({ ...camera.current, yaw: 0, pitch: MAX_PITCH })}
+              onFit={() => fly(fitted())}
+            />
           }
         />
         {pickedObject !== null && (
@@ -1889,10 +1886,18 @@ export function MapView3D({
                     : t.mapNearCount(areaState)}
           </span>
         </label>
-        {withObjects && <ActionIconsToggle />}
         <InfoTip text={t.mapReliefHint} above />
       </div>
     </div>
+  );
+}
+
+/** The trees, plants and grass of an area, by key: left out while trees are not shown. */
+function floraOf(found: AreaObjects): Set<string> {
+  return new Set(
+    found.objects
+      .filter((object) => isFlora(object.model))
+      .map((object) => objectKey(object.id.plugin, object.id.localId)),
   );
 }
 

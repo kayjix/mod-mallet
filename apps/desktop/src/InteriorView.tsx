@@ -6,13 +6,12 @@ import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useS
 import { useSession } from "./Actions";
 import {
   type ActionHit,
-  ActionIconsToggle,
   actionAt,
   asAreaObject,
   paintActionPlaces,
   useActionIconsShown,
 } from "./action-places";
-import { AreaLayer, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
+import { AreaLayer, isFlora, LOOK, type Look, objectKey, type PartTools } from "./area-layer";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import { colour, lookAt, type Mat4, multiply, perspective, project, type Vec3 } from "./gl";
 import { InfoTip } from "./info-tip";
@@ -25,6 +24,7 @@ import { moveKeysOf, moveOf } from "./moves";
 import { matchKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { watchView } from "./render-stats";
+import { ActionsTool, CameraTools, MarkingsTool, TreesTool, useTreesShown } from "./view-tools";
 import { useWandLevel, ViewToolbar, WandControl } from "./wand";
 
 export interface InteriorViewProps {
@@ -41,6 +41,8 @@ export interface InteriorViewProps {
    * hidden left out rather than drawn as a ghost.
    */
   plain: boolean;
+  /** What the markings mean here, beside their switch; a general sentence where none. */
+  markingsLegend?: ReactNode;
   /** More for the card of a picked object, such as what to do with it. */
   objectExtra?: (object: AreaObject, tools: PartTools) => ReactNode;
   /** Told about each object picked in the view, or none. */
@@ -95,6 +97,7 @@ export function InteriorView({
   focus,
   hidden,
   plain,
+  markingsLegend,
   objectExtra,
   onObject,
   onArea,
@@ -146,15 +149,20 @@ export function InteriorView({
   const seeInsideNow = useRef(seeInside);
   seeInsideNow.current = seeInside;
 
+  // The trees, the same in every view.
+  const [treesShown] = useTreesShown();
+  const flora = useRef<Set<string>>(new Set());
   const lookOf = useRef<(key: string) => Look>(() => LOOK.plain);
   lookOf.current = (key) =>
-    hidden.has(key)
-      ? plain
-        ? LOOK.gone
-        : LOOK.ghost
-      : !plain && focus.has(key)
-        ? LOOK.focus
-        : LOOK.plain;
+    !treesShown && flora.current.has(key)
+      ? LOOK.gone
+      : hidden.has(key)
+        ? plain
+          ? LOOK.gone
+          : LOOK.ghost
+        : !plain && focus.has(key)
+          ? LOOK.focus
+          : LOOK.plain;
 
   // The point by its value, so that a new array with the same point does
   // not move the camera.
@@ -383,6 +391,7 @@ export function InteriorView({
           told.current?.(null);
           return;
         }
+        flora.current = floraOf(found);
         current.show(found, lookOf.current);
         setArea(found);
         setState("shown");
@@ -410,7 +419,7 @@ export function InteriorView({
   useEffect(() => {
     layer.current?.restyle(lookOf.current);
     redraw();
-  }, [focus, hidden, plain, redraw]);
+  }, [focus, hidden, plain, treesShown, redraw]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: these change the drawing.
   useEffect(() => {
@@ -616,49 +625,24 @@ export function InteriorView({
             <>
               <WandControl level={level} onLevel={setLevel} />
               {tools}
+              <MarkingsTool legend={markingsLegend} />
+              <TreesTool />
+              <ActionsTool />
             </>
           }
           camera={
-            <>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => zoom(1 / 1.5)}
-                aria-label={t.mapZoomIn}
-                title={t.mapZoomIn}
-              >
-                +
-              </button>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => zoom(1.5)}
-                aria-label={t.mapZoomOut}
-                title={t.mapZoomOut}
-              >
-                −
-              </button>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => {
-                  camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
-                  redraw();
-                }}
-              >
-                {t.mapTopView}
-              </button>
-              <button
-                type="button"
-                className="map-zoom-button"
-                onClick={() => {
-                  camera.current = framed(area);
-                  redraw();
-                }}
-              >
-                {own.fit}
-              </button>
-            </>
+            <CameraTools
+              onZoom={zoom}
+              onTop={() => {
+                camera.current = { ...camera.current, yaw: 0, pitch: MAX_PITCH };
+                redraw();
+              }}
+              onFit={() => {
+                camera.current = framed(area);
+                redraw();
+              }}
+              fitLabel={own.fit}
+            />
           }
         />
         {picked !== null && (
@@ -723,10 +707,18 @@ export function InteriorView({
             {own.count(area.objects.length, progress.done, progress.total)}
           </span>
         )}
-        <ActionIconsToggle />
         <InfoTip text={own.hint} above />
       </div>
     </div>
+  );
+}
+
+/** The trees, plants and grass of an area, by key: left out while trees are not shown. */
+function floraOf(found: AreaObjects): Set<string> {
+  return new Set(
+    found.objects
+      .filter((object) => isFlora(object.model))
+      .map((object) => objectKey(object.id.plugin, object.id.localId)),
   );
 }
 
