@@ -7,23 +7,15 @@
   vertical-align: -2px;
   stroke: currentColor;
   stroke-width: 2;
-  color: #cc79a7;
+  color: var(--pin);
 }
 
 .pin-button[aria-pressed="true"] {
-  border-color: #cc79a7;
-  box-shadow: 0 0 0 1px #cc79a7;
+  border-color: var(--pin);
+  box-shadow: 0 0 0 1px var(--pin);
 }
 
 .work-pin {
   display: inline-flex;
   align-items: center;
-}
-
-.pin-note {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  border: 1px solid #cc79a7;
-  border-radius: 8px;
-  background: var(--surface);
 }

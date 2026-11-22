@@ -52,6 +52,7 @@ import { NOTHING_WAITS } from "./switched-off";
 import { switchedOffTexts } from "./switched-off-texts";
 import "./patches.css";
 import "./wide-advice.css";
+import { EmptyState, Note, UndoButton } from "./ui/kit";
 
 /** Base Object Swapper's page, for when it is missing. */
 const SWAPPER_PAGE = "https://www.nexusmods.com/skyrimspecialedition/mods/60805";
@@ -84,7 +85,7 @@ export function PatchView({ report }: { report: RenderedReport }) {
   const conflicts = useMemo(() => (book === null ? [] : conflictsOf(book, pairs)), [book, pairs]);
 
   if (book === null) {
-    return <p className="aside">{t.nothingHere}</p>;
+    return <EmptyState>{t.nothingHere}</EmptyState>;
   }
   const chosen =
     book.patches.find((patch) => patch.id === selected) ?? activePatch(book) ?? book.patches[0];
@@ -174,21 +175,23 @@ export function PatchView({ report }: { report: RenderedReport }) {
         </aside>
         <div className="patch-detail">
           {undo !== null && (
-            <div className="patch-confirm" role="status">
+            <Note
+              tone="ok"
+              role="status"
+              actions={
+                <UndoButton
+                  onClick={() => {
+                    setBook(undo.book);
+                    setUndo(null);
+                  }}
+                />
+              }
+            >
               <p>{undo.text}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setBook(undo.book);
-                  setUndo(null);
-                }}
-              >
-                {p.undo}
-              </button>
-            </div>
+            </Note>
           )}
           {chosen === undefined ? (
-            <p className="empty">{p.emptyBook}</p>
+            <EmptyState>{p.emptyBook}</EmptyState>
           ) : (
             <PatchDetail
               key={chosen.id}
@@ -296,15 +299,19 @@ function TopNotes({
   return (
     <>
       {!report.objectSwapper && (
-        <section className="patch-missing">
+        <Note
+          tone="warning"
+          actions={
+            <button type="button" onClick={() => session.api.openPage(SWAPPER_PAGE)}>
+              {session.t.openPage}
+            </button>
+          }
+        >
           <p>{p.needsSwapper}</p>
-          <button type="button" onClick={() => session.api.openPage(SWAPPER_PAGE)}>
-            {session.t.openPage}
-          </button>
-        </section>
+        </Note>
       )}
       {(paused.decisions > 0 || paused.installed > 0 || paused.stillLoaded.length > 0) && (
-        <div className="patch-paused" role="note">
+        <Note tone="neutral">
           {paused.decisions > 0 && (
             <p>
               {off.waiting(paused.decisions, paused.mods)} <InfoTip text={off.waitingNote} />
@@ -316,53 +323,65 @@ function TopNotes({
             </p>
           )}
           {paused.stillLoaded.length > 0 && <p>{off.stillLoaded(paused.stillLoaded)}</p>}
-        </div>
+        </Note>
       )}
       {firstOpen !== undefined && (
-        <p className="patch-line patch-open">
-          {p.open(open.keys.length, open.pairs)}{" "}
-          <button type="button" className="small" onClick={() => session.decideSpot(firstOpen)}>
-            {p.toCollisions}
-          </button>
-        </p>
+        <Note
+          actions={
+            <button type="button" className="small" onClick={() => session.decideSpot(firstOpen)}>
+              {p.toCollisions}
+            </button>
+          }
+        >
+          <p>{p.open(open.keys.length, open.pairs)}</p>
+        </Note>
       )}
       {unknown.map((installed) => {
         const objects = installed.patch.parts.flatMap((part) => part.objects);
         return (
-          <p className="patch-line" key={installed.patch.name}>
-            {p.unknownInstalled(installed.patch.name, objects.length)}{" "}
-            <button
-              type="button"
-              className="small"
-              onClick={() =>
-                onTake(
-                  withLoaded(book, {
-                    archive: installed.provider?.name ?? installed.patch.name,
-                    name: installed.patch.name,
-                    author: installed.patch.author ?? null,
-                    version: installed.patch.version ?? null,
-                    decisions: choicesOf(pairs, new Set(objects.map(matchKey)), objects),
-                  }).book,
-                )
-              }
-            >
-              {p.takeInstalled}
-            </button>
-          </p>
+          <Note
+            key={installed.patch.name}
+            actions={
+              <button
+                type="button"
+                className="small"
+                onClick={() =>
+                  onTake(
+                    withLoaded(book, {
+                      archive: installed.provider?.name ?? installed.patch.name,
+                      name: installed.patch.name,
+                      author: installed.patch.author ?? null,
+                      version: installed.patch.version ?? null,
+                      decisions: choicesOf(pairs, new Set(objects.map(matchKey)), objects),
+                    }).book,
+                  )
+                }
+              >
+                {p.takeInstalled}
+              </button>
+            }
+          >
+            <p>{p.unknownInstalled(installed.patch.name, objects.length)}</p>
+          </Note>
         );
       })}
       {oldMods.map((info) => (
-        <p className="patch-line" key={info.mod.id}>
-          {p.oldMod(info.mod.name)}{" "}
-          <button
-            type="button"
-            className="small"
-            disabled={action.busy}
-            onClick={() => action.run({ type: "disable-mod", mod: info.mod })}
-          >
-            {p.switchOldOff}
-          </button>
-        </p>
+        <Note
+          tone="warning"
+          key={info.mod.id}
+          actions={
+            <button
+              type="button"
+              className="small"
+              disabled={action.busy}
+              onClick={() => action.run({ type: "disable-mod", mod: info.mod })}
+            >
+              {p.switchOldOff}
+            </button>
+          }
+        >
+          <p>{p.oldMod(info.mod.name)}</p>
+        </Note>
       ))}
       <ActionResult state={action} />
     </>
@@ -542,7 +561,9 @@ function PatchDetail({
                 : p.stateNotInstalled}
         </p>
         {missing > 0 && patch.off !== true && (
-          <p className="patch-line patch-waiting">{p.differs(missing)}</p>
+          <Note tone="warning">
+            <p>{p.differs(missing)}</p>
+          </Note>
         )}
         <div className="patch-buttons">
           {patch.off !== true && (
@@ -604,6 +625,7 @@ function PatchDetail({
           {!foreign && (
             <button
               type="button"
+              className="danger"
               title={p.forgetHint}
               disabled={count === 0}
               onClick={() => setAsking("forget")}
@@ -611,12 +633,12 @@ function PatchDetail({
               {p.forget}
             </button>
           )}
-          <button type="button" onClick={() => setAsking("remove")}>
+          <button type="button" className="danger" onClick={() => setAsking("remove")}>
             {p.remove}
           </button>
         </div>
         {asking !== null && (
-          <div className="patch-confirm" role="alertdialog">
+          <Note tone="warning" role="alertdialog">
             <p>
               {asking === "forget"
                 ? p.confirmForget(count)
@@ -625,7 +647,7 @@ function PatchDetail({
             <span className="relief-object-buttons">
               <button
                 type="button"
-                className="primary"
+                className="danger primary"
                 onClick={() => {
                   if (asking === "forget") {
                     change(
@@ -649,7 +671,7 @@ function PatchDetail({
                 {p.cancel}
               </button>
             </span>
-          </div>
+          </Note>
         )}
         {written !== null && (
           <div className="patch-file">
@@ -661,7 +683,11 @@ function PatchDetail({
             </button>
           </div>
         )}
-        {writeError !== null && <p className="failure">{writeError}</p>}
+        {writeError !== null && (
+          <Note tone="danger" role="alert">
+            <p>{writeError}</p>
+          </Note>
+        )}
         <ActionResult state={action} />
       </header>
 

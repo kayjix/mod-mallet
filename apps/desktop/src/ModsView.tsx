@@ -16,6 +16,7 @@ import type { WorkKind } from "./map-places";
 import { type ModFilter, type ModSort, useOverviewTexts } from "./overview-texts";
 import { LEFT_BEHIND, STILL_LOADED, StillLoadedHelp } from "./still-loaded";
 import { FindingRow } from "./Tasks";
+import { EmptyState, SearchField, Segmented, Toolbar } from "./ui/kit";
 import { COLLIDES_WIDELY, toneOf, WideAdvice, WideTag } from "./wide-advice";
 import "./overview.css";
 
@@ -350,28 +351,18 @@ function ModList({
 
   return (
     <section className="mods-page">
-      <div className="mods-toolbar">
-        <input
-          className="text-input mods-search"
-          type="search"
-          placeholder={o.modsSearch}
-          aria-label={o.modsSearch}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+      <Toolbar className="mods-toolbar">
+        <SearchField value={search} onChange={setSearch} placeholder={o.modsSearch} />
+        <Segmented
+          label={o.colState}
+          items={(["all", "problems", "disabled"] as ModFilter[]).map((value) => ({
+            id: value,
+            label: o.modsFilter[value],
+          }))}
+          value={filter}
+          onChange={setFilter}
         />
-        <fieldset className="segmented" aria-label={o.colState}>
-          {(["all", "problems", "disabled"] as ModFilter[]).map((value) => (
-            <button
-              type="button"
-              key={value}
-              aria-pressed={filter === value}
-              onClick={() => setFilter(value)}
-            >
-              {o.modsFilter[value]}
-            </button>
-          ))}
-        </fieldset>
-        <label className="control mods-sort">
+        <label className="control">
           {o.modsSort}
           <select value={sort} onChange={(event) => setSort(event.target.value as ModSort)}>
             {(["problems", "collisions", "name"] as ModSort[]).map((value) => (
@@ -382,10 +373,10 @@ function ModList({
           </select>
         </label>
         <span className="aside">{o.modsShown(shown.length, mods.length)}</span>
-      </div>
+      </Toolbar>
 
       {shown.length === 0 ? (
-        <p className="empty">{o.modsNone}</p>
+        <EmptyState>{o.modsNone}</EmptyState>
       ) : (
         <div className="mod-table">
           <div className="mod-row mod-head" aria-hidden="true">

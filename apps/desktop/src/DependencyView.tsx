@@ -8,6 +8,7 @@ import { mostNeeded, neighbours, search } from "./dependencies";
 import { useDependencyTexts } from "./dependency-texts";
 import { InfoTip } from "./info-tip";
 import { ArcKey, DependencyContext, GroupList, summaryOf } from "./ModDependencies";
+import { EmptyState, SearchField, Toolbar } from "./ui/kit";
 
 /** How many plugins a search lists to pick from. */
 const RESULTS = 12;
@@ -38,24 +39,21 @@ export function DependencyView() {
   const top = useMemo(() => (graph === null ? [] : mostNeeded(graph, MOST_NEEDED)), [graph]);
 
   if (graph === null || graph.nodes.length === 0) {
-    return <p className="empty">{d.noLoadOrder}</p>;
+    return <EmptyState>{d.noLoadOrder}</EmptyState>;
   }
   const count = graph.nodes.length;
   const node = picked === null ? undefined : graph.nodes[picked];
 
   return (
     <section className="dep-page">
-      <div className="dep-toolbar">
-        <input
-          className="text-input dep-search"
-          type="search"
-          placeholder={d.search}
-          aria-label={d.search}
+      <Toolbar className="dep-toolbar">
+        <SearchField
           value={needle}
-          onChange={(event) => setNeedle(event.target.value)}
-          onKeyDown={(event) => {
+          onChange={setNeedle}
+          placeholder={d.search}
+          onEnter={() => {
             const first = found[0];
-            if (event.key === "Enter" && first !== undefined) {
+            if (first !== undefined) {
               setPicked(first.index);
             }
           }}
@@ -72,7 +70,7 @@ export function DependencyView() {
           </span>
           <InfoTip text={d.explain} />
         </span>
-      </div>
+      </Toolbar>
       {found.length > 0 && (
         <ul className="dep-results">
           {found.slice(0, RESULTS).map((result) => (

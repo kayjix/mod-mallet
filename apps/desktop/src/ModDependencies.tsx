@@ -5,6 +5,7 @@ import { createContext, type ReactNode, use, useMemo, useState } from "react";
 import { DependencyArcs } from "./DependencyArcs";
 import { type DependencyGraph, type Group, neighbours, pluginsOfMod, stem } from "./dependencies";
 import { useDependencyTexts } from "./dependency-texts";
+import { PageHeader, Tabs } from "./ui/kit";
 
 /** What the dependency views need from the Mods page around them. */
 export interface DependencyPage {
@@ -41,20 +42,19 @@ export function ModsTabs({
 }) {
   const d = useDependencyTexts();
   return (
-    <div className="tabs" role="tablist">
-      {(["list", "dependencies"] as const).map((id) => (
-        <button
-          type="button"
-          role="tab"
-          className="tab"
-          key={id}
-          aria-selected={tab === id}
-          onClick={() => onTab(id)}
-        >
-          {id === "list" ? d.tabList : d.tabDependencies}
-        </button>
-      ))}
-    </div>
+    <PageHeader
+      tabs={
+        <Tabs
+          label={d.tabList}
+          items={[
+            { id: "list", label: d.tabList },
+            { id: "dependencies", label: d.tabDependencies },
+          ]}
+          value={tab}
+          onChange={onTab}
+        />
+      }
+    />
   );
 }
 

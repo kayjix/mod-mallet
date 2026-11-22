@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useSession } from "./Actions";
 import type { RenderedTool, RenderedToolbox } from "./generated/rendered-toolbox";
 import { InfoTip } from "./info-tip";
-import { LoadingMallet } from "./LoadingMallet";
 import { toolboxTexts } from "./toolbox-texts";
 import "./toolbox.css";
+import { LoadingScreen, Note } from "./ui/kit";
 
 interface ToolboxProps {
   toolbox: RenderedToolbox | null;
@@ -38,12 +38,7 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   const [placed, setPlaced] = useState(false);
 
   if (toolbox === null) {
-    return (
-      <section className="loading-screen" role="status">
-        <LoadingMallet size={120} />
-        <span>{t.scanning}</span>
-      </section>
-    );
+    return <LoadingScreen title={t.scanning} />;
   }
 
   const attempt = async (work: () => Promise<string | null>) => {
@@ -177,14 +172,14 @@ export function ToolboxView({ toolbox, refresh }: ToolboxProps) {
   return (
     <section className="toolbox">
       {note !== null && (
-        <p className="note" role="status">
-          {note}
-        </p>
+        <Note tone="ok" role="status">
+          <p>{note}</p>
+        </Note>
       )}
       {failure !== null && (
-        <p className="failure" role="alert">
-          {failure}
-        </p>
+        <Note tone="danger" role="alert">
+          <p>{failure}</p>
+        </Note>
       )}
       <ul className="tool-list">{needed.map(row)}</ul>
       {listed.length > 0 && (

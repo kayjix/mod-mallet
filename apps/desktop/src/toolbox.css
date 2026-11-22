@@ -85,3 +85,8 @@
     animation: none;
   }
 }
+
+/* What was just done, or went wrong, above the list. */
+.toolbox > .note {
+  margin-bottom: var(--space-3);
+}

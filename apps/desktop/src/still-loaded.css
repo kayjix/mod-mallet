@@ -42,11 +42,3 @@
   border: 1px solid var(--warning);
   border-radius: var(--radius-small);
 }
-
-.still-loaded-note p {
-  margin: 0 0 var(--space-2);
-}
-
-.still-loaded-note p:last-child {
-  margin-bottom: 0;
-}

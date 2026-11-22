@@ -28,6 +28,7 @@ import type {
 import type { Texts } from "./i18n";
 import { InfoTip } from "./info-tip";
 import { fileDuels } from "./Overview";
+import { PageHeader, SearchField, Tabs, Toolbar, UndoButton } from "./ui/kit";
 import { Stage, type StageItem } from "./Viewer3D";
 
 type Topic = DuelFile["topic"];
@@ -76,44 +77,43 @@ export function CompareView({ report, start }: { report: RenderedReport; start: 
   const rendered = report.duels.find((candidate) => candidate.duel.id === duelId) ?? null;
 
   return (
-    <div className="compare">
-      <aside className="compare-left">
-        <div className="compare-left-head">
-          <span className="compare-tabs">
-            <fieldset className="segmented" aria-label={a.tabsLabel}>
-              <button type="button" aria-pressed={tab === "duels"} onClick={() => setTab("duels")}>
-                {t.compareDuels}
-              </button>
-              <button
-                type="button"
-                aria-pressed={tab === "ranking"}
-                onClick={() => setTab("ranking")}
-              >
-                {t.compareRanking}
-              </button>
-            </fieldset>
-            {tab === "ranking" && <InfoTip text={t.rankingHint} />}
-          </span>
-        </div>
-        {tab === "duels" ? (
-          <DuelPicker duels={duels} selected={duelId} onSelect={setDuelId} />
+    <>
+      <PageHeader
+        tabs={
+          <Tabs
+            label={a.tabsLabel}
+            items={[
+              { id: "duels", label: t.compareDuels },
+              { id: "ranking", label: t.compareRanking },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+        }
+        status={tab === "ranking" ? <InfoTip text={t.rankingHint} /> : undefined}
+      />
+      <div className="compare">
+        <aside className="compare-left">
+          {tab === "duels" ? (
+            <DuelPicker duels={duels} selected={duelId} onSelect={setDuelId} />
+          ) : (
+            <RankingPanel duels={duels} byId={byId} />
+          )}
+          <ObjectsElsewhere report={report} />
+        </aside>
+        {rendered === null ? (
+          <p className="aside compare-empty">{duels.length === 0 ? a.none : t.compareNone}</p>
         ) : (
-          <RankingPanel duels={duels} byId={byId} />
+          <DuelWorkspace
+            key={rendered.duel.id}
+            rendered={rendered}
+            byId={byId}
+            previews={cache.current.previews}
+            comparisons={cache.current.comparisons}
+          />
         )}
-        <ObjectsElsewhere report={report} />
-      </aside>
-      {rendered === null ? (
-        <p className="aside compare-empty">{duels.length === 0 ? a.none : t.compareNone}</p>
-      ) : (
-        <DuelWorkspace
-          key={rendered.duel.id}
-          rendered={rendered}
-          byId={byId}
-          previews={cache.current.previews}
-          comparisons={cache.current.comparisons}
-        />
-      )}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -186,13 +186,8 @@ function DuelPicker({
         <strong>{duels.length - decidedCount}</strong> {t.compareOpenLabel} ·{" "}
         <strong>{decidedCount}</strong> {t.compareDecidedLabel}
       </p>
-      <div className="compare-filters">
-        <input
-          type="search"
-          placeholder={t.compareSearch}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+      <Toolbar stacked className="compare-filters">
+        <SearchField value={search} onChange={setSearch} placeholder={t.compareSearch} wide />
         <label className="compare-check">
           <input
             type="checkbox"
@@ -201,7 +196,7 @@ function DuelPicker({
           />
           {t.compareShowDecided}
         </label>
-      </div>
+      </Toolbar>
       <ul className="compare-duels">
         {groups.map(({ group, members, open }) => {
           // A search, or the duel looked at, keeps its group open.
@@ -760,9 +755,7 @@ function DuelDecision({
       </p>
       <p className="aside">{rendered.topicLabels.join(" · ")}</p>
       {decided !== undefined && (
-        <button type="button" className="quiet small" onClick={() => decide(duel.id, null)}>
-          {t.duelUndo}
-        </button>
+        <UndoButton label={t.duelUndo} onClick={() => decide(duel.id, null)} />
       )}
       {applied !== null && (
         <div className="duel-applied" role="status">
@@ -974,12 +967,7 @@ function RankingPanel({
         )}
       </div>
       <h4>{t.rankingUnplaced}</h4>
-      <input
-        type="search"
-        placeholder={t.compareSearch}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <SearchField value={search} onChange={setSearch} placeholder={t.compareSearch} wide />
       <ul className="ranking-unplaced">
         {unplaced.map(([key, mod]) => (
           <li key={key} className="ranking-row">

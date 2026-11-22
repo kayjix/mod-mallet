@@ -24,15 +24,6 @@
   margin: 0;
 }
 
-.work-passage-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  margin: 0;
-  font-size: 0.88rem;
-}
-
 .work-stage:has(> .work-passage-note) {
   grid-template-rows: auto auto minmax(0, 1fr);
 }

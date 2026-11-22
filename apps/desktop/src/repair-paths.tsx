@@ -19,6 +19,7 @@ import { repairTexts } from "./repair-paths-texts";
 import "./repair-paths.css";
 import { Note } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
+import { Note as NoteBox } from "./ui/kit";
 
 /** The prefix of a repair among the patch choices. */
 export const REPAIR = "repair:";
@@ -397,7 +398,11 @@ export function PathsPanel({
           </ul>
         </div>
       )}
-      {error !== null && <p className="failure">{error}</p>}
+      {error !== null && (
+        <NoteBox tone="danger" role="alert">
+          <p>{error}</p>
+        </NoteBox>
+      )}
       <ActionResult state={action} />
       {inPatch !== undefined && <p className="aside">{inPatch.note}</p>}
       <p className="aside">{t.limits}</p>

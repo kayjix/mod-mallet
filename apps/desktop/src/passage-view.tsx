@@ -19,6 +19,7 @@ import { useReviewTexts } from "./review-texts";
 import { findSegments, type StageSegment } from "./segments";
 import { Note, NoteRow } from "./spot-notes";
 import "./passage-view.css";
+import { UndoButton } from "./ui/kit";
 
 /** What the view shows of a passage: the place now, or one side's version only. */
 export type PassageVersion = "now" | 0 | 1;
@@ -127,7 +128,8 @@ export function VersionSwitch({
   ];
   return (
     <fieldset
-      className="segmented segmented-small view-tool passage-versions"
+      className="segmented view-tool passage-versions"
+      data-size="small"
       title={p.versionHint}
       aria-label={p.versionHint}
     >
@@ -283,9 +285,7 @@ export function PassageHead({
               </button>
             </span>
           )}
-          <button type="button" className="small" onClick={onUndo}>
-            {r.undo}
-          </button>
+          <UndoButton onClick={onUndo} />
         </p>
       )}
       <details className="passage-sections">

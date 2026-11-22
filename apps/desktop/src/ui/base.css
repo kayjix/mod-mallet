@@ -57,6 +57,18 @@ button.primary {
   font-weight: 600;
 }
 
+/* What throws something away: red words, and filled red where it is confirmed. */
+button.danger {
+  border-color: color-mix(in srgb, var(--error) 55%, var(--border));
+  color: var(--error);
+}
+
+button.danger.primary {
+  border-color: var(--error);
+  background: var(--error);
+  color: var(--surface);
+}
+
 button.small {
   padding: 2px 10px;
   font-size: 0.85rem;

@@ -31,7 +31,6 @@ export interface MovesTexts {
   touchesNothing: string;
   boxesNote: string;
   walked: (pieces: number) => string;
-  undo: string;
   back: string;
   intoPlugin: string;
   spotMoved: (count: number) => string;
@@ -112,7 +111,6 @@ const en: MovesTexts = {
     "Measured by the boxes around the models, so a curved or open model may already be free a little earlier.",
   walked: (pieces) =>
     `Characters walk on this (${pieces === 1 ? "1 piece of path" : `${pieces} pieces of path`}). Their paths stay where they are: once it is moved, they walk beside it on thin air or bump into it. Move it only a little, or up or down not at all.`,
-  undo: "Undo",
   back: "Back to where it was",
   intoPlugin:
     "Moves go into the plugin Mod Mallet - Moves. Write and install it on the Patch page.",
@@ -191,7 +189,6 @@ const de: MovesTexts = {
     "Gemessen an den Kästen um die Modelle; ein gebogenes oder offenes Modell ist vielleicht schon etwas früher frei.",
   walked: (pieces) =>
     `Hier laufen Figuren (${pieces === 1 ? "1 Wegstück" : `${pieces} Wegstücke`}). Ihre Wege bleiben, wo sie sind: Ist es verschoben, laufen sie daneben durch die Luft oder stoßen dagegen. Verschieb es nur ein wenig, hoch oder runter am besten gar nicht.`,
-  undo: "Rückgängig",
   back: "Zurück an seinen Platz",
   intoPlugin:
     "Verschiebungen kommen ins Plugin Mod Mallet - Moves. Schreib und installier es auf der Seite Patch.",

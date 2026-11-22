@@ -85,6 +85,15 @@ import { spotNotesTexts } from "./spot-notes-texts";
 import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from "./still-loaded";
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
+import {
+  EmptyState,
+  Note as NoteBox,
+  PageHeader,
+  SearchField,
+  Segmented,
+  Tabs,
+  Toolbar,
+} from "./ui/kit";
 import { Eye, useMarkings } from "./view-tools";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery } from "./walkways";
 import { WideAdvice, wideFindings } from "./wide-advice";
@@ -943,20 +952,25 @@ export function Collisions({
               offHere.plugin.toLowerCase(),
         );
   const offNote = offHere !== undefined && (
-    <div className="still-loaded-note" role="note">
+    <NoteBox
+      tone="warning"
+      className="still-loaded-note"
+      actions={
+        offFinding !== undefined && (
+          <>
+            <DisablePluginsButton rendered={offFinding} />
+            <ShowFilesButton files={stillFiles(offFinding)} />
+          </>
+        )
+      }
+    >
       <p>
         {switchedOffTexts[lang].stillLoadedSpot(
           stillLoaded.get(offHere.plugin.toLowerCase()) ?? offHere.plugin,
           offHere.plugin,
         )}
       </p>
-      {offFinding !== undefined && (
-        <div className="still-buttons">
-          <DisablePluginsButton rendered={offFinding} />
-          <ShowFilesButton files={stillFiles(offFinding)} />
-        </div>
-      )}
-    </div>
+    </NoteBox>
   );
   const modCount = useMemo(
     () => new Set(items.filter((item) => item.pairs.length > 0).map((item) => item.mods.key)).size,
@@ -964,14 +978,15 @@ export function Collisions({
   );
 
   const tabs = (
-    <fieldset className="segmented work-tabs" aria-label={t.viewCollisions}>
-      <button type="button" aria-pressed={tab === "spots"} onClick={() => changeTab("spots")}>
-        {t.workTabSpots} <span className="count">{ordered.length}</span>
-      </button>
-      <button type="button" aria-pressed={tab === "mods"} onClick={() => changeTab("mods")}>
-        {t.workMore} <span className="count">{modCount}</span>
-      </button>
-    </fieldset>
+    <Tabs
+      label={t.viewCollisions}
+      items={[
+        { id: "spots", label: t.workTabSpots, count: ordered.length },
+        { id: "mods", label: t.workMore, count: modCount },
+      ]}
+      value={tab}
+      onChange={changeTab}
+    />
   );
   const toPatch = (
     <button type="button" className="primary" onClick={showPatch}>
@@ -984,26 +999,29 @@ export function Collisions({
     const withSpots = new Set(items.map((item) => item.spot.finding));
     return (
       <section className="work work-pairs-view">
-        <div className="work-bar">
-          {tabs}
-          <span className="spacer" />
-          {suggested.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                let next = choices;
-                for (const pair of suggested) {
-                  next = chooseFinding(next, pair, pair.suggested);
-                }
-                setPatchChoices(next);
-              }}
-            >
-              {own.takeSuggestions(suggested.length)}
-            </button>
-          )}
-          {toPatch}
-        </div>
-        {items.length === 0 && <p className="empty">{t.workEmpty}</p>}
+        <PageHeader
+          tabs={tabs}
+          actions={
+            <>
+              {suggested.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    let next = choices;
+                    for (const pair of suggested) {
+                      next = chooseFinding(next, pair, pair.suggested);
+                    }
+                    setPatchChoices(next);
+                  }}
+                >
+                  {own.takeSuggestions(suggested.length)}
+                </button>
+              )}
+              {toPatch}
+            </>
+          }
+        />
+        {items.length === 0 && <EmptyState>{t.workEmpty}</EmptyState>}
         {wideBanners}
         <ModPairs
           items={items}
@@ -1040,32 +1058,26 @@ export function Collisions({
   const shownItem = passageItem ?? current;
   return (
     <section className="work work-spots">
-      <div className="work-bar">
-        {tabs}
-        <div className="work-progress" title={t.workProgress(decidedCount, ordered.length)}>
-          <strong>{t.workProgress(decidedCount, ordered.length)}</strong>
-          <span className="work-meter" aria-hidden="true">
-            <span
-              style={{
-                width: `${ordered.length === 0 ? 0 : (decidedCount / ordered.length) * 100}%`,
-              }}
-            />
-          </span>
-        </div>
-        <span className="spacer" />
-        {toPatch}
-      </div>
+      <PageHeader
+        tabs={tabs}
+        status={
+          <div className="work-progress" title={t.workProgress(decidedCount, ordered.length)}>
+            <strong>{t.workProgress(decidedCount, ordered.length)}</strong>
+            <span className="work-meter" aria-hidden="true">
+              <span
+                style={{
+                  width: `${ordered.length === 0 ? 0 : (decidedCount / ordered.length) * 100}%`,
+                }}
+              />
+            </span>
+          </div>
+        }
+        actions={toPatch}
+      />
       <div className="work-bench">
         <div className="work-left">
-          <div className="work-filters">
-            <input
-              type="search"
-              className="work-search"
-              placeholder={t.workSearch}
-              aria-label={t.workSearch}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+          <Toolbar stacked className="work-filters">
+            <SearchField value={query} onChange={setQuery} placeholder={t.workSearch} wide />
             <fieldset className="work-kinds" aria-label={t.mapCollisions}>
               {WORK_KINDS.map((kind) => (
                 <label key={kind} className="control-check" title={t.spotKindHints[kind]}>
@@ -1088,35 +1100,25 @@ export function Collisions({
                 </label>
               ))}
             </fieldset>
-            <fieldset className="segmented" aria-label={t.workGroupBy}>
-              {(["region", "mods", "passage"] as const).map((grouping) => (
-                <button
-                  type="button"
-                  key={grouping}
-                  aria-pressed={by === grouping}
-                  title={grouping === "passage" ? p.groupByHint : undefined}
-                  onClick={() => changeBy(grouping)}
-                >
-                  {grouping === "region"
-                    ? t.workByRegion
-                    : grouping === "mods"
-                      ? t.workByMods
-                      : p.groupBy}
-                </button>
-              ))}
-            </fieldset>
-            <fieldset className="segmented" aria-label={t.workSortBy}>
-              {(["open", "spots"] as const).map((sorting) => (
-                <button
-                  type="button"
-                  key={sorting}
-                  aria-pressed={sort === sorting}
-                  onClick={() => changeSort(sorting)}
-                >
-                  {sorting === "open" ? t.workSortOpen : t.workSortSpots}
-                </button>
-              ))}
-            </fieldset>
+            <Segmented
+              label={t.workGroupBy}
+              items={[
+                { id: "region", label: t.workByRegion },
+                { id: "mods", label: t.workByMods },
+                { id: "passage", label: p.groupBy, hint: p.groupByHint },
+              ]}
+              value={by}
+              onChange={changeBy}
+            />
+            <Segmented
+              label={t.workSortBy}
+              items={[
+                { id: "open", label: t.workSortOpen },
+                { id: "spots", label: t.workSortSpots },
+              ]}
+              value={sort}
+              onChange={changeSort}
+            />
             <label className="control-check">
               <input
                 type="checkbox"
@@ -1142,7 +1144,7 @@ export function Collisions({
               </label>
             )}
             {wideBanners}
-          </div>
+          </Toolbar>
           <WorkList
             groups={groups}
             by={by}
@@ -1161,21 +1163,25 @@ export function Collisions({
           {openedPassage === null &&
             currentInPassage !== undefined &&
             currentInPassage.passage !== undefined && (
-              <p className="work-passage-note">
-                <span>
+              <NoteBox
+                className="work-passage-note"
+                actions={
+                  <button
+                    type="button"
+                    className="small"
+                    onClick={() => openPassage(currentInPassage.key)}
+                  >
+                    {p.openPassage}
+                  </button>
+                }
+              >
+                <p>
                   {p.inPassage(passageTitle(currentInPassage.passage.passage, report.map.worlds))}
-                </span>
-                <button
-                  type="button"
-                  className="small quiet"
-                  onClick={() => openPassage(currentInPassage.key)}
-                >
-                  {p.openPassage}
-                </button>
-              </p>
+                </p>
+              </NoteBox>
             )}
           {shownItem === null ? (
-            <p className="empty">{t.workPickSpot}</p>
+            <EmptyState>{t.workPickSpot}</EmptyState>
           ) : (
             <Spot
               report={report}
@@ -1982,7 +1988,9 @@ function Spot(props: SpotProps & SpotFrameProps) {
                     )}
                   </div>
                   {item.sides.every((side) => !side.hideable) && (
-                    <p className="work-note">{t.workBothNeeded}</p>
+                    <NoteBox>
+                      <p>{t.workBothNeeded}</p>
+                    </NoteBox>
                   )}
                   {first !== undefined && second !== undefined && pairSpots > 1 && (
                     <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>

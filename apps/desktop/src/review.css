@@ -97,7 +97,7 @@
   gap: 4px 12px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
 }
 
 .review-foot {
@@ -131,7 +131,7 @@
 .stage3-frame {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: #0d0f12;
 }
 
@@ -216,7 +216,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: var(--sunken);
 }
 
@@ -303,7 +303,7 @@
   gap: 4px 10px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
 }
 
 .review-segment[data-focus="true"] {
@@ -376,7 +376,7 @@
 .pair-report-pair {
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
 }
 
 .pair-report-pair summary {
@@ -422,15 +422,6 @@
 
 /* What each side brings, a click's result, and a segment's objects one by one. */
 .review-compared,
-.review-note {
-  margin: 0;
-  font-size: 0.88rem;
-}
-
-.review-note {
-  color: var(--accent);
-}
-
 .review-segment-parts {
   flex-basis: 100%;
 }

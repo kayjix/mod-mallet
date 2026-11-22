@@ -12,69 +12,9 @@
   margin-bottom: 12px;
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
-}
-
-.patch-list {
-  display: grid;
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.patch-pair {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
-.patch-headline {
-  flex: 1 1 320px;
-}
-
-.patch-installed {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--ok);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
-.patch-installed.differs {
-  border-color: var(--warning);
-}
-
-.patch-line {
-  margin: 0;
-}
-
-.patch-mark {
-  margin-left: 10px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.patch-mark.done {
-  background: color-mix(in srgb, var(--ok) 18%, transparent);
-  color: var(--ok);
-}
-
-.patch-mark.partly {
-  background: color-mix(in srgb, var(--warning) 18%, transparent);
-  color: var(--warning);
 }
 
 .patch-file {
@@ -84,7 +24,7 @@
   gap: 8px 12px;
   margin-bottom: 12px;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface-muted, var(--surface));
   font-size: 0.9rem;
 }
@@ -104,15 +44,4 @@
   background: color-mix(in srgb, var(--brand) 18%, transparent);
   font-size: 0.75rem;
   font-weight: 500;
-}
-
-.patch-missing {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--warning);
-  border-radius: 10px;
-  background: var(--surface);
 }

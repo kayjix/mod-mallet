@@ -23,6 +23,7 @@ import { InfoTip } from "./info-tip";
 import { LoadingLine, LoadingScreen } from "./LoadingMallet";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
+import { PageHeader, SearchField, Segmented, Tabs, Toolbar } from "./ui/kit";
 
 type Arrange = "category" | "material" | "outfit";
 
@@ -212,103 +213,96 @@ export function CatalogueView({ scannedAt }: { scannedAt: number }) {
   const shownArrange = arrangements.includes(arrange) ? arrange : "category";
 
   return (
-    <div className="catalogue">
-      <aside className="catalogue-left">
-        <fieldset className="segmented catalogue-groups" aria-label={c.groupsLabel}>
-          {GROUPS.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              aria-pressed={group === candidate}
-              onClick={() => setGroup(candidate)}
-            >
-              {c.groups[candidate]}
-            </button>
-          ))}
-        </fieldset>
-        <div className="catalogue-filters">
-          <input
-            type="search"
-            placeholder={c.search}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+    <>
+      <PageHeader
+        tabs={
+          <Tabs
+            label={c.groupsLabel}
+            items={GROUPS.map((candidate) => ({ id: candidate, label: c.groups[candidate] }))}
+            value={group}
+            onChange={setGroup}
           />
-          <label className="catalogue-field">
-            <span>{c.originLabel}</span>
-            <select value={origin} onChange={(event) => setOrigin(event.target.value as Origin)}>
-              <option value="all">{c.originAll}</option>
-              <option value="chosen">{c.originChosen}</option>
-              <option value="game">{c.originGame}</option>
-              <option value="creation-club">{c.originCreationClub}</option>
-              <option value="mods">{c.originMods}</option>
-              <option value="changed">{c.originChanged}</option>
-              {index.mods.length > 0 && (
-                <optgroup label="Mods">
-                  {index.mods.map(([mod, count]) => (
-                    <option key={mod} value={`mod:${mod}`}>
-                      {c.originMod(mod)} ({count})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </label>
-          <fieldset className="segmented" aria-label={c.arrangeLabel}>
-            {arrangements.map((candidate) => (
-              <button
-                key={candidate}
-                type="button"
-                aria-pressed={shownArrange === candidate}
-                onClick={() => setArrange(candidate)}
-              >
-                {candidate === "category"
-                  ? group === "characters"
-                    ? c.byRace
-                    : c.byCategory
-                  : candidate === "material"
-                    ? c.byMaterial
-                    : c.byOutfit}
-              </button>
-            ))}
-          </fieldset>
-        </div>
-        {shownArrange === "outfit" ? (
-          <OutfitList
+        }
+      />
+      <div className="catalogue">
+        <aside className="catalogue-left">
+          <Toolbar stacked className="catalogue-filters">
+            <SearchField value={search} onChange={setSearch} placeholder={c.search} wide />
+            <label className="catalogue-field">
+              <span>{c.originLabel}</span>
+              <select value={origin} onChange={(event) => setOrigin(event.target.value as Origin)}>
+                <option value="all">{c.originAll}</option>
+                <option value="chosen">{c.originChosen}</option>
+                <option value="game">{c.originGame}</option>
+                <option value="creation-club">{c.originCreationClub}</option>
+                <option value="mods">{c.originMods}</option>
+                <option value="changed">{c.originChanged}</option>
+                {index.mods.length > 0 && (
+                  <optgroup label="Mods">
+                    {index.mods.map(([mod, count]) => (
+                      <option key={mod} value={`mod:${mod}`}>
+                        {c.originMod(mod)} ({count})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
+            <Segmented
+              label={c.arrangeLabel}
+              items={arrangements.map((candidate) => ({
+                id: candidate,
+                label:
+                  candidate === "category"
+                    ? group === "characters"
+                      ? c.byRace
+                      : c.byCategory
+                    : candidate === "material"
+                      ? c.byMaterial
+                      : c.byOutfit,
+              }))}
+              value={shownArrange}
+              onChange={setArrange}
+            />
+          </Toolbar>
+          {shownArrange === "outfit" ? (
+            <OutfitList
+              index={index}
+              choices={choices}
+              group={group}
+              origin={origin}
+              search={search.trim().toLowerCase()}
+              selected={selected}
+              onSelect={setSelected}
+            />
+          ) : (
+            <ItemList
+              index={index}
+              choices={choices}
+              group={group}
+              arrange={shownArrange}
+              origin={origin}
+              search={search.trim().toLowerCase()}
+              selected={selected}
+              onSelect={setSelected}
+            />
+          )}
+        </aside>
+        {selected === null ? (
+          <p className="aside catalogue-message catalogue-pick">{c.pickSomething}</p>
+        ) : selected.kind === "item" ? (
+          <ItemView
             index={index}
-            choices={choices}
-            group={group}
-            origin={origin}
-            search={search.trim().toLowerCase()}
-            selected={selected}
+            id={selected.id}
             onSelect={setSelected}
+            choices={choices}
+            onChoice={choose}
           />
         ) : (
-          <ItemList
-            index={index}
-            choices={choices}
-            group={group}
-            arrange={shownArrange}
-            origin={origin}
-            search={search.trim().toLowerCase()}
-            selected={selected}
-            onSelect={setSelected}
-          />
+          <OutfitView index={index} id={selected.id} onSelect={setSelected} />
         )}
-      </aside>
-      {selected === null ? (
-        <p className="aside catalogue-message catalogue-pick">{c.pickSomething}</p>
-      ) : selected.kind === "item" ? (
-        <ItemView
-          index={index}
-          id={selected.id}
-          onSelect={setSelected}
-          choices={choices}
-          onChoice={choose}
-        />
-      ) : (
-        <OutfitView index={index} id={selected.id} onSelect={setSelected} />
-      )}
-    </div>
+      </div>
+    </>
   );
 }
 

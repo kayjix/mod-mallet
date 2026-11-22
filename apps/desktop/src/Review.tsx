@@ -64,6 +64,7 @@ import {
   walkedOn,
 } from "./walkways";
 import "./review.css";
+import { Note, UndoButton } from "./ui/kit";
 
 /** The steps, in their order. */
 export const REVIEW_STEPS: ReviewStep[] = [
@@ -536,9 +537,7 @@ export function CollisionsStep({
   );
   const decidedPlaces = clusters.filter((candidate) => openIn(candidate) === 0).length;
   const undo = (
-    <button
-      type="button"
-      className="quiet"
+    <UndoButton
       disabled={history.length === 0}
       onClick={() => {
         const previous = history[history.length - 1];
@@ -547,9 +546,7 @@ export function CollisionsStep({
           setPatchChoices(previous);
         }
       }}
-    >
-      {r.undo}
-    </button>
+    />
   );
 
   const first = cluster?.spots[0];
@@ -1167,9 +1164,9 @@ export function CollisionsStep({
         <span className="aside"> · {r.pickHint}</span>
       </p>
       {note !== null && (
-        <p className="review-note" role="status">
-          {note}
-        </p>
+        <Note role="status">
+          <p>{note}</p>
+        </Note>
       )}
       {walkedPlaces.length > 0 && (
         <div className="walk-warning walk-doubtful">

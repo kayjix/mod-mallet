@@ -75,6 +75,8 @@
   --spot-deep: #fcc419;
   --spot-focus: #22d3ee;
   --spot-ghost: #f03e3e;
+  /* Pins (ADR 0050): marked to solve later by hand, the same in both themes. */
+  --pin: #cc79a7;
 
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 15px;

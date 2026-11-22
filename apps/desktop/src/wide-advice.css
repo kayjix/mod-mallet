@@ -74,26 +74,7 @@
 
 /* A note on a collision with a plugin of a mod that is switched off. */
 .still-loaded-note {
-  margin: 0 0 var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-small);
-  background: var(--surface);
   font-size: 0.9rem;
-}
-
-/* The decisions that wait for mods that are switched off, on the patch page. */
-.patch-paused {
-  display: grid;
-  gap: var(--space-1);
-  margin: var(--space-2) 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-small);
-}
-
-.patch-paused p {
-  margin: 0;
 }
 
 /* The note stands above a spot in the worklist's stage, whose rows are

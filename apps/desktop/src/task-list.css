@@ -27,7 +27,7 @@
 .tasks > ul {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -191,7 +191,7 @@
 .guide {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 

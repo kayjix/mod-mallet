@@ -31,6 +31,7 @@ import { Note } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
 import { walkedOn } from "./walkways";
 import "./moves.css";
+import { Note as NoteBox, UndoButton } from "./ui/kit";
 
 /** The steps a nudge can take, in game units: about 10 cm, 50 cm, 1 m and 5 m. */
 const STEPS = [7, 35, 70, 350];
@@ -437,9 +438,7 @@ export function MoveControls({
         </p>
       )}
       <span className="relief-object-buttons">
-        <button type="button" className="small" disabled={history.length === 0} onClick={undo}>
-          {m.undo}
-        </button>
+        <UndoButton disabled={history.length === 0} onClick={undo} />
         <button type="button" className="small" disabled={moved.length === 0} onClick={back}>
           {m.back}
         </button>
@@ -614,7 +613,11 @@ export function MovesPanel({
           </ul>
         </div>
       )}
-      {error !== null && <p className="failure">{error}</p>}
+      {error !== null && (
+        <NoteBox tone="danger" role="alert">
+          <p>{error}</p>
+        </NoteBox>
+      )}
       <ActionResult state={action} />
       {inPatch !== undefined && <p className="aside">{inPatch.note}</p>}
       <p className="aside">{m.limits}</p>

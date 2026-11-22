@@ -52,6 +52,7 @@ import { MapObjectActions } from "./object-actions";
 import { pinsOf, spotKey } from "./patch";
 import { useHiddenBySpots, usePathsMode, withPaths } from "./paths-mode";
 import { drawPin, PIN_COLOUR } from "./pins";
+import { EmptyState, Segmented, Toolbar } from "./ui/kit";
 import { type WorldTexts, worldTexts } from "./world-texts";
 
 interface MapViewProps {
@@ -150,12 +151,12 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
   const shownPaths = useMemo(() => withPaths(pathsMode.overlay, null), [pathsMode.overlay]);
 
   if (world === undefined) {
-    return <p className="empty">{t.mapEmpty}</p>;
+    return <EmptyState>{t.mapEmpty}</EmptyState>;
   }
   const ownMap = picture?.meta.world === world.name ? picture : null;
   return (
     <section className="map-view">
-      <div className="controls">
+      <Toolbar className="controls">
         <label className="control">
           {t.mapWorld}
           <select value={worldIndex} onChange={(event) => chooseWorld(Number(event.target.value))}>
@@ -181,16 +182,17 @@ export function MapView({ map, headlines, focus }: MapViewProps) {
             ))}
           </select>
         </label>
-        <fieldset className="segmented" aria-label={t.mapRelief}>
-          <button type="button" aria-pressed={mode === "flat"} onClick={() => setMode("flat")}>
-            {t.mapFlat}
-          </button>
-          <button type="button" aria-pressed={mode === "relief"} onClick={() => setMode("relief")}>
-            {t.mapRelief}
-          </button>
-        </fieldset>
+        <Segmented
+          label={t.mapRelief}
+          items={[
+            { id: "flat", label: t.mapFlat },
+            { id: "relief", label: t.mapRelief },
+          ]}
+          value={mode}
+          onChange={setMode}
+        />
         <Legend />
-      </div>
+      </Toolbar>
       <div className="map-body map-body-places">
         <PlacesPanel
           markers={markers}

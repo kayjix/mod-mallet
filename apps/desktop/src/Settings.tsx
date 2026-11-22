@@ -6,6 +6,7 @@ import { applyTheme, initialTheme, type Lang, languages, type Theme } from "./i1
 import { InfoTip } from "./info-tip";
 import { Places } from "./Places";
 import { graphicsCard } from "./render-stats";
+import { PageHeader, Segmented, Tabs } from "./ui/kit";
 
 interface SettingsProps {
   places: RenderedPlaces | null;
@@ -76,20 +77,9 @@ export function SettingsView({
 
   return (
     <div className="page-narrow">
-      <div className="tabs" role="tablist">
-        {tabs.map((entry) => (
-          <button
-            type="button"
-            role="tab"
-            className="tab"
-            key={entry.id}
-            aria-selected={tab === entry.id}
-            onClick={() => setTab(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
+      <PageHeader
+        tabs={<Tabs label={t.viewSettings} items={tabs} value={tab} onChange={setTab} />}
+      />
 
       {tab === "general" && (
         <div className="stack">
@@ -109,19 +99,12 @@ export function SettingsView({
                 </select>
               </Row>
               <Row label={t.settingsTheme}>
-                <div className="segmented-small">
-                  {themes.map((entry) => (
-                    <button
-                      type="button"
-                      key={entry.id}
-                      className="segment"
-                      aria-pressed={theme === entry.id}
-                      onClick={() => changeTheme(entry.id)}
-                    >
-                      {entry.label}
-                    </button>
-                  ))}
-                </div>
+                <Segmented
+                  label={t.settingsTheme}
+                  items={themes}
+                  value={theme}
+                  onChange={changeTheme}
+                />
               </Row>
               <Row label={t.settingsLive} note={t.liveNote}>
                 <label className="check">

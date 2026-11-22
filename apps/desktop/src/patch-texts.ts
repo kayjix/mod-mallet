@@ -48,7 +48,6 @@ export interface PatchTexts {
   remove: string;
   confirmRemove: (name: string, decisions: number, inGame: boolean) => string;
   removed: (name: string) => string;
-  undo: string;
   forget: string;
   forgetHint: string;
   confirmForget: (decisions: number) => string;
@@ -204,7 +203,6 @@ const en: PatchTexts = {
         : ""
     } You can undo it right after.`,
   removed: (name) => `“${name}” was removed.`,
-  undo: "Undo",
   forget: "Forget all decisions",
   forgetHint: "Empties this patch; the other patches stay as they are.",
   confirmForget: (decisions) =>
@@ -386,7 +384,6 @@ const de: PatchTexts = {
         : ""
     } Du kannst es direkt danach rückgängig machen.`,
   removed: (name) => `„${name}“ wurde entfernt.`,
-  undo: "Rückgängig",
   forget: "Alle Entscheidungen vergessen",
   forgetHint: "Leert diesen Patch; die anderen Patches bleiben, wie sie sind.",
   confirmForget: (decisions) =>

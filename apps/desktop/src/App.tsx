@@ -14,7 +14,6 @@ import "./patch-page.css";
 import "./tools.css";
 import "./games.css";
 import "./settings.css";
-import "./mods.css";
 import "./collisions.css";
 import "./journey.css";
 import "./review.css";
@@ -67,6 +66,7 @@ import { splitWaiting, withWaiting } from "./switched-off";
 import { TasksPage } from "./Tasks";
 import { ToolboxView } from "./Toolbox";
 import { NotDrawnHere, UnrealPaks } from "./Unreal";
+import { EmptyState, Note } from "./ui/kit";
 
 interface AppProps {
   api: Api;
@@ -749,14 +749,16 @@ export default function App({ api, startLang }: AppProps) {
             </p>
           )}
           {pinNote !== null && (
-            <p className="pin-note" role="status">
-              {pinTexts[lang].cleared(pinNote)}
-            </p>
+            <Note tone="ok" role="status">
+              <p>{pinTexts[lang].cleared(pinNote)}</p>
+            </Note>
           )}
           {failure !== null && (
-            <p className="failure" role="alert">
-              <strong>{t.scanFailed}:</strong> {failure}
-            </p>
+            <Note tone="danger" role="alert">
+              <p>
+                <strong>{t.scanFailed}:</strong> {failure}
+              </p>
+            </Note>
           )}
 
           {current === "places" && places !== null ? (
@@ -805,12 +807,15 @@ export default function App({ api, startLang }: AppProps) {
             />
           ) : report === null ? (
             places !== null && (
-              <section className="welcome">
-                <p>{t.noScanYet}</p>
-                <button type="button" className="primary" onClick={scan}>
-                  {t.scan}
-                </button>
-              </section>
+              <EmptyState
+                action={
+                  <button type="button" className="primary" onClick={scan}>
+                    {t.scan}
+                  </button>
+                }
+              >
+                {t.noScanYet}
+              </EmptyState>
             )
           ) : current === "review" ? (
             <Review report={report} game={games.choice?.active ?? ""} onOpen={go} />

@@ -10,6 +10,7 @@ import type {
 } from "./generated/rendered-places";
 import type { Texts } from "./i18n";
 import { type ManagerTexts, managerTexts } from "./managers-texts";
+import { Note } from "./ui/kit";
 
 interface PlacesProps {
   places: RenderedPlaces;
@@ -68,9 +69,9 @@ export function Places({ places, t, busy, onConfirm, onCancel }: PlacesProps) {
         />
       )}
       {failure !== null && (
-        <p className="failure" role="alert">
-          {failure}
-        </p>
+        <Note tone="danger" role="alert">
+          <p>{failure}</p>
+        </Note>
       )}
       <PlacesForm
         // The fields start again from the places of the chosen manager.

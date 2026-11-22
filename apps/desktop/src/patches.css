@@ -27,8 +27,9 @@
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .patch-shelf h3 {
@@ -53,7 +54,7 @@
   width: 100%;
   padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: none;
   box-shadow: none;
   text-align: left;
@@ -137,8 +138,9 @@
   gap: 6px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .patch-card-head h2 {
@@ -194,8 +196,9 @@
 .patch-group {
   padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .patch-mods h3,
@@ -329,7 +332,7 @@ button.link:hover {
 
 .patch-editing {
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   font-weight: 600;
 }

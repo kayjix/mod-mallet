@@ -37,6 +37,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .catalogue-left {
@@ -63,24 +64,6 @@
 
 .catalogue-pick {
   grid-column: 2 / -1;
-}
-
-/* The broad groups wrap as chips; a segmented row is too wide for five. */
-.catalogue-groups.segmented {
-  gap: 4px;
-}
-
-.catalogue-groups.segmented button,
-.catalogue-groups.segmented button:first-child,
-.catalogue-groups.segmented button:last-child {
-  border-width: 1px;
-  border-radius: 999px;
-  padding: 3px 10px;
-}
-
-.catalogue-filters {
-  display: grid;
-  gap: 6px;
 }
 
 .catalogue-field {

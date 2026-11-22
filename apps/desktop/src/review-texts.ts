@@ -23,7 +23,6 @@ export interface ReviewTexts {
   modsLine: (enabled: number, total: number, newer: number) => string;
   worldLine: (cells: number, places: number) => string;
   keepBoth: string;
-  undo: string;
   allDecided: string;
   parts: (name: string, count: number) => string;
   gameParts: (count: number) => string;
@@ -150,7 +149,6 @@ const en: ReviewTexts = {
     `${enabled} of ${total} mods switched on${newer > 0 ? `, ${newer} with a newer version` : ""}.`,
   worldLine: (cells, places) => `mods place objects in ${cells} cells · ${places} places`,
   keepBoth: "Keep both",
-  undo: "Undo",
   allDecided: "Every collision is decided.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "part" : "parts"}`,
   gameParts: (count) =>
@@ -294,7 +292,6 @@ const de: ReviewTexts = {
     `${enabled} von ${total} Mods eingeschaltet${newer > 0 ? `, ${newer} mit neuerer Version` : ""}.`,
   worldLine: (cells, places) => `Mods stellen Objekte in ${cells} Zellen · ${places} Orte`,
   keepBoth: "Beide behalten",
-  undo: "Rückgängig",
   allDecided: "Jede Kollision ist entschieden.",
   parts: (name, count) => `${name}: ${count} ${count === 1 ? "Teil" : "Teile"}`,
   gameParts: (count) =>
