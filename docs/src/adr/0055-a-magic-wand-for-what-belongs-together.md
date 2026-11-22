@@ -63,6 +63,16 @@ the left, and did not show that a spot is about two mods.
    what the wand took along about half as much. No hulls. The card says
    how many parts the wand took at which level and hides or shows them
    together; parts the game cannot do without stay.
+   - **Both ways.** The wand works for hidden parts as for visible ones.
+     It walks through hidden parts too (the views keep them as ghosts or
+     left out, the wand knows them either way), and the card tells the
+     selection apart by what the patch does with each part. From a hidden
+     object it offers "Show these N again" for the hidden parts; from a
+     visible one "Hide these N" for the visible parts. A selection of both
+     says how many of each it holds and offers both ways, the picked
+     object's own first. Hidden parts of the selection are drawn as lit
+     ghosts, also where the view leaves hidden parts out, so that they can
+     be seen before they are shown again.
 6. **One column per mod.** The panel over a collision up close has, from
    top to bottom:
    - a bar to go through the spots: the spot and where it is, previous,

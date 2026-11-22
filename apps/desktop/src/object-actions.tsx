@@ -25,6 +25,7 @@ import {
 } from "./patch";
 import { PinButton } from "./pins";
 import { useWandTexts } from "./wand";
+import { offersFor, splitParts } from "./wand-parts";
 
 /** The plugins of the games themselves, whose objects quests may need. */
 const GAME_PLUGIN =
@@ -137,48 +138,48 @@ export function PartsTogether({ tools }: { tools: PartTools }) {
       </div>
     );
   }
-  const allHidden = group.every((part) => hidden.has(matchKey(part.id)));
-  const hideable = group.filter((part) => !part.anchored);
+  // Both ways (ADR 0055): from a hidden object the hidden parts of the
+  // selection are shown again, from a visible one the visible parts are
+  // hidden; a selection of both states offers both.
+  const isHidden = (part: AreaObject) => hidden.has(matchKey(part.id));
+  const split = splitParts(group, isHidden);
+  const first = group[0];
+  const offers = offersFor(split, first !== undefined && isHidden(first));
   return (
     <div className="parts-together">
       <p className="aside wand-took">{w.took(group.length, level)}</p>
+      {split.hidden.length > 0 && split.visible.length > 0 && (
+        <p className="aside parts-hint">{w.mixed(split.hidden.length, split.visible.length)}</p>
+      )}
       <span className="relief-object-buttons">
-        {allHidden ? (
+        {offers.map((offer) => (
           <button
+            key={offer.direction}
             type="button"
-            className="small primary"
-            onClick={() =>
-              setPatchChoices(
-                revealObjects(
-                  patchChoices,
-                  spots,
-                  group.map((part) => part.id),
-                ),
-              )
-            }
-          >
-            {own.partsShow(group.length)}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="small"
-            disabled={hideable.length === 0}
+            className={offer.primary ? "small primary" : "small"}
             onClick={() => {
+              if (offer.direction === "show") {
+                setPatchChoices(
+                  revealObjects(
+                    patchChoices,
+                    spots,
+                    split.hidden.map((part) => part.id),
+                  ),
+                );
+                return;
+              }
               let next = patchChoices;
-              for (const part of hideable) {
+              for (const part of split.hideable) {
                 next = chooseObject(next, part.id, true);
               }
               setPatchChoices(next);
             }}
           >
-            {own.partsHide(hideable.length)}
+            {offer.direction === "show" ? own.partsShow(offer.count) : own.partsHide(offer.count)}
           </button>
-        )}
+        ))}
       </span>
-      {hideable.length < group.length && (
-        <p className="aside parts-hint">{own.partsSomeTied(group.length - hideable.length)}</p>
-      )}
+      {split.tied > 0 && <p className="aside parts-hint">{own.partsSomeTied(split.tied)}</p>}
     </div>
   );
 }

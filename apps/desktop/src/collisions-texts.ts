@@ -61,8 +61,8 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
       count === 1
         ? `Hide its 1 object within ${metres} m`
         : `Hide its ${count} objects within ${metres} m`,
-    partsShow: (count) => `Show all ${count} again`,
-    partsHide: (count) => `Hide all ${count}`,
+    partsShow: (count) => `Show these ${count} again`,
+    partsHide: (count) => `Hide these ${count}`,
     partsSomeTied: (count) => `${count} of them the game relies on and stay. `,
     aroundCareful: (count) => `${count} of them with care`,
     aroundCarefulHint:
@@ -94,8 +94,8 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
       count === 1
         ? `Ihr 1 Objekt im Umkreis von ${metres} m ausblenden`
         : `Ihre ${count} Objekte im Umkreis von ${metres} m ausblenden`,
-    partsShow: (count) => `Alle ${count} wieder zeigen`,
-    partsHide: (count) => `Alle ${count} ausblenden`,
+    partsShow: (count) => `Diese ${count} wieder zeigen`,
+    partsHide: (count) => `Diese ${count} ausblenden`,
     partsSomeTied: (count) => `${count} davon braucht das Spiel; die bleiben. `,
     aroundCareful: (count) => `davon ${count} mit Vorsicht`,
     aroundCarefulHint:

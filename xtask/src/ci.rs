@@ -38,6 +38,11 @@ pub(crate) fn run(root: &Path, skip_desktop: bool, require_tools: bool) -> Resul
         extension.args(["test", "--workspace", "integrations/vortex-extension"]);
         tools::run(extension, "extension tests")?;
 
+        step("Desktop frontend: tests of its logic");
+        let mut logic = tools::npm(root);
+        logic.args(["test", "--workspace", "apps/desktop"]);
+        tools::run(logic, "desktop tests")?;
+
         if !skip_desktop {
             step("Desktop frontend: type check and build");
             let mut build = tools::npm(root);

@@ -16,6 +16,8 @@ interface WandTexts {
   took: (count: number, level: number) => string;
   alone: string;
   raise: string;
+  /** A selection of hidden and visible parts: how many of each. */
+  mixed: (hidden: number, visible: number) => string;
 }
 
 const wandTexts: Record<Lang, WandTexts> = {
@@ -36,6 +38,7 @@ const wandTexts: Record<Lang, WandTexts> = {
         : `Magic wand, level ${level}: ${count} parts`,
     alone: "At this level nothing else belongs to it.",
     raise: "To take more at once, raise the magic wand above the view.",
+    mixed: (hidden, visible) => `${hidden} of them hidden, ${visible} there.`,
   },
   de: {
     wand: "Zauberstab",
@@ -54,6 +57,7 @@ const wandTexts: Record<Lang, WandTexts> = {
         : `Zauberstab Stufe ${level}: ${count} Teile`,
     alone: "Auf dieser Stufe gehört nichts weiter dazu.",
     raise: "Mehr auf einmal: den Zauberstab über der Ansicht höher stellen.",
+    mixed: (hidden, visible) => `${hidden} davon ausgeblendet, ${visible} sichtbar.`,
   },
 };
 

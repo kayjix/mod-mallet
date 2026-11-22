@@ -56,14 +56,19 @@ void main() {
   vec3 light = normalize(vec3(-0.6, 0.7, 1.1));
   float lit = 0.55 + 0.6 * abs(dot(normalize(v_normal), light));
   vec3 shaded = sampled.rgb * lit;
-  if (v_look > 5.5) {
+  if (v_look > 6.5) {
+    // Hidden and in the chain of the picked object: the ghost, lit up.
+    if (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) {
+      discard;
+    }
+    shaded = mix(mix(shaded, u_ghost, 0.6), vec3(1.0), 0.3);
+  } else if (v_look > 5.5) {
     // In the chain of the picked object: lit up, half as much.
     shaded = mix(shaded, vec3(1.0), 0.22);
   } else if (v_look > 4.5) {
     // Hidden, and shown as the game would show it: not at all.
     discard;
-  }
-  if (v_look > 3.5) {
+  } else if (v_look > 3.5) {
     // Hidden by the patch: half there, every other pixel left out.
     if (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) {
       discard;
@@ -573,6 +578,8 @@ export const LOOK = {
   ghost: 4,
   gone: 5,
   chained: 6,
+  /** Hidden by the patch and in the chain of the picked object: the ghost, lit up. */
+  chainedGhost: 7,
 } as const;
 export type Look = (typeof LOOK)[keyof typeof LOOK];
 
@@ -625,8 +632,11 @@ export class AreaLayer {
     if (this.selected.has(key)) {
       return LOOK.selected;
     }
-    if (this.chained.has(key) && look !== LOOK.ghost && look !== LOOK.gone) {
-      return LOOK.chained;
+    if (this.chained.has(key)) {
+      // Hidden parts the wand took along are shown too, as lit ghosts even
+      // where the view leaves hidden parts out, so that they can be seen
+      // before they are shown again (ADR 0055).
+      return look === LOOK.ghost || look === LOOK.gone ? LOOK.chainedGhost : LOOK.chained;
     }
     return look;
   }
