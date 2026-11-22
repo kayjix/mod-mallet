@@ -101,4 +101,5 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0073](0073-switched-off-mods-taken-out-through-vortex.md) | Switched-off mods still loaded are taken out through Vortex's plugin list | accepted |
 | [0074](0074-level-of-detail-makes-room-for-real-objects.md) | The level of detail makes room for the real objects up close | accepted |
 | [0075](0075-one-call-per-material-for-a-place-up-close.md) | A place up close is drawn with one call per material | accepted |
+| [0076](0076-task-rows-crash-risks-first.md) | Task rows: crash risks first, one thing to do per row | accepted |
 | [0077](0077-one-ui-kit-for-every-page.md) | One UI kit for every page | accepted |

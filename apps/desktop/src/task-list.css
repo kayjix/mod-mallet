@@ -36,65 +36,6 @@
   border-top: 1px solid var(--border);
 }
 
-.group > ul {
-  border-top: 1px solid var(--border);
-  background: var(--sunken);
-}
-
-.group > ul > li + li {
-  border-top: 1px solid var(--border);
-}
-
-.line-with-action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-right: 10px;
-}
-
-.line {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-width: 0;
-  padding: 10px 14px;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  text-align: left;
-}
-
-.line.nested {
-  padding-left: 34px;
-}
-
-.line:hover {
-  background: color-mix(in srgb, var(--brand) 7%, transparent);
-}
-
-.line-title {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.line-mod {
-  flex: none;
-  max-width: 40%;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.85rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.group > .line .line-title {
-  font-weight: 600;
-}
-
-/* The mark in front of a line says how much the finding matters. */
 .chevron {
   flex: none;
   width: 8px;
@@ -105,67 +46,15 @@
   transition: transform 0.12s;
 }
 
-[data-severity="error"] > .line .chevron,
-[data-severity="error"] > .line-with-action .chevron {
-  border-color: var(--error);
-}
-
-[data-severity="warning"] > .line .chevron,
-[data-severity="warning"] > .line-with-action .chevron {
-  border-color: var(--warning);
-}
-
-.line[aria-expanded="true"] .chevron {
-  transform: rotate(45deg);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .chevron {
     transition: none;
   }
 }
 
-.act {
-  flex: none;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-text);
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.body {
-  padding: 4px 16px 14px 32px;
-}
-
-.body.nested {
-  padding-left: 52px;
-}
-
-.body > * + * {
-  margin-top: 10px;
-}
-
-.body h3 {
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.body h3 + p {
-  margin-top: 2px;
-}
-
 .more {
   color: var(--brand);
   cursor: pointer;
-}
-
-.body details p {
-  margin-top: 6px;
-  color: var(--muted);
 }
 
 .outcome {

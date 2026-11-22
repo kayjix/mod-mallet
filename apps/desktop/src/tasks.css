@@ -1,62 +1,143 @@
-/* ---- a task's row, opened ----------------------------------------------- */
+/* The task page around the rows of task-rows.css (ADR 0076). Uses the
+ * tokens of App.css. */
 
-/* What a finding is and what to do about it stay together on the left, in a
-   column narrow enough to read, however wide the window is. */
-.task-body > * {
-  max-width: 82ch;
+/* ---- the top: how many, and what they do to the game --------------------- */
+
+.tasks-top {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 var(--space-1) var(--space-4);
 }
 
-.task-body .summary {
+.tasks-page .tasks-headline {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.01em;
+}
+
+.tasks-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+}
+
+.tasks-summary > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tasks-summary > li[data-level="crash"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tasks-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--ok);
+}
+
+/* The first part follows the top closely; the collisions' line after it. */
+.tasks-top + .task-part,
+.tasks-clear + .task-part {
+  margin-top: var(--space-4);
+}
+
+.tasks-page .collisions-card {
+  margin-top: var(--space-5);
+}
+
+.tasks-top + .collisions-card,
+.tasks-clear + .collisions-card {
+  margin-top: 0;
+}
+
+.task-part .duels-line {
+  margin: 0 0 var(--space-3);
+}
+
+/* Recommendations are optional: a lighter frame. */
+.task-part[data-part="advice"] .task-list,
+.task-part[data-part="notes"] .task-list,
+.task-part[data-part="ignored"] .task-list {
+  box-shadow: none;
+}
+
+.task-part[data-part="advice"] > .task-list {
+  border-style: dashed;
+}
+
+/* ---- an opened row ------------------------------------------------------ */
+
+.task-summary-text {
   font-size: 0.95rem;
 }
 
-.task-body .remedy {
-  color: var(--text);
-}
-
 /* The ways out, in one row right under the text. */
-.ways {
+.task-ways {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
-.ways > .quiet {
-  margin-left: var(--space-2);
+.task-ways > .task-aside {
+  margin-left: var(--space-1);
 }
 
-/* The mods a finding is about, one line each, under "more about it". */
+/* What there is to know, quieter than what to do, two columns when wide. */
+.task-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3) var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.task-row-body > .task-facts {
+  max-width: 120ch;
+}
+
+.task-facts h3,
+.task-row-body h3 {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.task-facts p + h3 {
+  margin-top: var(--space-3);
+}
+
+.task-handed {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* The mods a finding is about, one line each. */
 .mod-facts {
   display: grid;
   gap: 2px;
-  margin: var(--space-2) 0 0;
+  margin: 0 0 var(--space-3);
   padding: 0;
   list-style: none;
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .mod-facts strong {
   color: var(--text);
   font-weight: 600;
-}
-
-.task-body details > h3 {
-  margin-top: var(--space-3);
-}
-
-.task-body details .spots {
-  margin-top: var(--space-2);
-}
-
-/* The mod a line is about follows its title, not the far edge of the window. */
-.finding > .line-with-action .line-title {
-  flex: 0 1 auto;
-}
-
-.finding > .line-with-action .line {
-  justify-content: flex-start;
 }
 
 /* Every missing texture, with the meshes that use it. */
@@ -73,4 +154,30 @@
 
 .missing-files code {
   overflow-wrap: anywhere;
+}
+
+/* ---- the way back after setting a task aside ---------------------------- */
+
+.task-undo {
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--space-5) auto 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.task-undo-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

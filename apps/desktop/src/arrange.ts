@@ -247,31 +247,3 @@ export function isTask(rendered: RenderedFinding, ignored: Set<string>): boolean
 export function openTaskCount(findings: RenderedFinding[], ignored: Set<string>): number {
   return findings.filter((rendered) => isTask(rendered, ignored)).length;
 }
-
-/** The findings of each step, grouped by kind, the errors first. */
-export function stepsFor(
-  findings: RenderedFinding[],
-  ignored: Set<string>,
-): { step: Step; groups: Group[]; count: number }[] {
-  const byStep = new Map<Step, RenderedFinding[]>();
-  for (const rendered of findings) {
-    const step = stepOf(rendered, ignored);
-    if (step !== null) {
-      byStep.set(step, [...(byStep.get(step) ?? []), rendered]);
-    }
-  }
-  const rank = (group: Group) =>
-    Math.min(
-      ...group.findings.map(({ finding }) =>
-        finding.severity === "error" ? 0 : finding.severity === "warning" ? 1 : 2,
-      ),
-    );
-  return STEPS.flatMap((step) => {
-    const members = byStep.get(step) ?? [];
-    if (members.length === 0) {
-      return [];
-    }
-    const groups = groupByKind(members).sort((a, b) => rank(a) - rank(b));
-    return [{ step, groups, count: members.length }];
-  });
-}

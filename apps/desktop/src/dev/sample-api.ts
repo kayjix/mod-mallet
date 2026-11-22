@@ -40,6 +40,7 @@ import {
   sampleLodTexture,
   sampleLodTiles,
 } from "./sample-lod";
+import { manyFindings, SAMPLE_MANY } from "./sample-many";
 import { onSampleScanProgress, simulateScan } from "./sample-scan";
 
 type Two = Record<Lang, string>;
@@ -626,7 +627,10 @@ function report(lang: Lang): RenderedReport {
     installersChecked: 4,
     meshesChecked: 120,
     locations: places(lang, true).places.filter(({ location }) => location.path !== ""),
-    findings: samples.map((sample) => render(sample, lang)),
+    findings: [
+      ...samples.map((sample) => render(sample, lang)),
+      ...(SAMPLE_MANY ? manyFindings(lang) : []),
+    ],
     mods: sampleMods,
     map: sampleMap(),
     objectSwapper: true,
