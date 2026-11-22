@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use mallet_core::action::{Action, ActionOutcome, ActionStatus, OptionToTick};
 use mallet_core::{DEFAULT_PATCH_NAME, Patch};
+use mallet_game_bethesda::swap;
 use mallet_source_vortex::SOURCE_ID;
 use mallet_source_vortex::link::{self, Link, LinkError};
 
@@ -268,24 +269,85 @@ pub struct CreatedPatch {
     pub path: PathBuf,
     /// How many objects it hides.
     pub objects: usize,
+    /// How many objects its plugin of moves moves.
+    pub moved: usize,
+    /// How many navigation meshes its plugin of paths repairs.
+    pub repaired: usize,
 }
 
-/// Writes `patch` into Mod Mallet's own folder, with an installer that
-/// offers its parts (ADR 0053), replacing the patch of the same name
-/// written before. Parts that hide nothing are left out. Nothing is
+/// Whether a patch would do anything: hide, move or repair.
+fn does_something(patch: &Patch) -> bool {
+    patch.parts.iter().any(|part| !part.objects.is_empty())
+        || patch
+            .moves
+            .as_ref()
+            .is_some_and(|moves| !moves.moves.is_empty())
+        || patch.repairs.as_ref().is_some_and(|repairs| {
+            repairs
+                .places
+                .iter()
+                .any(|place| !place.navmeshes.is_empty())
+        })
+}
+
+/// Writes `patch` into Mod Mallet's own folder as one archive, replacing
+/// the patch of the same name written before: its parts with an installer
+/// that offers them (ADR 0053), its own plugins of moves and paths, and its
+/// manifest (ADR 0070). Parts that hide nothing are left out. Nothing is
 /// installed: that is [`Action::HideObjects`].
 ///
 /// # Errors
 ///
-/// If there is nothing to hide, or the archive cannot be written.
+/// If there is nothing to hide, move or repair, the setup is needed for
+/// moves or paths and not known, or a plugin or the archive cannot be
+/// written.
 pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPatch, EngineError> {
     let mut patch = patch.clone();
     patch.parts.retain(|part| !part.objects.is_empty());
     if patch.name.trim().is_empty() {
         DEFAULT_PATCH_NAME.clone_into(&mut patch.name);
     }
+    if !does_something(&patch) {
+        return Err(EngineError::NothingToHide);
+    }
     let objects = patch.objects();
-    if objects.is_empty() {
+    let mut plugins = Vec::new();
+    let mut moved = 0;
+    if let Some(moves) = patch.moves.as_ref().filter(|moves| !moves.moves.is_empty()) {
+        let scan = options.setup.as_ref().ok_or(EngineError::SetupUnknown)?;
+        let built = crate::moves::moves_plugin(scan, moves)?;
+        moved = built.moved.len();
+        for refused in &built.refused {
+            tracing::info!(
+                plugin = refused.object.plugin,
+                local_id = format!("{:06X}", refused.object.local_id),
+                reason = ?refused.reason,
+                "object not moved"
+            );
+        }
+        if let Some(bytes) = built.bytes {
+            plugins.push((swap::moves_plugin_name(&patch.name), bytes));
+        }
+    }
+    let mut repaired = 0;
+    if let Some(repairs) = patch.repairs.as_ref().filter(|repairs| {
+        repairs
+            .places
+            .iter()
+            .any(|place| !place.navmeshes.is_empty())
+    }) {
+        let scan = options.setup.as_ref().ok_or(EngineError::SetupUnknown)?;
+        let own = swap::paths_plugin_name(&patch.name);
+        let (built, refused) = crate::paths::paths_plugin(scan, repairs, &own)?;
+        repaired = built.repaired.len();
+        for refused in &refused {
+            tracing::info!(navmesh = refused.navmesh, reason = ?refused.reason, "path not repaired");
+        }
+        if let Some(bytes) = built.bytes {
+            plugins.push((own, bytes));
+        }
+    }
+    if objects.is_empty() && plugins.is_empty() {
         return Err(EngineError::NothingToHide);
     }
     let archive = patch_file_named(&patch.name, options).ok_or(EngineError::ManagerNotFound)?;
@@ -295,21 +357,25 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
             source,
         })?;
     }
-    crate::patch::write_zip(&archive, &crate::patch::patch_files(&patch)).map_err(|source| {
-        EngineError::Write {
+    crate::patch::write_zip(&archive, &crate::patch::patch_files(&patch, &plugins)).map_err(
+        |source| EngineError::Write {
             path: archive.clone(),
             source,
-        }
-    })?;
+        },
+    )?;
     tracing::info!(
         path = %archive.display(),
         parts = patch.parts.len(),
         objects = objects.len(),
+        moved,
+        repaired,
         "patch written"
     );
     Ok(CreatedPatch {
         path: archive,
         objects: objects.len(),
+        moved,
+        repaired,
     })
 }
 
@@ -341,17 +407,19 @@ pub fn save_patch_report(text: &str, options: &ManagerOptions) -> Result<PathBuf
     Ok(path)
 }
 
-/// Writes `patch` and asks Vortex to install it.
+/// Writes `patch`, with its plugins and manifest, and asks Vortex to
+/// install it as a mod of its own (ADR 0070).
 fn hide_objects(patch: &Patch, options: &ManagerOptions) -> ActionOutcome {
+    let hides = patch.parts.iter().any(|part| !part.objects.is_empty());
     let swaps = mallet_game_bethesda::Game::from_id(options.vortex_game())
         .is_some_and(mallet_game_bethesda::Game::has_object_swapper);
-    if !swaps {
+    if hides && !swaps {
         return ActionOutcome {
             status: ActionStatus::Failed,
             detail: Some(EngineError::NoObjectSwapper.to_string()),
         };
     }
-    if patch.parts.iter().all(|part| part.objects.is_empty()) {
+    if !does_something(patch) {
         return ActionOutcome {
             status: ActionStatus::Failed,
             detail: Some(EngineError::NothingToHide.to_string()),

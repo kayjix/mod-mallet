@@ -29,6 +29,7 @@ mod managers;
 mod mesh;
 mod moves;
 mod patch;
+mod patch_archive;
 mod paths;
 mod png;
 mod preview;
@@ -70,6 +71,7 @@ pub use logging::{LOG_FILE, PREVIOUS_LOG_FILE, default_log_dir, start_logging};
 pub use managers::ModManager;
 pub use mesh::mesh_view;
 pub use moves::{create_moves, moves_file};
+pub use patch_archive::load_patch;
 pub use paths::{create_paths, paths_file};
 pub use preview::file_preview;
 pub use reach::{spots_reach, walkway_reach, walkway_reach_after, walkway_repair_reach};
@@ -240,6 +242,15 @@ pub enum EngineError {
     /// An action needs to read the setup, but where it is was not given.
     #[error("the game's setup is not known here")]
     SetupUnknown,
+    /// An archive picked as a patch could not be opened.
+    #[error("the archive could not be opened: {0}")]
+    ArchiveUnreadable(String),
+    /// An archive picked as a patch holds no patch of Mod Mallet.
+    #[error("the archive holds no patch of Mod Mallet")]
+    NotAPatch,
+    /// A patch's manifest is in a format this Mod Mallet does not know.
+    #[error("the patch was made by a newer Mod Mallet (manifest format {0}); update Mod Mallet")]
+    ManifestFormat(u32),
     /// The mod manager's records could not be used.
     #[error(transparent)]
     Vortex(#[from] VortexError),
@@ -508,6 +519,7 @@ fn old_patch(text: &str) -> mallet_core::Patch {
         author: None,
         version: None,
         parts,
+        ..mallet_core::Patch::default()
     }
 }
 

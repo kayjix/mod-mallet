@@ -22,8 +22,12 @@ pub struct Installer {
     pub page: String,
     /// The title of the group of options on the page.
     pub group: String,
-    /// The options, in the order they are shown.
+    /// The options, in the order they are shown. Without any, the
+    /// installer has no page.
     pub options: Vec<Choice>,
+    /// The files always installed: the path in the archive, and the path
+    /// below the data directory.
+    pub required: Vec<(String, String)>,
 }
 
 /// One option of an [`Installer`].
@@ -53,6 +57,23 @@ pub fn module_config(installer: &Installer) -> String {
         "  <moduleName>{}</moduleName>",
         escape(&installer.name)
     );
+    if !installer.required.is_empty() {
+        xml.push_str("  <requiredInstallFiles>\n");
+        for (source, destination) in &installer.required {
+            let _ = writeln!(
+                xml,
+                "    <file source=\"{}\" destination=\"{}\" priority=\"0\"/>",
+                escape(source),
+                escape(destination)
+            );
+        }
+        xml.push_str("  </requiredInstallFiles>\n");
+    }
+    // A group needs at least one option; without any, there is no page.
+    if installer.options.is_empty() {
+        xml.push_str("</config>\n");
+        return xml;
+    }
     xml.push_str("  <installSteps order=\"Explicit\">\n");
     let _ = writeln!(
         xml,
@@ -175,6 +196,7 @@ mod tests {
             page: "Parts".to_owned(),
             group: "Mods".to_owned(),
             options,
+            required: Vec::new(),
         }
     }
 
@@ -221,6 +243,21 @@ mod tests {
         );
         assert_eq!(second.default_status, OptionStatus::Recommended);
         assert_eq!(second.rules, []);
+    }
+
+    #[test]
+    fn required_files_are_written_and_an_empty_page_left_out() {
+        let mut only_required = installer(Vec::new());
+        only_required.required = vec![(
+            "plugins/A - Mod Mallet Moves.esp".to_owned(),
+            "A - Mod Mallet Moves.esp".to_owned(),
+        )];
+        let xml = module_config(&only_required);
+        assert!(xml.contains("<requiredInstallFiles>"));
+        assert!(xml.contains("destination=\"A - Mod Mallet Moves.esp\""));
+        assert!(!xml.contains("<installSteps"));
+        roxmltree::Document::parse(&xml).unwrap();
+        assert_eq!(crate::parse(&xml).unwrap().len(), 0);
     }
 
     #[test]

@@ -29,6 +29,40 @@ pub fn moves_file(options: &ManagerOptions) -> Option<PathBuf> {
     )
 }
 
+/// Builds the plugin that applies `moves` to the setup `scan` describes,
+/// leaving out Mod Mallet's own plugins of moves, which it replaces. The
+/// plugin's bytes are `None` if no object can be moved.
+///
+/// # Errors
+///
+/// If the setup cannot be found or the plugin cannot be made.
+pub(crate) fn moves_plugin(
+    scan: &ScanOptions,
+    moves: &Moves,
+) -> Result<mallet_game_bethesda::moves::MovesPlugin, EngineError> {
+    let game = scan.game()?;
+    let (game_dir, _) = scan.located_game_dir().ok_or(EngineError::GameNotFound)?;
+    let plugins =
+        mallet_game_bethesda::moves::active_plugins(game, &game_dir, scan.local_dir.as_deref());
+    let tables = LodLibrary::with_prefixes(
+        game,
+        &game_dir,
+        scan.local_dir.as_deref(),
+        &["strings/".to_owned()],
+    );
+    let read: RefCell<HashMap<String, HashMap<u32, String>>> = RefCell::new(HashMap::new());
+    let names = |plugin: &str, id: u32| -> Option<String> {
+        let key = plugin.to_ascii_lowercase();
+        let mut read = read.borrow_mut();
+        read.entry(key)
+            .or_insert_with(|| string_table(&tables, plugin, NAMES_LANGUAGE))
+            .get(&id)
+            .cloned()
+    };
+    mallet_game_bethesda::moves::build(game, &plugins, &moves.moves, &names)
+        .map_err(|error| EngineError::MovesNotWritten(error.to_string()))
+}
+
 /// Writes the plugin that applies `moves` to the setup `scan` describes,
 /// in an archive in Mod Mallet's own folder, replacing the one written
 /// before. Objects that cannot be moved are listed in the result; if none
@@ -45,34 +79,8 @@ pub fn create_moves(
     options: &ManagerOptions,
 ) -> Result<CreatedMoves, EngineError> {
     let started = std::time::Instant::now();
-    let game = scan.game()?;
-    let (game_dir, _) = scan.located_game_dir().ok_or(EngineError::GameNotFound)?;
     let own = format!("{MOVES_NAME}.esp");
-    // The moves written before are not read: the new plugin replaces them
-    // and must not copy from itself.
-    let plugins = mallet_game_bethesda::moves::active_plugins(
-        game,
-        &game_dir,
-        scan.local_dir.as_deref(),
-        &own,
-    );
-    let tables = LodLibrary::with_prefixes(
-        game,
-        &game_dir,
-        scan.local_dir.as_deref(),
-        &["strings/".to_owned()],
-    );
-    let read: RefCell<HashMap<String, HashMap<u32, String>>> = RefCell::new(HashMap::new());
-    let names = |plugin: &str, id: u32| -> Option<String> {
-        let key = plugin.to_ascii_lowercase();
-        let mut read = read.borrow_mut();
-        read.entry(key)
-            .or_insert_with(|| string_table(&tables, plugin, NAMES_LANGUAGE))
-            .get(&id)
-            .cloned()
-    };
-    let built = mallet_game_bethesda::moves::build(game, &plugins, &moves.moves, &names)
-        .map_err(|error| EngineError::MovesNotWritten(error.to_string()))?;
+    let built = moves_plugin(scan, moves)?;
     let count = u32::try_from(built.moved.len()).unwrap_or(u32::MAX);
     let Some(bytes) = built.bytes else {
         tracing::info!(

@@ -485,14 +485,7 @@ impl Messages {
                 vec![("mod", ArgValue::from(mod_ref.name.as_str()))],
                 tick,
             ),
-            Action::HideObjects { patch } => (
-                "action-hide-objects",
-                vec![(
-                    "count",
-                    ArgValue::Number(i64::try_from(patch.objects().len()).unwrap_or(i64::MAX)),
-                )],
-                &no_ticks,
-            ),
+            Action::HideObjects { patch } => ("action-hide-objects", patch_args(patch), &no_ticks),
             Action::MoveObjects { moves } => (
                 "action-move-objects",
                 vec![(
@@ -879,6 +872,26 @@ impl Messages {
 /// The Fluent message id of a kind: Fluent ids cannot contain dots.
 fn message_id(kind_id: &str) -> String {
     kind_id.replace('.', "-")
+}
+
+/// The arguments of the action that installs a patch: its name, and what
+/// it hides, moves and repairs (ADR 0070).
+fn patch_args(patch: &mallet_core::Patch) -> Vec<(&'static str, ArgValue)> {
+    let number = |count: usize| ArgValue::Number(i64::try_from(count).unwrap_or(i64::MAX));
+    let moved = patch.moves.as_ref().map_or(0, |moves| moves.moves.len());
+    let paths = patch.repairs.as_ref().map_or(0, |repairs| {
+        repairs
+            .places
+            .iter()
+            .filter(|place| !place.navmeshes.is_empty())
+            .count()
+    });
+    vec![
+        ("name", ArgValue::from(patch.name.as_str())),
+        ("count", number(patch.objects().len())),
+        ("moved", number(moved)),
+        ("paths", number(paths)),
+    ]
 }
 
 #[cfg(test)]

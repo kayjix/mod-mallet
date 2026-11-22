@@ -32,24 +32,26 @@ pub fn paths_file(options: &ManagerOptions) -> Option<PathBuf> {
     )
 }
 
-/// Writes the plugin that carries the repaired paths of `repairs` into the
-/// setup `scan` describes, in an archive in Mod Mallet's own folder,
-/// replacing the one written before. Each place is repaired with every
-/// object the patch hides there, and the meshes chosen for it are kept.
-/// Meshes that cannot be repaired are listed in the result; if none can,
-/// nothing is written and the result's path is empty. Nothing is
-/// installed: that is [`mallet_core::Action::RepairPaths`].
+/// Builds the plugin, named `own`, that carries the repaired paths of
+/// `repairs` into the setup `scan` describes, from the versions of the
+/// meshes other than Mod Mallet's own repairs. Each place is repaired with
+/// every object hidden there, and the meshes chosen for it are kept. Also
+/// returns the meshes that cannot be repaired, and why.
 ///
 /// # Errors
 ///
-/// If the setup or Mod Mallet's folder cannot be found, the plugin cannot
-/// be made, or the archive cannot be written.
-pub fn create_paths(
+/// If the setup cannot be found or the plugin cannot be made.
+pub(crate) fn paths_plugin(
     scan: &ScanOptions,
     repairs: &PathRepairs,
-    options: &ManagerOptions,
-) -> Result<CreatedPaths, EngineError> {
-    let started = std::time::Instant::now();
+    own: &str,
+) -> Result<
+    (
+        mallet_game_bethesda::paths_plugin::PathsPlugin,
+        Vec<RefusedPath>,
+    ),
+    EngineError,
+> {
     let game = scan.game()?;
     let (game_dir, _) = scan.located_game_dir().ok_or(EngineError::GameNotFound)?;
 
@@ -103,12 +105,35 @@ pub fn create_paths(
             .cloned()
     };
     let records: Vec<NavmeshRecord> = records.into_values().collect();
-    let built = mallet_game_bethesda::paths_plugin::build(game, &plugins, &records, &names)
+    let built = mallet_game_bethesda::paths_plugin::build(game, &plugins, &records, &names, own)
         .map_err(|error| EngineError::PathsNotWritten(error.to_string()))?;
     refused.extend(built.refused.iter().map(|(navmesh, reason)| RefusedPath {
         navmesh: navmesh.to_string(),
         reason: reason.clone(),
     }));
+    Ok((built, refused))
+}
+
+/// Writes the plugin that carries the repaired paths of `repairs` into the
+/// setup `scan` describes, in an archive in Mod Mallet's own folder,
+/// replacing the one written before. Each place is repaired with every
+/// object the patch hides there, and the meshes chosen for it are kept.
+/// Meshes that cannot be repaired are listed in the result; if none can,
+/// nothing is written and the result's path is empty. Nothing is
+/// installed: that is [`mallet_core::Action::RepairPaths`].
+///
+/// # Errors
+///
+/// If the setup or Mod Mallet's folder cannot be found, the plugin cannot
+/// be made, or the archive cannot be written.
+pub fn create_paths(
+    scan: &ScanOptions,
+    repairs: &PathRepairs,
+    options: &ManagerOptions,
+) -> Result<CreatedPaths, EngineError> {
+    let started = std::time::Instant::now();
+    let own = mallet_game_bethesda::paths_plugin::file_name();
+    let (built, refused) = paths_plugin(scan, repairs, &own)?;
     let repaired: Vec<String> = built.repaired.iter().map(ToString::to_string).collect();
     let Some(bytes) = built.bytes else {
         tracing::info!(
@@ -124,7 +149,6 @@ pub fn create_paths(
         });
     };
     let archive = paths_file(options).ok_or(EngineError::ManagerNotFound)?;
-    let own = mallet_game_bethesda::paths_plugin::file_name();
     crate::patch::write_zip(&archive, &[(own, bytes)]).map_err(|source| EngineError::Write {
         path: archive.clone(),
         source,

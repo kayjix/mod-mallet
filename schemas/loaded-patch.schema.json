@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LoadedPatch",
+  "description": "A patch read from an archive: its manifest if it has one, and what its\nswap files hide, for an archive without one.",
+  "type": "object",
+  "properties": {
+    "archive": {
+      "description": "The archive's file name, as the user picked it.",
+      "type": "string"
+    },
+    "manifest": {
+      "description": "The manifest; `None` if the archive has none.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PatchManifest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "patch": {
+      "description": "The patch its swap files describe: name, author, version and parts.",
+      "$ref": "#/$defs/Patch"
+    }
+  },
+  "required": [
+    "archive",
+    "patch"
+  ],
+  "$defs": {
+    "DoorTarget": {
+      "description": "Where a door is to lead: the door on the other side, and where the\nplayer arrives there (ADR 0067).",
+      "type": "object",
+      "properties": {
+        "arrival": {
+          "description": "Where the player arrives, in whole game units; `None` keeps the\npoint the door has.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "door": {
+          "description": "The door on the other side.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "facing": {
+          "description": "Which way the player faces there, in thousandths of a radian;\n`None` keeps it.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "required": [
+        "door"
+      ]
+    },
+    "Moves": {
+      "description": "The moves to carry into the game, as one plugin.",
+      "type": "object",
+      "properties": {
+        "moves": {
+          "description": "The moves, one per object.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectMove"
+          }
+        }
+      },
+      "required": [
+        "moves"
+      ]
+    },
+    "ObjectMove": {
+      "description": "One placed object moved: by how much, and where it was found.",
+      "type": "object",
+      "properties": {
+        "cell": {
+          "description": "The interior cell it stands in, by its editor ID; `None` outside.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "description": "Where it stood when it was moved, in whole game units. Only a hint\nfor finding it: the plugin starts from where the game has it.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "object": {
+          "description": "The object.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "offset": {
+          "description": "How far it goes east, north and up, in game units (about 1.4 cm\neach).",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "teleport": {
+          "description": "For a door: where its teleport is to lead instead, when stacked\ndoors are merged into one (ADR 0067).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "turn": {
+          "description": "How far it turns about the upright axis through its own origin, in\ndegrees, the way the game counts (clockwise seen from above).",
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "object",
+        "from",
+        "offset",
+        "turn"
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
+    "Patch": {
+      "description": "A patch as it is made and passed on: what it hides, in parts, and,\nsince patches are mods of their own (ADR 0070), what it moves and which\npaths it repairs, with the manifest that lets its decisions be read\nback.",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made it; `None` for the user's own. Plain text: nothing proves\nit yet.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manifest": {
+          "description": "Its decisions, for reading it back into Mod Mallet (ADR 0070).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PatchManifest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moves": {
+          "description": "What it moves, and the doors it merges (ADR 0060, 0067), written\nas its own plugin of moves.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Moves"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "Its name. Patches with different names can be installed side by\nside; one with the same name replaces the one before.",
+          "type": "string"
+        },
+        "parts": {
+          "description": "Its parts.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PatchPart"
+          }
+        },
+        "repairs": {
+          "description": "The paths it repairs (ADR 0058), written as its own plugin of paths.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PathRepairs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "description": "Its version, as its maker numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "parts"
+      ]
+    },
+    "PatchManifest": {
+      "description": "Everything needed to rebuild a patch's decisions in Mod Mallet: carried\nin its archive, so that a patch can be loaded, changed and installed\nagain, by its maker or anybody else (ADR 0070).",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made it; `None` for a patch its maker kept for themselves.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisions": {
+          "description": "The decisions, by the keys the desktop app makes for them: a\ncollision finding, a spot, an object, a move, a repaired navigation\nmesh, a duel, a version of a thing. The keys do not depend on the\nload order (ADR 0007).",
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "format": {
+          "description": "The format of the manifest, [`PATCH_MANIFEST_FORMAT`] when written.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "mods": {
+          "description": "The mods the decisions are about, by the names the maker's mod\nmanager showed for them.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The patch's name.",
+          "type": "string"
+        },
+        "plugins": {
+          "description": "The plugins the decisions are about, by file name.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "description": "Its version, as its maker numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "name",
+        "decisions"
+      ]
+    },
+    "PatchPart": {
+      "description": "One part of a patch: what it hides of one plugin, and the plugin that\nwas the reason, if any.",
+      "type": "object",
+      "properties": {
+        "against": {
+          "description": "The plugin the part was decided against, as in a collision; `None`\nfor objects hidden for their own sake. A part with one applies only\nwhere both plugins are active.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "objects": {
+          "description": "The objects it hides.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectRef"
+          }
+        },
+        "plugin": {
+          "description": "The plugin whose objects the part hides, by its file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "objects"
+      ]
+    },
+    "PathRepairs": {
+      "description": "The repairs of paths to write into the plugin of paths: where, and the\nobjects the patch hides, whose paths are repaired.",
+      "type": "object",
+      "properties": {
+        "hidden": {
+          "description": "Every object the patch hides. The repair of a place takes those\nthat stand there, so that it is the same whichever choice asked\nfor it.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectRef"
+          }
+        },
+        "places": {
+          "description": "Each place with meshes to repair.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairPlace"
+          }
+        }
+      },
+      "required": [
+        "places",
+        "hidden"
+      ]
+    },
+    "RepairPlace": {
+      "description": "The meshes to repair in one place.",
+      "type": "object",
+      "properties": {
+        "centre": {
+          "description": "Outside, a point near the objects, in whole game units; inside,\n`None`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "navmeshes": {
+          "description": "The meshes chosen for repair there, as in [`RepairedPaths::navmesh`].",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "place": {
+          "description": "The worldspace, or the interior cell by its editor ID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "place",
+        "navmeshes"
+      ]
+    }
+  }
+}

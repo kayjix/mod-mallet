@@ -64,7 +64,7 @@
           ]
         },
         {
-          "description": "Hide placed objects in the game, through a patch that the mod\nmanager installs: each object is swapped for an invisible marker\nwhile the game runs. Removing the patch brings them back. Its parts\ncan be left out in its installer (ADR 0053).",
+          "description": "Hide placed objects in the game, through a patch that the mod\nmanager installs: each object is swapped for an invisible marker\nwhile the game runs. Removing the patch brings them back. Its parts\ncan be left out in its installer (ADR 0053). The patch is a mod of\nits own and also brings its moves and repaired paths (ADR 0070).",
           "type": "object",
           "properties": {
             "patch": {
@@ -553,7 +553,7 @@
       ]
     },
     "Patch": {
-      "description": "A patch as it is made and passed on.",
+      "description": "A patch as it is made and passed on: what it hides, in parts, and,\nsince patches are mods of their own (ADR 0070), what it moves and which\npaths it repairs, with the manifest that lets its decisions be read\nback.",
       "type": "object",
       "properties": {
         "author": {
@@ -561,6 +561,28 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "manifest": {
+          "description": "Its decisions, for reading it back into Mod Mallet (ADR 0070).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PatchManifest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moves": {
+          "description": "What it moves, and the doors it merges (ADR 0060, 0067), written\nas its own plugin of moves.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Moves"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "name": {
@@ -574,6 +596,17 @@
             "$ref": "#/$defs/PatchPart"
           }
         },
+        "repairs": {
+          "description": "The paths it repairs (ADR 0058), written as its own plugin of paths.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PathRepairs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "version": {
           "description": "Its version, as its maker numbers it.",
           "type": [
@@ -585,6 +618,67 @@
       "required": [
         "name",
         "parts"
+      ]
+    },
+    "PatchManifest": {
+      "description": "Everything needed to rebuild a patch's decisions in Mod Mallet: carried\nin its archive, so that a patch can be loaded, changed and installed\nagain, by its maker or anybody else (ADR 0070).",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made it; `None` for a patch its maker kept for themselves.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisions": {
+          "description": "The decisions, by the keys the desktop app makes for them: a\ncollision finding, a spot, an object, a move, a repaired navigation\nmesh, a duel, a version of a thing. The keys do not depend on the\nload order (ADR 0007).",
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "format": {
+          "description": "The format of the manifest, [`PATCH_MANIFEST_FORMAT`] when written.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "mods": {
+          "description": "The mods the decisions are about, by the names the maker's mod\nmanager showed for them.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The patch's name.",
+          "type": "string"
+        },
+        "plugins": {
+          "description": "The plugins the decisions are about, by file name.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "description": "Its version, as its maker numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "name",
+        "decisions"
       ]
     },
     "PatchPart": {

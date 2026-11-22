@@ -4,12 +4,13 @@
 //! like any downloaded mod. The archive is written into Mod Mallet's own
 //! folder; nothing is written into the game or the mod manager's data
 //! (ADR 0025). It carries a FOMOD installer, so that each part can be left
-//! out wherever it is installed (ADR 0053).
+//! out wherever it is installed (ADR 0053), the patch's own plugins of
+//! moves and paths, and a manifest of its decisions (ADR 0070).
 
 use std::io::Write;
 use std::path::Path;
 
-use mallet_core::Patch;
+use mallet_core::{PATCH_MANIFEST_FILE, PATCH_MANIFEST_FORMAT, Patch};
 use mallet_format_fomod::write::{Choice, Installer};
 use mallet_game_bethesda::swap;
 
@@ -17,9 +18,15 @@ use mallet_game_bethesda::swap;
 /// installer copies into the data directory.
 const PARTS: &str = "parts";
 
+/// The folder in the archive that holds the patch's plugins of moves and
+/// paths, which the installer always copies into the data directory.
+const PLUGINS: &str = "plugins";
+
 /// The files of the archive of `patch`, by their paths in the archive:
-/// one swap file per part, and the installer that offers them.
-pub(crate) fn patch_files(patch: &Patch) -> Vec<(String, Vec<u8>)> {
+/// one swap file per part, the patch's own `plugins` (file name and
+/// bytes), its manifest, and the installer that offers the parts and
+/// always installs the plugins (ADR 0053, 0070).
+pub(crate) fn patch_files(patch: &Patch, plugins: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
     let names = swap::part_file_names(patch);
     let mut files = Vec::new();
     let mut options = Vec::new();
@@ -46,15 +53,33 @@ pub(crate) fn patch_files(patch: &Patch) -> Vec<(String, Vec<u8>)> {
             needs,
         });
     }
+    let mut required = Vec::new();
+    for (name, bytes) in plugins {
+        let source = format!("{PLUGINS}/{name}");
+        files.push((source.clone(), bytes.clone()));
+        required.push((source, name.clone()));
+    }
+    if let Some(manifest) = &patch.manifest {
+        let mut manifest = manifest.clone();
+        manifest.format = PATCH_MANIFEST_FORMAT;
+        manifest.name.clone_from(&patch.name);
+        manifest.author.clone_from(&patch.author);
+        manifest.version.clone_from(&patch.version);
+        if let Ok(text) = serde_json::to_string_pretty(&manifest) {
+            files.push((PATCH_MANIFEST_FILE.to_owned(), text.into_bytes()));
+        }
+    }
     let installer = Installer {
         name: patch.name.clone(),
         author: patch.author.clone(),
         version: patch.version.clone(),
-        description: "Hides placed objects through Base Object Swapper. Made with Mod Mallet."
+        description: "Hides placed objects through Base Object Swapper, and moves objects \
+                      and repairs paths through its own plugins. Made with Mod Mallet."
             .to_owned(),
         page: "Parts".to_owned(),
         group: "Mods the patch changes".to_owned(),
         options,
+        required,
     };
     files.push((
         "fomod/info.xml".to_owned(),
@@ -211,8 +236,9 @@ mod tests {
                     objects: vec![object("Roads.esp", 3)],
                 },
             ],
+            ..Patch::default()
         };
-        let files = patch_files(&patch);
+        let files = patch_files(&patch, &[]);
         let names: Vec<&str> = files.iter().map(|(name, _)| name.as_str()).collect();
         assert_eq!(
             names,

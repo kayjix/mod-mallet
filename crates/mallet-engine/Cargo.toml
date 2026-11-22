@@ -29,6 +29,7 @@ tracing-subscriber.workspace = true
 [dev-dependencies]
 mallet-formats-bethesda.workspace = true
 mallet-unpack.workspace = true
+proptest.workspace = true
 tempfile.workspace = true
 
 [lints]

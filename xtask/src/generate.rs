@@ -120,6 +120,14 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "schemas/created-paths.schema.json",
         "apps/desktop/src/generated/created-paths.ts",
     ),
+    (
+        "schemas/patch-book.schema.json",
+        "apps/desktop/src/generated/patch-book.ts",
+    ),
+    (
+        "schemas/loaded-patch.schema.json",
+        "apps/desktop/src/generated/loaded-patch.ts",
+    ),
 ];
 
 /// A file and the content it should have.
@@ -164,6 +172,8 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::walkway_repair::CreatedPaths>(
             "schemas/created-paths.schema.json",
         )?,
+        schema_of::<mallet_core::PatchBook>("schemas/patch-book.schema.json")?,
+        schema_of::<mallet_core::LoadedPatch>("schemas/loaded-patch.schema.json")?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),

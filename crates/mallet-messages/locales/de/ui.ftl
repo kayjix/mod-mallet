@@ -91,11 +91,19 @@ action-reinstall-mod = In Vortex neu installieren
 
 guide-page = Seite { $page } von { $pages }
 
-action-hide-objects = Patch in Vortex installieren
-    .description = Mod Mallet schreibt eine kleine Mod, die im Spiel { $count ->
+action-hide-objects = Patch „{ $name }“ in Vortex installieren
+    .description = Mod Mallet schreibt den Patch als eigene kleine Mod, und Vortex installiert sie. Im Spiel ersetzt sie { $count ->
         [one] 1 Objekt
        *[other] { $count } Objekte
-    } durch einen unsichtbaren Marker ersetzt, und Vortex installiert sie. Dafür braucht es Base Object Swapper. Entfernst du die Mod in Vortex, sind die Objekte wieder da.
+    } durch einen unsichtbaren Marker{ $moved ->
+        [0] {""}
+        [one] , verschiebt 1 Objekt
+       *[other] , verschiebt { $moved } Objekte
+    }{ $paths ->
+        [0] {""}
+        [one] und repariert die Wege an 1 Ort
+       *[other] und repariert die Wege an { $paths } Orten
+    }. Zum Ausblenden braucht es Base Object Swapper. Schaltest du die Mod in Vortex aus, ist alles wieder wie vorher; deine Entscheidungen bleiben in Mod Mallet.
 
 action-move-objects = Verschiebungen in Vortex installieren
     .description = Mod Mallet schreibt ein kleines Plugin, das { $count ->

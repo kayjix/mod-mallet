@@ -51,8 +51,15 @@ pub struct Settings {
     /// order; the desktop app makes them. `None` as a whole while the user
     /// has chosen nothing, so that the app starts from the patch in the
     /// game.
+    ///
+    /// Since patches are several (ADR 0070), this is only read, to make the
+    /// first patch of the [`Settings::patch_book`] from it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub patch_choices: Option<BTreeMap<String, Option<String>>>,
+    /// The user's patches, each with its decisions, and the one new
+    /// decisions go to (ADR 0070). `None` until the window made it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch_book: Option<mallet_core::PatchBook>,
     /// Which version of a thing of the catalogue the user had the mod
     /// manager put into the game, by the thing's identity: the version's
     /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0054).
@@ -681,6 +688,20 @@ mod tests {
                 "skyrim.esm/00013989".to_owned(),
                 "mod:Better Blades".to_owned(),
             )]),
+            patch_book: Some(mallet_core::PatchBook {
+                patches: vec![mallet_core::BookPatch {
+                    id: "own".to_owned(),
+                    name: "Two Towns".to_owned(),
+                    decisions: BTreeMap::from([(
+                        "object:a.esp|1".to_owned(),
+                        Some("a.esp".to_owned()),
+                    )]),
+                    unticked: vec!["object:a.esp|1".to_owned()],
+                    ..mallet_core::BookPatch::default()
+                }],
+                active: "own".to_owned(),
+                pins: vec!["pin:spot:x".to_owned()],
+            }),
             manager: Some("mo2".to_owned()),
         };
 

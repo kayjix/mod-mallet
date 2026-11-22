@@ -29,10 +29,11 @@ pub enum Action {
     /// Hide placed objects in the game, through a patch that the mod
     /// manager installs: each object is swapped for an invisible marker
     /// while the game runs. Removing the patch brings them back. Its parts
-    /// can be left out in its installer (ADR 0053).
+    /// can be left out in its installer (ADR 0053). The patch is a mod of
+    /// its own and also brings its moves and repaired paths (ADR 0070).
     HideObjects {
         /// The patch, with the objects to hide in its parts.
-        patch: crate::Patch,
+        patch: Box<crate::Patch>,
     },
     /// Move placed objects a little, through a plugin of overrides that
     /// the mod manager installs (ADR 0060). Removing it puts them back.

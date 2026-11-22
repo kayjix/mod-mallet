@@ -218,8 +218,14 @@ fn hiding_objects_writes_a_patch_and_hands_it_to_vortex() {
                 local_id: 0x812,
             }],
         }],
+        ..mallet_core::Patch::default()
     };
-    let outcome = run_action(&Action::HideObjects { patch }, &vortex.options());
+    let outcome = run_action(
+        &Action::HideObjects {
+            patch: Box::new(patch),
+        },
+        &vortex.options(),
+    );
 
     assert_eq!(outcome.status, ActionStatus::Installing);
     let archive = PathBuf::from(extension.join().unwrap());
@@ -244,12 +250,10 @@ fn nothing_to_hide_asks_nothing_of_vortex() {
     let vortex = Vortex::new();
     let outcome = run_action(
         &Action::HideObjects {
-            patch: mallet_core::Patch {
+            patch: Box::new(mallet_core::Patch {
                 name: mallet_core::DEFAULT_PATCH_NAME.to_owned(),
-                author: None,
-                version: None,
-                parts: Vec::new(),
-            },
+                ..mallet_core::Patch::default()
+            }),
         },
         &vortex.options(),
     );

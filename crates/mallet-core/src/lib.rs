@@ -49,7 +49,10 @@ pub use finding::{ArgValue, Confidence, Finding, FindingId, Party, Severity, Sub
 pub use kinds::KindInfo;
 pub use managers::{KnownInstance, KnownManager, ManagerChoice};
 pub use mods::{ModRef, ModSource, NoModSource, SwitchedOffPlugin};
-pub use patch::{DEFAULT_PATCH_NAME, Patch, PatchInGame, PatchPart};
+pub use patch::{
+    BookPatch, DEFAULT_PATCH_NAME, LoadedPatch, PATCH_MANIFEST_FILE, PATCH_MANIFEST_FORMAT, Patch,
+    PatchBook, PatchInGame, PatchManifest, PatchPart,
+};
 pub use path::GamePath;
 pub use progress::{Progress, ScanProgress, ScanStep};
 pub use report::{

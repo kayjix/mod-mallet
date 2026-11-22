@@ -214,12 +214,11 @@ impl AreaReader {
         crate::walkways::read_plugins(&self.without_paths(), around)
     }
 
-    /// The active plugins without the plugin of paths.
+    /// The active plugins without Mod Mallet's plugins of paths (ADR 0070).
     pub fn without_paths(&self) -> Vec<(String, PathBuf)> {
-        let own = crate::paths_plugin::file_name();
         self.plugins
             .iter()
-            .filter(|(name, _)| !name.eq_ignore_ascii_case(&own))
+            .filter(|(name, _)| !crate::swap::is_paths_plugin(name))
             .cloned()
             .collect()
     }

@@ -40,7 +40,8 @@ pub struct PathsPlugin {
     pub refused: Vec<(RecordId, PathRefusal)>,
 }
 
-/// The file name of the plugin of paths.
+/// The file name of the one plugin of paths written before patches were
+/// mods of their own (ADR 0058).
 pub fn file_name() -> String {
     format!("{PATHS_NAME}.esp")
 }
@@ -48,7 +49,8 @@ pub fn file_name() -> String {
 /// Builds the plugin that carries `records` into the setup whose active
 /// plugins are `plugins` (name and file, in load order, without the plugin
 /// of paths itself). `names` gives the text of a localized plugin's name
-/// by plugin and number, where it can.
+/// by plugin and number, where it can. `own` is the file name the plugin
+/// is written under (ADR 0070).
 ///
 /// # Errors
 ///
@@ -59,6 +61,7 @@ pub fn build(
     plugins: &[(String, PathBuf)],
     records: &[NavmeshRecord],
     names: &dyn Fn(&str, u32) -> Option<String>,
+    own: &str,
 ) -> Result<PathsPlugin, WriteError> {
     let Some(format) = moves::plugin_format(game) else {
         return Ok(nothing(
@@ -72,7 +75,6 @@ pub fn build(
     let name_of = |plugin: usize| plugins.get(plugin).map_or("", |(name, _)| name.as_str());
     let mut refused = Vec::new();
     let (planned, masters) = plan(&found, plugins, records, &mut refused);
-    let own = file_name();
 
     let mut builder = PluginBuilder::new(masters.clone())
         .author("Mod Mallet")
@@ -98,8 +100,8 @@ pub fn build(
             }
         };
         let (Some(form_id), Some(fields)) = (
-            form_id_in(&record.navmesh, &masters, &own),
-            record.fields_for(&masters, &own),
+            form_id_in(&record.navmesh, &masters, own),
+            record.fields_for(&masters, own),
         ) else {
             refused.push((record.navmesh.clone(), PathRefusal::NotFound));
             continue;
@@ -327,7 +329,14 @@ mod tests {
         let (_directory, plugins) = setup();
         let records = records(&plugins);
         assert_eq!(records.len(), 1);
-        let built = build(Game::SkyrimSe, &plugins, &records, &|_, _| None).unwrap();
+        let built = build(
+            Game::SkyrimSe,
+            &plugins,
+            &records,
+            &|_, _| None,
+            &file_name(),
+        )
+        .unwrap();
         assert_eq!(built.refused, Vec::new());
         assert_eq!(
             built.masters,
@@ -366,13 +375,20 @@ mod tests {
     fn other_games_and_missing_cells_are_refused() {
         let (_directory, plugins) = setup();
         let records = records(&plugins);
-        let built = build(Game::Fallout4, &plugins, &records, &|_, _| None).unwrap();
+        let built = build(
+            Game::Fallout4,
+            &plugins,
+            &records,
+            &|_, _| None,
+            &file_name(),
+        )
+        .unwrap();
         assert_eq!(built.bytes, None);
         assert_eq!(built.refused[0].1, PathRefusal::UnsupportedGame);
 
         let mut lost = records.clone();
         lost[0].cell.local_id = 0x999;
-        let built = build(Game::SkyrimSe, &plugins, &lost, &|_, _| None).unwrap();
+        let built = build(Game::SkyrimSe, &plugins, &lost, &|_, _| None, &file_name()).unwrap();
         assert_eq!(built.bytes, None);
         assert_eq!(built.refused[0].1, PathRefusal::NotFound);
     }

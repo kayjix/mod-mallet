@@ -242,6 +242,32 @@ fn set_patch_choices(choices: BTreeMap<String, Option<String>>) -> Result<(), St
     Ok(())
 }
 
+/// The user's patches for the game in use (ADR 0070); `None` until the
+/// window made them.
+#[tauri::command(async)]
+fn patch_book() -> Result<Option<mallet_core::PatchBook>, String> {
+    Ok(settings()?.patch_book)
+}
+
+/// Remembers the user's patches. Only ever called because the user decided
+/// something, or made, changed or loaded a patch.
+#[tauri::command(async)]
+fn set_patch_book(book: mallet_core::PatchBook) -> Result<(), String> {
+    change_settings(|settings| settings.patch_book = Some(book))?;
+    Ok(())
+}
+
+/// Reads the patch in an archive the user picked, by its file name and its
+/// bytes. Nothing is installed or written.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn load_patch_archive(name: String, bytes: Vec<u8>) -> Result<mallet_core::LoadedPatch, String> {
+    mallet_engine::load_patch(&name, &bytes).map_err(|error| {
+        tracing::warn!(%error, "patch not loaded");
+        error.to_string()
+    })
+}
+
 /// A short text that changes when a file the scan starts from changes.
 /// The window asks for it every few seconds and scans again when it
 /// changed.
@@ -966,6 +992,9 @@ pub fn run() -> tauri::Result<()> {
             set_ranking,
             patch_choices,
             set_patch_choices,
+            patch_book,
+            set_patch_book,
+            load_patch_archive,
             games,
             select_game
         ])

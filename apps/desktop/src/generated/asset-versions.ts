@@ -19,11 +19,11 @@ export type Action =
       type: "hide-objects";
     }
   | {
-      moves: Moves;
+      moves: Moves1;
       type: "move-objects";
     }
   | {
-      repairs: PathRepairs;
+      repairs: PathRepairs1;
       type: "repair-paths";
     }
   | {
@@ -152,6 +152,15 @@ export interface Patch {
    */
   author?: string | null;
   /**
+   * Its decisions, for reading it back into Mod Mallet (ADR 0070).
+   */
+  manifest?: PatchManifest | null;
+  /**
+   * What it moves, and the doors it merges (ADR 0060, 0067), written
+   * as its own plugin of moves.
+   */
+  moves?: Moves | null;
+  /**
    * Its name. Patches with different names can be installed side by
    * side; one with the same name replaces the one before.
    */
@@ -161,47 +170,57 @@ export interface Patch {
    */
   parts: PatchPart[];
   /**
+   * The paths it repairs (ADR 0058), written as its own plugin of paths.
+   */
+  repairs?: PathRepairs | null;
+  /**
    * Its version, as its maker numbers it.
    */
   version?: string | null;
 }
 /**
- * One part of a patch: what it hides of one plugin, and the plugin that
- * was the reason, if any.
+ * Everything needed to rebuild a patch's decisions in Mod Mallet: carried
+ * in its archive, so that a patch can be loaded, changed and installed
+ * again, by its maker or anybody else (ADR 0070).
  */
-export interface PatchPart {
+export interface PatchManifest {
   /**
-   * The plugin the part was decided against, as in a collision; `None`
-   * for objects hidden for their own sake. A part with one applies only
-   * where both plugins are active.
+   * Who made it; `None` for a patch its maker kept for themselves.
    */
-  against?: string | null;
+  author?: string | null;
   /**
-   * The objects it hides.
+   * The decisions, by the keys the desktop app makes for them: a
+   * collision finding, a spot, an object, a move, a repaired navigation
+   * mesh, a duel, a version of a thing. The keys do not depend on the
+   * load order (ADR 0007).
    */
-  objects: ObjectRef[];
+  decisions: {
+    [k: string]: string | null;
+  };
   /**
-   * The plugin whose objects the part hides, by its file name.
+   * The format of the manifest, [`PATCH_MANIFEST_FORMAT`] when written.
    */
-  plugin: string;
+  format: number;
+  /**
+   * The mods the decisions are about, by the names the maker's mod
+   * manager showed for them.
+   */
+  mods?: string[];
+  /**
+   * The patch's name.
+   */
+  name: string;
+  /**
+   * The plugins the decisions are about, by file name.
+   */
+  plugins?: string[];
+  /**
+   * Its version, as its maker numbers it.
+   */
+  version?: string | null;
 }
 /**
- * A placed object, by the plugin that placed it first and its number in
- * that plugin. Unlike a form ID as the game shows it, this does not
- * depend on the load order.
- */
-export interface ObjectRef {
-  /**
-   * The object's number in that plugin.
-   */
-  localId: number;
-  /**
-   * The plugin's file name.
-   */
-  plugin: string;
-}
-/**
- * The moves.
+ * The moves to carry into the game, as one plugin.
  */
 export interface Moves {
   /**
@@ -225,7 +244,7 @@ export interface ObjectMove {
    * @maxItems 3
    */
   from: [number, number, number];
-  object: ObjectRef1;
+  object: ObjectRef;
   /**
    * How far it goes east, north and up, in game units (about 1.4 cm
    * each).
@@ -246,11 +265,9 @@ export interface ObjectMove {
   turn: number;
 }
 /**
- * A placed object, by the plugin that placed it first and its number in
- * that plugin. Unlike a form ID as the game shows it, this does not
- * depend on the load order.
+ * The object.
  */
-export interface ObjectRef1 {
+export interface ObjectRef {
   /**
    * The object's number in that plugin.
    */
@@ -273,7 +290,7 @@ export interface DoorTarget {
    * @maxItems 3
    */
   arrival?: [number, number, number] | null;
-  door: ObjectRef2;
+  door: ObjectRef1;
   /**
    * Which way the player faces there, in thousandths of a radian;
    * `None` keeps it.
@@ -282,6 +299,39 @@ export interface DoorTarget {
    * @maxItems 3
    */
   facing?: [number, number, number] | null;
+}
+/**
+ * The door on the other side.
+ */
+export interface ObjectRef1 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * One part of a patch: what it hides of one plugin, and the plugin that
+ * was the reason, if any.
+ */
+export interface PatchPart {
+  /**
+   * The plugin the part was decided against, as in a collision; `None`
+   * for objects hidden for their own sake. A part with one applies only
+   * where both plugins are active.
+   */
+  against?: string | null;
+  /**
+   * The objects it hides.
+   */
+  objects: ObjectRef2[];
+  /**
+   * The plugin whose objects the part hides, by its file name.
+   */
+  plugin: string;
 }
 /**
  * A placed object, by the plugin that placed it first and its number in
@@ -299,7 +349,8 @@ export interface ObjectRef2 {
   plugin: string;
 }
 /**
- * The repairs.
+ * The repairs of paths to write into the plugin of paths: where, and the
+ * objects the patch hides, whose paths are repaired.
  */
 export interface PathRepairs {
   /**
@@ -307,7 +358,7 @@ export interface PathRepairs {
    * that stand there, so that it is the same whichever choice asked
    * for it.
    */
-  hidden: ObjectRef[];
+  hidden: ObjectRef2[];
   /**
    * Each place with meshes to repair.
    */
@@ -333,6 +384,31 @@ export interface RepairPlace {
    * The worldspace, or the interior cell by its editor ID.
    */
   place: string;
+}
+/**
+ * The moves to carry into the game, as one plugin.
+ */
+export interface Moves1 {
+  /**
+   * The moves, one per object.
+   */
+  moves: ObjectMove[];
+}
+/**
+ * The repairs of paths to write into the plugin of paths: where, and the
+ * objects the patch hides, whose paths are repaired.
+ */
+export interface PathRepairs1 {
+  /**
+   * Every object the patch hides. The repair of a place takes those
+   * that stand there, so that it is the same whichever choice asked
+   * for it.
+   */
+  hidden: ObjectRef2[];
+  /**
+   * Each place with meshes to repair.
+   */
+  places: RepairPlace[];
 }
 /**
  * The mod to switch off.

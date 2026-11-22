@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PatchBook",
+  "description": "The user's patches for one game, as the window keeps them in the\nsettings (ADR 0070). The keys of decisions are the window's; the engine\nkeeps them as they are.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "description": "The identity of the patch new decisions go to, one of the user's\nown.",
+      "type": "string"
+    },
+    "patches": {
+      "description": "The patches, in the order in which they count: on the same decision\nthe later one wins.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/BookPatch"
+      }
+    },
+    "pins": {
+      "description": "The spots pinned to solve later, by their keys among the decisions\n(`pin:…`). A pin is no decision and belongs to no patch (ADR 0050).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "patches",
+    "active"
+  ],
+  "$defs": {
+    "BookPatch": {
+      "description": "One patch of the [`PatchBook`].",
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who made it, if they said.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisions": {
+          "description": "Its decisions, by key, as in [`PatchManifest::decisions`].",
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "foreign": {
+          "description": "Whether it is somebody else's: loaded, and not made one's own. The\nwindow never changes such a patch's decisions.",
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "description": "Its identity, which stays when it is renamed.",
+          "type": "string"
+        },
+        "loadedFrom": {
+          "description": "The archive it was loaded from; `None` for a patch made here.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Its name, which names its archive and its mod.",
+          "type": "string"
+        },
+        "off": {
+          "description": "Whether the user switched it off: its decisions are kept but do not\ncount.",
+          "type": "boolean",
+          "default": false
+        },
+        "unticked": {
+          "description": "The keys of its decisions that are unticked: kept, but not counted\nand not written.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "description": "Its version, as its maker numbers it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "decisions"
+      ]
+    }
+  }
+}

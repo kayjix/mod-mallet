@@ -2344,6 +2344,7 @@ dependencies = [
  "mallet-source-vortex",
  "mallet-store",
  "mallet-unpack",
+ "proptest",
  "serde",
  "serde_json",
  "tempfile",

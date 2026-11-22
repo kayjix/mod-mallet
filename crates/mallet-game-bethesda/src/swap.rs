@@ -149,6 +149,7 @@ pub fn read_part(text: &str) -> Option<Patch> {
             against: value("against"),
             objects: hidden_objects(text),
         }],
+        ..Patch::default()
     })
 }
 
@@ -198,6 +199,50 @@ pub fn archive_name(name: &str) -> String {
     } else {
         format!("{word}.zip")
     }
+}
+
+/// The end of the name of every plugin of moves a patch brings (ADR 0070).
+const MOVES_PLUGIN_END: &str = " - Mod Mallet Moves.esp";
+
+/// The end of the name of every plugin of paths a patch brings (ADR 0070).
+const PATHS_PLUGIN_END: &str = " - Mod Mallet Paths.esp";
+
+/// The patch's name as a file name would carry it.
+fn patch_word(name: &str) -> String {
+    let word = file_word(name);
+    if word.is_empty() {
+        mallet_core::DEFAULT_PATCH_NAME.to_owned()
+    } else {
+        word
+    }
+}
+
+/// The file name of the plugin that carries the moves of the patch named
+/// `name`.
+pub fn moves_plugin_name(name: &str) -> String {
+    format!("{}{MOVES_PLUGIN_END}", patch_word(name))
+}
+
+/// The file name of the plugin that carries the repaired paths of the
+/// patch named `name`.
+pub fn paths_plugin_name(name: &str) -> String {
+    format!("{}{PATHS_PLUGIN_END}", patch_word(name))
+}
+
+/// Whether a plugin is one of Mod Mallet's plugins of moves: a patch's, or
+/// the one plugin of moves written before patches were mods of their own.
+pub fn is_moves_plugin(plugin: &str) -> bool {
+    let lower = plugin.to_ascii_lowercase();
+    lower.ends_with(&MOVES_PLUGIN_END.to_ascii_lowercase())
+        || lower == format!("{}.esp", mallet_core::moves::MOVES_NAME).to_ascii_lowercase()
+}
+
+/// Whether a plugin is one of Mod Mallet's plugins of paths: a patch's, or
+/// the one plugin of paths written before patches were mods of their own.
+pub fn is_paths_plugin(plugin: &str) -> bool {
+    let lower = plugin.to_ascii_lowercase();
+    lower.ends_with(&PATHS_PLUGIN_END.to_ascii_lowercase())
+        || lower == format!("{}.esp", mallet_core::walkway_repair::PATHS_NAME).to_ascii_lowercase()
 }
 
 /// A plugin's name without its extension.
@@ -337,6 +382,7 @@ nonsense
             author: Some("Someone".to_owned()),
             version: Some("1.2".to_owned()),
             parts,
+            ..Patch::default()
         }
     }
 

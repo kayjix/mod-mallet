@@ -45,19 +45,19 @@ pub fn plugin_format(game: Game) -> Option<Format> {
 }
 
 /// The active plugins of `game` in `game_dir`, name and file in load
-/// order, without the one named `leave_out`; `local_dir` holds
+/// order, without Mod Mallet's own plugins of moves, which a new one
+/// replaces and must not copy from (ADR 0070); `local_dir` holds
 /// `plugins.txt`, as for [`crate::ingest::read_setup`].
 pub fn active_plugins(
     game: Game,
     game_dir: &Path,
     local_dir: Option<&Path>,
-    leave_out: &str,
 ) -> Vec<(String, PathBuf)> {
     let data_dir = game_dir.join("Data");
     crate::ingest::active_plugin_names(game, game_dir, local_dir)
         .unwrap_or_default()
         .into_iter()
-        .filter(|name| !name.eq_ignore_ascii_case(leave_out))
+        .filter(|name| !crate::swap::is_moves_plugin(name))
         .map(|name| {
             let path = data_dir.join(&name);
             (name, path)
