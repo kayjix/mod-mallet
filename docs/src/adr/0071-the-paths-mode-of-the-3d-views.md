@@ -129,9 +129,10 @@ the triangles it takes out in place, leading nowhere (ADR 0052).
   the view; the legend does, by lighting the mod's triangles.
 - When the camera goes far, the paths of the last area stay drawn, like the
   objects.
-- Action places show only where the objects of the area carry them, that
-  is once ADR 0069 fills `AreaObjects.actions`; until then the switch
-  shows nothing.
+- Action places come with the objects the view reads. The paths mode
+  draws ADR 0069's twelve kinds as five marks: sit, lean and sleep each
+  apart, every kind of work alike, and praying, standing and the rest
+  alike. Which way a place faces is not drawn.
 
 ## Alternatives considered
 

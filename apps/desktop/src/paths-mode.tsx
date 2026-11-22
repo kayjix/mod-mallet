@@ -7,7 +7,7 @@
 
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSession } from "./Actions";
-import type { AreaObjects } from "./generated/area-objects";
+import type { ActionPlace, AreaObjects } from "./generated/area-objects";
 import type { AreaPaths } from "./generated/area-paths";
 import type { MapSpot, ObjectRef } from "./generated/rendered-report";
 import { CELL } from "./map-places";
@@ -63,23 +63,8 @@ const MARK_STYLES = {
 
 type MarkName = keyof typeof MARK_STYLES;
 
-/**
- * A place where characters do something, as the objects of an area carry
- * them (ADR 0069, `AreaObjects.actions`): only what the paths mode draws.
- */
-interface AreaAction {
-  kind: string;
-  position: number[];
-}
-
-/** The places where characters do something among the objects of `area`, if it carries them. */
-function actionsOf(area: AreaObjects | null): AreaAction[] {
-  const actions = (area as { actions?: unknown } | null)?.actions;
-  return Array.isArray(actions) ? (actions as AreaAction[]) : [];
-}
-
 /** The mark of each kind of action place (ADR 0069): sit, lean and sleep apart, all work alike. */
-const MARK_OF_KIND: Record<string, MarkName> = {
+const MARK_OF_KIND: Record<ActionPlace["kind"], MarkName> = {
   sit: "sit",
   lean: "lean",
   sleep: "sleep",
@@ -310,7 +295,7 @@ function pathsOverlay(
   paths: AreaPaths,
   options: {
     highlight: number | null;
-    actions: AreaAction[] | null;
+    actions: ActionPlace[] | null;
     problems: PathsProblem[];
   },
 ): { groups: PathGroup[]; marks: PathMarks[]; counts: Counts } {
@@ -385,7 +370,7 @@ function pathsOverlay(
     }
   }
   for (const place of options.actions ?? []) {
-    marks[MARK_OF_KIND[place.kind] ?? "other"].push(
+    marks[MARK_OF_KIND[place.kind]].push(
       place.position[0] ?? 0,
       place.position[1] ?? 0,
       place.position[2] ?? 0,
@@ -474,7 +459,7 @@ export function usePathsMode(input: {
         ? null
         : pathsOverlay(shown, {
             highlight,
-            actions: actions ? actionsOf(input.area) : null,
+            actions: actions ? (input.area?.actions ?? []) : null,
             problems: found.problems,
           }),
     [shown, highlight, actions, found, input.area],
