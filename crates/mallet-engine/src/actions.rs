@@ -351,18 +351,9 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
         return Err(EngineError::NothingToHide);
     }
     let archive = patch_file_named(&patch.name, options).ok_or(EngineError::ManagerNotFound)?;
-    if let Some(dir) = archive.parent() {
-        std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
-            path: dir.to_path_buf(),
-            source,
-        })?;
-    }
-    crate::patch::write_zip(&archive, &crate::patch::patch_files(&patch, &plugins)).map_err(
-        |source| EngineError::Write {
-            path: archive.clone(),
-            source,
-        },
-    )?;
+    crate::create_folder_of(&archive)?;
+    crate::patch::write_zip(&archive, &crate::patch::patch_files(&patch, &plugins))
+        .map_err(EngineError::not_written(&archive))?;
     tracing::info!(
         path = %archive.display(),
         parts = patch.parts.len(),
@@ -393,16 +384,8 @@ pub fn save_patch_report(text: &str, options: &ManagerOptions) -> Result<PathBuf
     let path = patch_file(options)
         .ok_or(EngineError::ManagerNotFound)?
         .with_file_name(PATCH_REPORT);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|source| EngineError::Write {
-            path: dir.to_path_buf(),
-            source,
-        })?;
-    }
-    std::fs::write(&path, text).map_err(|source| EngineError::Write {
-        path: path.clone(),
-        source,
-    })?;
+    crate::create_folder_of(&path)?;
+    std::fs::write(&path, text).map_err(EngineError::not_written(&path))?;
     tracing::info!(path = %path.display(), "patch report written");
     Ok(path)
 }

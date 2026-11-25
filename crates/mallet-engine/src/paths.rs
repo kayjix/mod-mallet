@@ -151,10 +151,8 @@ pub fn create_paths(
         });
     };
     let archive = paths_file(options).ok_or(EngineError::ManagerNotFound)?;
-    crate::patch::write_zip(&archive, &[(own, bytes)]).map_err(|source| EngineError::Write {
-        path: archive.clone(),
-        source,
-    })?;
+    crate::patch::write_zip(&archive, &[(own, bytes)])
+        .map_err(EngineError::not_written(&archive))?;
     tracing::info!(
         path = %archive.display(),
         repaired = repaired.len(),

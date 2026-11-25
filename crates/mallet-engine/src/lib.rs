@@ -259,6 +259,30 @@ pub enum EngineError {
     Store(#[from] StoreError),
 }
 
+impl EngineError {
+    /// Turns what the system reported when `path`, a file or folder of Mod
+    /// Mallet's own, could not be written into [`EngineError::Write`].
+    pub(crate) fn not_written(path: &Path) -> impl FnOnce(std::io::Error) -> Self + '_ {
+        move |source| Self::Write {
+            path: path.to_path_buf(),
+            source,
+        }
+    }
+}
+
+/// Creates the folder `path` lies in, if it has one, for a file of Mod
+/// Mallet's own.
+///
+/// # Errors
+///
+/// [`EngineError::Write`], naming the folder, if it cannot be created.
+pub(crate) fn create_folder_of(path: &Path) -> Result<(), EngineError> {
+    match path.parent() {
+        Some(dir) => std::fs::create_dir_all(dir).map_err(EngineError::not_written(dir)),
+        None => Ok(()),
+    }
+}
+
 /// Examines the setup described by `options` and reports what is wrong.
 ///
 /// Nothing is remembered between calls, so everything is read again each
