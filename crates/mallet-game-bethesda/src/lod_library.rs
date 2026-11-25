@@ -79,17 +79,7 @@ impl LodLibrary {
         };
 
         let active = ingest::active_plugin_names(game, game_dir, local_dir).unwrap_or_default();
-        let extension = format!(".{}", game.archive_extension());
-        let on_disk: Vec<String> = std::fs::read_dir(&data_dir).map_or_else(
-            |_| Vec::new(),
-            |entries| {
-                entries
-                    .filter_map(Result::ok)
-                    .filter_map(|entry| entry.file_name().into_string().ok())
-                    .filter(|name| name.to_ascii_lowercase().ends_with(&extension))
-                    .collect()
-            },
-        );
+        let on_disk = ingest::archives_in(game, &data_dir).unwrap_or_default();
         for name in archives::load_order(game, &on_disk, &active) {
             let path = data_dir.join(&name);
             let Ok(directory) = archive::read_directory(&path) else {

@@ -51,16 +51,9 @@ pub fn active_plugins(
     game_dir: &Path,
     local_dir: Option<&Path>,
 ) -> Vec<(String, PathBuf)> {
-    let data_dir = game_dir.join("Data");
-    crate::ingest::active_plugin_names(game, game_dir, local_dir)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|name| !crate::swap::is_moves_plugin(name))
-        .map(|name| {
-            let path = data_dir.join(&name);
-            (name, path)
-        })
-        .collect()
+    let mut plugins = crate::ingest::active_plugin_files(game, game_dir, local_dir);
+    plugins.retain(|(name, _)| !crate::swap::is_moves_plugin(name));
+    plugins
 }
 
 /// The plugin that moves the objects, and what could not be moved.

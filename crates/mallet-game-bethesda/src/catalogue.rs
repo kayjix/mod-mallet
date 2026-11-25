@@ -612,12 +612,11 @@ pub fn read_catalogue(
     if game.family() != Family::Skyrim {
         return Catalogue::default();
     }
-    let data_dir = game_dir.join("Data");
     let tables = LodLibrary::with_prefixes(game, game_dir, local_dir, &["strings/".to_owned()]);
     let shipped = crate::locate::shipped_plugins(game, game_dir);
     let mut collector = Collector::new(game);
-    for name in ingest::active_plugin_names(game, game_dir, local_dir).unwrap_or_default() {
-        let Ok(file) = File::open(data_dir.join(&name)) else {
+    for (name, path) in ingest::active_plugin_files(game, game_dir, local_dir) {
+        let Ok(file) = File::open(&path) else {
             continue;
         };
         let Ok(plugin) = plugin::read(&mut BufReader::new(file), &RECORDS) else {

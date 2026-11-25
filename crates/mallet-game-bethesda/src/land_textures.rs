@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use mallet_core::facts::RecordId;
 use mallet_formats_bethesda::plugin::{self, Record};
@@ -147,16 +147,7 @@ impl LandTextures {
     /// Reads the landscape textures and texture sets of the active plugins
     /// of `game` in `game_dir`; `local_dir` holds `plugins.txt`.
     pub fn open(game: Game, game_dir: &Path, local_dir: Option<&Path>) -> Self {
-        let data_dir = game_dir.join("Data");
-        let plugins: Vec<(String, PathBuf)> =
-            ingest::active_plugin_names(game, game_dir, local_dir)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|name| {
-                    let path = data_dir.join(&name);
-                    (name, path)
-                })
-                .collect();
+        let plugins = ingest::active_plugin_files(game, game_dir, local_dir);
         let mut sets: HashMap<RecordId, String> = HashMap::new();
         let mut landscape: HashMap<RecordId, Source> = HashMap::new();
         for (name, path) in &plugins {

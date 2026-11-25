@@ -371,7 +371,9 @@ fn load_order_settings(
 }
 
 /// The archives of `game` in `data_dir`, by file name.
-fn archives_in(game: Game, data_dir: &Path) -> io::Result<Vec<String>> {
+/// The names of the archives of `game` in `data_dir`, in no particular
+/// order.
+pub(crate) fn archives_in(game: Game, data_dir: &Path) -> io::Result<Vec<String>> {
     let extension = format!(".{}", game.archive_extension());
     Ok(std::fs::read_dir(data_dir)?
         .filter_map(Result::ok)
@@ -515,7 +517,26 @@ pub(crate) fn active_plugin_names(
     active_plugins(game, game_dir, local_dir).map(|(names, _)| names)
 }
 
-/// The header and the character records of the plugin at `path`.
+/// The active plugins in load order, by name and file in the data
+/// directory, as `plugins.txt` in `local_dir` (or its standard place) has
+/// them; empty if the load order cannot be read. Plugins that only a mod
+/// manager's own folders hold are not looked for.
+pub(crate) fn active_plugin_files(
+    game: Game,
+    game_dir: &Path,
+    local_dir: Option<&Path>,
+) -> Vec<(String, PathBuf)> {
+    let data_dir = game_dir.join("Data");
+    active_plugin_names(game, game_dir, local_dir)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|name| {
+            let path = data_dir.join(&name);
+            (name, path)
+        })
+        .collect()
+}
+
 /// The land of the plugin `name` at `file`, read as `plugin`; `names` are
 /// its strings if it is localized. The land of the game's own plugins is
 /// kept in `cache`.

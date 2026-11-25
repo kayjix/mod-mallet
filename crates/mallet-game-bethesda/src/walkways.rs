@@ -48,15 +48,7 @@ impl Around {
 /// setup of `game` in `game_dir`; `local_dir` holds `plugins.txt`, as for
 /// [`ingest::read_setup`].
 pub fn read(game: Game, game_dir: &Path, local_dir: Option<&Path>, around: &Around) -> NearHidden {
-    let data_dir = game_dir.join("Data");
-    let plugins: Vec<(String, PathBuf)> = ingest::active_plugin_names(game, game_dir, local_dir)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|name| {
-            let path = data_dir.join(&name);
-            (name, path)
-        })
-        .collect();
+    let plugins = ingest::active_plugin_files(game, game_dir, local_dir);
     read_plugins(&plugins, around)
 }
 
@@ -75,15 +67,7 @@ pub fn read_with_destinations(
     local_dir: Option<&Path>,
     around: &Around,
 ) -> (NearHidden, Vec<PlacedDestination>) {
-    let data_dir = game_dir.join("Data");
-    let plugins: Vec<(String, PathBuf)> = ingest::active_plugin_names(game, game_dir, local_dir)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|name| {
-            let path = data_dir.join(&name);
-            (name, path)
-        })
-        .collect();
+    let plugins = ingest::active_plugin_files(game, game_dir, local_dir);
     read_plugins_with_destinations(&plugins, around)
 }
 
