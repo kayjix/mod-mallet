@@ -83,6 +83,7 @@ export function PreferencesSection() {
         </div>
         <div className="panel-body">
           <p>{p.intro}</p>
+          <p>{p.applyNote}</p>
           <label className="check">
             <input
               type="checkbox"

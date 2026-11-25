@@ -19,6 +19,7 @@ import {
   learn,
   type OpenCheck,
   offerOf,
+  offersOf,
   type PreferenceWorld,
   pairId,
   planOf,
@@ -268,6 +269,35 @@ test("a pair preference goes before a favourite, one said before one learned", (
   assert.equal(preferredSide([favourite, rivalFavourite], conflict), null);
   // A favourite for textures says nothing about meshes.
   assert.equal(preferredSide([{ ...favourite, topic: "textures" }], conflict), null);
+});
+
+test("every favourite with open conflicts waits, one offer each", () => {
+  const meshes = ["A", "B", "C", "D", "E"].map((other) => duel(MESH, other));
+  const textures = ["A", "B", "C", "D", "E"].map((other) => duel("T", other, ["textures"]));
+  const open = [duel(MESH, "F"), duel("T", "G", ["textures"])];
+  const choices: Record<string, string | null> = {};
+  for (const d of [...meshes, ...textures]) {
+    pick(choices, d, 0);
+  }
+  const theWorld = world([...meshes, ...textures, ...open]);
+  const learned = learn(votesOf(choices, theWorld));
+  const check: OpenCheck = {
+    duelOpen: (id) => choices[`duel:${id}`] === undefined,
+    spotOpen: () => true,
+  };
+  const nothing: PatchPreferences = {};
+  const offers = offersOf(
+    learned,
+    nothing,
+    rulesOf(learned, nothing),
+    conflictsOf(theWorld),
+    check,
+  );
+  assert.deepEqual(
+    offers.map((offer) => offer.learned.id).sort(),
+    [favouriteId(MESH, "meshes"), favouriteId("T", "textures")].sort(),
+  );
+  assert.ok(offers.every((offer) => offer.items.length === 1));
 });
 
 test("the offer names the open conflicts, and the answers are kept", () => {

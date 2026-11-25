@@ -687,20 +687,22 @@ export interface Offer {
 export const LATER_AFTER = 5;
 
 /**
- * The learned preference to offer now, if any: the strongest one with open
- * conflicts it would decide that the user has not answered, or answered
- * "Not now" to before {@link LATER_AFTER} more decisions about it.
+ * The learned preferences waiting to be offered, strongest first: those
+ * with open conflicts they would decide that the user has not answered,
+ * or answered "Not now" to before {@link LATER_AFTER} more decisions about
+ * them.
  */
-export function offerOf(
+export function offersOf(
   learned: readonly Learned[],
   kept: PatchPreferences,
   rules: readonly Rule[],
   conflicts: readonly Conflict[],
   open: OpenCheck,
-): Offer | null {
+): Offer[] {
   if (kept.learningOff === true) {
-    return null;
+    return [];
   }
+  const offers: Offer[] = [];
   for (const entry of learned) {
     const answer = kept.answers?.[entry.id];
     if (
@@ -715,10 +717,21 @@ export function offerOf(
     }
     const items = planOf(rule, rules, conflicts, open);
     if (items.length > 0) {
-      return { learned: entry, items };
+      offers.push({ learned: entry, items });
     }
   }
-  return null;
+  return offers;
+}
+
+/** The learned preference to offer first, if any (see {@link offersOf}). */
+export function offerOf(
+  learned: readonly Learned[],
+  kept: PatchPreferences,
+  rules: readonly Rule[],
+  conflicts: readonly Conflict[],
+  open: OpenCheck,
+): Offer | null {
+  return offersOf(learned, kept, rules, conflicts, open)[0] ?? null;
 }
 
 /**

@@ -1,21 +1,52 @@
-/* Preferences between mods (ADR 0086): the offer in a corner, the mark on
-   a conflict, the preview and the settings section. */
+/* Preferences between mods (ADR 0086): the mallet in a corner and the
+   panel it opens, the mark on a conflict, the preview and the settings
+   section. */
 
-.preference-offer {
+/* The corner: the panel above, the mallet below it, at the right. */
+.preference-corner {
   position: fixed;
   right: var(--space-4);
   bottom: var(--space-4);
   z-index: 60;
-  width: min(420px, calc(100vw - 2 * var(--space-4)));
-  max-height: calc(100vh - 2 * var(--space-5));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.preference-corner > * {
+  pointer-events: auto;
+}
+
+.preference-offer {
+  width: min(400px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100vh - 2 * var(--space-5) - 56px);
   overflow: auto;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--brand);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  transform-origin: calc(100% - 26px) 100%;
+  animation: preference-rise 180ms ease-out;
+}
+
+.preference-offer:focus {
+  outline: none;
+}
+
+.preference-offer:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@keyframes preference-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
 }
 
 .preference-offer p {
@@ -23,24 +54,224 @@
 }
 
 .preference-offer > .note {
-  margin: 0;
+  margin: var(--space-1) 0 0;
 }
 
 .preference-offer-head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
-.preference-offer-head strong {
+.preference-offer-spacer {
   flex: 1;
+}
+
+.preference-offer-mod {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
 }
 
 .preference-offer-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.preference-icon-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 var(--space-1);
+  line-height: 1;
+}
+
+.preference-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.preference-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.preference-pager .preference-icon-button {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.preference-menu {
+  position: relative;
+}
+
+.preference-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 1;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+
+/* The mallet: the logo's hammer on a small round button, a badge with
+   how many favourites wait, and now and then a move. */
+.preference-mascot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.preference-mascot[data-open] {
+  border-color: var(--brand);
+}
+
+.preference-mascot-hammer {
+  width: 38px;
+  height: 38px;
+  overflow: visible;
+  transform-origin: 30% 75%;
+  transition: transform 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preference-mascot-hammer {
+    transition: none;
+  }
+}
+
+.preference-mascot:hover .preference-mascot-hammer,
+.preference-mascot:focus-visible .preference-mascot-hammer {
+  transform: rotate(-10deg);
+}
+
+.preference-mascot-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid var(--surface);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* Thrown up, a spin, caught. */
+.preference-mascot[data-move="toss"] .preference-mascot-hammer {
+  transform-origin: 50% 50%;
+  animation: mascot-toss 1.1s ease-in-out;
+}
+
+@keyframes mascot-toss {
+  12% {
+    transform: translateY(2px) scale(1.06, 0.9);
+  }
+  45% {
+    transform: translateY(-30px) rotate(-200deg);
+  }
+  72% {
+    transform: translateY(0) rotate(-360deg);
+  }
+  82% {
+    transform: translateY(2px) rotate(-360deg) scale(1.06, 0.92);
+  }
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+/* Thrown down a little, up again. */
+.preference-mascot[data-move="bounce"] .preference-mascot-hammer {
+  transform-origin: 50% 90%;
+  animation: mascot-bounce 0.9s ease-in-out;
+}
+
+@keyframes mascot-bounce {
+  20% {
+    transform: translateY(3px) scale(1.1, 0.84);
+  }
+  45% {
+    transform: translateY(-12px) rotate(10deg);
+  }
+  68% {
+    transform: translateY(0) scale(0.95, 1.05);
+  }
+  84% {
+    transform: translateY(1px) scale(1.03, 0.97);
+  }
+}
+
+/* A tap to the left, and one to the right, from the end of the handle. */
+.preference-mascot[data-move="tap-left"] .preference-mascot-hammer {
+  animation: mascot-tap-left 0.9s ease-in-out;
+}
+
+.preference-mascot[data-move="tap-right"] .preference-mascot-hammer {
+  animation: mascot-tap-right 0.9s ease-in-out;
+}
+
+@keyframes mascot-tap-left {
+  22% {
+    transform: rotate(-26deg);
+  }
+  38% {
+    transform: rotate(4deg);
+  }
+  58% {
+    transform: rotate(-18deg);
+  }
+  74% {
+    transform: rotate(2deg);
+  }
+}
+
+@keyframes mascot-tap-right {
+  22% {
+    transform: rotate(16deg);
+  }
+  36% {
+    transform: rotate(-3deg);
+  }
+  56% {
+    transform: rotate(12deg);
+  }
+  72% {
+    transform: rotate(-1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preference-offer,
+  .preference-mascot[data-move] .preference-mascot-hammer {
+    animation: none;
+  }
 }
 
 .preference-mark {

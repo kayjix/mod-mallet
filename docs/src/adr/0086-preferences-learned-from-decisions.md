@@ -63,20 +63,29 @@ several preferences speak, a pair goes before a favourite and one the user
 set before one learned; where equally strong ones pull both ways, none
 decides.
 
-**Offer.** When a learned preference has open conflicts it would decide,
-the window shows it once in a small card in a corner: what it is, how
-often the user kept the mod, and how many open conflicts it would decide.
-Preview lists each with the way to it (the duel on the assets page, the
-spot in Map collisions). Apply decides them into the patch being edited
+**Offer.** While learned preferences have open conflicts they would
+decide, a small mallet waits in a corner of the window, the hammer of the
+logo, with how many on a badge: Mal the Rubber Mallet, as the user named
+it, the name it goes by where it speaks. About once a minute it makes a short move
+(tossed and caught, a bounce, a tap to either side), never while the user
+holds a button, types or scrolls, and not for those who asked their
+system for less motion; it says nothing until clicked. Clicked, a panel
+slides up from it with one preference at a time (a pager where there are
+several): the mod, the topic, how often the user kept it, and Apply to
+the open conflicts it would decide; what Apply does in full sits behind
+an ⓘ and in the settings. Show list lists each with the way to it (the
+duel on the assets page, the spot in Map collisions). Apply decides them into the patch being edited
 (ADR 0070): each spot with the mod given up, which hides only the parts
 that may go, as every spot decision does; a spot where characters walk
 on what would go stays open (ADR 0051). A duel is picked as by hand
 (ADR 0054), which asks the mod manager to let the files of the kept mod
 win; when the mod manager cannot be reached, the duels stop there, as the
 ranking's do. One undo takes the batch back in Mod Mallet; what the mod
-manager was asked stays there, and the note says so. Not now asks again
-once 5 more of the user's own decisions speak for it; Never stops it, as
-an offer and as a suggestion.
+manager was asked stays there, and the note says so. Closing the panel
+puts it back into the mallet. "Don't suggest this again", in a small menu
+of the panel, stops a preference, as an offer and as a suggestion. (An
+earlier "Not now", which asked again once 5 more of the user's own
+decisions spoke for it, is still honoured where it was given.)
 
 **What is kept.** Per game in the settings, as `preferences`
 (`PatchPreferences`): learning on or off, the preferences the user set,
@@ -110,6 +119,11 @@ to apply to its open conflicts, and the preferences the user sets.
   on it does not collide.
 
 ## Alternatives considered
+
+- **A card that stays in the corner until answered.** The first version
+  did so, with Preview, Apply, Not now and Never; the user found a card
+  that waits there all the time annoying. The mallet keeps the count in
+  sight and talks only when asked.
 
 - **Learning per plugin instead of per mod.** The spots know plugins, the
   duels mods; a mod with several plugins would split its evidence, and the

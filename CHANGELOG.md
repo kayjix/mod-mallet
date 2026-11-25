@@ -20,9 +20,10 @@ in [Releases](docs/src/contributing/releases.md).
   that characters reach the kept door and walk through it.
 - Mod Mallet notices when you keep choosing the same mod: for meshes,
   textures, faces, other files or buildings, or one mod over another. A
-  small card says so ("you kept it 14 of 15 times") and offers to prefer
-  it in the conflicts still open, with a preview of each and one undo for
-  the whole batch. Where a preference covers a conflict, the collisions,
+  small rubber mallet in the corner, Mal, counts the favourites waiting and
+  now and then hops about; click Mal, and a panel says what it found ("you kept it
+  14 of 15 times") and offers to prefer it in the conflicts still open,
+  with a list of each and one undo for the whole batch. Where a preference covers a conflict, the collisions,
   the guided review and the asset collisions mark it "suggested: your
   preference". Settings → Preferences lists what was learned, lets you set
   your own preferences, and switches learning off. Decisions that only

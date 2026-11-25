@@ -57,8 +57,8 @@ function reducedMotion(): boolean {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
-/** The hammer of the logo, in the logo's coordinates. */
-function Hammer({ clip }: { clip: string }) {
+/** The hammer of the logo, in the logo's coordinates; `clip` names a clip path of its head. */
+export function Hammer({ clip }: { clip: string }) {
   return (
     <g transform="translate(307.2 204.8) scale(0.9341) rotate(45)">
       <path fill="#2EC4B6" d="M -17,80 L 17,80 L 24.99,321.17 A 25 25 0 1 1 -24.99,321.17 Z" />

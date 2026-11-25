@@ -27,7 +27,7 @@ import {
   namesOf,
   type Offer,
   type OpenCheck,
-  offerOf,
+  offersOf,
   type PlanItem,
   type PreferenceWorld,
   type Preferred,
@@ -62,8 +62,8 @@ export interface Preferences {
   kept: PatchPreferences;
   learned: Learned[];
   rules: Rule[];
-  /** The preference worth offering now, if any. */
-  offer: Offer | null;
+  /** The preferences worth offering now, strongest first. */
+  offers: Offer[];
   /** What preferences say about a duel, by its identity. */
   forDuel: (id: string) => Preferred | null;
   /** What preferences say about a spot; the plugin kept, if any. */
@@ -204,8 +204,8 @@ export function PreferencesHost({ report }: { report: RenderedReport | null }) {
     }),
     [decided],
   );
-  const offer = useMemo(
-    () => offerOf(learned, kept, rules, conflicts, open),
+  const offers = useMemo(
+    () => offersOf(learned, kept, rules, conflicts, open),
     [learned, kept, rules, conflicts, open],
   );
 
@@ -334,7 +334,7 @@ export function PreferencesHost({ report }: { report: RenderedReport | null }) {
       kept,
       learned,
       rules,
-      offer,
+      offers,
       forDuel: (id) => preferred(byId.get(id)),
       forSpot: (spot) => {
         const key = spotKey(spot);
@@ -382,7 +382,7 @@ export function PreferencesHost({ report }: { report: RenderedReport | null }) {
       kept,
       learned,
       rules,
-      offer,
+      offers,
       preferred,
       byId,
       conflicts,

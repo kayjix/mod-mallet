@@ -17,20 +17,28 @@ export interface PreferenceTexts {
   /** How often it was kept. */
   kept: (chosen: number, of: number) => string;
   followed: (count: number) => string;
+  /** The mallet in the corner, with how many favourites wait. */
+  mascot: (count: number) => string;
   /** The offer. */
   offerTitle: string;
-  offerFavourite: (mod: string, topic: string, chosen: number, of: number) => string;
-  offerPair: (mod: string, over: string, chosen: number, of: number) => string;
-  offerQuestion: (mod: string, topic: PreferenceTopic, count: number) => string;
-  offerPairQuestion: (mod: string, count: number) => string;
-  preview: string;
-  hidePreview: string;
+  keptSentence: (chosen: number, of: number) => string;
+  overChip: (over: string) => string;
+  offerWhat: (mod: string, topic: PreferenceTopic, count: number) => string;
+  offerPairWhat: (mod: string, count: number) => string;
+  pager: (index: number, count: number) => string;
+  previous: string;
+  next: string;
+  showList: string;
+  hideList: string;
   apply: (count: number) => string;
-  notNow: string;
+  more: string;
   never: string;
+  minimise: string;
   close: string;
   managerNote: (mod: string) => string;
-  previewHint: string;
+  keepHint: string;
+  /** The whole of applying, for the settings. */
+  applyNote: string;
   open: string;
   duelRow: (winner: string, loser: string) => string;
   spotRow: (loser: string, objects: string) => string;
@@ -98,28 +106,35 @@ const en: PreferenceTexts = {
   always: (mod) => `${mod}, for everything`,
   kept: (chosen, of) => `you kept it ${chosen} of ${of} times`,
   followed: (count) => `and ${count} more times by taking a suggestion`,
-  offerTitle: "Your favourite?",
-  offerFavourite: (mod, topic, chosen, of) =>
-    `${mod} seems to be your favourite for ${topic}: you kept it ${chosen} of ${of} times.`,
-  offerPair: (mod, over, chosen, of) => `You keep ${mod} over ${over}: ${chosen} of ${of} times.`,
-  offerQuestion: (mod, topic, count) =>
+  mascot: (count) =>
+    `Mal the Rubber Mallet — ${count === 1 ? "1 favourite" : `${count} favourites`}`,
+  offerTitle: "Mal noticed a favourite",
+  keptSentence: (chosen, of) => `You kept it ${chosen} of ${of} times.`,
+  overChip: (over) => `over ${over}`,
+  offerWhat: (mod, topic, count) =>
     count === 1
-      ? `Prefer ${mod} in the 1 other open ${enTopicConflicts[topic][0]}?`
-      : `Prefer ${mod} in the ${count} other open ${enTopicConflicts[topic][1]}?`,
-  offerPairQuestion: (mod, count) =>
+      ? `Apply prefers ${mod} in the 1 other open ${enTopicConflicts[topic][0]}, in the patch you are editing.`
+      : `Apply prefers ${mod} in the ${count} other open ${enTopicConflicts[topic][1]}, in the patch you are editing.`,
+  offerPairWhat: (mod, count) =>
     count === 1
-      ? `Prefer ${mod} in the 1 other place where the two are in conflict?`
-      : `Prefer ${mod} in the ${count} other places where the two are in conflict?`,
-  preview: "Preview",
-  hidePreview: "Hide preview",
+      ? `Apply prefers ${mod} in the 1 other place where the two are in conflict, in the patch you are editing.`
+      : `Apply prefers ${mod} in the ${count} other places where the two are in conflict, in the patch you are editing.`,
+  pager: (index, count) => `${index} of ${count}`,
+  previous: "Previous favourite",
+  next: "Next favourite",
+  showList: "Show list",
+  hideList: "Hide list",
   apply: (count) => `Apply to ${count}`,
-  notNow: "Not now",
-  never: "Never",
+  more: "More",
+  never: "Don't suggest this again",
+  minimise: "Minimise",
   close: "Close",
   managerNote: (mod) =>
     `For conflicts about files, the mod manager is asked to let ${mod}'s files win, as when you pick by hand.`,
-  previewHint:
-    "This is what would be decided, into the patch you are editing. Parts the game needs stay, and places where characters walk on what would go are left for you.",
+  keepHint:
+    "Parts the game needs stay, and places where characters walk on what would go are left for you. One undo takes it all back.",
+  applyNote:
+    "When a preference is clear, Mal the Rubber Mallet, small in the corner of the window, counts how many wait; click Mal to see them. Applying one decides its open conflicts in the patch you are editing. Parts the game needs stay, and places where characters walk on what would go are left for you. For conflicts about files, the mod manager is asked to let the kept mod's files win, as when you pick by hand. One undo takes the decisions back in Mod Mallet.",
   open: "Open",
   duelRow: (winner, loser) => `${winner} wins over ${loser}`,
   spotRow: (loser, objects) => `${objects}: the part of ${loser} goes`,
@@ -197,28 +212,34 @@ const de: PreferenceTexts = {
   always: (mod) => `${mod}, für alles`,
   kept: (chosen, of) => `${chosen} von ${of} Mal behalten`,
   followed: (count) => `und ${count}-mal mehr durch einen übernommenen Vorschlag`,
-  offerTitle: "Dein Favorit?",
-  offerFavourite: (mod, topic, chosen, of) =>
-    `${mod} scheint dein Favorit für ${topic} zu sein: Du hast es ${chosen} von ${of} Mal behalten.`,
-  offerPair: (mod, over, chosen, of) => `Du behältst ${mod} vor ${over}: ${chosen} von ${of} Mal.`,
-  offerQuestion: (mod, topic, count) =>
+  mascot: (count) => `Mal, der Gummihammer – ${count === 1 ? "1 Favorit" : `${count} Favoriten`}`,
+  offerTitle: "Mal hat einen Favoriten bemerkt",
+  keptSentence: (chosen, of) => `Du hast sie bei ${chosen} von ${of} Entscheidungen behalten.`,
+  overChip: (over) => `vor ${over}`,
+  offerWhat: (mod, topic, count) =>
     count === 1
-      ? `${mod} auch im letzten offenen Fall bevorzugen (${deTopicConflicts[topic][0]})?`
-      : `${mod} auch in den ${count} weiteren offenen ${deTopicConflicts[topic][1]} bevorzugen?`,
-  offerPairQuestion: (mod, count) =>
+      ? `Anwenden bevorzugt ${mod} auch im letzten offenen Fall (${deTopicConflicts[topic][0]}), im Patch, den du gerade bearbeitest.`
+      : `Anwenden bevorzugt ${mod} auch in den ${count} weiteren offenen ${deTopicConflicts[topic][1]}, im Patch, den du gerade bearbeitest.`,
+  offerPairWhat: (mod, count) =>
     count === 1
-      ? `${mod} auch an der 1 weiteren Stelle bevorzugen, an der sich die beiden in die Quere kommen?`
-      : `${mod} auch an den ${count} weiteren Stellen bevorzugen, an denen sich die beiden in die Quere kommen?`,
-  preview: "Vorschau",
-  hidePreview: "Vorschau schließen",
+      ? `Anwenden bevorzugt ${mod} auch an der 1 weiteren Stelle, an der sich die beiden in die Quere kommen, im Patch, den du gerade bearbeitest.`
+      : `Anwenden bevorzugt ${mod} auch an den ${count} weiteren Stellen, an denen sich die beiden in die Quere kommen, im Patch, den du gerade bearbeitest.`,
+  pager: (index, count) => `${index} von ${count}`,
+  previous: "Voriger Favorit",
+  next: "Nächster Favorit",
+  showList: "Aufklappen",
+  hideList: "Zuklappen",
   apply: (count) => `Auf ${count} anwenden`,
-  notNow: "Nicht jetzt",
-  never: "Nie",
+  more: "Mehr",
+  never: "Nicht mehr vorschlagen",
+  minimise: "Minimieren",
   close: "Schließen",
   managerNote: (mod) =>
     `Bei Konflikten um Dateien wird der Mod-Manager gebeten, die Dateien von ${mod} gewinnen zu lassen – wie bei einer Wahl von Hand.`,
-  previewHint:
-    "Das würde entschieden, in den Patch, den du gerade bearbeitest. Teile, die das Spiel braucht, bleiben; Stellen, an denen Figuren über das laufen, was wegkäme, bleiben für dich offen.",
+  keepHint:
+    "Teile, die das Spiel braucht, bleiben; Stellen, an denen Figuren über das laufen, was wegkäme, bleiben für dich offen. Ein Rückgängig nimmt alles zurück.",
+  applyNote:
+    "Ist eine Vorliebe eindeutig, zählt Mal, der Gummihammer, klein in der Ecke des Fensters, wie viele warten; klick Mal an, um sie zu sehen. Anwenden entscheidet ihre offenen Konflikte im Patch, den du gerade bearbeitest. Teile, die das Spiel braucht, bleiben; Stellen, an denen Figuren über das laufen, was wegkäme, bleiben für dich offen. Bei Konflikten um Dateien wird der Mod-Manager gebeten, die Dateien der behaltenen Mod gewinnen zu lassen – wie bei einer Wahl von Hand. Ein Rückgängig nimmt die Entscheidungen in Mod Mallet zurück.",
   open: "Öffnen",
   duelRow: (winner, loser) => `${winner} gewinnt gegen ${loser}`,
   spotRow: (loser, objects) => `${objects}: der Teil von ${loser} kommt weg`,
