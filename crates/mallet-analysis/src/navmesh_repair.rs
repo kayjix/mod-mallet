@@ -37,6 +37,7 @@ use mallet_core::facts::objects::Place;
 use mallet_core::grid::cell_of;
 
 use crate::contact::Point;
+use crate::geometry::mesh_vertex as vertex;
 use crate::tin::{Tin, orient};
 use crate::walkways::{Carried, Ground, Hidden, RAISED, Surface};
 
@@ -942,12 +943,6 @@ fn midpoint(a: Point, b: Point) -> Point {
         f64::midpoint(a[1], b[1]),
         f64::midpoint(a[2], b[2]),
     ]
-}
-
-/// A vertex of a mesh.
-fn vertex(shape: &NavmeshShape, index: u32) -> Option<Point> {
-    let [x, y, z] = *shape.vertices.get(usize::try_from(index).ok()?)?;
-    Some([f64::from(x), f64::from(y), f64::from(z)])
 }
 
 /// The outside cell a mesh lies in: that of the middle of the box around

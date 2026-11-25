@@ -24,6 +24,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::{Beyond, NavmeshShape, PlacedDestination};
 use mallet_core::facts::objects::Place;
 
+use crate::geometry::{mesh_corners, triangle_middle};
 use crate::walkways::Carried;
 
 /// How far a destination may stand from the triangle it is reached on, in
@@ -490,20 +491,9 @@ impl<'a> Graph<'a> {
         for shape in order {
             first.insert(&shape.id, (nodes.len(), shape));
             for (number, triangle) in (0u32..).zip(&shape.triangles) {
-                let corner = |index: u32| -> Option<[f64; 3]> {
-                    let [x, y, z] = *shape.vertices.get(usize::try_from(index).ok()?)?;
-                    Some([f64::from(x), f64::from(y), f64::from(z)])
-                };
-                let corners = match (
-                    corner(triangle[0]),
-                    corner(triangle[1]),
-                    corner(triangle[2]),
-                ) {
-                    (Some(a), Some(b), Some(c)) => [a, b, c],
-                    // A triangle with a corner the mesh lacks: nobody
-                    // stands on it, but it keeps its number.
-                    _ => [[f64::NAN; 3]; 3],
-                };
+                // A triangle with a corner the mesh lacks: nobody stands
+                // on it, but it keeps its number.
+                let corners = mesh_corners(shape, *triangle).unwrap_or([[f64::NAN; 3]; 3]);
                 nodes.push((shape, number, corners));
             }
         }
@@ -615,12 +605,8 @@ impl<'a> Graph<'a> {
     }
 
     fn middle(&self, node: usize) -> Option<[f64; 3]> {
-        let (_, _, [a, b, c]) = self.nodes.get(node)?;
-        let middle = [
-            (a[0] + b[0] + c[0]) / 3.0,
-            (a[1] + b[1] + c[1]) / 3.0,
-            (a[2] + b[2] + c[2]) / 3.0,
-        ];
+        let (_, _, corners) = self.nodes.get(node)?;
+        let middle = triangle_middle(corners);
         middle
             .iter()
             .all(|value| value.is_finite())
@@ -856,20 +842,7 @@ fn position(destination: &PlacedDestination) -> [f64; 3] {
 
 fn middle_of(shape: &NavmeshShape, index: usize) -> Option<[f64; 3]> {
     let triangle = shape.triangles.get(index)?;
-    let corner = |vertex: u32| -> Option<[f64; 3]> {
-        let [x, y, z] = *shape.vertices.get(usize::try_from(vertex).ok()?)?;
-        Some([f64::from(x), f64::from(y), f64::from(z)])
-    };
-    let [a, b, c] = [
-        corner(triangle[0])?,
-        corner(triangle[1])?,
-        corner(triangle[2])?,
-    ];
-    Some([
-        (a[0] + b[0] + c[0]) / 3.0,
-        (a[1] + b[1] + c[1]) / 3.0,
-        (a[2] + b[2] + c[2]) / 3.0,
-    ])
+    Some(triangle_middle(&mesh_corners(shape, *triangle)?))
 }
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
@@ -883,17 +856,10 @@ fn flat_distance(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// How far `at` lies from a triangle: straight above or below it where it
 /// lies over it seen from above, else from its nearest edge.
 fn triangle_distance(corners: &[[f64; 3]; 3], at: [f64; 3]) -> f64 {
-    let [a, b, c] = *corners;
-    let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
-    if det.abs() > 1e-9 {
-        let first = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
-        let second = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
-        let third = 1.0 - first - second;
-        if first >= 0.0 && second >= 0.0 && third >= 0.0 {
-            let height = first * a[2] + second * b[2] + third * c[2];
-            return (at[2] - height).abs();
-        }
+    if let Some(height) = height_over(corners, at) {
+        return (at[2] - height).abs();
     }
+    let [a, b, c] = *corners;
     [(a, b), (b, c), (c, a)]
         .into_iter()
         .map(|(from, to)| segment_distance(from, to, at))
@@ -908,19 +874,29 @@ fn nearest_on_triangle(corners: &[[f64; 3]; 3], at: [f64; 3]) -> Option<[f64; 3]
     if corners.iter().flatten().any(|value| !value.is_finite()) {
         return None;
     }
-    let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
-    if det.abs() > 1e-9 {
-        let first = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
-        let second = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
-        let third = 1.0 - first - second;
-        if first >= 0.0 && second >= 0.0 && third >= 0.0 {
-            return Some([at[0], at[1], first * a[2] + second * b[2] + third * c[2]]);
-        }
+    if let Some(height) = height_over(corners, at) {
+        return Some([at[0], at[1], height]);
     }
     [(a, b), (b, c), (c, a)]
         .into_iter()
         .map(|(from, to)| segment_point(from, to, at))
         .min_by(|p, q| distance(*p, at).total_cmp(&distance(*q, at)))
+}
+
+/// The height of a triangle straight above or below `at`, where `at` lies
+/// over the triangle seen from above; `None` elsewhere, and for a
+/// triangle that is a line seen from above.
+fn height_over(corners: &[[f64; 3]; 3], at: [f64; 3]) -> Option<f64> {
+    let [a, b, c] = *corners;
+    let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+    if det.abs() <= 1e-9 {
+        return None;
+    }
+    let first = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
+    let second = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
+    let third = 1.0 - first - second;
+    (first >= 0.0 && second >= 0.0 && third >= 0.0)
+        .then(|| first * a[2] + second * b[2] + third * c[2])
 }
 
 /// The point of the segment from `from` to `to` nearest to `at`.
@@ -944,25 +920,7 @@ fn segment_point(from: [f64; 3], to: [f64; 3], at: [f64; 3]) -> [f64; 3] {
 }
 
 fn segment_distance(from: [f64; 3], to: [f64; 3], at: [f64; 3]) -> f64 {
-    let along = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
-    let length = along[0] * along[0] + along[1] * along[1] + along[2] * along[2];
-    let share = if length > 0.0 {
-        (((at[0] - from[0]) * along[0]
-            + (at[1] - from[1]) * along[1]
-            + (at[2] - from[2]) * along[2])
-            / length)
-            .clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    distance(
-        [
-            from[0] + along[0] * share,
-            from[1] + along[1] * share,
-            from[2] + along[2] * share,
-        ],
-        at,
-    )
+    distance(segment_point(from, to, at), at)
 }
 
 #[cfg(test)]

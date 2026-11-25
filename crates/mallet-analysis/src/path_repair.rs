@@ -24,6 +24,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::{Beyond, NavmeshShape, NearHidden};
 
 use crate::contact::Point;
+use crate::geometry::{mesh_corners, triangle_middle};
 use crate::walkways::Carried;
 
 /// The smallest part, in square game units, that counts as cut off when
@@ -358,16 +359,11 @@ impl Part {
 
 /// The area and the middle of a triangle of `shape`.
 fn measure(shape: &NavmeshShape, triangle: u32) -> Option<(f64, Point)> {
-    let corners = shape.triangles.get(usize::try_from(triangle).ok()?)?;
-    let corner = |index: u32| -> Option<Point> {
-        let [x, y, z] = *shape.vertices.get(usize::try_from(index).ok()?)?;
-        Some([f64::from(x), f64::from(y), f64::from(z)])
-    };
-    let [a, b, c] = [
-        corner(corners[0])?,
-        corner(corners[1])?,
-        corner(corners[2])?,
-    ];
+    let corners = mesh_corners(
+        shape,
+        *shape.triangles.get(usize::try_from(triangle).ok()?)?,
+    )?;
+    let [a, b, c] = corners;
     let (along, across) = (
         [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
         [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
@@ -378,11 +374,7 @@ fn measure(shape: &NavmeshShape, triangle: u32) -> Option<(f64, Point)> {
         along[0] * across[1] - along[1] * across[0],
     ];
     let area = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt() / 2.0;
-    let middle = [
-        (a[0] + b[0] + c[0]) / 3.0,
-        (a[1] + b[1] + c[1]) / 3.0,
-        (a[2] + b[2] + c[2]) / 3.0,
-    ];
+    let middle = triangle_middle(&corners);
     Some((area, middle))
 }
 

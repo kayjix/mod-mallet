@@ -25,6 +25,7 @@ use mallet_core::grid::{CELL_SIDE, cell_of};
 use mallet_core::{Facts, Finding, GamePath, Party, Subject, kinds};
 
 use crate::contact::Point;
+use crate::geometry::{mesh_corners, triangle_middle};
 use crate::objects::placed_points;
 use crate::{Analysis, Context, examples, reachability};
 
@@ -465,23 +466,10 @@ impl Surface {
     /// numbers. `ground` gives the height of the land at a point outside,
     /// if known.
     fn carried(&self, shape: &NavmeshShape, ground: impl Fn(f64, f64) -> Option<f64>) -> Vec<u32> {
-        let vertex = |index: u32| -> Option<Point> {
-            let [x, y, z] = *shape.vertices.get(usize::try_from(index).ok()?)?;
-            Some([f64::from(x), f64::from(y), f64::from(z)])
-        };
         (0u32..)
             .zip(&shape.triangles)
             .filter_map(|(number, triangle)| {
-                let [a, b, c] = [
-                    vertex(triangle[0])?,
-                    vertex(triangle[1])?,
-                    vertex(triangle[2])?,
-                ];
-                let middle = [
-                    (a[0] + b[0] + c[0]) / 3.0,
-                    (a[1] + b[1] + c[1]) / 3.0,
-                    (a[2] + b[2] + c[2]) / 3.0,
-                ];
+                let middle = triangle_middle(&mesh_corners(shape, *triangle)?);
                 self.carries(middle, &ground).then_some(number)
             })
             .collect()

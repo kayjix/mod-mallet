@@ -29,6 +29,7 @@ pub mod extender;
 pub mod faces;
 pub mod foreign_meshes;
 pub mod generated;
+mod geometry;
 pub mod installer;
 pub mod knowledge;
 pub mod map;
