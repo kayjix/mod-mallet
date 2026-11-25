@@ -19,7 +19,7 @@ import { useReviewTexts } from "./review-texts";
 import { findSegments, type StageSegment } from "./segments";
 import { Note, NoteRow } from "./spot-notes";
 import "./passage-view.css";
-import { UndoButton } from "./ui/kit";
+import { Note as NoteBox, UndoButton } from "./ui/kit";
 
 /** What the view shows of a passage: the place now, or one side's version only. */
 export type PassageVersion = "now" | 0 | 1;
@@ -266,27 +266,35 @@ export function PassageHead({
         </span>
       </div>
       {pending && (
-        <p className="passage-done" role="status">
-          {p.deciding}
-        </p>
+        <NoteBox tone="neutral" role="status" compact>
+          <p>{p.deciding}</p>
+        </NoteBox>
       )}
       {!pending && outcome !== null && (
-        <p className="passage-done" role="status">
-          <span>
+        <NoteBox
+          tone="ok"
+          role="status"
+          compact
+          actions={
+            <>
+              {outcome.side !== null && outcome.byHand.length > 0 && (
+                <button type="button" className="small" onClick={onHideAgain}>
+                  {p.hideAgain}
+                </button>
+              )}
+              <UndoButton onClick={onUndo} />
+            </>
+          }
+        >
+          <p>
             {outcome.side === null
               ? p.keptBoth
               : p.keptDone(names[outcome.side], outcome.hidden, names[outcome.side === 0 ? 1 : 0])}
-          </span>
-          {outcome.side !== null && outcome.byHand.length > 0 && (
-            <span>
-              {p.byHand(outcome.byHand.length, names[outcome.side])}{" "}
-              <button type="button" className="small quiet" onClick={onHideAgain}>
-                {p.hideAgain}
-              </button>
-            </span>
-          )}
-          <UndoButton onClick={onUndo} />
-        </p>
+            {outcome.side !== null &&
+              outcome.byHand.length > 0 &&
+              ` ${p.byHand(outcome.byHand.length, names[outcome.side])}`}
+          </p>
+        </NoteBox>
       )}
       <details className="passage-sections">
         <summary>{segments === null ? p.measuring : p.sections(segments.length)}</summary>

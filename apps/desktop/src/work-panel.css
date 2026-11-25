@@ -87,16 +87,7 @@
 }
 
 .work-pair-note {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
   font-size: 0.85rem;
-}
-
-.work-pair-note[data-many] {
-  padding: 6px 8px;
-  border-radius: var(--radius-small);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
 .work-around {

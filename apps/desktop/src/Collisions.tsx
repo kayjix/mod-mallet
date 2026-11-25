@@ -1989,8 +1989,16 @@ function Spot(props: SpotProps & SpotFrameProps) {
                     </NoteBox>
                   )}
                   {first !== undefined && second !== undefined && pairSpots > 1 && (
-                    <div className="work-pair-note" data-many={pairSpots >= MANY || undefined}>
-                      <span>
+                    <NoteBox
+                      tone={pairSpots >= MANY ? "warning" : "info"}
+                      className="work-pair-note"
+                      actions={
+                        <button type="button" className="small" onClick={props.onOpenPair}>
+                          {own.openThePair}
+                        </button>
+                      }
+                    >
+                      <p>
                         {pairSpots >= MANY
                           ? t.workPairMany(first.plugin, second.plugin, pairSpots)
                           : own.pairSpots(
@@ -1998,11 +2006,8 @@ function Spot(props: SpotProps & SpotFrameProps) {
                               shortName(second.plugin),
                               pairSpots,
                             )}
-                      </span>
-                      <button type="button" className="small" onClick={props.onOpenPair}>
-                        {own.openThePair}
-                      </button>
-                    </div>
+                      </p>
+                    </NoteBox>
                   )}
                 </div>
                 {rightSides.length > 0 && (
@@ -2463,8 +2468,13 @@ function PairPanel({
   const files = duel?.duel.topics.some(
     (topic) => topic.topic !== "objects" && topic.topic !== "contained",
   );
+  // Opened below the panel, it comes into sight.
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panel.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   return (
-    <section className="work-pair-row" aria-label={own.openThePair}>
+    <section className="work-pair-row" aria-label={own.openThePair} ref={panel}>
       <div className="work-pair-head">
         <strong>{sides.map((side) => side.plugin).join(" × ")}</strong>
         <PairVerdict findings={findings} spots={spots} decision={decision} duels={duels} />

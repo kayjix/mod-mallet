@@ -3,9 +3,9 @@
 // the place they are nearest and summed up, to be decided as a whole.
 
 import type { MapPassage, RenderedReport } from "./generated/rendered-report";
-import { InfoTip } from "./info-tip";
 import { nearest } from "./map-places";
 import { usePassageTexts } from "./passage-texts";
+import { Note } from "./ui/kit";
 import "./passages.css";
 
 /** A plugin's name without its extension, to name a side. */
@@ -34,9 +34,10 @@ export function usePassageTitle(): (
 }
 
 /**
- * What a passage is about, in one line: what and where, its sides, its
- * twins and how far they stand in each other; why one has to go behind
- * its ⓘ, the pictures beside it show the rest (ADR 0080).
+ * What a passage is about, as a note of one line that opens (ADR 0077):
+ * what and where and its sides; opened, its twins, how far they stand in
+ * each other and why one has to go. The pictures beside it show the rest
+ * (ADR 0080).
  */
 export function PassageSummary({
   passage,
@@ -59,11 +60,27 @@ export function PassageSummary({
         p.inside(names[side], percent(passage.inside[side]), names[side === 0 ? 1 : 0]),
       ),
   ];
+  const tone =
+    passage.severity === "doubled"
+      ? "danger"
+      : passage.severity === "inside"
+        ? "warning"
+        : "neutral";
   return (
-    <div className="passage-summary" data-severity={passage.severity}>
-      <strong className="passage-title">{title(passage, worlds)}</strong>
-      <span className="aside">{facts.join(" · ")}</span>
-      <InfoTip text={`${p.why[passage.severity]} ${p.bounded}`} />
-    </div>
+    <Note
+      tone={tone}
+      className="passage-summary"
+      summary={
+        <>
+          <strong className="passage-title">{title(passage, worlds)}</strong>
+          <span className="aside"> · {facts[0]}</span>
+        </>
+      }
+    >
+      <p>{facts.slice(1).join(" · ")}</p>
+      <p className="aside">
+        {p.why[passage.severity]} {p.bounded}
+      </p>
+    </Note>
   );
 }
