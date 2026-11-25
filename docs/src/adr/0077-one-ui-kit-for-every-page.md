@@ -98,3 +98,41 @@ own pieces.
   height.
 - **Flat cards without a shadow.** They are calmer still, but the user
   preferred the cards to stand off the background a little.
+
+## Amendment 2026-11-25: switches, sorting and notes that open
+
+Working with the kit, the user found that the checkboxes looked dated,
+that search, grouping and sorting took three rows above the list, and
+that the magic wand's slider was wide and plain. The kit gains these
+pieces, and the rules grow by these points:
+
+10. **A switch is a `ToggleChip`, not a checkbox.** Its colour, its name
+    and its count sit in one chip. When on, the chip is filled and its
+    ring holds a tick. When off, the ring is empty and the words are muted.
+    This covers the kinds of collision, the worklist's switches and every
+    switch in the bar of the 3D views.
+11. **Sorting sits at the end of the search, as `SearchSort`.** It is one
+    button that steps through the orders. Its bars and arrow show which way
+    the list runs; its tooltip says which order it is. Grouping stays a
+    small `Segmented`.
+12. **A tool with levels is a `LevelToggle`.** A click on its name turns it
+    on and off; turning it on again goes back to the level it had. A pip
+    for each level sets that level. The pips are filled up to the level,
+    and each one says in its tooltip what its level does. The magic wand is
+    the first such tool.
+13. **A note that would stand as a thick block is a `Note` with a
+    `summary`.** It is one line with its tone's sign, and it opens to the
+    rest. A passage's summary is the first such note.
+14. **A button that is a switch shows when it is on.** If it has no look of
+    its own, it gets a frame and a tint. That rule is the weakest in the
+    window, so a page's own style always wins.
+
+Map collisions lost its Mod against mod tab, which the passages had made
+redundant:
+
+- A pair of mods is now decided as a whole below the spot's panel. "Decide
+  this pair as a whole" opens it there.
+- A pair handed over from another page opens there too, with its worst
+  spot.
+- Taking every suggestion moved to the page's head.
+- The collisions that name no spot fold below the worklist.
