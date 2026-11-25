@@ -1,6 +1,7 @@
 // Many findings for the sample, shown with `?many` in the address: made-up
 // mods in the numbers a large real setup has, so that the task page can be
-// looked at full: dozens of doors cut off, textures that do not reach
+// looked at full: dozens of doors cut off, walkways the patch hides,
+// notes about paths undone, textures that do not reach
 // replaced meshes, missing textures that are only a guess. Every name is
 // made up.
 
@@ -68,7 +69,7 @@ function finding(
 export function manyFindings(lang: Lang): RenderedFinding[] {
   const de = lang === "de";
   const found: RenderedFinding[] = [];
-  for (let index = 0; index < 26; index++) {
+  for (let index = 0; index < 33; index++) {
     const winner = pick(index * 5 + 1);
     const loser = pick(index * 3);
     const count = 1 + ((index * 7) % 4);
@@ -128,6 +129,44 @@ export function manyFindings(lang: Lang): RenderedFinding[] {
           : "Meshes of a mod use textures that are not in the game",
         de ? `${count} Texturen fehlen in ${mod}` : `${count} textures missing in ${mod}`,
         { count, meshes: count },
+      ),
+    );
+  }
+  for (let index = 0; index < 7; index++) {
+    const mod = pick(index * 2 + 3);
+    found.push(
+      finding(
+        lang,
+        "patch.hides-walkway",
+        `${index}`,
+        mod,
+        "warning",
+        "likely",
+        de
+          ? "Der Patch blendet etwas aus, über das Figuren gehen"
+          : "The patch hides something characters walk on",
+        de
+          ? `Der Patch blendet einen Steg von ${mod} aus, über den Figuren gehen`
+          : `The patch hides a walkway of ${mod} that characters walk on`,
+        { count: 1 + (index % 3) },
+      ),
+    );
+  }
+  for (let index = 0; index < 40; index++) {
+    const mod = pick(index + 5);
+    found.push(
+      finding(
+        lang,
+        "navmeshes.changes-undone",
+        `${index}`,
+        mod,
+        "info",
+        "likely",
+        de ? "Ein Plugin macht Wegänderungen rückgängig" : "A plugin undoes changes to paths",
+        de
+          ? `${pick(index + 1)}.esp macht Wege von ${mod}.esp rückgängig`
+          : `${pick(index + 1)}.esp undoes paths of ${mod}.esp`,
+        { count: 1 + (index % 4) },
       ),
     );
   }

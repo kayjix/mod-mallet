@@ -1,6 +1,6 @@
 # 0076 Task rows: crash risks first, one thing to do per row
 
-- Status: accepted
+- Status: accepted; the mods' initials and the page's order changed by [0082](0082-task-page-tiles-by-category.md)
 - Date: 2026-11-22
 - Changes: ADR 0045 (tasks by what to do), ADR 0061 (the wide-collider advice on the task page)
 

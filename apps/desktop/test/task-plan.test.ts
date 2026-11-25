@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { RenderedFinding } from "../src/generated/rendered-report";
 import type { Impact } from "../src/health";
-import { partOf, planTasks, rowModsOf } from "../src/task-plan.ts";
+import { categoryOf, countCategories, isCrashRisk, planView, rowModsOf } from "../src/task-plan.ts";
 
 type Severity = RenderedFinding["finding"]["severity"];
 type Confidence = RenderedFinding["finding"]["confidence"];
@@ -76,19 +76,23 @@ const impactOf = (rendered: RenderedFinding): Impact => {
 
 const none = new Set<string>();
 
-test("crash risks come first, whatever the user does about them", () => {
+test("everything open leads with the crash risks, then the categories to do", () => {
   const doors = finding("navmeshes.door-cut-off", "Town");
   const master = finding("plugins.master-missing", "Patch", { severity: "error", direct: true });
   const faces = finding("npcs.face-mismatch", "Faces");
   const textures = finding("meshes.retexture-bypassed", "Trees");
+  const outdated = finding("plugins.generated-outdated", "Grass");
+  const guess = finding("meshes.texture-missing", "Maybe", { confidence: "hint" });
 
-  const parts = planTasks([textures, faces, doors, master], none, impactOf);
+  const parts = planView([textures, faces, doors, master, outdated, guess], none, impactOf, "open");
 
+  // Recommendations are not in the open list; they have a tile of their own.
   assert.deepEqual(
     parts.map(({ id, count }) => [id, count]),
     [
       ["crash", 2],
-      ["choose", 2],
+      ["decide", 2],
+      ["yourself", 1],
     ],
   );
   // Within the crash risks, the one with a button for the mod manager first.
@@ -96,7 +100,7 @@ test("crash risks come first, whatever the user does about them", () => {
     parts[0]?.groups.map(({ kind }) => kind),
     ["plugins.master-missing", "navmeshes.door-cut-off"],
   );
-  // Within a step, what is wrong in the game before what costs quality.
+  // Within a category, what is wrong in the game before what costs quality.
   assert.deepEqual(
     parts[1]?.groups.map(({ kind, impact }) => [kind, impact]),
     [
@@ -106,12 +110,57 @@ test("crash risks come first, whatever the user does about them", () => {
   );
 });
 
+test("a category lists its own findings, its crash risks first", () => {
+  const doors = finding("navmeshes.door-cut-off", "Town");
+  const textures = finding("meshes.retexture-bypassed", "Trees");
+  const master = finding("plugins.master-missing", "Patch", { severity: "error" });
+
+  const parts = planView([textures, doors, master], none, impactOf, "decide");
+
+  assert.deepEqual(
+    parts.map(({ id, count }) => [id, count]),
+    [["decide", 2]],
+  );
+  assert.deepEqual(
+    parts[0]?.groups.map(({ kind }) => kind),
+    ["navmeshes.door-cut-off", "meshes.retexture-bypassed"],
+  );
+  assert.deepEqual(planView([textures], none, impactOf, "notes"), []);
+});
+
+test("the tiles count every category and its crash risks", () => {
+  const doors = finding("navmeshes.door-cut-off", "Town");
+  const textures = finding("meshes.retexture-bypassed", "Trees");
+  const loaded = finding("plugins.switched-off-but-loaded", "Busy", { direct: true });
+  const install = finding("plugins.requirement-missing", "Patch");
+  const guess = finding("meshes.texture-missing", "Maybe", { confidence: "hint" });
+  const note = finding("assets.loose-over-archive", "Loose", { severity: "info" });
+  const aside = finding("navmeshes.door-cut-off", "Aside");
+  const collision = finding("objects.duplicated", "Twice");
+  const ignored = new Set([aside.finding.id]);
+
+  const counts = countCategories(
+    [doors, textures, loaded, install, guess, note, aside, collision],
+    ignored,
+    impactOf,
+  );
+
+  assert.deepEqual(counts, {
+    "one-click": { count: 1, crash: 0 },
+    decide: { count: 2, crash: 1 },
+    yourself: { count: 1, crash: 0 },
+    advice: { count: 1, crash: 0 },
+    notes: { count: 1, crash: 0 },
+    ignored: { count: 1, crash: 0 },
+  });
+});
+
 test("findings of one kind share a group, the mods named most often first", () => {
   const first = finding("navmeshes.door-cut-off", "Town", { args: { count: 1 } });
   const second = finding("navmeshes.door-cut-off", "Castle", { args: { count: 5 } });
   const third = finding("navmeshes.door-cut-off", "Castle", { args: { count: 2 } });
 
-  const [part] = planTasks([first, second, third], none, impactOf);
+  const [part] = planView([first, second, third], none, impactOf, "open");
   const [group] = part?.groups ?? [];
 
   assert.equal(part?.groups.length, 1);
@@ -132,19 +181,19 @@ test("set aside, notes and recommendations are never crash risks", () => {
   const guess = finding("navmeshes.door-cut-off", "Maybe", { confidence: "hint" });
   const ignored = new Set([aside.finding.id]);
 
-  assert.equal(partOf(aside, ignored, impactOf), "ignored");
-  assert.equal(partOf(note, none, impactOf), "notes");
-  assert.equal(partOf(guess, none, impactOf), "advice");
-  assert.deepEqual(
-    planTasks([aside, note, guess], ignored, impactOf).map(({ id }) => id),
-    ["advice", "notes", "ignored"],
-  );
+  assert.equal(categoryOf(aside, ignored), "ignored");
+  assert.equal(categoryOf(note, none), "notes");
+  assert.equal(categoryOf(guess, none), "advice");
+  for (const rendered of [aside, note, guess]) {
+    assert.equal(isCrashRisk(rendered, ignored, impactOf), false);
+  }
+  assert.deepEqual(planView([aside, note, guess], ignored, impactOf, "open"), []);
 });
 
-test("collisions are left to their own page", () => {
+test("collisions are counted by their spots, not here", () => {
   const collision = finding("objects.duplicated", "Town");
-  assert.equal(partOf(collision, none, impactOf), null);
-  assert.deepEqual(planTasks([collision], none, impactOf), []);
+  assert.equal(categoryOf(collision, none), null);
+  assert.deepEqual(planView([collision], none, impactOf, "open"), []);
 });
 
 test("a row names the mods of meshes and textures as well", () => {

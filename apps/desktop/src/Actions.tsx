@@ -100,6 +100,8 @@ export interface Session {
    * window has no toolbox to go to.
    */
   showToolbox?: () => void;
+  /** Switches to the mods page. Absent where the window has none to go to. */
+  showMods?: () => void;
   /**
    * Switches to the Mods page, at a mod's page or at a plugin in the
    * dependency diagram (ADR 0068). Absent where the window has no Mods page.

@@ -1,12 +1,4 @@
-import {
-  createContext,
-  Fragment,
-  type ReactNode,
-  useContext,
-  useId,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useContext, useId, useMemo, useState } from "react";
 import { ActionResult, type ActionState, CopyButton, useAction, useSession } from "./Actions";
 import {
   type Filter,
@@ -31,16 +23,20 @@ import { useOverviewTexts } from "./overview-texts";
 import { Previews } from "./Preview";
 import { LEFT_BEHIND, STILL_LOADED, StillLoadedHelp } from "./still-loaded";
 import {
+  countCategories,
+  type ListView,
   type PartId,
   type PlannedGroup as Planned,
   type PlannedPart,
-  planTasks,
+  planView,
   rowModsOf,
+  TO_DO,
 } from "./task-plan";
 import { useTaskRowTexts } from "./task-row-texts";
 import { ToolHint } from "./tool-hint";
-import { Note, PageHeader, UndoButton } from "./ui/kit";
+import { EmptyState, Note, PageHeader, UndoButton } from "./ui/kit";
 import { ModLine, SeverityMark, TaskGroup, TaskPart, TaskRow } from "./ui/rows";
+import { type Tile, TileTabs } from "./ui/tiles";
 import { COLLIDES_WIDELY, toneOf, WideAdvice } from "./wide-advice";
 import "./overview.css";
 import "./tasks.css";
@@ -141,16 +137,16 @@ function planned(part: string, group: Group): Planned {
 }
 
 /** The rows of a part: one per finding, one per kind where there are several. */
-function GroupList({ groups }: { groups: Planned[] }) {
+function GroupList({ groups, calm = false }: { groups: Planned[]; calm?: boolean }) {
   return (
     <ul className="task-list">
       {groups.map((group) =>
         group.findings.length === 1 ? (
           group.findings.map((rendered) => (
-            <FindingRow key={rendered.finding.id} rendered={rendered} />
+            <FindingRow key={rendered.finding.id} rendered={rendered} calm={calm} />
           ))
         ) : (
-          <FindingGroup key={group.key} group={group} />
+          <FindingGroup key={group.key} group={group} calm={calm} />
         ),
       )}
     </ul>
@@ -158,15 +154,19 @@ function GroupList({ groups }: { groups: Planned[] }) {
 }
 
 /** Several findings of one kind behind one row that opens into theirs. */
-function FindingGroup({ group }: { group: Planned }) {
+function FindingGroup({ group, calm }: { group: Planned; calm: boolean }) {
   const { showToolbox } = useSession();
   const o = useOverviewTexts();
   const r = useTaskRowTexts();
   const [open, setOpen] = useState(group.findings.length <= OPEN_GROUP_LIMIT);
   const { mods } = group;
-  // The tool that repairs paths repairs them all: offered once, on the group.
+  const impact = calm ? "note" : group.impact;
+  // The tool that repairs paths repairs them all: offered once, on the group;
+  // not where there is nothing to do.
   const shared =
-    group.kind.startsWith("navmeshes.") && showToolbox !== undefined ? showToolbox : undefined;
+    !calm && group.kind.startsWith("navmeshes.") && showToolbox !== undefined
+      ? showToolbox
+      : undefined;
   return (
     <TaskGroup
       primary={
@@ -176,20 +176,11 @@ function FindingGroup({ group }: { group: Planned }) {
           </button>
         )
       }
-      level={group.impact}
-      levelLabel={o.impact[group.impact]}
+      level={impact}
+      levelLabel={o.impact[impact]}
       title={group.title}
       count={group.findings.length}
-      meta={
-        mods.length <= 2 ? (
-          <ModLine mods={mods} more={r.moreMods} />
-        ) : (
-          <>
-            <ModLine mods={mods} shown={5} names={false} more={() => ""} />
-            <span>{r.modCount(mods.length)}</span>
-          </>
-        )
-      }
+      meta={<ModLine mods={mods} more={r.moreMods} />}
       open={open}
       onToggle={() => setOpen(!open)}
       toggleLabel={open ? r.fold : r.showAll(group.findings.length)}
@@ -198,8 +189,9 @@ function FindingGroup({ group }: { group: Planned }) {
         <FindingRow
           key={rendered.finding.id}
           rendered={rendered}
-          groupLevel={group.impact}
+          groupLevel={impact}
           groupShares={shared !== undefined}
+          calm={calm}
         />
       ))}
     </TaskGroup>
@@ -226,8 +218,11 @@ export function FindingRow({
   rendered,
   groupLevel,
   groupShares = false,
+  calm = false,
 }: {
   rendered: RenderedFinding;
+  /** In a list of what is only to know or set aside: the mark of a note, whatever it would do. */
+  calm?: boolean;
   /** The level of the group the row is in; its mark is left out where it is the same. */
   groupLevel?: Impact;
   /** Whether the group offers the ways every finding of it shares, so that the row does not. */
@@ -243,7 +238,7 @@ export function FindingRow({
     return info === undefined ? [] : [info];
   });
   const ways = useWays(rendered, known);
-  const impact = impactOf(rendered);
+  const impact = calm ? "note" : impactOf(rendered);
   const status = action.outcome?.outcome.status;
   const handed = status !== undefined && HANDED_ON.has(status);
   const primary = primaryOf(
@@ -724,22 +719,24 @@ function Spots({ spots, collision }: { spots: MapSpot[]; collision: boolean }) {
   );
 }
 
-/** The parts that are only to know or set aside; they start folded. */
-const FOLDED = new Set<PartId>(["notes", "ignored"]);
+/** What the tiles choose: everything open, the collisions, or a category. */
+type View = ListView | "collisions";
 
-/** The parts that are not things to do, and get no number. */
-const UNNUMBERED = new Set<PartId>(["advice", "notes", "ignored"]);
+/** The categories that are not things to do: their tiles step back. */
+const QUIET = new Set<View>(["notes", "ignored"]);
 
 /**
- * The task page (ADR 0045, 0076): what can crash the game first, then
- * the steps by what the user does, the collisions summed up in one line,
- * then the recommendations, and folded what is only to know or set aside.
+ * The task page (ADR 0045, 0076, 0082): a board of tiles, one per category
+ * with its count and what it means, and under it the list of the tile
+ * chosen. Everything open is shown first, its crash risks leading.
  */
 export function TasksPage({ report }: { report: RenderedReport }) {
-  const { ignored, setIgnored } = useSession();
+  const { ignored, setIgnored, decisions } = useSession();
   const o = useOverviewTexts();
   const r = useTaskRowTexts();
+  const [view, setView] = useState<View>("open");
   const [aside, setAside] = useState<{ id: string; title: string } | null>(null);
+  const panelId = useId();
   // Duels about the same files in two mods are decided on Assets; their
   // findings are not listed again here, only one line leads there. Duels
   // about placed objects belong to the collisions.
@@ -754,60 +751,75 @@ export function TasksPage({ report }: { report: RenderedReport }) {
     () => new Set(report.duels.flatMap((rendered) => rendered.duel.findings)),
     [report.duels],
   );
-  const parts = useMemo(
+  const listed = useMemo(
     () =>
-      planTasks(
-        report.findings.filter(
-          (rendered) => ignored.has(rendered.finding.id) || !inDuels.has(rendered.finding.id),
-        ),
-        ignored,
-        impactOf,
+      report.findings.filter(
+        (rendered) => ignored.has(rendered.finding.id) || !inDuels.has(rendered.finding.id),
       ),
     [report.findings, ignored, inDuels],
   );
+  const counts = useMemo(() => countCategories(listed, ignored, impactOf), [listed, ignored]);
+  const collisions = useCollisionState(report);
   const open = openTaskCount(report.findings, ignored);
-  // The choice between mods leads to Assets even when no finding is in it.
-  const withDuels =
-    duels.length > 0 && !parts.some(({ id }) => id === "choose") ? insertChoose(parts) : parts;
-  let number = 0;
+  const crash = TO_DO.reduce((sum, category) => sum + counts[category].crash, 0);
+  const openDuels = duels.filter((rendered) => decisions[rendered.duel.id] === undefined).length;
+
+  const crashBadge = (count: number) =>
+    count > 0 ? (
+      <>
+        <SeverityMark level="crash" label={o.impact.crash} />
+        {r.crashCount(count)}
+      </>
+    ) : undefined;
+  const tile = (id: View, count: number, badge?: ReactNode): Tile<View> => ({
+    id,
+    label: r.tile[id].label,
+    meaning: r.tile[id].meaning,
+    count,
+    badge,
+    quiet: QUIET.has(id),
+  });
+  const tiles: Tile<View>[] = [
+    tile("open", open, crashBadge(crash)),
+    tile("collisions", collisions.states.open),
+    tile("one-click", counts["one-click"].count, crashBadge(counts["one-click"].crash)),
+    tile("decide", counts.decide.count + duels.length, crashBadge(counts.decide.crash)),
+    tile("yourself", counts.yourself.count, crashBadge(counts.yourself.crash)),
+    tile("advice", counts.advice.count),
+    tile("notes", counts.notes.count),
+    tile("ignored", counts.ignored.count),
+  ];
 
   return (
     <AsideNotice.Provider value={(id, title) => setAside({ id, title })}>
-      <section className="tasks-page" data-row-scope="" aria-live="polite">
+      <section className="tasks-page" aria-live="polite">
         <PageHeader
           status={
-            <>
-              <h2 className="tasks-headline">
-                {open === 0 ? o.tasksHeadlineNone : o.tasksHeadline(open)}
-              </h2>
-              <Summary parts={parts} />
-            </>
+            <h2 className="tasks-headline">
+              {open === 0 ? o.tasksHeadlineNone : o.tasksHeadline(open)}
+            </h2>
           }
         />
-        {open === 0 && (
-          <Note tone="ok" className="tasks-clear">
-            {r.allClearNote}
-          </Note>
-        )}
-        {!withDuels.some(({ id }) => id === "crash") && <CollisionsCard report={report} />}
-        {withDuels.map(({ id, groups, count }) => {
-          if (!UNNUMBERED.has(id)) {
-            number += 1;
-          }
-          return (
-            <Fragment key={id}>
-              <Part
-                id={id}
-                number={UNNUMBERED.has(id) ? undefined : number}
-                count={id === "choose" ? count + duels.length : count}
-              >
-                {id === "choose" && duels.length > 0 && <DuelsLine duels={duels} />}
-                {groups.length > 0 && <GroupList groups={groups} />}
-              </Part>
-              {id === "crash" && <CollisionsCard report={report} />}
-            </Fragment>
-          );
-        })}
+        <TileTabs
+          label={r.tilesLabel}
+          tiles={tiles}
+          value={view}
+          onChange={setView}
+          panelId={panelId}
+        />
+        <div className="task-view" id={panelId} role="tabpanel" data-view={view} data-row-scope="">
+          {view === "collisions" ? (
+            <CollisionsView report={report} />
+          ) : (
+            <ListOf
+              view={view}
+              findings={listed}
+              duels={duels}
+              openDuels={openDuels}
+              nothingOpen={open === 0}
+            />
+          )}
+        </div>
         {aside !== null && (
           <div className="task-undo" role="status">
             <span className="task-undo-text">{r.setAside(aside.title)}</span>
@@ -824,118 +836,132 @@ export function TasksPage({ report }: { report: RenderedReport }) {
   );
 }
 
-/** The parts with an empty choice between mods where the step order puts it. */
-function insertChoose(parts: PlannedPart[]): PlannedPart[] {
-  const after = new Set<PartId>(["crash", "one-click", "install", "update"]);
-  const index = parts.findIndex(({ id }) => !after.has(id));
-  const at = index === -1 ? parts.length : index;
-  return [...parts.slice(0, at), { id: "choose", groups: [], count: 0 }, ...parts.slice(at)];
-}
-
-/** Under the headline: what the things to do do to the game, in words and marks. */
-function Summary({ parts }: { parts: PlannedPart[] }) {
+/**
+ * The list under the tiles: everything open, numbered in the order to work
+ * in with the crash risks first, or the rows of one category under a line
+ * that says what it is and leads to the page where it is handled.
+ */
+function ListOf({
+  view,
+  findings,
+  duels,
+  openDuels,
+  nothingOpen,
+}: {
+  view: ListView;
+  findings: RenderedFinding[];
+  duels: RenderedDuel[];
+  openDuels: number;
+  nothingOpen: boolean;
+}) {
+  const { ignored } = useSession();
   const r = useTaskRowTexts();
-  const counts: Record<"crash" | "broken" | "quality" | "scan", number> = {
-    crash: 0,
-    broken: 0,
-    quality: 0,
-    scan: 0,
-  };
-  for (const part of parts) {
-    if (UNNUMBERED.has(part.id)) {
-      continue;
+  const parts = useMemo(
+    () => planView(findings, ignored, impactOf, view),
+    [findings, ignored, view],
+  );
+  if (view === "open") {
+    const withDuels =
+      duels.length > 0 && !parts.some(({ id }) => id === "decide") ? insertDecide(parts) : parts;
+    if (nothingOpen && withDuels.length === 0) {
+      return (
+        <Note tone="ok" className="tasks-clear">
+          {r.allClearNote}
+        </Note>
+      );
     }
-    for (const group of part.groups) {
-      for (const rendered of group.findings) {
-        const impact = impactOf(rendered);
-        if (
-          impact === "crash" ||
-          impact === "broken" ||
-          impact === "quality" ||
-          impact === "scan"
-        ) {
-          counts[impact] += 1;
-        }
-      }
-    }
+    return (
+      <>
+        {withDuels.map(({ id, groups, count }, index) => (
+          <TaskPart
+            key={id}
+            id={id}
+            number={index + 1}
+            title={r.partTitle[id]}
+            count={id === "decide" ? count + openDuels : count}
+            open
+          >
+            {id === "decide" && duels.length > 0 && <DuelsLine duels={duels} />}
+            {groups.length > 0 && <GroupList groups={groups} />}
+          </TaskPart>
+        ))}
+      </>
+    );
   }
-  const items = [
-    { level: "crash" as const, text: r.summaryCrash(counts.crash) },
-    { level: "broken" as const, text: r.summaryBroken(counts.broken) },
-    { level: "quality" as const, text: r.summaryQuality(counts.quality) },
-    { level: "scan" as const, text: r.summaryScan(counts.scan) },
-  ].filter(({ level }) => counts[level] > 0);
-  if (items.length === 0) {
-    return null;
-  }
+  const [part] = parts;
   return (
-    <ul className="tasks-summary">
-      {items.map(({ level, text }) => (
-        <li key={level} data-level={level}>
-          <SeverityMark level={level} label={text} />
-          <span aria-hidden="true">{text}</span>
-        </li>
-      ))}
-      {counts.crash === 0 && <li className="tasks-summary-calm">{r.summaryNoCrash}</li>}
-    </ul>
+    <>
+      <ViewHead view={view} />
+      {view === "decide" && duels.length > 0 && <DuelsLine duels={duels} />}
+      {part === undefined ? (
+        view === "decide" && duels.length > 0 ? null : (
+          <EmptyState>{r.emptyCategory}</EmptyState>
+        )
+      ) : (
+        <GroupList groups={part.groups} calm={view === "notes" || view === "ignored"} />
+      )}
+    </>
   );
 }
 
-/** One part of the task page, numbered in the order to work in. */
-function Part({
-  id,
-  number,
-  count,
-  children,
-}: {
-  id: PartId;
-  number: number | undefined;
-  count: number;
-  children: ReactNode;
-}) {
-  const o = useOverviewTexts();
+/** The parts with an empty decision part where the order puts it, for the duels. */
+function insertDecide(parts: PlannedPart[]): PlannedPart[] {
+  const after = new Set<PartId>(["crash", "one-click"]);
+  const index = parts.findIndex(({ id }) => !after.has(id));
+  const at = index === -1 ? parts.length : index;
+  return [...parts.slice(0, at), { id: "decide", groups: [], count: 0 }, ...parts.slice(at)];
+}
+
+/** What a category is, and the way to the page where it is handled. */
+function ViewHead({ view }: { view: Exclude<ListView, "open"> }) {
+  const { showToolbox, showMods } = useSession();
   const r = useTaskRowTexts();
-  const folded = FOLDED.has(id);
-  const [open, setOpen] = useState(!folded);
-  const title = id === "crash" ? r.crashTitle : o.step[id].title;
+  // Decisions lead to Assets from their duels' line, under this head.
+  const jump: { label: string; run: () => void } | null =
+    view === "yourself" && showToolbox !== undefined
+      ? { label: r.toToolbox, run: showToolbox }
+      : (view === "advice" || view === "one-click") && showMods !== undefined
+        ? { label: r.toMods, run: showMods }
+        : null;
   return (
-    <TaskPart
-      id={id}
-      number={number}
-      title={title}
-      count={count}
-      tag={id === "advice" ? o.optional : undefined}
-      folded={folded}
-      open={open}
-      onToggle={() => setOpen(!open)}
-      toggleLabel={open ? r.fold : o.showFolded(count)}
-    >
-      {children}
-    </TaskPart>
+    <header className="task-view-head">
+      <div className="task-view-text">
+        <h2>{r.partTitle[view]}</h2>
+        <span className="aside">{r.tile[view].hint}</span>
+      </div>
+      {jump !== null && (
+        <button type="button" onClick={jump.run}>
+          {jump.label}
+        </button>
+      )}
+    </header>
   );
 }
 
 /**
- * The collisions in one line: how many spots are left to decide, and the
- * way to the worklist; and what is decided but not in the patch yet.
+ * The collisions under their tile: how many spots are left, the ways to
+ * the worklist and the patch, and the collisions by kind and pair of mods.
  */
-function CollisionsCard({ report }: { report: RenderedReport }) {
-  const { ignored, patchChoices, decideSpot, showPatch } = useSession();
-  const o = useOverviewTexts();
-  const headingId = useId();
+function CollisionsView({ report }: { report: RenderedReport }) {
+  const { ignored } = useSession();
+  const [section] = sectionsFor(report.findings, "collisions", ignored);
+  return (
+    <>
+      <CollisionsCard report={report} />
+      {section !== undefined && (
+        <GroupList groups={section.groups.map((group) => planned(section.id, group))} />
+      )}
+    </>
+  );
+}
+
+/** Every collision spot with its state, and the pairs of mods still to decide. */
+function useCollisionState(report: RenderedReport) {
+  const { ignored, patchChoices } = useSession();
   const spots = useMemo(
     () => reportSpots(report, ignored, patchChoices),
     [report, ignored, patchChoices],
   );
-  const states: Record<SpotState, number> = {
-    open: 0,
-    kept: 0,
-    waiting: 0,
-    patched: 0,
-  };
-  for (const spot of spots) {
-    states[spot.state] += 1;
-  }
   // Pairs of mods, whatever kind of collision they have.
   const pairOf = useMemo(() => {
     const found = new Map<string, string>();
@@ -953,12 +979,28 @@ function CollisionsCard({ report }: { report: RenderedReport }) {
     }
     return found;
   }, [report.findings]);
+  const states: Record<SpotState, number> = { open: 0, kept: 0, waiting: 0, patched: 0 };
+  for (const spot of spots) {
+    states[spot.state] += 1;
+  }
   const pairs = new Set(
     spots
       .filter((spot) => spot.state === "open")
       .map((spot) => pairOf.get(spot.finding) ?? spot.finding),
   ).size;
   const first = spots.find((spot) => spot.state === "open") ?? spots[0];
+  return { spots, states, pairs, first };
+}
+
+/**
+ * The collisions in one line: how many spots are left to decide, and the
+ * way to the worklist; and what is decided but not in the patch yet.
+ */
+function CollisionsCard({ report }: { report: RenderedReport }) {
+  const { decideSpot, showPatch } = useSession();
+  const o = useOverviewTexts();
+  const headingId = useId();
+  const { spots, states, pairs, first } = useCollisionState(report);
 
   return (
     <section

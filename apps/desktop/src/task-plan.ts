@@ -1,24 +1,56 @@
-// How the task page orders and groups what there is to do (ADR 0076).
+// How the task page orders and groups what there is to do (ADR 0076, 0082).
 //
 // Nothing here decides anything about a setup: what a finding is, how
 // severe it is and what can be done about it comes from the Rust side, and
 // what it does to the game from the weights of the health score. This only
-// sorts the findings into the parts of the page, crash risks first, and
-// puts findings of one kind behind one row. Pure, so that a script can test
-// it without a window.
+// sorts the findings into the page's categories, counts them for its tiles,
+// lists crash risks first, and puts findings of one kind behind one row.
+// Pure, so that a script can test it without a window.
 
-import { isDirect, modsOf, STEPS, type Step, stepOf } from "./arrange.ts";
+import { isDirect, modsOf, type Step, stepOf } from "./arrange.ts";
 import type { RenderedFinding } from "./generated/rendered-report";
 import type { Impact } from "./health";
 
-/** A part of the task page: the crash risks, then the steps of `arrange.ts`. */
-export type PartId = "crash" | Step;
+/**
+ * What the user does about a finding, as the task page's tiles sort it:
+ * done with one click in the mod manager, a decision between mods, a thing
+ * to do by hand, a recommendation, something only to know, or set aside.
+ * Collisions are a category of the page as well, but counted by their
+ * spots, not here.
+ */
+export type Category = "one-click" | "decide" | "yourself" | "advice" | "notes" | "ignored";
 
-/** The parts in the order the page shows them. */
-export const PARTS: PartId[] = ["crash", ...STEPS];
+/** The categories in the order of the page's tiles. */
+export const CATEGORIES: Category[] = [
+  "one-click",
+  "decide",
+  "yourself",
+  "advice",
+  "notes",
+  "ignored",
+];
 
-/** Steps whose findings are not things to do: optional, only to know, or set aside. */
-const NOT_TO_DO = new Set<Step>(["advice", "notes", "ignored"]);
+/** The categories that are things to do; the rest are optional or only to know. */
+export const TO_DO: Category[] = ["one-click", "decide", "yourself"];
+
+/** The category of each step of `arrange.ts`. */
+const CATEGORY_OF_STEP: Record<Step, Category> = {
+  "one-click": "one-click",
+  install: "yourself",
+  update: "yourself",
+  choose: "decide",
+  scan: "yourself",
+  check: "yourself",
+  advice: "advice",
+  notes: "notes",
+  ignored: "ignored",
+};
+
+/** A part of a list on the task page: the crash risks, or a category. */
+export type PartId = "crash" | Category;
+
+/** What the list under the tiles shows: everything open, or one category. */
+export type ListView = "open" | Category;
 
 /** What a finding does to the game, the worst first. */
 const IMPACT_RANK: Record<Impact, number> = {
@@ -80,42 +112,85 @@ function countOf(rendered: RenderedFinding): number {
   return typeof count === "number" ? count : 0;
 }
 
-/**
- * The part a finding belongs to; null for collisions, which have a page of
- * their own. A thing to do that can crash the game comes first, whatever
- * the user does about it.
- */
-export function partOf(
+/** The category of a finding; null for collisions, which are counted by their spots. */
+export function categoryOf(rendered: RenderedFinding, ignored: Set<string>): Category | null {
+  const step = stepOf(rendered, ignored);
+  return step === null ? null : CATEGORY_OF_STEP[step];
+}
+
+/** Whether a finding is a thing to do that can crash the game. */
+export function isCrashRisk(
   rendered: RenderedFinding,
   ignored: Set<string>,
   impactOf: (rendered: RenderedFinding) => Impact,
-): PartId | null {
-  const step = stepOf(rendered, ignored);
-  if (step === null) {
-    return null;
-  }
-  return !NOT_TO_DO.has(step) && impactOf(rendered) === "crash" ? "crash" : step;
+): boolean {
+  const category = categoryOf(rendered, ignored);
+  return category !== null && TO_DO.includes(category) && impactOf(rendered) === "crash";
 }
 
-/**
- * The parts of the task page with their groups, without the empty ones.
- * Within a part, the groups that do the worst come first, then those with
- * a button for the mod manager, then the larger ones; within a group, the
- * findings with such a button, then those that concern the most things.
- */
-export function planTasks(
+/** How many findings a category holds, and how many of them can crash the game. */
+export interface CategoryCount {
+  count: number;
+  crash: number;
+}
+
+/** The count of every category, for the tiles; collisions are not among them. */
+export function countCategories(
   findings: RenderedFinding[],
   ignored: Set<string>,
   impactOf: (rendered: RenderedFinding) => Impact,
+): Record<Category, CategoryCount> {
+  const counts = Object.fromEntries(
+    CATEGORIES.map((category) => [category, { count: 0, crash: 0 }]),
+  ) as Record<Category, CategoryCount>;
+  for (const rendered of findings) {
+    const category = categoryOf(rendered, ignored);
+    if (category !== null) {
+      counts[category].count += 1;
+      if (isCrashRisk(rendered, ignored, impactOf)) {
+        counts[category].crash += 1;
+      }
+    }
+  }
+  return counts;
+}
+
+/**
+ * The parts of a list with their groups, without the empty ones. Everything
+ * open is the crash risks first, then the other things to do by category;
+ * a category is one part, its crash risks first within it. Within a part,
+ * the groups that do the worst come first, then those with a button for
+ * the mod manager, then the larger ones; within a group, the findings with
+ * such a button, then those that concern the most things.
+ */
+export function planView(
+  findings: RenderedFinding[],
+  ignored: Set<string>,
+  impactOf: (rendered: RenderedFinding) => Impact,
+  view: ListView,
 ): PlannedPart[] {
   const byPart = new Map<PartId, RenderedFinding[]>();
   for (const rendered of findings) {
-    const part = partOf(rendered, ignored, impactOf);
+    const category = categoryOf(rendered, ignored);
+    if (category === null) {
+      continue;
+    }
+    const part: PartId | null =
+      view === "open"
+        ? TO_DO.includes(category)
+          ? isCrashRisk(rendered, ignored, impactOf)
+            ? "crash"
+            : category
+          : null
+        : category === view
+          ? category
+          : null;
     if (part !== null) {
       byPart.set(part, [...(byPart.get(part) ?? []), rendered]);
     }
   }
-  return PARTS.flatMap((id) => {
+  const order: PartId[] = view === "open" ? ["crash", ...TO_DO] : [view];
+  return order.flatMap((id) => {
     const members = byPart.get(id) ?? [];
     return members.length === 0
       ? []

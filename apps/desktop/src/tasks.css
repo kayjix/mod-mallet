@@ -1,65 +1,57 @@
-/* The task page around the rows of ui/rows.css (ADR 0076). Uses the
- * tokens of App.css. */
+/* The task page around the tiles and rows of the kit (ADR 0076, 0082).
+ * Uses the kit's tokens. */
 
-/* ---- the top: how many, and what they do to the game --------------------- */
+/* ---- the top: how many, then the tiles (ui/tiles.css) ------------------- */
 
 .tasks-page .tasks-headline {
   margin: 0;
   font-size: 1.1rem;
 }
 
-.tasks-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-}
-
-.tasks-summary > li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.tasks-summary > li[data-level="crash"] {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .tasks-clear {
   margin-bottom: var(--space-4);
 }
 
-/* The first part follows the top closely; the collisions' line after it. */
-.page-head + .task-part,
-.tasks-clear + .task-part {
-  margin-top: var(--space-4);
-}
+/* ---- the list under the tiles --------------------------------------------- */
 
-.tasks-page .collisions-card {
-  margin-top: var(--space-5);
-}
-
-.page-head + .collisions-card,
-.tasks-clear + .collisions-card {
+/* The first part follows the tiles closely. */
+.task-view > .task-part:first-child {
   margin-top: 0;
 }
 
-.task-part .duels-line {
+/* A category's head: what it is, and the way to its page. */
+.task-view-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 var(--space-1) var(--space-3);
+}
+
+.task-view-text {
+  display: grid;
+  flex: 1 1 280px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-view-head h2 {
+  font-size: 1.05rem;
+}
+
+.task-view .collisions-card,
+.task-view .duels-line {
   margin: 0 0 var(--space-3);
 }
 
-/* Recommendations are optional: a lighter frame. */
-.task-part[data-part="advice"] .task-list,
-.task-part[data-part="notes"] .task-list,
-.task-part[data-part="ignored"] .task-list {
+/* Recommendations and notes are optional: a lighter frame. */
+.task-view[data-view="advice"] .task-list,
+.task-view[data-view="notes"] .task-list,
+.task-view[data-view="ignored"] .task-list {
   box-shadow: none;
 }
 
-.task-part[data-part="advice"] > .task-list {
+.task-view[data-view="advice"] .task-list {
   border-style: dashed;
 }
 

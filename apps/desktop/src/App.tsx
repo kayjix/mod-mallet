@@ -605,6 +605,7 @@ export default function App({ api, startLang }: AppProps) {
       setPatchChoices: setActiveChoices,
       waiting: split.waiting,
       showReview: () => go("review"),
+      showMods: () => go("mods"),
       showPatch,
       openPatch,
       decisions,

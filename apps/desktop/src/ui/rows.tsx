@@ -1,10 +1,10 @@
 // The rows of a list of things to do (ADR 0076): one row per task, one row
 // for several tasks of one sort, the mark that says how bad it is and the
-// badges of the mods it is about. Part of the UI kit (ADR 0077): they know
+// names of the mods it is about. Part of the UI kit (ADR 0077): they know
 // nothing about findings; the task page and the other lists fill them in.
 
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useId } from "react";
-import { hueOf, initialsOf, isRowKey, nextRow } from "./row-helpers.ts";
+import { type KeyboardEvent, type ReactNode, useId } from "react";
+import { isRowKey, nextRow } from "./row-helpers.ts";
 import "./rows.css";
 
 /** How bad a task is, as its mark shows it; `done` once it is handed on. */
@@ -92,33 +92,18 @@ function markShape(level: MarkLevel): ReactNode {
   }
 }
 
-/** The badge of one mod: its initials on a colour of its own. */
-export function ModBadge({ name }: { name: string }) {
-  return (
-    <span
-      className="mod-badge"
-      style={{ "--mod-hue": hueOf(name) } as CSSProperties}
-      aria-hidden="true"
-    >
-      {initialsOf(name)}
-    </span>
-  );
-}
-
 /**
- * The mods a row is about: up to `shown` badges and names, and how many
- * more there are. With `names` false only the badges show, and the names
- * are in their tooltip.
+ * The mods a row is about, by name: up to `shown` of them, and how many
+ * more there are, all of them in the tooltip. No picture or initials: a
+ * mod has no face of its own here (ADR 0082).
  */
 export function ModLine({
   mods,
   shown = 2,
-  names = true,
   more,
 }: {
   mods: string[];
   shown?: number;
-  names?: boolean;
   /** "+3 more", in the window's language. */
   more: (count: number) => string;
 }) {
@@ -129,16 +114,7 @@ export function ModLine({
   const rest = mods.length - visible.length;
   return (
     <span className="mod-line" title={mods.join("\n")}>
-      <span className="mod-badges">
-        {visible.map((name) => (
-          <ModBadge key={name} name={name} />
-        ))}
-      </span>
-      {names ? (
-        <span className="mod-names">{visible.join(" · ")}</span>
-      ) : (
-        <span className="visually-hidden">{visible.join(", ")}</span>
-      )}
+      <span className="mod-names">{visible.join(" · ")}</span>
       {rest > 0 && <span className="mod-more">{more(rest)}</span>}
     </span>
   );

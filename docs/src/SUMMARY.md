@@ -96,6 +96,7 @@
   - [0079 Version changes are read from the files, and compared with the last scan](adr/0079-version-changes.md)
   - [0080 The collisions step is decided by side, with the pictures](adr/0080-collisions-decided-by-side-with-the-pictures.md)
   - [0081 One source of truth for decisions](adr/0081-one-source-of-truth-for-decisions.md)
+  - [0082 The task page: tiles by category over one list](adr/0082-task-page-tiles-by-category.md)
   - [0085 Pictures of meshes, a faster relief](adr/0085-pictures-of-meshes-and-a-faster-relief.md)
   - [0088 The paths of merged doors are re-attached to the kept door](adr/0088-door-paths-re-attached-to-the-kept-door.md)
   - [0089 When the game rewrites the load order, it is told why](adr/0089-when-the-game-rewrites-the-load-order.md)

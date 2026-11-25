@@ -3,6 +3,10 @@
 
 import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
+import type { ListView, PartId } from "./task-plan";
+
+/** What a tile of the task page chooses. */
+type TileId = ListView | "collisions";
 
 /** What the task rows and the task page say beside the findings' own texts. */
 export interface TaskRowTexts {
@@ -24,26 +28,26 @@ export interface TaskRowTexts {
   fold: string;
   /** More mods than a row names. */
   moreMods: (count: number) => string;
-  /** How many mods a group is about. */
-  modCount: (count: number) => string;
-  /** The title of the part with the crash risks. */
-  crashTitle: string;
   /** A row's action was handed to the mod manager. */
   handedOn: string;
-  /** Under the headline: how many tasks can crash the game. */
-  summaryCrash: (count: number) => string;
-  /** How many tasks are wrong in the game. */
-  summaryBroken: (count: number) => string;
-  /** How many cost quality. */
-  summaryQuality: (count: number) => string;
-  /** How many keep checks from running. */
-  summaryScan: (count: number) => string;
-  /** No task can crash the game. */
-  summaryNoCrash: string;
   /** What is shown when nothing at all is to do. */
   allClearNote: string;
   /** A finding was set aside, with the way back. */
   setAside: (title: string) => string;
+  /** What the tiles choose between, for a screen reader. */
+  tilesLabel: string;
+  /** Each tile: its name, what it means in a few words, and a longer line over its list. */
+  tile: Record<TileId, { label: string; meaning: string; hint: string }>;
+  /** On a tile: how many of its findings can crash the game. */
+  crashCount: (count: number) => string;
+  /** The title of each part of a list. */
+  partTitle: Record<PartId, string>;
+  /** A category with nothing in it. */
+  emptyCategory: string;
+  /** The way to the toolbox. */
+  toToolbox: string;
+  /** The way to the mods page. */
+  toMods: string;
 }
 
 const en: TaskRowTexts = {
@@ -57,18 +61,65 @@ const en: TaskRowTexts = {
   showAll: (count) => `Show all ${count}`,
   fold: "Fold",
   moreMods: (count) => `+${count} more`,
-  modCount: (count) => (count === 1 ? "1 mod" : `${count} mods`),
-  crashTitle: "First: what can crash the game",
   handedOn: "Handed to your mod manager",
-  summaryCrash: (count) => (count === 1 ? "1 can crash the game" : `${count} can crash the game`),
-  summaryBroken: (count) =>
-    count === 1 ? "1 is wrong in the game" : `${count} are wrong in the game`,
-  summaryQuality: (count) => (count === 1 ? "1 costs quality" : `${count} cost quality`),
-  summaryScan: (count) =>
-    count === 1 ? "1 keeps checks from running" : `${count} keep checks from running`,
-  summaryNoCrash: "None of them crashes the game.",
   allClearNote: "Nothing Mod Mallet found crashes the game or looks wrong in it.",
   setAside: (title) => `Set aside: ${title}`,
+  tilesLabel: "What there is",
+  tile: {
+    open: {
+      label: "Everything open",
+      meaning: "Crash risks first",
+      hint: "",
+    },
+    collisions: {
+      label: "Collisions",
+      meaning: "Spots where two mods' objects meet",
+      hint: "Spots still to decide; they are decided in the worklist.",
+    },
+    "one-click": {
+      label: "One click",
+      meaning: "Your mod manager does it",
+      hint: "Mod Mallet hands these to your mod manager. You confirm there.",
+    },
+    decide: {
+      label: "Decisions",
+      meaning: "Which of two mods wins",
+      hint: "Two mods change the same thing. One gives way, or a patch joins them.",
+    },
+    yourself: {
+      label: "Do it yourself",
+      meaning: "Install, update, look into it",
+      hint: "Mod Mallet cannot do these for you; each row says how.",
+    },
+    advice: {
+      label: "Recommendations",
+      meaning: "Optional, may help",
+      hint: "Optional. Nothing breaks if you leave them.",
+    },
+    notes: {
+      label: "Good to know",
+      meaning: "Nothing to do",
+      hint: "Nothing to do. This is how the setup works.",
+    },
+    ignored: {
+      label: "Set aside",
+      meaning: "Left as they are, not counted",
+      hint: "You chose to leave these as they are. They do not count.",
+    },
+  },
+  crashCount: (count) => (count === 1 ? "1 crash risk" : `${count} crash risks`),
+  partTitle: {
+    crash: "First: what can crash the game",
+    "one-click": "Done with one click in your mod manager",
+    decide: "Decide which mod wins",
+    yourself: "Do it yourself",
+    advice: "Recommendations",
+    notes: "Good to know, nothing to do",
+    ignored: "Set aside, not counted",
+  },
+  emptyCategory: "Nothing here right now.",
+  toToolbox: "To the toolbox",
+  toMods: "To the mods",
 };
 
 const de: TaskRowTexts = {
@@ -82,22 +133,66 @@ const de: TaskRowTexts = {
   showAll: (count) => `Alle ${count} zeigen`,
   fold: "Einklappen",
   moreMods: (count) => `+${count} weitere`,
-  modCount: (count) => (count === 1 ? "1 Mod" : `${count} Mods`),
-  crashTitle: "Zuerst: was das Spiel abstürzen lassen kann",
   handedOn: "An deine Mod-Verwaltung übergeben",
-  summaryCrash: (count) =>
-    count === 1
-      ? "1 kann das Spiel abstürzen lassen"
-      : `${count} können das Spiel abstürzen lassen`,
-  summaryBroken: (count) =>
-    count === 1 ? "1 zeigt Fehler im Spiel" : `${count} zeigen Fehler im Spiel`,
-  summaryQuality: (count) => (count === 1 ? "1 kostet Qualität" : `${count} kosten Qualität`),
-  summaryScan: (count) =>
-    count === 1 ? "1 verhindert Prüfungen" : `${count} verhindern Prüfungen`,
-  summaryNoCrash: "Nichts davon lässt das Spiel abstürzen.",
   allClearNote:
     "Nichts, was Mod Mallet gefunden hat, lässt das Spiel abstürzen oder sieht darin falsch aus.",
   setAside: (title) => `Beiseitegelegt: ${title}`,
+  tilesLabel: "Was es gibt",
+  tile: {
+    open: {
+      label: "Alles Offene",
+      meaning: "Absturzgefahren zuerst",
+      hint: "",
+    },
+    collisions: {
+      label: "Kollisionen",
+      meaning: "Stellen, an denen sich zwei Mods treffen",
+      hint: "Stellen, die noch zu entscheiden sind; entschieden wird in der Kollisionsliste.",
+    },
+    "one-click": {
+      label: "Ein Klick",
+      meaning: "Erledigt deine Mod-Verwaltung",
+      hint: "Mod Mallet gibt das an deine Mod-Verwaltung weiter. Bestätigen musst du dort.",
+    },
+    decide: {
+      label: "Entscheidungen",
+      meaning: "Welche von zwei Mods gewinnt",
+      hint: "Zwei Mods ändern dasselbe. Eine gibt nach, oder ein Patch verbindet sie.",
+    },
+    yourself: {
+      label: "Selbst erledigen",
+      meaning: "Installieren, aktualisieren, nachsehen",
+      hint: "Das kann Mod Mallet nicht für dich tun; jede Zeile sagt, wie es geht.",
+    },
+    advice: {
+      label: "Empfehlungen",
+      meaning: "Freiwillig, kann helfen",
+      hint: "Freiwillig. Nichts geht kaputt, wenn du sie lässt.",
+    },
+    notes: {
+      label: "Gut zu wissen",
+      meaning: "Nichts zu tun",
+      hint: "Nichts zu tun. So funktioniert das Setup eben.",
+    },
+    ignored: {
+      label: "Beiseitegelegt",
+      meaning: "Gelassen, zählt nicht mit",
+      hint: "Die hast du gelassen, wie sie sind. Sie zählen nicht mit.",
+    },
+  },
+  crashCount: (count) => (count === 1 ? "1 Absturzgefahr" : `${count} Absturzgefahren`),
+  partTitle: {
+    crash: "Zuerst: was das Spiel abstürzen lassen kann",
+    "one-click": "Mit einem Klick in deiner Mod-Verwaltung",
+    decide: "Entscheiden, welche Mod gewinnt",
+    yourself: "Selbst erledigen",
+    advice: "Empfehlungen",
+    notes: "Gut zu wissen, nichts zu tun",
+    ignored: "Beiseitegelegt, zählt nicht mit",
+  },
+  emptyCategory: "Hier ist gerade nichts.",
+  toToolbox: "Zum Werkzeugkasten",
+  toMods: "Zu den Mods",
 };
 
 const taskRowTexts: Record<Lang, TaskRowTexts> = { en, de };
