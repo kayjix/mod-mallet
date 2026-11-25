@@ -1012,6 +1012,8 @@ mod tests {
                 (AnchorKind::VisibleWhenDistant, None),
             ]
         );
+        // Only the distant view ties it: hidden, it may still show from afar.
+        assert_eq!(AnchorVerdict::of(tower), AnchorVerdict::Careful);
         assert_eq!(well.as_slice(), []);
         assert_eq!(AnchorVerdict::of(well), AnchorVerdict::Free);
     }

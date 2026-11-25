@@ -71,7 +71,7 @@
           "const": "quest-alias"
         },
         {
-          "description": "The worldspace counts it among its large objects, which are drawn\nfrom afar.",
+          "description": "The worldspace counts it among its large objects, which are drawn\nfrom afar. Hidden, it may still show from a distance until the\ndistant view is generated again.",
           "type": "string",
           "const": "large-reference"
         },
@@ -168,7 +168,7 @@
           "const": "careful"
         },
         {
-          "description": "Hiding it would break the game: a door with a way through, an\nobject a quest names, a large object of the distant view.",
+          "description": "Hiding it would break the game: a door with a way through, or an\nobject a quest names.",
           "type": "string",
           "const": "locked"
         }

@@ -37,8 +37,8 @@ pub enum AnchorVerdict {
     /// It can be hidden, but something still uses it or it is seen from
     /// afar; the reasons say what.
     Careful,
-    /// Hiding it would break the game: a door with a way through, an
-    /// object a quest names, a large object of the distant view.
+    /// Hiding it would break the game: a door with a way through, or an
+    /// object a quest names.
     Locked,
 }
 
@@ -85,7 +85,8 @@ pub enum AnchorKind {
     /// A quest names it as one of its parts (a forced alias).
     QuestAlias,
     /// The worldspace counts it among its large objects, which are drawn
-    /// from afar.
+    /// from afar. Hidden, it may still show from a distance until the
+    /// distant view is generated again.
     LargeReference,
     /// Using it activates the other.
     ActivateParent,
@@ -114,8 +115,9 @@ impl AnchorKind {
     /// side is not gone.
     pub fn verdict(self) -> AnchorVerdict {
         match self {
-            Self::TeleportDoor | Self::QuestAlias | Self::LargeReference => AnchorVerdict::Locked,
-            Self::ActivateParent
+            Self::TeleportDoor | Self::QuestAlias => AnchorVerdict::Locked,
+            Self::LargeReference
+            | Self::ActivateParent
             | Self::EnableParent
             | Self::LinkedRef
             | Self::LocationRole
@@ -189,6 +191,20 @@ mod tests {
             AnchorVerdict::of(&[
                 tie(AnchorKind::LinkedRef, Some(OtherState::Present)),
                 tie(AnchorKind::TeleportDoor, Some(OtherState::Off)),
+            ]),
+            AnchorVerdict::Locked
+        );
+    }
+
+    #[test]
+    fn a_large_object_of_the_distant_view_alone_may_be_hidden_with_a_warning() {
+        let reasons = [tie(AnchorKind::LargeReference, None)];
+        assert_eq!(AnchorVerdict::of(&reasons), AnchorVerdict::Careful);
+        // Doors and quests still lock what is also a large object.
+        assert_eq!(
+            AnchorVerdict::of(&[
+                tie(AnchorKind::LargeReference, None),
+                tie(AnchorKind::QuestAlias, Some(OtherState::Present)),
             ]),
             AnchorVerdict::Locked
         );

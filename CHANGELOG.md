@@ -106,6 +106,14 @@ in [Releases](docs/src/contributing/releases.md).
   Re-attaching the characters' paths to it comes with the repair of the
   paths (ADR 0067).
 
+### Changed
+
+- Large objects of the distant view, such as big rocks, are no longer
+  "needed, stays": they can be hidden anyway, with the warning that they
+  may still show from afar until the distant view (LOD) is generated
+  again with DynDOLOD or xLODGen. Doors with a way through and objects a
+  quest needs stay locked (ADR 0046).
+
 ## [0.2.2] - 2026-11-19
 
 ### Changed

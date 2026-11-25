@@ -612,7 +612,8 @@ export const texts: Record<Lang, Texts> = {
     anchorKinds: {
       "teleport-door": (other) => `A door with a way through${other ? ` to ${other}` : ""}`,
       "quest-alias": (other) => `A quest needs it${other ? ` (${other})` : ""}`,
-      "large-reference": () => "Part of the world's distant view",
+      "large-reference": () =>
+        "Part of the far view: hidden up close, but it may still show from a distance until LOD is rebuilt (DynDOLOD or xLODGen)",
       "activate-parent": (other) => `It sets off ${other || "other objects"}`,
       "enable-parent": (other) =>
         `It switches other objects on and off${other ? `, such as ${other}` : ""}; they stay as they are`,
@@ -1024,7 +1025,8 @@ export const texts: Record<Lang, Texts> = {
     anchorKinds: {
       "teleport-door": (other) => `Eine Tür mit Durchgang${other ? ` nach ${other}` : ""}`,
       "quest-alias": (other) => `Eine Quest braucht es${other ? ` (${other})` : ""}`,
-      "large-reference": () => "Teil der Fernansicht der Welt",
+      "large-reference": () =>
+        "Teil der Fernansicht: aus der Nähe ausgeblendet, aber von Weitem ist es vielleicht noch zu sehen, bis das LOD neu erstellt ist (DynDOLOD oder xLODGen)",
       "activate-parent": (other) => `Es löst ${other || "andere Objekte"} aus`,
       "enable-parent": (other) =>
         `Es schaltet andere Objekte ein und aus${other ? `, etwa ${other}` : ""}; die bleiben, wie sie sind`,
