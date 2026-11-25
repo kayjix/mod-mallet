@@ -145,7 +145,10 @@ fn version_tools(game: Game, install: &Path) -> Vec<Tool> {
     use mallet_analysis::versions::{Verdict, verdict};
     use mallet_core::facts::versions::PluginDeclaration;
 
-    let dirs = [install.join(game.script_extender().plugin_dir)];
+    let dirs = [mallet_game_bethesda::locate::on_disk(
+        install,
+        game.script_extender().plugin_dir,
+    )];
     let facts = versions::read(game, install, &dirs);
     let Some(game_version) = facts.game else {
         return Vec::new();

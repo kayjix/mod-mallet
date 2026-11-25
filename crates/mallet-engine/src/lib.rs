@@ -514,7 +514,7 @@ fn read_versions(
                 .map(|folder| folder.join(below.as_str()))
                 .collect()
         });
-    dirs.push(install.join(plugin_dir.as_str()));
+    dirs.push(locate::on_disk(&install, plugin_dir.as_str()));
     let versions = mallet_game_bethesda::versions::read(game, &install, &dirs);
     tracing::info!(
         game = ?versions.game.map(|version| version.to_string()),
@@ -983,10 +983,10 @@ fn without_removed_plugins(
 ) -> ExtenderReport {
     // Without the game's data folder there is nothing to compare with; the
     // scan reports that on its own.
-    if !game_dir.join("Data").is_dir() {
+    if !locate::on_disk(game_dir, "data").is_dir() {
         return report;
     }
-    let dir = game_dir.join(report.plugin_dir.as_str());
+    let dir = locate::on_disk(game_dir, report.plugin_dir.as_str());
     // Mod Organizer shows the game the plugins in the mods' folders.
     let below_data = report.plugin_dir.strip_base(&GamePath::new("data"));
     let virtual_dirs: Vec<PathBuf> = below_data.map_or_default(|below| {

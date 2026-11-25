@@ -395,3 +395,51 @@ mod tests {
         }
     }
 }
+
+/// `relative` (folders separated by `/`) below `base`, as it is spelt on
+/// disk. Windows does not care how a folder's name is spelt; Linux does,
+/// and games keep `Data`, `SKSE` and `Plugins` in whatever case their
+/// installers chose. Each folder is matched without regard to case; where
+/// none matches, the rest is joined as written, so the result names the
+/// place even if it does not exist. Only reads directory listings.
+pub fn on_disk(base: &Path, relative: &str) -> PathBuf {
+    let mut path = base.to_path_buf();
+    for part in relative.split('/').filter(|part| !part.is_empty()) {
+        let exact = path.join(part);
+        let found = std::fs::read_dir(&path).ok().and_then(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name())
+                .find(|name| name.to_string_lossy().eq_ignore_ascii_case(part))
+        });
+        path = match found {
+            Some(name) => path.join(name),
+            None => exact,
+        };
+    }
+    path
+}
+
+#[cfg(test)]
+mod on_disk_tests {
+    use super::on_disk;
+
+    #[test]
+    fn folders_are_found_however_they_are_spelt() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("Data").join("SKSE").join("Plugins")).unwrap();
+        let found = on_disk(root.path(), "data/skse/plugins");
+        assert_eq!(found, root.path().join("Data").join("SKSE").join("Plugins"));
+        assert!(found.is_dir());
+    }
+
+    #[test]
+    fn a_missing_folder_is_joined_as_written() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("Data")).unwrap();
+        assert_eq!(
+            on_disk(root.path(), "data/skse/plugins"),
+            root.path().join("Data").join("skse").join("plugins")
+        );
+    }
+}
