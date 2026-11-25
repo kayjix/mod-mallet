@@ -118,8 +118,13 @@ button.quiet:where([aria-pressed="true"]) {
   font-size: 0.78rem;
 }
 
+/* Text for screen readers only. Pinned to the corner of the box it belongs
+   to: left where it would stand, inside a list that scrolls, it would stretch
+   the window below its content. */
 .visually-hidden {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;

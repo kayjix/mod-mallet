@@ -6,6 +6,7 @@
 /* ---- the mark of how bad it is ------------------------------------------ */
 
 .severity-mark {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
