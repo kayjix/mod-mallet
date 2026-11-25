@@ -51,6 +51,7 @@ import { Places } from "./Places";
 import { type PatchChoices, withoutDecidedPins } from "./patch";
 import { bookFromChoices, countedChoices, withChange } from "./patch-book";
 import { pinTexts } from "./pins";
+import { PreferencesHost } from "./preferences-ui";
 import { Review } from "./Review";
 import { useReviewTexts } from "./review-texts";
 import { SettingsView } from "./Settings";
@@ -680,6 +681,7 @@ export default function App({ api, startLang }: AppProps) {
 
   return (
     <SessionContext value={session}>
+      <PreferencesHost report={askFirst ? null : report} />
       <div className="shell">
         <Sidebar
           view={current}

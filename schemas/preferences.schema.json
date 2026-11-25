@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PatchPreferences",
+  "description": "What the user said about preferences between their mods, for one game.",
+  "type": "object",
+  "properties": {
+    "answers": {
+      "description": "The user's answers to preferences learned and offered, by the\npreference's identity.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/PreferenceAnswer"
+      },
+      "default": {}
+    },
+    "applied": {
+      "description": "The decisions made by applying a preference, by their key among the\ndecisions: the identity of the preference that made each.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "learningOff": {
+      "description": "Whether the user switched learning off: then only the preferences\nthey set themselves count, and nothing is offered.",
+      "type": "boolean"
+    },
+    "rules": {
+      "description": "The preferences the user set themselves.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PreferenceRule"
+      }
+    }
+  },
+  "$defs": {
+    "PreferenceAnswer": {
+      "description": "The user's answer to a preference offered.",
+      "type": "object",
+      "properties": {
+        "answer": {
+          "description": "What they answered.",
+          "$ref": "#/$defs/PreferenceAnswerKind"
+        },
+        "at": {
+          "description": "How many decisions the preference rested on then, so that \"not\nnow\" can be asked again once there are more.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "answer"
+      ]
+    },
+    "PreferenceAnswerKind": {
+      "description": "The answers to a preference offered.",
+      "oneOf": [
+        {
+          "description": "Applied to the open conflicts; it keeps counting.",
+          "type": "string",
+          "const": "applied"
+        },
+        {
+          "description": "Not now: asked again once more decisions speak for it.",
+          "type": "string",
+          "const": "later"
+        },
+        {
+          "description": "Never: neither offered again nor used.",
+          "type": "string",
+          "const": "never"
+        }
+      ]
+    },
+    "PreferenceRule": {
+      "description": "A preference the user set: one mod kept over others.",
+      "type": "object",
+      "properties": {
+        "mod": {
+          "description": "The mod preferred, by the name the mod manager shows.",
+          "type": "string"
+        },
+        "over": {
+          "description": "The one mod it is preferred over; `None` for every other mod.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topic": {
+          "description": "What it is preferred for (`meshes`, `textures`, `faces`, `files`,\n`places`); `None` for everything.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mod"
+      ]
+    }
+  }
+}

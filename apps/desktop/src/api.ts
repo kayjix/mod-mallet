@@ -27,6 +27,7 @@ import type { MeshThumbnailRequest } from "./generated/mesh-thumbnail-request";
 import type { MeshView } from "./generated/mesh-view";
 import type { ObjectAnchors } from "./generated/object-anchors";
 import type { PatchBook } from "./generated/patch-book";
+import type { PatchPreferences } from "./generated/preferences";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
 import type { RenderedPlaces, ScanLocation } from "./generated/rendered-places";
@@ -266,6 +267,10 @@ export interface Api {
   patchBook(): Promise<PatchBook | null>;
   /** Remembers the user's patches. */
   setPatchBook(book: PatchBook): Promise<void>;
+  /** What the user said about preferences between mods (ADR 0086); null until anything. */
+  preferences(): Promise<PatchPreferences | null>;
+  /** Remembers what the user said about preferences between mods. */
+  setPreferences(preferences: PatchPreferences): Promise<void>;
   /** Reads the patch in an archive the user picked; nothing is installed. */
   loadPatchArchive(name: string, bytes: number[]): Promise<LoadedPatch>;
   /** The sides the user picked in duels between mods, by duel. */
@@ -357,6 +362,8 @@ const tauriApi: Api = {
   setPatchChoices: (choices) => invoke<void>("set_patch_choices", { choices }),
   patchBook: () => invoke<PatchBook | null>("patch_book"),
   setPatchBook: (book) => invoke<void>("set_patch_book", { book }),
+  preferences: () => invoke<PatchPreferences | null>("preferences"),
+  setPreferences: (preferences) => invoke<void>("set_preferences", { preferences }),
   loadPatchArchive: (name, bytes) => invoke<LoadedPatch>("load_patch_archive", { name, bytes }),
   decisions: () => invoke<Record<string, number>>("decisions"),
   setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),

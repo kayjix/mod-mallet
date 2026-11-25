@@ -38,6 +38,7 @@ import { PassageSummary } from "./passages";
 import { matchKey, type PatchChoices } from "./patch";
 import type { PathsOverlay } from "./paths-layer";
 import { PinButton } from "./pins";
+import { PreferenceMark } from "./preferences-ui";
 import { ReachNote, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
 import {
@@ -1254,6 +1255,12 @@ export function CollisionsStep({
               setSingles(side === 0 ? [!singles[0], singles[1]] : [singles[0], !singles[1]])
             }
             list={partList(partsOf(shownSegments, side))}
+            preference={
+              <PreferenceMark
+                spots={cluster.spots.map(({ item }) => item.spot)}
+                plugin={cluster.plugins[side]}
+              />
+            }
           />
         ))}
       </div>
@@ -1653,6 +1660,7 @@ function SideColumn({
   singles,
   onSingles,
   list,
+  preference,
 }: {
   side: 0 | 1;
   name: string;
@@ -1685,6 +1693,8 @@ function SideColumn({
   singles: boolean;
   onSingles: () => void;
   list: ReactNode;
+  /** The mark of a preference that keeps this side (ADR 0086). */
+  preference?: ReactNode;
 }) {
   const r = useReviewTexts();
   const c = useCollisionStepTexts();
@@ -1800,6 +1810,7 @@ function SideColumn({
             {r.suggestedTag}
           </Chip>
         )}
+        {preference}
         {kept && (
           <Chip tone="ok" icon>
             {c.keptHere}

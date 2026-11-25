@@ -61,6 +61,11 @@ pub struct Settings {
     /// decisions go to (ADR 0070). `None` until the window made it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub patch_book: Option<mallet_core::PatchBook>,
+    /// What the user said about preferences between their mods: the ones
+    /// they set, their answers to those offered, and whether learning is
+    /// on (ADR 0086). `None` until they said anything.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preferences: Option<mallet_core::PatchPreferences>,
     /// Which version of a thing of the catalogue the user had the mod
     /// manager put into the game, by the thing's identity: the version's
     /// identity (`mod:<folder>`, `game`, `archive:<name>`) (ADR 0054).
@@ -702,6 +707,14 @@ mod tests {
                 }],
                 active: "own".to_owned(),
                 pins: vec!["pin:spot:x".to_owned()],
+            }),
+            preferences: Some(mallet_core::PatchPreferences {
+                rules: vec![mallet_core::PreferenceRule {
+                    mod_name: "Better Blades".to_owned(),
+                    over: None,
+                    topic: Some("meshes".to_owned()),
+                }],
+                ..mallet_core::PatchPreferences::default()
             }),
             manager: Some("mo2".to_owned()),
         };

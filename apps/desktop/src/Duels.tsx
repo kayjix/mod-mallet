@@ -10,6 +10,7 @@ import type {
 } from "./generated/rendered-report";
 import "./assets.css";
 import { chooseFinding, decisionAt, type PatchChoices, pairFor, spotKey } from "./patch";
+import { PreferenceMark } from "./preferences-ui";
 
 /**
  * The side the collisions' worklist lets win at every spot of a duel (the
@@ -330,6 +331,7 @@ function DuelCard({
               <strong>{names[index]}</strong>
               {suggested === index && <span className="suggested-mark">{t.patchSuggested}</span>}
               {ranked === index && <span className="ranked-mark">{t.rankedMark}</span>}
+              <PreferenceMark duel={duel.id} side={index} />
               {decided === index && <span className="duel-winner">{t.duelWinner}</span>}
             </div>
           ))}

@@ -18,6 +18,15 @@ in [Releases](docs/src/contributing/releases.md).
   to the door you keep: the door triangles of the hidden doors are written
   into the patch's plugin Mod Mallet - Paths, and the door's card checks
   that characters reach the kept door and walk through it.
+- Mod Mallet notices when you keep choosing the same mod: for meshes,
+  textures, faces, other files or buildings, or one mod over another. A
+  small card says so ("you kept it 14 of 15 times") and offers to prefer
+  it in the conflicts still open, with a preview of each and one undo for
+  the whole batch. Where a preference covers a conflict, the collisions,
+  the guided review and the asset collisions mark it "suggested: your
+  preference". Settings → Preferences lists what was learned, lets you set
+  your own preferences, and switches learning off. Decisions that only
+  took a suggestion count little, and nothing leaves your computer.
 - After a Steam update of Skyrim Special Edition, Mod Mallet says which
   script extender plugins no longer fit before you start the game: it reads
   the game's version from its program and what each plugin says about the

@@ -5,6 +5,7 @@
 import type { MapPassage, RenderedReport } from "./generated/rendered-report";
 import { nearest } from "./map-places";
 import { usePassageTexts } from "./passage-texts";
+import { Note } from "./ui/kit";
 import "./passages.css";
 
 /** A plugin's name without its extension, to name a side. */

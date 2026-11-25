@@ -75,6 +75,7 @@ import {
 import type { PathsOverlay } from "./paths-layer";
 import { usePathsMode, withPaths } from "./paths-mode";
 import { PinButton, PinIcon, usePinTexts } from "./pins";
+import { PreferenceMark } from "./preferences-ui";
 import { ReachNote, usePaintReach, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
 import { type Cluster, collisionClusters, passageKey, spotsInPassages } from "./review-clusters";
@@ -1747,6 +1748,7 @@ function Spot(props: SpotProps & SpotFrameProps) {
         <div className="work-column-head">
           <strong title={side.plugin}>{shortName(side.plugin)}</strong>
           {side.suggested && <span className="suggested-mark">{t.patchSuggested}</span>}
+          <PreferenceMark spots={[spot]} plugin={side.plugin} />
           <LocateButton objects={side.parts.map((part) => part.object)} at={spot.position} />
         </div>
         <div className="work-side" data-left={left || undefined}>

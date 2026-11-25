@@ -259,6 +259,22 @@ fn set_patch_book(book: mallet_core::PatchBook) -> Result<(), String> {
     Ok(())
 }
 
+/// What the user said about preferences between their mods for the game
+/// in use (ADR 0086); `None` until they said anything.
+#[tauri::command(async)]
+fn preferences() -> Result<Option<mallet_core::PatchPreferences>, String> {
+    Ok(settings()?.preferences)
+}
+
+/// Remembers what the user said about preferences between their mods.
+/// Only ever called because the user set a preference, answered one, or
+/// switched learning on or off.
+#[tauri::command(async)]
+fn set_preferences(preferences: mallet_core::PatchPreferences) -> Result<(), String> {
+    change_settings(|settings| settings.preferences = Some(preferences))?;
+    Ok(())
+}
+
 /// Reads the patch in an archive the user picked, by its file name and its
 /// bytes. Nothing is installed or written.
 #[tauri::command(async)]
@@ -1040,6 +1056,8 @@ pub fn run() -> tauri::Result<()> {
             set_patch_choices,
             patch_book,
             set_patch_book,
+            preferences,
+            set_preferences,
             load_patch_archive,
             games,
             select_game

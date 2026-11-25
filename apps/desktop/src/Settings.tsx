@@ -5,6 +5,8 @@ import type { RenderedPlaces } from "./generated/rendered-places";
 import { applyTheme, initialTheme, type Lang, languages, type Theme } from "./i18n";
 import { InfoTip } from "./info-tip";
 import { Places } from "./Places";
+import { preferenceTexts } from "./preference-texts";
+import { PreferencesSection } from "./preferences-settings";
 import { graphicsCard } from "./render-stats";
 import { settingsTexts } from "./settings-texts";
 import { PageHeader, Segmented, Tabs } from "./ui/kit";
@@ -18,7 +20,7 @@ interface SettingsProps {
   onLive: (live: boolean) => void;
 }
 
-type Tab = "general" | "places" | "about";
+type Tab = "general" | "places" | "preferences" | "about";
 
 /** One setting: what it is on the left, the control on the right. */
 function Row({ label, note, children }: { label: string; note?: string; children: ReactNode }) {
@@ -69,6 +71,7 @@ export function SettingsView({
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: s.settingsTabGeneral },
     { id: "places", label: s.settingsTabPlaces },
+    { id: "preferences", label: preferenceTexts[lang].tab },
     { id: "about", label: s.settingsTabAbout },
   ];
   const themes: { id: Theme; label: string }[] = [
@@ -139,6 +142,8 @@ export function SettingsView({
           </div>
         </section>
       )}
+
+      {tab === "preferences" && <PreferencesSection />}
 
       {tab === "about" && (
         <section className="panel">

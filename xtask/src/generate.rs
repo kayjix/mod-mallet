@@ -140,6 +140,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "schemas/loaded-patch.schema.json",
         "apps/desktop/src/generated/loaded-patch.ts",
     ),
+    (
+        "schemas/preferences.schema.json",
+        "apps/desktop/src/generated/preferences.ts",
+    ),
 ];
 
 /// A file and the content it should have.
@@ -191,6 +195,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         )?,
         schema_of::<mallet_core::PatchBook>("schemas/patch-book.schema.json")?,
         schema_of::<mallet_core::LoadedPatch>("schemas/loaded-patch.schema.json")?,
+        schema_of::<mallet_core::PatchPreferences>("schemas/preferences.schema.json")?,
         Generated {
             path: "docs/src/reference/findings.md",
             content: finding_catalog(),

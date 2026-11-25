@@ -35,6 +35,7 @@ pub mod mods;
 pub mod moves;
 pub mod patch;
 pub mod path;
+pub mod preferences;
 pub mod progress;
 pub mod reach;
 pub mod report;
@@ -56,6 +57,7 @@ pub use patch::{
     PatchBook, PatchInGame, PatchManifest, PatchPart,
 };
 pub use path::GamePath;
+pub use preferences::{PatchPreferences, PreferenceAnswer, PreferenceAnswerKind, PreferenceRule};
 pub use progress::{Progress, ScanProgress, ScanStep};
 pub use report::{
     FilePreview, GameChoice, GameInfo, GameLack, GameSupport, InstalledPatch, KnownGame,

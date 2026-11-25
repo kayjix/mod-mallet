@@ -15,6 +15,7 @@ import type { MeshThumbnail } from "../generated/mesh-thumbnail";
 import type { MeshView } from "../generated/mesh-view";
 import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
 import type { PatchBook } from "../generated/patch-book";
+import type { PatchPreferences } from "../generated/preferences";
 import type { RenderedPlaces } from "../generated/rendered-places";
 import type {
   Finding,
@@ -1521,6 +1522,7 @@ let ranked: string[] = [];
 // The user's patches, as the settings keep them (ADR 0070); none yet, so
 // the first is made from the choices below.
 let book: PatchBook | null = null;
+let preferences: PatchPreferences | null = null;
 // A decision made while Gone Mod was on; it waits while the mod is off.
 let chosen: Record<string, string | null> | null = {
   "objects.overlapping:pair:file:data/gone mod.esp+file:data/old town.esp": "Gone Mod.esp",
@@ -1953,6 +1955,11 @@ export const sampleApi: Api = {
   patchBook: () => later(book === null ? null : structuredClone(book)),
   setPatchBook: (next) => {
     book = structuredClone(next);
+    return later(undefined);
+  },
+  preferences: () => later(preferences === null ? null : structuredClone(preferences)),
+  setPreferences: (next) => {
+    preferences = structuredClone(next);
     return later(undefined);
   },
   // The sample reads every archive as a small patch by someone else.

@@ -29,6 +29,7 @@ import type { Texts } from "./i18n";
 import { InfoTip } from "./info-tip";
 import { MeshThumb } from "./mesh-thumb";
 import { fileDuels } from "./Overview";
+import { PreferenceMark } from "./preferences-ui";
 import { PageHeader, SearchField, Tabs, Toolbar, UndoButton } from "./ui/kit";
 import { Stage, type StageItem } from "./Viewer3D";
 
@@ -769,7 +770,7 @@ function DuelDecision({
       </div>
       <p className="aside compare-why">
         {ranked !== null && <span className="ranked-mark">{t.rankedFor(names[ranked])}</span>}{" "}
-        {rendered.suggestion}
+        <PreferenceMark duel={duel.id} named /> {rendered.suggestion}
       </p>
       <p className="aside">{rendered.topicLabels.join(" · ")}</p>
       {decided !== undefined && (
