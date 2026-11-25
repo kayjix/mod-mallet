@@ -120,7 +120,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 │ │ [ Scan ]  14:02 ·live│ │
 │ └──────────────────────┘ │
 │ ▣ Overview               │
-│ ➜ Go through it   3/5    │  ← the guided review (ADR 0050)
+│ ➜ Step by step   3/5    │  ← the guided review (ADR 0050)
 │ ☑ Tasks              12  │  ← open tasks (ADR 0045 counts.tasks)
 │ ⧉ Map collisions     37  │  ← open spots
 │ ▨ Asset collisions    4  │  ← duels about files without a side picked
@@ -155,7 +155,7 @@ Toolbox, Settings: beside the game's pages, always reachable
 |---|---|---|---|
 | **Start** (all games) | Choose what to do and which game | the game in use with its state and the way to what is open; a card per game to switch | list findings, decide anything |
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
-| **Go through it** | Lead through the setup step by step, and remember how far | the steps in order; a step's own items, shown by the homes' own rows | own any item: it is a path through the homes (ADR 0050) |
+| **Step by step** | Lead through the setup step by step, and remember how far | the steps in order; a step's own items, shown by the homes' own rows | own any item: it is a path through the homes (ADR 0050) |
 | **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
 | **Map collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
 | **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
@@ -252,11 +252,11 @@ to switch to another. The start page is that page, reached by the name
 place for the reasons behind the score. The window opens on the overview
 of the game in use; the start page is one click away.
 
-#### Go through it
+#### Step by step
 
 ```text
-┌─ Go through it ───────────────────────────────────────────────────┐
-│ ① Installation ✓  ② Load order ✓  ③ Assets 2  ④ Map  ⑤ Collisions │
+┌─ Step by step ───────────────────────────────────────────────────┐
+│ ① Installation ✓  ② Assets 2  ③ World map  ④ Collisions  ⑤ Report │
 ├───────────────────────────────────────────────────────────────────┤
 │ Collisions · structure 4 of 31        Lux Via ⟷ JK's Outskirts    │
 │ ┌─────────────────┬─────────────────┬─────────────────┐           │
@@ -269,11 +269,14 @@ of the game in use; the start page is one click away.
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-The guided review walks through five steps: the installation, the load
-order, the assets, the world map and the collisions. The first four show
-the homes' own rows (the task page's finding rows, the assets page's duel
-lines) and lead to the home where more is needed; the collisions are
-decided in the review itself, one structure at a time. A structure is
+The guided review walks through five steps: the installation (with the
+plugins and their order, which the mod manager sets), the assets, a map
+of where the collisions are, the collisions and a report. The
+installation opens with who does what: Mod Mallet decides, the mod
+manager carries out, the game shows. The assets show the biggest duels in
+pictures, the map leads to each place, and the report says what the
+patch does, what is still open and what to try in the game (ADR 0083).
+The collisions are decided in the review itself, one place at a time. A structure is
 the parts of one mod that hang together; the stage shows the place as it
 is now, with only the one structure and with only the other, through one
 camera. Deciding writes the same patch choices the collisions page

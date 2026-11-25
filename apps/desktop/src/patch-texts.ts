@@ -284,7 +284,7 @@ const en: PatchTexts = {
   objectsHere: (count) => plural(count, "hidden object", "hidden objects"),
   chipLabel: "Decisions go to",
   chipHint:
-    "Everything you decide in Map collisions, Go through it, Asset collisions and the 3D views goes into this patch. Pick another one here, or start a new one.",
+    "Everything you decide in Map collisions, Step by step, Asset collisions and the 3D views goes into this patch. Pick another one here, or start a new one.",
   duplicate: "Duplicate",
   duplicateHint:
     "Copies this patch into a new one that you then edit, and switches the original off here, so you can work from it as a starting point. Vortex keeps the original until you switch it off there or install the copy.",
@@ -472,7 +472,7 @@ const de: PatchTexts = {
     count === 1 ? "1 ausgeblendetes Objekt" : `${count} ausgeblendete Objekte`,
   chipLabel: "Entscheidungen gehen in",
   chipHint:
-    "Alles, was du unter Karten-Kollisionen, Durchgehen, Asset-Kollisionen und in den 3D-Ansichten entscheidest, kommt in diesen Patch. Wähle hier einen anderen, oder beginne einen neuen.",
+    "Alles, was du unter Karten-Kollisionen, Schritt für Schritt, Asset-Kollisionen und in den 3D-Ansichten entscheidest, kommt in diesen Patch. Wähle hier einen anderen, oder beginne einen neuen.",
   duplicate: "Duplizieren",
   duplicateHint:
     "Kopiert diesen Patch in einen neuen, den du dann bearbeitest, und schaltet das Original hier aus – so arbeitest du von ihm aus weiter. In Vortex bleibt das Original, bis du es dort ausschaltest oder die Kopie installierst.",

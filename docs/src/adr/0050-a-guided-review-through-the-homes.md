@@ -1,6 +1,6 @@
 # 0050 A guided review through the homes, collisions structure by structure
 
-- Status: accepted; changed by [ADR 0072](0072-passages-where-two-mods-build-the-same.md): passages come first; by [ADR 0080](0080-collisions-decided-by-side-with-the-pictures.md): the collisions step is laid out by side
+- Status: accepted; changed by [ADR 0072](0072-passages-where-two-mods-build-the-same.md): passages come first; by [ADR 0080](0080-collisions-decided-by-side-with-the-pictures.md): the collisions step is laid out by side; by [ADR 0083](0083-step-by-step-says-what-is-at-stake.md): called Step by step, five steps, the load order part of the installation
 - Date: 2026-11-19
 - Changes: ADR 0048 (every thing has one home: a second exception), ADR 0040
   (collisions decided spot by spot: also structure by structure)

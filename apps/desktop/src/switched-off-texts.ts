@@ -200,8 +200,9 @@ export const wideTexts: Record<Lang, WideTexts> = {
     cancel: "Cancel",
     bulk: (mod, places, clear) =>
       `${mod} collides in ${places} places, but in ${clear} of them one object is far larger than the other, so the decision is clear.`,
-    bulkNote: "Go through it and take every clear suggestion at once; only the rest needs a look.",
-    toReview: "Go through it",
+    bulkNote:
+      "Go through them step by step and take every clear suggestion at once; only the rest needs a look.",
+    toReview: "Step by step",
     keep: (mod, places, rooms) =>
       `${mod} collides in ${places} places, but furnishes ${
         rooms === 1 ? "a room" : `${rooms} rooms`
@@ -232,7 +233,7 @@ export const wideTexts: Record<Lang, WideTexts> = {
       `${mod} kollidiert an ${places} Orten, aber an ${clear} davon ist ein Objekt viel größer als das andere, die Entscheidung also klar.`,
     bulkNote:
       "Geh sie durch und übernimm alle klaren Vorschläge auf einmal; nur der Rest braucht einen Blick.",
-    toReview: "Durchgehen",
+    toReview: "Schritt für Schritt",
     keep: (mod, places, rooms) =>
       `${mod} kollidiert an ${places} Orten, richtet aber ${
         rooms === 1 ? "einen eigenen Raum" : `${rooms} eigene Räume`

@@ -92,7 +92,7 @@ export interface ReviewTexts {
 }
 
 const en: ReviewTexts = {
-  nav: "Go through it",
+  nav: "Step by step",
   step: {
     install: {
       title: "Installation",
@@ -112,7 +112,7 @@ const en: ReviewTexts = {
   },
   open: (count) => `${count} open`,
   continueAt: (step) => `Continue: ${step}`,
-  start: "Go through it",
+  start: "Step by step",
   more: (count) => `${count} more on the page itself`,
   toTasks: "To the tasks",
   toMods: "To the mods",
@@ -192,7 +192,7 @@ const en: ReviewTexts = {
 };
 
 const de: ReviewTexts = {
-  nav: "Durchgehen",
+  nav: "Schritt für Schritt",
   step: {
     install: {
       title: "Installation",
@@ -212,7 +212,7 @@ const de: ReviewTexts = {
   },
   open: (count) => `${count} offen`,
   continueAt: (step) => `Weiter: ${step}`,
-  start: "Durchgehen",
+  start: "Schritt für Schritt",
   more: (count) => `${count} weitere auf der Seite selbst`,
   toTasks: "Zu den Aufgaben",
   toMods: "Zu den Mods",

@@ -108,6 +108,7 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0080](0080-collisions-decided-by-side-with-the-pictures.md) | The collisions step is decided by side, with the pictures | accepted |
 | [0081](0081-one-source-of-truth-for-decisions.md) | One source of truth for decisions | accepted |
 | [0082](0082-task-page-tiles-by-category.md) | The task page: tiles by category over one list | accepted |
+| [0083](0083-step-by-step-says-what-is-at-stake.md) | "Step by step" says what is at stake in every step | accepted |
 | [0085](0085-pictures-of-meshes-and-a-faster-relief.md) | Pictures of meshes are drawn in the engine; the relief reads its textures from an index | accepted |
 | [0088](0088-door-paths-re-attached-to-the-kept-door.md) | The paths of merged doors are re-attached to the kept door | accepted |
 | [0089](0089-when-the-game-rewrites-the-load-order.md) | When the game rewrites the load order, it is told why | accepted |
