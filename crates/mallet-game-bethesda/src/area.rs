@@ -18,9 +18,9 @@ use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, group
 
 use crate::game::Game;
 use crate::ingest;
-use crate::objects::{
+use crate::records::{
     FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, FLAG_VISIBLE_WHEN_DISTANT, editor_id,
-    floats, model_path, record_id,
+    floats, model_path, record_id, spelt_name,
 };
 use crate::terrain;
 
@@ -510,10 +510,7 @@ fn read_models(plugins: &[(String, PathBuf)]) -> HashMap<RecordId, BaseModel> {
                     && !model.contains("marker")
             }) {
                 Some(model) => {
-                    let shown = (!read.header.is_localized)
-                        .then(|| record.first(b"FULL").map(plugin::zstring))
-                        .flatten()
-                        .filter(|name| !name.is_empty());
+                    let shown = spelt_name(record, read.header.is_localized);
                     models.insert(
                         id,
                         BaseModel {

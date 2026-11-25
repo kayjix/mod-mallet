@@ -23,7 +23,7 @@ use crate::destinations::{self, Collector};
 use crate::game::Game;
 use crate::ingest;
 use crate::navmeshes::NAVMESH;
-use crate::objects::{FLAG_DELETED, editor_id, record_id};
+use crate::records::{FLAG_DELETED, editor_id, record_id};
 use crate::terrain;
 
 /// The cells to read.

@@ -15,14 +15,13 @@ use mallet_core::facts::navmeshes::{NavmeshChange, NavmeshChanges};
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
+use crate::records::{FLAG_DELETED, editor_id, record_id};
+
 /// The record type of navigation meshes.
 pub const NAVMESH: Signature = *b"NAVM";
 
 /// The records read from the groups of places for the navigation meshes.
 pub const RECORDS: [Signature; 1] = [NAVMESH];
-
-/// Record flag: the record is deleted.
-const FLAG_DELETED: u32 = 0x0000_0020;
 
 /// The navigation meshes of other plugins that `plugin`, named
 /// `plugin_name`, changes, and the doors its own connect; `None` if there
@@ -106,21 +105,6 @@ fn doors(record: &Record, masters: &[String], plugin_name: &str) -> Option<Vec<R
             .map(|door| record_id(door, masters, plugin_name))
             .collect(),
     )
-}
-
-fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
-    let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-    RecordId {
-        plugin: origin.to_lowercase(),
-        local_id,
-    }
-}
-
-fn editor_id(record: &Record) -> Option<String> {
-    record
-        .first(b"EDID")
-        .map(plugin::zstring)
-        .filter(|name| !name.is_empty())
 }
 
 #[cfg(test)]

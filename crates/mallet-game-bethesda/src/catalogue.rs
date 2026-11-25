@@ -24,8 +24,9 @@ use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature};
 use mallet_formats_bethesda::strings;
 
 use crate::game::{Family, Game};
+use crate::ingest;
 use crate::lod_library::LodLibrary;
-use crate::{ingest, objects};
+use crate::records::{self, FLAG_DELETED};
 
 /// The record types read for the catalogue.
 pub const RECORDS: [Signature; 22] = [
@@ -33,9 +34,6 @@ pub const RECORDS: [Signature; 22] = [
     *b"MISC", *b"BOOK", *b"ALCH", *b"INGR", *b"KEYM", *b"SLGM", *b"SCRL", *b"FURN", *b"CONT",
     *b"DOOR", *b"ACTI", *b"FLOR", *b"LIGH",
 ];
-
-/// Record flag: the record is deleted.
-const FLAG_DELETED: u32 = 0x0000_0020;
 
 /// Record flag of armour: it cannot be worn by players (a creature's skin,
 /// for example).
@@ -118,7 +116,7 @@ impl Collector {
         let masters = &plugin.header.masters;
         let localized = plugin.header.is_localized;
         for record in &plugin.records {
-            let id = objects::record_id(record.form_id, masters, plugin_name);
+            let id = records::record_id(record.form_id, masters, plugin_name);
             if record.flags & FLAG_DELETED != 0 {
                 self.records.remove(&id);
                 continue;
@@ -435,7 +433,7 @@ fn entry(
     localized: bool,
     names: &HashMap<u32, String>,
 ) -> Entry {
-    let id = |form_id: u32| objects::record_id(form_id, masters, plugin_name);
+    let id = |form_id: u32| records::record_id(form_id, masters, plugin_name);
     let form_ids = |data: &[u8]| -> Vec<RecordId> {
         data.as_chunks::<4>()
             .0
@@ -456,7 +454,7 @@ fn entry(
     };
     let mut entry = Entry {
         signature: record.signature,
-        editor_id: objects::editor_id(record),
+        editor_id: records::editor_id(record),
         name: name(record, localized, names),
         model: model(record, *b"MODL"),
         keywords: record.first(b"KWDA").map_or_default(form_ids),
@@ -580,16 +578,7 @@ fn material(keyword: &str) -> Option<String> {
 /// The name players see: `FULL`, looked up in the string table for a
 /// localized plugin.
 fn name(record: &Record, localized: bool, names: &HashMap<u32, String>) -> Option<String> {
-    record
-        .first(b"FULL")
-        .and_then(|data| {
-            if localized {
-                let number = u32::from_le_bytes(data.get(..4)?.try_into().ok()?);
-                names.get(&number).cloned()
-            } else {
-                Some(plugin::zstring(data))
-            }
-        })
+    records::full_name(record, localized, names)
         .map(|name| name.trim().to_owned())
         .filter(|name| !name.is_empty())
 }

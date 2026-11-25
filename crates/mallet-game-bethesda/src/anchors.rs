@@ -19,9 +19,9 @@ use mallet_formats_bethesda::plugin::{self, PluginHeader, Record, Signature};
 
 use crate::game::Game;
 use crate::ingest;
-use crate::objects::{
+use crate::records::{
     FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, FLAG_VISIBLE_WHEN_DISTANT, editor_id,
-    floats,
+    floats, spelt_name,
 };
 
 /// The kinds of placed objects: things, characters, creatures and
@@ -457,11 +457,7 @@ fn form_id_at(data: &[u8], offset: usize) -> Option<u32> {
 /// The name of a base object, keyword or role: what players see, or else
 /// the internal name.
 fn name_of(record: &Record, localized: bool) -> Option<String> {
-    (!localized)
-        .then(|| record.first(b"FULL").map(plugin::zstring))
-        .flatten()
-        .filter(|name| !name.is_empty())
-        .or_else(|| editor_id(record))
+    spelt_name(record, localized).or_else(|| editor_id(record))
 }
 
 /// What a placed object points at, and what the game makes of it.

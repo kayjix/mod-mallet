@@ -18,9 +18,10 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::terrain::{
     SAMPLES_PER_CELL, TerrainCell, TerrainFacts, TerrainWorld, WorldspaceFacts,
 };
-use mallet_formats_bethesda::plugin::{self, Plugin, Record, group_type};
+use mallet_formats_bethesda::plugin::{Plugin, Record, group_type};
 
 use crate::game::{Family, Game};
+use crate::records::{editor_id, full_name, record_id};
 
 /// Points per side of the height grid of a cell.
 pub(crate) const GRID: usize = 33;
@@ -85,13 +86,7 @@ impl Contribution {
     /// of a localized plugin, by their number.
     pub fn of(plugin_name: &str, plugin: &Plugin, names: &HashMap<u32, String>) -> Self {
         let masters = &plugin.header.masters;
-        let id = |form_id: u32| {
-            let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-            RecordId {
-                plugin: origin.to_lowercase(),
-                local_id,
-            }
-        };
+        let id = |form_id: u32| record_id(form_id, masters, plugin_name);
         let label = |record: &Record, wanted: u32| {
             record
                 .groups
@@ -396,20 +391,8 @@ fn world_record(
     names: &HashMap<u32, String>,
     id: &dyn Fn(u32) -> RecordId,
 ) -> WorldRecord {
-    let editor_id = record
-        .first(b"EDID")
-        .map(plugin::zstring)
-        .filter(|name| !name.is_empty());
-    let title = record
-        .first(b"FULL")
-        .and_then(|data| {
-            if localized {
-                let number = u32::from_le_bytes(data.get(..4)?.try_into().ok()?);
-                names.get(&number).cloned()
-            } else {
-                Some(plugin::zstring(data))
-            }
-        })
+    let editor_id = editor_id(record);
+    let title = full_name(record, localized, names)
         .map(|title| title.trim().to_owned())
         .filter(|title| !title.is_empty());
     let parent = record

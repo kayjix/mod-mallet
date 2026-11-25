@@ -17,7 +17,7 @@ use mallet_formats_bethesda::plugin::{self, Record};
 
 use crate::game::Game;
 use crate::ingest;
-use crate::objects::record_id;
+use crate::records::record_id;
 
 /// Points per side of a quarter of a cell: half of the cell's 33, sharing
 /// the middle row and column.

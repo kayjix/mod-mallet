@@ -28,6 +28,10 @@ use mallet_core::facts::objects::{
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
 use crate::game::Game;
+use crate::records::{
+    FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, editor_id, floats, model_path,
+    record_id, spelt_name, whole,
+};
 
 /// The record types of base objects whose placement is compared.
 pub const BASE_TYPES: [(Signature, BaseKind); 8] = [
@@ -55,19 +59,6 @@ pub const PLACE_RECORDS: [Signature; 4] = [*b"REFR", *b"CELL", *b"WRLD", *b"LAND
 /// land, and the cells and worldspaces it belongs to.
 pub const LAND_RECORDS: [Signature; 3] = [*b"CELL", *b"WRLD", *b"LAND"];
 
-/// Record flag: the record is deleted.
-pub(crate) const FLAG_DELETED: u32 = 0x0000_0020;
-
-/// Record flag of references: the object is switched off when the game
-/// starts and only appears if a script switches it on.
-pub(crate) const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
-
-/// Record flag of references: the object is persistent.
-pub(crate) const FLAG_PERSISTENT: u32 = 0x0000_0400;
-
-/// Record flag of references: the object is part of the distant view.
-pub(crate) const FLAG_VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
-
 /// An object of the game counts as moved by a mod if the mod puts it at
 /// least this far, in game units, from where the game has it.
 const MOVED_DISTANCE: i64 = 32;
@@ -81,10 +72,6 @@ const MOVED_SCALE: i32 = 100;
 
 /// A full turn, in thousandths of a radian.
 const FULL_TURN: i32 = 6283;
-
-/// Positions farther out than this are not real places. The world is a
-/// few hundred thousand units wide.
-const MAX_COORDINATE: f32 = 1.0e7;
 
 /// The record types a plugin is read for, besides characters: the base
 /// objects always, the places only for plugins that are not the game's.
@@ -133,10 +120,7 @@ impl Collector {
                         BaseObject {
                             id: id(),
                             editor_id: editor_id(record),
-                            name: (!plugin.header.is_localized)
-                                .then(|| record.first(b"FULL").map(plugin::zstring))
-                                .flatten()
-                                .filter(|name| !name.is_empty()),
+                            name: spelt_name(record, plugin.header.is_localized),
                             model: model_path(record),
                             kind,
                             solid: is_solid(record),
@@ -298,35 +282,6 @@ fn base_kind(signature: Signature) -> Option<BaseKind> {
         .map(|(_, kind)| *kind)
 }
 
-pub(crate) fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
-    let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-    RecordId {
-        plugin: origin.to_lowercase(),
-        local_id,
-    }
-}
-
-pub(crate) fn editor_id(record: &Record) -> Option<String> {
-    record
-        .first(b"EDID")
-        .map(plugin::zstring)
-        .filter(|name| !name.is_empty())
-}
-
-/// The model of a record, as a path below the data directory.
-pub(crate) fn model_path(record: &Record) -> Option<String> {
-    let model = record.first(b"MODL").map(plugin::zstring)?;
-    let model = model.replace('\\', "/").to_ascii_lowercase();
-    if model.is_empty() {
-        return None;
-    }
-    Some(if model.starts_with("meshes/") {
-        model
-    } else {
-        format!("meshes/{model}")
-    })
-}
-
 /// Whether the model of a base object is one that can be seen and bumped
 /// into.
 fn is_solid(record: &Record) -> bool {
@@ -449,22 +404,6 @@ pub(crate) fn place(plugin_name: &str, masters: &[String], record: &Record) -> O
         Some(worldspace) => Some(Place::Exterior { worldspace }),
         None => label(group_type::CELL_CHILDREN).map(|cell| Place::Interior { cell }),
     }
-}
-
-pub(crate) fn floats(data: &[u8]) -> Vec<f32> {
-    data.as_chunks::<4>()
-        .0
-        .iter()
-        .map(|bytes| f32::from_le_bytes(*bytes))
-        .collect()
-}
-
-/// A coordinate rounded to a whole number, or `None` if it is not one a
-/// real place could have.
-#[allow(clippy::cast_possible_truncation)]
-pub(crate) fn whole(value: f32) -> Option<i32> {
-    // The range check makes the conversion exact up to rounding.
-    (value.is_finite() && value.abs() <= MAX_COORDINATE).then(|| value.round() as i32)
 }
 
 #[cfg(test)]

@@ -20,7 +20,7 @@ use mallet_formats_bethesda::navmesh_write::{EdgeLink, NONE, NavmeshData, Triang
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Signature, Subrecord, group_type};
 
 use crate::navmeshes::NAVMESH;
-use crate::objects::record_id;
+use crate::records::record_id;
 use crate::walkways::{Around, CHILDREN, holds_any, in_world};
 
 /// A navigation mesh repaired, ready to be written as an override.

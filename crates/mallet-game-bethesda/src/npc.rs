@@ -11,10 +11,11 @@
 //! [`npc_facts`] extracts the face-related fields in a form that compares
 //! equal exactly when two plugins describe the same face.
 
-use mallet_core::facts::{NpcFacts, RecordId};
-use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature};
+use mallet_core::facts::NpcFacts;
+use mallet_formats_bethesda::plugin::{Plugin, Record, Signature};
 
 use crate::game::{Family, Game};
+use crate::records::{editor_id, record_id};
 
 /// The record type of characters.
 pub const NPC: Signature = *b"NPC_";
@@ -76,22 +77,11 @@ pub fn npc_facts(game: Game, plugin_name: &str, plugin: &Plugin) -> Vec<NpcFacts
         .filter(|record| record.signature == NPC)
         .map(|record| NpcFacts {
             id: record_id(record.form_id, &plugin.header.masters, plugin_name),
-            editor_id: record
-                .first(b"EDID")
-                .map(plugin::zstring)
-                .filter(|name| !name.is_empty()),
+            editor_id: editor_id(record),
             inherits_appearance: inherits_appearance(record, fields),
             appearance: appearance(record, fields, &plugin.header.masters, plugin_name),
         })
         .collect()
-}
-
-fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
-    let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-    RecordId {
-        plugin: origin.to_lowercase(),
-        local_id,
-    }
 }
 
 /// Whether the character `record` of `game` takes its looks from its
@@ -171,7 +161,9 @@ fn appearance(
 mod tests {
     use std::io::Cursor;
 
+    use mallet_core::facts::RecordId;
     use mallet_formats_bethesda::fixture::{self, RecordSpec};
+    use mallet_formats_bethesda::plugin;
 
     use super::*;
 

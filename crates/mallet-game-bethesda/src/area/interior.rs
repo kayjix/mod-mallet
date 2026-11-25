@@ -13,7 +13,7 @@ use mallet_core::facts::RecordId;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, group_type};
 
 use super::{AreaObject, AreaReader, area_object};
-use crate::objects::{editor_id, record_id};
+use crate::records::{editor_id, record_id};
 
 /// An interior cell as the plugins have it.
 #[derive(Debug, Clone, PartialEq, Eq)]

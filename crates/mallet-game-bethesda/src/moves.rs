@@ -33,7 +33,7 @@ use mallet_formats_bethesda::plugin_write::{
 };
 
 use crate::game::Game;
-use crate::objects::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, record_id};
+use crate::records::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, record_id};
 
 /// The format of the plugins Mod Mallet writes for `game`, if it writes
 /// any for it. The fields copied are those of Skyrim Special Edition.
@@ -1292,10 +1292,10 @@ mod tests {
         // The second master's record, where the player now arrives, and
         // the facing kept.
         assert_eq!(read_u32(xtel, 0), Some(0x0100_0800));
-        let values = crate::objects::floats(xtel.get(4..28).unwrap());
+        let values = crate::records::floats(xtel.get(4..28).unwrap());
         assert_eq!(values, [100.0, 156.0, 0.0, 0.0, 0.0, 1.0]);
         // Nothing else moved.
-        let data = crate::objects::floats(door.first(b"DATA").unwrap());
+        let data = crate::records::floats(door.first(b"DATA").unwrap());
         assert_eq!(&data[..3], &[5.0, 5.0, 0.0]);
     }
 
@@ -1319,7 +1319,7 @@ mod tests {
             .unwrap();
         assert_eq!(object.form_id, 0x0000_0812);
         // The mod's version, moved: 110 + 10, 200 − 20, 0 + 5, turned 90°.
-        let data: Vec<f32> = crate::objects::floats(object.first(b"DATA").unwrap());
+        let data: Vec<f32> = crate::records::floats(object.first(b"DATA").unwrap());
         assert_eq!(&data[..3], &[120.0, 180.0, 5.0]);
         assert!((f64::from(data[5]) - std::f64::consts::FRAC_PI_2).abs() < 1e-6);
         // Its base and links pointed at the mod's own records: master 1 now.
@@ -1363,7 +1363,7 @@ mod tests {
             .unwrap();
         assert_eq!(object.form_id, 0x813);
         assert_eq!(
-            crate::objects::floats(object.first(b"DATA").unwrap())[2],
+            crate::records::floats(object.first(b"DATA").unwrap())[2],
             10.0
         );
     }
@@ -1410,7 +1410,7 @@ mod tests {
             Some(group_type::INTERIOR_BLOCK)
         );
         assert_eq!(
-            crate::objects::floats(object.first(b"DATA").unwrap())[1],
+            crate::records::floats(object.first(b"DATA").unwrap())[1],
             8.0
         );
     }

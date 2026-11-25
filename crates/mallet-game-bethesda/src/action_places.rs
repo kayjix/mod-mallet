@@ -20,7 +20,7 @@ use mallet_core::action_places::ActionKind;
 use mallet_core::facts::RecordId;
 use mallet_formats_bethesda::plugin::{self, Record, Signature};
 
-use crate::objects::{FLAG_DELETED, editor_id, model_path, record_id};
+use crate::records::{FLAG_DELETED, editor_id, model_path, record_id, spelt_name};
 
 /// The records read: furniture, idle markers and the keywords they name.
 const TYPES: [Signature; 3] = [*b"FURN", *b"IDLM", *b"KYWD"];
@@ -123,10 +123,7 @@ fn read_base(record: &Record, masters: &[String], plugin_name: &str, localized: 
     Read {
         idle_marker: &record.signature == b"IDLM",
         editor_id: editor_id(record),
-        name: (!localized)
-            .then(|| record.first(b"FULL").map(plugin::zstring))
-            .flatten()
-            .filter(|name| !name.is_empty()),
+        name: spelt_name(record, localized),
         model: model_path(record),
         keywords,
     }

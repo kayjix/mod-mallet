@@ -17,9 +17,11 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::PlacedDestination;
 use mallet_core::facts::objects::Place;
 use mallet_core::reach::DestinationKind;
-use mallet_formats_bethesda::plugin::{self, Record, Signature};
+use mallet_formats_bethesda::plugin::{Record, Signature};
 
-use crate::objects::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, floats, record_id};
+use crate::records::{
+    FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, floats, record_id, spelt_name,
+};
 
 /// The base records that make a placed object a destination.
 pub(crate) const BASES: [Signature; 3] = [*b"DOOR", *b"FURN", *b"IDLM"];
@@ -72,7 +74,7 @@ impl Collector {
         };
         let base = (record.flags & FLAG_DELETED == 0).then(|| Base {
             kind,
-            name: shown_name(record, localized).or_else(|| editor_id(record)),
+            name: spelt_name(record, localized).or_else(|| editor_id(record)),
         });
         self.bases.insert(id, base);
     }
@@ -175,22 +177,13 @@ fn placed(
             leads_to,
             map_marker,
             name: if map_marker {
-                shown_name(record, localized)
+                spelt_name(record, localized)
             } else {
                 None
             },
         },
         at,
     ))
-}
-
-/// The name players see, where the plugin spells it out rather than
-/// numbering it in a string table.
-fn shown_name(record: &Record, localized: bool) -> Option<String> {
-    (!localized)
-        .then(|| record.first(b"FULL").map(plugin::zstring))
-        .flatten()
-        .filter(|name| !name.is_empty())
 }
 
 /// A coordinate in whole game units.

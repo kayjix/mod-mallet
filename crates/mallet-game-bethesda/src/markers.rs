@@ -24,16 +24,7 @@ use mallet_formats_bethesda::strings;
 
 use crate::game::Game;
 use crate::meshes::LoadedArchive;
-
-/// Record flag: the record is deleted.
-const FLAG_DELETED: u32 = 0x0000_0020;
-
-/// Record flag of references: the object is switched off when the game
-/// starts.
-const FLAG_INITIALLY_DISABLED: u32 = 0x0000_0800;
-
-/// Positions farther out than this are not real places.
-const MAX_COORDINATE: f32 = 1.0e7;
+use crate::records::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, full_name, record_id, whole};
 
 /// The top-level group read for markers in the game's own plugins.
 pub const MARKER_GROUP: [Signature; 1] = [*b"WRLD"];
@@ -82,13 +73,7 @@ impl Contribution {
     /// name of a localized plugin by its number.
     pub fn of(plugin_name: &str, plugin: &Plugin, names: &HashMap<u32, String>) -> Self {
         let masters = &plugin.header.masters;
-        let id = |form_id: u32| {
-            let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-            RecordId {
-                plugin: origin.to_lowercase(),
-                local_id,
-            }
-        };
+        let id = |form_id: u32| record_id(form_id, masters, plugin_name);
         let mut entries = Vec::new();
         for record in plugin
             .records
@@ -303,25 +288,10 @@ fn position(record: &Record) -> Option<[i32; 3]> {
 /// The name of a marker: its `FULL` field, looked up in the string table
 /// for a localized plugin, else the reference's internal name.
 fn name(record: &Record, localized: bool, names: &HashMap<u32, String>) -> Option<String> {
-    let full = record.first(b"FULL").and_then(|data| {
-        if localized {
-            let number = u32::from_le_bytes(data.get(..4)?.try_into().ok()?);
-            names.get(&number).cloned()
-        } else {
-            Some(plugin::zstring(data))
-        }
-    });
-    full.or_else(|| record.first(b"EDID").map(plugin::zstring))
+    full_name(record, localized, names)
+        .or_else(|| record.first(b"EDID").map(plugin::zstring))
         .map(|name| name.trim().to_owned())
         .filter(|name| !name.is_empty())
-}
-
-/// A coordinate rounded to a whole number, or `None` if it is not one a
-/// real place could have.
-#[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> Option<i32> {
-    // The range check makes the conversion exact up to rounding.
-    (value.is_finite() && value.abs() <= MAX_COORDINATE).then(|| value.round() as i32)
 }
 
 /// The names of the string table of `plugin_name`, from a loose file or an

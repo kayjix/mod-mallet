@@ -22,9 +22,10 @@ use mallet_core::facts::objects::{Bounds, Place, PlaceName};
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{PluginHeader, Record, Signature, group_type};
 
-use crate::objects::{
-    FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, bounds, editor_id, floats, model_path,
-    place, record_id, whole,
+use crate::objects::{bounds, place};
+use crate::records::{
+    FLAG_DELETED, FLAG_INITIALLY_DISABLED, FLAG_PERSISTENT, editor_id, floats, model_path,
+    record_id, whole,
 };
 
 /// Under which name the doors of the game's plugins are kept in the cache.
