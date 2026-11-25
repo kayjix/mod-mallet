@@ -8,6 +8,16 @@ in [Releases](docs/src/contributing/releases.md).
 
 ### Added
 
+- When Skyrim itself rewrote your load order at its last start, Mod Mallet
+  now says which plugins it switched off and why, usually a plugin they
+  need that is missing or whose mod is switched off. On a click, Vortex
+  switches those mods on or the plugins off. And when Vortex warns that
+  another program changed your load order: that was the game, not Mod
+  Mallet.
+- Merging stacked doors now also re-attaches the paths of the characters
+  to the door you keep: the door triangles of the hidden doors are written
+  into the patch's plugin Mod Mallet - Paths, and the door's card checks
+  that characters reach the kept door and walk through it.
 - After a Steam update of Skyrim Special Edition, Mod Mallet says which
   script extender plugins no longer fit before you start the game: it reads
   the game's version from its program and what each plugin says about the

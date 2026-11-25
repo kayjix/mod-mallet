@@ -11,6 +11,7 @@ pub mod markers;
 pub mod models;
 pub mod navmeshes;
 pub mod objects;
+pub mod plugin_list;
 pub mod terrain;
 pub mod versions;
 
@@ -85,6 +86,9 @@ pub struct Facts {
     /// The versions of the game, its script extender and the extender's
     /// plugins, as their files tell them now (ADR 0079).
     pub versions: VersionFacts,
+    /// The list of active plugins, if the game itself last wrote it and
+    /// switched plugins off (ADR 0089).
+    pub game_rewrite: Option<plugin_list::GameRewrite>,
 }
 
 /// The surface textures a mesh names.

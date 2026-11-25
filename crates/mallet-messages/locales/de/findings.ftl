@@ -601,3 +601,70 @@ patch-hides-walkway = Der Patch von Mod Mallet versteckt etwas, worauf Figuren l
         }
     .explanation = Figuren im Spiel finden ihren Weg über ein unsichtbares Netz, das über allem liegt, worauf sie laufen können: über dem Boden, aber auch über Brücken, Stegen, Schiffsdecks und Treppen. Der Patch von Mod Mallet versteckt ein Objekt, indem er es unsichtbar macht und alle hindurchlässt, doch das Netz bleibt, wie es gemacht wurde. Wo es über ein verstecktes Deck, einen Steg oder eine Brücke führt, laufen Bewohner, Wachen, Begleiter und Tiere durch die Luft oder bleiben an der Kante hängen, und eine Quest, die jemanden hinüberschickt, kann stehen bleiben. Du selbst fällst dort hindurch, wo das Objekt war.
     .remedy = Entscheide, was dir hier wichtiger ist. Behalte das Objekt: Lass auf der Seite der Kollisionen stattdessen das Objekt der anderen Mod weichen, oder behalte beide. Oder nimm es bewusst in Kauf, wenn dort niemand laufen muss, etwa auf einem Schiff, das niemand betritt. Oder repariere die Wege: Wo die Warnung auf der Seite der Kollisionen oder beim Durchgehen erscheint, nimmt „Wege reparieren“ die Wege über dem Objekt heraus und legt neue auf den Boden darunter, und zeigt beides, bevor du wählst.
+
+plugins-game-rewrote-load-order = Das Spiel hat deine Ladereihenfolge umgeschrieben und Plugins ausgeschaltet
+    .headline = { $game } hat beim letzten Start { $count ->
+        [one] 1 Plugin
+       *[other] { $count } Plugins
+    } ausgeschaltet
+    .summary = { $game } hat beim letzten Start deine Ladereihenfolge umgeschrieben und { $count ->
+        [one] 1 Plugin
+       *[other] { $count } Plugins
+    } ausgeschaltet ({ $plugins }), weil { $cause ->
+        [missing-master] { $count ->
+            [one] es
+           *[other] sie
+        } { $masters } { $count ->
+            [one] braucht
+           *[other] brauchen
+        }, { $masterCount ->
+            [one] das
+           *[other] die
+        } das Spiel nicht lädt. { $masterModCount ->
+            [0] { $masterCount ->
+                [one] Es ist
+               *[other] Sie sind
+            } nicht installiert: Installiere die Mod, die { $masterCount ->
+                [one] es
+               *[other] sie
+            } enthält, oder schalte { $count ->
+                [one] das Plugin
+               *[other] diese Plugins
+            } aus.
+           *[other] { $masterMods } { $masterModCount ->
+                [one] enthält
+               *[other] enthalten
+            } { $masterCount ->
+                [one] es
+               *[other] sie
+            }, { $masterModCount ->
+                [one] ist
+               *[other] sind
+            } aber ausgeschaltet. Schalte { $masterMods } ein, oder schalte { $count ->
+                [one] das Plugin
+               *[other] diese Plugins
+            } aus.
+        }
+        [not-found] { $count ->
+            [one] seine Datei
+           *[other] ihre Dateien
+        } nicht im Data-Ordner { $count ->
+            [one] liegt
+           *[other] liegen
+        }.
+        [unreadable] es { $count ->
+            [one] seine Datei
+           *[other] ihre Dateien
+        } nicht als Plugin lesen kann.
+        [too-many] mehr Plugins eingeschaltet sind, als es laden kann.
+        [mixed] einige davon { $masters } brauchen, das Spiel lädt sie aber nicht, und es die anderen gar nicht laden konnte.
+       *[other] es { $count ->
+            [one] es
+           *[other] sie
+        } nicht laden konnte; warum, konnte Mod Mallet nicht herausfinden.
+    }{ $manager ->
+        [vortex] {" "}Die Knöpfe unten erledigen beides in Vortex, wenn du sie anklickst. Wenn Vortex meldet, dass ein anderes Programm deine Ladereihenfolge geändert hat: Das war { $game }, nicht Mod Mallet.
+       *[other] {""}
+    }
+    .explanation = Bevor das Spiel startet, schreibt dein Mod-Manager die Liste der Plugins, die das Spiel lädt: Plugins.txt. Findet das Spiel ein Plugin, das es nicht laden kann, meist eines, das ein anderes, fehlendes Plugin braucht, schaltet es dieses Plugin aus und schreibt die Liste selbst neu. Beim nächsten Start findet dein Mod-Manager eine Liste, die er nicht selbst geschrieben hat, und meldet, dass ein anderes Programm deine Ladereihenfolge geändert hat. Dieses Programm war das Spiel, nicht Mod Mallet: Mod Mallet liest die Liste nur. Bis das geklärt ist, überspringt das Spiel diese Plugins bei jedem Start, und was sie ändern, fehlt in deinem Spiel.
+    .remedy = Braucht das Plugin ein anderes, fehlendes Plugin, schalte die Mod ein oder installiere sie, die es enthält. Brauchst du das Plugin nicht, schalte es stattdessen in deinem Mod-Manager aus. So oder so schreibt dein Mod-Manager die Liste danach neu, und das Spiel lässt sie in Ruhe. Fragt dein Mod-Manager, ob er die Änderung eines anderen Programms übernehmen soll, kannst du zustimmen: Das Spiel hat nur ausgeschaltet, was es nicht laden konnte.

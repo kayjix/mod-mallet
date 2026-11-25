@@ -107,3 +107,5 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0079](0079-version-changes.md) | Version changes are read from the files, and compared with the last scan | accepted |
 | [0080](0080-collisions-decided-by-side-with-the-pictures.md) | The collisions step is decided by side, with the pictures | accepted |
 | [0081](0081-one-source-of-truth-for-decisions.md) | One source of truth for decisions | accepted |
+| [0088](0088-door-paths-re-attached-to-the-kept-door.md) | The paths of merged doors are re-attached to the kept door | accepted |
+| [0089](0089-when-the-game-rewrites-the-load-order.md) | When the game rewrites the load order, it is told why | accepted |

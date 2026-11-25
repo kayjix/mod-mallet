@@ -616,3 +616,61 @@ patch-hides-walkway = Mod Mallet's patch hides something characters walk on
         }
     .explanation = Characters in the game find their way on an invisible net laid over everything they can walk on: the ground, but also bridges, piers, decks and stairs. Mod Mallet's patch hides an object by making it invisible and letting everyone pass through it, but the net stays as it was made. Where the net runs over a hidden deck, pier or bridge, townspeople, guards, followers and animals walk on thin air or get stuck at its edge, and a quest that sends someone across can stop. You yourself fall through where the object was.
     .remedy = Decide what matters more to you here. Keep the object: on the collisions page, let the other mod's object give way instead, or keep both. Or accept it knowingly if nobody needs to walk there, such as on a ship that nobody boards. Or repair the paths: where the warning shows on the collisions page or while going through them, "Repair the paths" takes out the paths over the object and lays new ones on the ground below, and shows both before you choose.
+
+plugins-game-rewrote-load-order = The game rewrote your load order and switched plugins off
+    .headline = { $game } switched off { $count ->
+        [one] 1 plugin
+       *[other] { $count } plugins
+    } at its last start
+    .summary = { $game } rewrote your load order when it last started and switched off { $count ->
+        [one] 1 plugin
+       *[other] { $count } plugins
+    } ({ $plugins }) because { $cause ->
+        [missing-master] { $count ->
+            [one] it needs
+           *[other] they need
+        } { $masters }, which the game does not load. { $masterModCount ->
+            [0] { $masterCount ->
+                [one] It is
+               *[other] They are
+            } not installed: install the mod that contains { $masterCount ->
+                [one] it
+               *[other] them
+            }, or switch { $count ->
+                [one] the plugin
+               *[other] these plugins
+            } off.
+           *[other] { $masterMods } { $masterModCount ->
+                [one] has
+               *[other] have
+            } { $masterCount ->
+                [one] it
+               *[other] them
+            }, but { $masterModCount ->
+                [one] is
+               *[other] are
+            } switched off. Switch { $masterMods } on, or switch { $count ->
+                [one] the plugin
+               *[other] these plugins
+            } off.
+        }
+        [not-found] { $count ->
+            [one] its file is
+           *[other] their files are
+        } not in the Data folder.
+        [unreadable] it cannot read { $count ->
+            [one] its file
+           *[other] their files
+        } as a plugin.
+        [too-many] more plugins are switched on than it can load.
+        [mixed] some of them need { $masters }, which the game does not load, and it could not load the others at all.
+       *[other] it could not load { $count ->
+            [one] it
+           *[other] them
+        }; Mod Mallet could not tell why.
+    }{ $manager ->
+        [vortex] {" "}The buttons below do either in Vortex when you click them. When Vortex says that another program changed your load order, that was { $game }, not Mod Mallet.
+       *[other] {""}
+    }
+    .explanation = Before the game starts, your mod manager writes the list of plugins the game loads, Plugins.txt. When the game finds a plugin it cannot load, most often one that needs another plugin that is missing, it switches that plugin off and writes the list again itself. The next time your mod manager starts, it finds a list it did not write and says that another program changed your load order. That program was the game, not Mod Mallet: Mod Mallet only reads the list. Until this is settled, the game skips these plugins every time it starts, and whatever they change is not in your game.
+    .remedy = If the plugin needs another plugin that is missing, switch on or install the mod that contains it. If you do not need the plugin, switch it off in your mod manager instead. Either way, your mod manager then writes the list again, and the game leaves it alone. Where the mod manager asks whether to keep the change another program made, you can let it: the game only switched off what it could not load.

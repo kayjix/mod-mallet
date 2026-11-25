@@ -21,6 +21,7 @@ mod area_paths;
 mod catalogue;
 mod compare;
 mod dashboard;
+mod game_rewrite;
 mod installers;
 mod knowledge;
 mod lod;
@@ -358,6 +359,16 @@ fn scan_with(
     facts.installers = installers;
     facts.switched_off_plugins =
         switched_off::plugins(game, &game_dir, &facts.plugins, mods.as_ref());
+    // Whether the game rewrote the list of plugins at its last start
+    // (ADR 0089).
+    facts.game_rewrite = game_rewrite::read(
+        game,
+        &game_dir,
+        options.local_dir.as_deref(),
+        &facts.plugins,
+        mods.as_ref(),
+        &facts.switched_off_plugins,
+    );
     // The versions as the files tell them now, and what changed since the
     // last stored scan (ADR 0079).
     facts.versions = read_versions(game, &game_dir, &virtual_data);

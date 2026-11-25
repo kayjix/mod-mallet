@@ -28,6 +28,7 @@ pub mod duels;
 pub mod extender;
 pub mod faces;
 pub mod foreign_meshes;
+pub mod game_rewrite;
 pub mod generated;
 mod geometry;
 pub mod installer;
@@ -131,6 +132,7 @@ pub fn all() -> Vec<Box<dyn Analysis>> {
         Box::new(walkways::HiddenWalkways),
         Box::new(switched_off::SwitchedOffButLoaded),
         Box::new(switched_off::SwitchedOffLeftBehind),
+        Box::new(game_rewrite::GameRewroteLoadOrder),
     ]
 }
 

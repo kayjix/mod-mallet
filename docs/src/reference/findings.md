@@ -51,6 +51,7 @@ Every kind of finding Mod Mallet can report. `mallet explain <kind>` prints the 
 | `patch.hides-walkway` | Warning | likely | Mod Mallet's patch hides something characters walk on |
 | `plugins.switched-off-but-loaded` | Warning | certain | A mod you switched off is still in the game |
 | `plugins.switched-off-left-behind` | Note | certain | Files of a switched-off mod are still in the Data folder |
+| `plugins.game-rewrote-load-order` | Warning | likely | The game rewrote your load order and switched plugins off |
 
 ## extender.plugin-incompatible
 
@@ -591,3 +592,15 @@ When a mod manager installs a mod, it puts the mod's files into the game's Data 
 A copy that was in the Data folder before a mod manager installed the mod is set aside while the mod is on and put back when it goes. Such leftovers are easy to forget: if you switch the mod on again, the mod manager sets them aside once more; if you tick its plugin again in the list of plugins, the game loads the old copy again.
 
 **What to do:** Move the files named here out of the game's Data folder, for example into a folder next to it, and scan again. Keep them until you are sure nothing is missing.
+
+## plugins.game-rewrote-load-order
+
+**The game rewrote your load order and switched plugins off**
+
+- Severity: Warning
+- Confidence: likely
+- Message arguments: `game`, `manager`, `count`, `plugins`, `pluginList`, `needs`, `cause`, `masters`, `masterCount`, `masterMods`, `masterModCount`
+
+Before the game starts, your mod manager writes the list of plugins the game loads, Plugins.txt. When the game finds a plugin it cannot load, most often one that needs another plugin that is missing, it switches that plugin off and writes the list again itself. The next time your mod manager starts, it finds a list it did not write and says that another program changed your load order. That program was the game, not Mod Mallet: Mod Mallet only reads the list. Until this is settled, the game skips these plugins every time it starts, and whatever they change is not in your game.
+
+**What to do:** If the plugin needs another plugin that is missing, switch on or install the mod that contains it. If you do not need the plugin, switch it off in your mod manager instead. Either way, your mod manager then writes the list again, and the game leaves it alone. Where the mod manager asks whether to keep the change another program made, you can let it: the game only switched off what it could not load.

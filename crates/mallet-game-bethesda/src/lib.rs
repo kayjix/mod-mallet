@@ -55,6 +55,7 @@ pub mod objects;
 pub mod paths_plugin;
 pub mod pe;
 pub mod place_kinds;
+pub mod plugin_list;
 mod records;
 pub mod skse_log;
 pub mod swap;

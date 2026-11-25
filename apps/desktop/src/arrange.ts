@@ -188,6 +188,7 @@ export const ADVICE_KINDS = new Set([
 const STEP_OF_KIND: Record<string, Step> = {
   "plugins.master-missing": "install",
   "plugins.requirement-missing": "install",
+  "plugins.game-rewrote-load-order": "install",
   "meshes.texture-missing": "install",
   "extender.plugin-incompatible": "update",
   "extender.plugin-not-loaded": "update",

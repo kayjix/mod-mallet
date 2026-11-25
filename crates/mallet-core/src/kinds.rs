@@ -469,6 +469,7 @@ pub const ALL: &[KindInfo] = &[
     PATCH_HIDES_WALKWAY,
     PLUGINS_SWITCHED_OFF_LOADED,
     PLUGINS_SWITCHED_OFF_LEFT_BEHIND,
+    PLUGINS_GAME_REWROTE_LOAD_ORDER,
 ];
 
 /// A mod whose placed objects collide with many spots of other mods: a
@@ -580,6 +581,29 @@ pub const PLUGINS_SWITCHED_OFF_LEFT_BEHIND: KindInfo = KindInfo {
     severity: Severity::Info,
     confidence: Confidence::Certain,
     args: &["plugin", "mod", "fileCount", "files", "fileList"],
+};
+
+/// The game rewrote the list of active plugins at its last start and
+/// switched plugins off that the mod manager had on, most often because a
+/// plugin they need is not loaded (ADR 0089).
+pub const PLUGINS_GAME_REWROTE_LOAD_ORDER: KindInfo = KindInfo {
+    id: "plugins.game-rewrote-load-order",
+    severity: Severity::Warning,
+    confidence: Confidence::Likely,
+    args: &[
+        "game",
+        "manager",
+        "count",
+        "plugins",
+        "pluginList",
+        // One line per plugin, in the order of pluginList: what it needs.
+        "needs",
+        "cause",
+        "masters",
+        "masterCount",
+        "masterMods",
+        "masterModCount",
+    ],
 };
 
 /// Looks a kind up by its identifier.
