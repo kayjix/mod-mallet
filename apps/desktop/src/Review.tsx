@@ -30,15 +30,14 @@ import { InfoTip } from "./info-tip";
 import { CELL, type WorkKind } from "./map-places";
 import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
-import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
 import { partKind } from "./part-groups";
 import { type ListedPart, PartList, type PartNote } from "./part-list";
 import { usePassageTexts } from "./passage-texts";
 import { PassageSummary } from "./passages";
-import { matchKey, type PatchChoices, pinsOf } from "./patch";
+import { matchKey, type PatchChoices } from "./patch";
 import type { PathsOverlay } from "./paths-layer";
-import { PinButton, PinIcon, usePinTexts } from "./pins";
+import { PinButton } from "./pins";
 import { ReachNote, useReach } from "./reach";
 import { RepairPaths } from "./repair-paths";
 import {
@@ -48,6 +47,7 @@ import {
   decidedOf,
   openIn,
 } from "./review-clusters";
+import { ReportStep } from "./review-report";
 import { AssetsStep, InstallStep, MapStep } from "./review-steps";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
@@ -1950,122 +1950,5 @@ function SideColumn({
       </button>
       {singles && list}
     </section>
-  );
-}
-
-/**
- * The report at the end (ADR 0050): the places decided and how, the mods
- * involved, and what is left open, in this step and in the others.
- */
-function ReportStep({
-  report,
-  game,
-  clusters,
-  open,
-  onCluster,
-  onStep,
-}: {
-  report: RenderedReport;
-  game: string;
-  clusters: Cluster[];
-  open: Record<ReviewStep, number | null>;
-  onCluster: (key: string) => void;
-  onStep: (step: ReviewStep) => void;
-}) {
-  const { patchChoices, showPinned } = useSession();
-  const r = useReviewTexts();
-  const pinText = usePinTexts();
-  const pinned = pinsOf(patchChoices).size;
-  const decided = clusters.filter((cluster) => openIn(cluster) === 0);
-  const pending = clusters.filter((cluster) => openIn(cluster) > 0);
-  const mods = new Map<string, number>();
-  for (const cluster of clusters) {
-    for (const plugin of cluster.plugins) {
-      mods.set(short(plugin), (mods.get(short(plugin)) ?? 0) + 1);
-    }
-  }
-  const line = (cluster: Cluster) => {
-    const state = decidedOf(cluster.spots, patchChoices, cluster.passage?.passage);
-    const what =
-      state.type === "open"
-        ? r.stateOpen
-        : state.type === "kept"
-          ? r.stateKept
-          : state.type === "hidden"
-            ? r.stateHidden(short(state.plugin))
-            : r.stateMixed(state.open);
-    return (
-      <li key={cluster.key} className="review-report-line">
-        <strong>
-          {short(cluster.plugins[0])} ⟷ {short(cluster.plugins[1])}
-        </strong>
-        <code className="aside">{cluster.spots[0]?.item.spot.console}</code>
-        <span className="aside">{cluster.spots.length}×</span>
-        <span className="review-state" data-decided={state.type !== "open"}>
-          {what}
-        </span>
-        <span className="spacer" />
-        <button type="button" className="small quiet" onClick={() => onCluster(cluster.key)}>
-          {r.goThere}
-        </button>
-      </li>
-    );
-  };
-  const steps: ReviewStep[] = ["install", "assets"];
-  return (
-    <div className="review-report">
-      <p>
-        <strong>{r.reportCollisions(decided.length, clusters.length)}</strong>
-      </p>
-      {pending.length > 0 && (
-        <section>
-          <h4>{r.reportOpenTitle}</h4>
-          <ul className="review-report-list">{pending.map(line)}</ul>
-        </section>
-      )}
-      {decided.length > 0 && (
-        <section>
-          <h4>{r.reportDecidedTitle}</h4>
-          <ul className="review-report-list">{decided.map(line)}</ul>
-        </section>
-      )}
-      {mods.size > 0 && (
-        <section>
-          <h4>{r.reportModsTitle}</h4>
-          <p className="aside">
-            {[...mods.entries()]
-              .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-              .map(([name, count]) => `${name} (${count})`)
-              .join(" · ")}
-          </p>
-        </section>
-      )}
-      <section>
-        <h4>{r.reportOtherSteps}</h4>
-        <ul className="review-report-list">
-          {steps.map((step) => (
-            <li key={step} className="review-report-line">
-              <span>{r.reportLine(r.step[step].title, open[step] ?? 0)}</span>
-              <span className="spacer" />
-              {(open[step] ?? 0) > 0 && (
-                <button type="button" className="small quiet" onClick={() => onStep(step)}>
-                  {r.goThere}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-      {pinned > 0 && (
-        <p className="review-report-line">
-          <PinIcon /> <strong>{pinText.reportPinned(pinned)}</strong>
-          <span className="spacer" />
-          <button type="button" className="small" onClick={showPinned}>
-            {pinText.showPinned}
-          </button>
-        </p>
-      )}
-      <PairReport report={report} game={game} />
-    </div>
   );
 }

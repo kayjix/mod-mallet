@@ -366,3 +366,98 @@ button.review-tile:hover {
   gap: 6px;
   font-size: 0.85rem;
 }
+
+/* ---- the report at the end (ADR 0083) ------------------------------------------ */
+
+.review-report-part {
+  display: grid;
+  gap: 6px;
+}
+
+.review-report-part > h4 {
+  margin: var(--space-2) 0 0;
+  font-size: 1rem;
+}
+
+.review-report-pairs,
+.review-report-places,
+.review-report-open {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-report-pair {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.review-report-pair > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  cursor: pointer;
+}
+
+.review-report-places {
+  margin-top: 6px;
+}
+
+.review-report-places li,
+.review-report-open li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.review-report-places li:hover {
+  background: var(--sunken);
+}
+
+.review-report-open li {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+}
+
+.review-report-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.review-report-try {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.review-report-try li {
+  padding-left: 4px;
+}
+
+.review-console {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.review-console code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+
+.review-report-full {
+  margin-top: var(--space-2);
+}
