@@ -5,7 +5,7 @@ import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
 
 /** The steps of the review, in their order. */
-export type ReviewStep = "install" | "order" | "assets" | "map" | "collisions" | "report";
+export type ReviewStep = "install" | "assets" | "map" | "collisions" | "report";
 
 export interface ReviewTexts {
   nav: string;
@@ -96,9 +96,6 @@ const en: ReviewTexts = {
   step: {
     install: {
       title: "Installation",
-    },
-    order: {
-      title: "Load order",
     },
     assets: {
       title: "Assets",
@@ -199,9 +196,6 @@ const de: ReviewTexts = {
   step: {
     install: {
       title: "Installation",
-    },
-    order: {
-      title: "Ladereihenfolge",
     },
     assets: {
       title: "Assets",

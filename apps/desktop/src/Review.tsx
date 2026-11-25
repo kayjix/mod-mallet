@@ -14,7 +14,6 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { useCollisionStepTexts } from "./collision-step-texts";
-import { DuelLine } from "./Duels";
 import { keepSide, leftoversOf, mergeDoors } from "./decisions";
 import { DoorPanel } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
@@ -49,29 +48,22 @@ import {
   decidedOf,
   openIn,
 } from "./review-clusters";
+import { AssetsStep, InstallStep, MapStep } from "./review-steps";
 import { type ReviewStep, useReviewTexts } from "./review-texts";
 import { findSegments } from "./segments";
 import { type Suggestion, suggestionOf, suggestionOfPassage } from "./suggest";
-import { FindingRow } from "./Tasks";
 import { Eye } from "./view-tools";
 import { PathIcon, useWalkedOn, useWalkTexts, type WalkQuery, walkedOn } from "./walkways";
 import "./review.css";
 import { Chip, Note, UndoButton } from "./ui/kit";
 
 /** The steps, in their order. */
-export const REVIEW_STEPS: ReviewStep[] = [
-  "install",
-  "order",
-  "assets",
-  "map",
-  "collisions",
-  "report",
-];
+export const REVIEW_STEPS: ReviewStep[] = ["install", "assets", "map", "collisions", "report"];
 
 /** Where the review leads for more than it shows. */
 export type ReviewTarget = "tasks" | "mods" | "assets" | "map";
 
-/** Kinds whose findings depend on the order of the plugins. */
+/** Kinds about plugins and their order: a group of their own in the installation step (ADR 0083). */
 const ORDER_KINDS = new Set([
   "plugins.loot-note",
   "plugins.loot-warning",
@@ -87,9 +79,6 @@ const ORDER_KINDS = new Set([
 
 /** Kinds about whose files the game shows: the assets' step, through their duels. */
 const ASSET_KINDS = new Set(["meshes.retexture-bypassed", "npcs.face-mismatch"]);
-
-/** How many rows a step shows before it leads to the page itself. */
-const LIMIT = 12;
 
 /** What the review remembers per game: the step the user is on, and the steps looked at. */
 interface Stored {
@@ -114,7 +103,9 @@ export function storedReview(game: string): Stored | null {
       return null;
     }
     const value = JSON.parse(text) as Partial<Stored>;
-    const step = REVIEW_STEPS.find((candidate) => candidate === value.step);
+    // The load order was a step of its own until it joined the installation (ADR 0083).
+    const was = (value.step as string | undefined) === "order" ? "install" : value.step;
+    const step = REVIEW_STEPS.find((candidate) => candidate === was);
     const seen = (value.seen ?? []).filter((candidate) => REVIEW_STEPS.includes(candidate));
     const place = typeof value.place === "string" ? value.place : null;
     const accepted = Array.isArray(value.accepted)
@@ -138,7 +129,7 @@ function remember(game: string, stored: Stored) {
 function findingsOf(
   report: RenderedReport,
   ignored: Set<string>,
-  step: "install" | "order",
+  group: "mods" | "plugins",
 ): RenderedFinding[] {
   return report.findings.filter((rendered) => {
     if (isCollision(rendered) || ASSET_KINDS.has(rendered.finding.kind)) {
@@ -148,7 +139,7 @@ function findingsOf(
     if (what === null || what === "notes" || what === "ignored") {
       return false;
     }
-    return ORDER_KINDS.has(rendered.finding.kind) === (step === "order");
+    return ORDER_KINDS.has(rendered.finding.kind) === (group === "plugins");
   });
 }
 
@@ -185,20 +176,17 @@ export function Review({ report, game, onOpen }: ReviewProps) {
   const previous = REVIEW_STEPS[index - 1];
   const following = REVIEW_STEPS[index + 1];
 
-  const install = useMemo(() => findingsOf(report, ignored, "install"), [report, ignored]);
-  const order = useMemo(() => findingsOf(report, ignored, "order"), [report, ignored]);
-  const duels = useMemo(
-    () => fileDuels(report).filter((rendered) => decisions[rendered.duel.id] === undefined),
-    [report, decisions],
-  );
+  const mods = useMemo(() => findingsOf(report, ignored, "mods"), [report, ignored]);
+  const plugins = useMemo(() => findingsOf(report, ignored, "plugins"), [report, ignored]);
+  const allDuels = useMemo(() => fileDuels(report), [report]);
+  const duels = allDuels.filter((rendered) => decisions[rendered.duel.id] === undefined);
   const clusters = useMemo(
     () => collisionClusters(reportSpots(report, ignored, patchChoices), report.map.passages ?? []),
     [report, ignored, patchChoices],
   );
   const openClusters = clusters.filter((cluster) => openIn(cluster) > 0).length;
   const open: Record<ReviewStep, number | null> = {
-    install: install.length,
-    order: order.length,
+    install: mods.length + plugins.length,
     assets: duels.length,
     map: null,
     collisions: openClusters,
@@ -241,19 +229,28 @@ export function Review({ report, game, onOpen }: ReviewProps) {
 
       <article className="panel review-body" aria-label={r.step[stored.step].title}>
         {stored.step === "install" && (
-          <InstallStep report={report} findings={install} onOpen={onOpen} />
-        )}
-        {stored.step === "order" && (
-          <FindingsStep findings={order} more={r.toTasks} onMore={() => onOpen("tasks")} />
+          <InstallStep
+            report={report}
+            mods={mods}
+            plugins={plugins}
+            onTasks={() => onOpen("tasks")}
+            onMods={() => onOpen("mods")}
+          />
         )}
         {stored.step === "assets" && (
-          <Rows count={duels.length} more={r.toAssets} onMore={() => onOpen("assets")}>
-            {duels.slice(0, LIMIT).map((rendered) => (
-              <DuelLine key={rendered.duel.id} rendered={rendered} />
-            ))}
-          </Rows>
+          <AssetsStep duels={allDuels} onOpen={() => onOpen("assets")} />
         )}
-        {stored.step === "map" && <MapStep report={report} onOpen={onOpen} />}
+        {stored.step === "map" && (
+          <MapStep
+            report={report}
+            clusters={clusters}
+            onPlace={(key) => {
+              setClusterAt(key);
+              go("collisions");
+            }}
+            onMap={() => onOpen("map")}
+          />
+        )}
         {stored.step === "collisions" && (
           <CollisionsStep
             report={report}
@@ -306,106 +303,6 @@ export function Review({ report, game, onOpen }: ReviewProps) {
         </footer>
       </article>
     </section>
-  );
-}
-
-/** The first few rows of a step, and the way to the page with all of them. */
-function Rows({
-  count,
-  children,
-  more,
-  onMore,
-}: {
-  count: number;
-  children: ReactNode;
-  more: string;
-  onMore: () => void;
-}) {
-  const r = useReviewTexts();
-  return (
-    <div className="review-rows">
-      {count === 0 ? <p className="aside">{r.nothing}</p> : children}
-      <p className="review-more">
-        {count > LIMIT && <span className="aside">{r.more(count - LIMIT)}</span>}
-        <button type="button" className="small" onClick={onMore}>
-          {more} →
-        </button>
-      </p>
-    </div>
-  );
-}
-
-function FindingsStep({
-  findings,
-  more,
-  onMore,
-}: {
-  findings: RenderedFinding[];
-  more: string;
-  onMore: () => void;
-}) {
-  return (
-    <Rows count={findings.length} more={more} onMore={onMore}>
-      <ul className="review-findings">
-        {findings.slice(0, LIMIT).map((rendered) => (
-          <FindingRow key={rendered.finding.id} rendered={rendered} />
-        ))}
-      </ul>
-    </Rows>
-  );
-}
-
-function InstallStep({
-  report,
-  findings,
-  onOpen,
-}: {
-  report: RenderedReport;
-  findings: RenderedFinding[];
-  onOpen: (view: ReviewTarget) => void;
-}) {
-  const r = useReviewTexts();
-  const enabled = report.mods.filter((info) => info.enabled).length;
-  const newer = report.mods.filter((info) => info.newerVersion != null).length;
-  return (
-    <>
-      <p className="review-line">
-        {r.modsLine(enabled, report.mods.length, newer)}{" "}
-        <button type="button" className="small quiet" onClick={() => onOpen("mods")}>
-          {r.toMods} →
-        </button>
-      </p>
-      <FindingsStep findings={findings} more={r.toTasks} onMore={() => onOpen("tasks")} />
-    </>
-  );
-}
-
-function MapStep({
-  report,
-  onOpen,
-}: {
-  report: RenderedReport;
-  onOpen: (view: ReviewTarget) => void;
-}) {
-  const r = useReviewTexts();
-  const worlds = report.map.worlds.filter((world) => world.small !== true);
-  return (
-    <Rows count={worlds.length} more={r.toMap} onMore={() => onOpen("map")}>
-      {worlds.slice(0, LIMIT).map((world) => (
-        <div key={world.name} className="review-world">
-          <strong>{world.title ?? world.name}</strong>
-          {world.title != null && world.title !== world.name && (
-            <code className="aside">{world.name}</code>
-          )}
-          <span className="aside">
-            {r.worldLine(
-              world.cells.length,
-              (world.markers ?? []).filter((marker) => marker.origin !== "game").length,
-            )}
-          </span>
-        </div>
-      ))}
-    </Rows>
   );
 }
 
@@ -2114,7 +2011,7 @@ function ReportStep({
       </li>
     );
   };
-  const steps: ReviewStep[] = ["install", "order", "assets"];
+  const steps: ReviewStep[] = ["install", "assets"];
   return (
     <div className="review-report">
       <p>
