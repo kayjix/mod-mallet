@@ -51,6 +51,8 @@ export interface ActionPlaceTexts {
   hideNote: (kind: ActionKind) => string;
   /** The toggle of the icons in the 3D views. */
   toggle: string;
+  /** The same, short, as a chip in the bar of a 3D view; the tooltip says it in full. */
+  toggleShort: string;
   toggleHint: string;
   /** After hiding: places that stood on what is hidden. */
   followTitle: (count: number) => string;
@@ -134,6 +136,7 @@ const en: ActionPlaceTexts = {
   hideNote: (kind) =>
     `If hidden: ${en.stop[kind]} Their routine goes on elsewhere, or they stand idle.`,
   toggle: "Places to sit, lean, work",
+  toggleShort: "Sit, lean, work",
   toggleHint:
     "Shows where characters sit, lean, sleep or work, with an icon by what they do there. Many of these spots are invisible in the game. Click one to see who uses it.",
   followTitle: (count) =>
@@ -223,6 +226,7 @@ const de: ActionPlaceTexts = {
   hideNote: (kind) =>
     `Wenn versteckt: ${de.stop[kind]} Ihr Tagesablauf geht anderswo weiter, oder sie stehen herum.`,
   toggle: "Plätze zum Sitzen, Lehnen, Arbeiten",
+  toggleShort: "Sitzen, Lehnen, Arbeiten",
   toggleHint:
     "Zeigt, wo Figuren sitzen, sich anlehnen, schlafen oder arbeiten, mit einem Symbol für das, was sie dort tun. Viele dieser Stellen sind im Spiel unsichtbar. Ein Klick zeigt, wer sie benutzt.",
   followTitle: (count) =>

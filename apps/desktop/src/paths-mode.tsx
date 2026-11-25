@@ -17,6 +17,7 @@ import type { MarkShape, PathGroup, PathMarks, PathPattern, PathsOverlay } from 
 import { pathsModeTexts } from "./paths-mode-texts";
 import { repairKey } from "./repair-paths";
 import "./paths-mode.css";
+import { ToggleChip } from "./ui/kit";
 
 type Colour = [number, number, number, number];
 
@@ -472,26 +473,15 @@ export function usePathsMode(input: {
   );
 
   const tool = (
-    <span className="view-tool" title={p.toggleHint}>
-      <button
-        type="button"
-        className="small paths-mode-toggle"
-        aria-pressed={on}
-        onClick={() => setOn(!on)}
-      >
-        <PathsIcon />
-        {p.toggle}
-      </button>
-      {on && (
-        <label className="paths-mode-actions">
-          <input
-            type="checkbox"
-            checked={actions}
-            onChange={(event) => setActions(event.target.checked)}
-          />
-          {p.actions}
-        </label>
-      )}
+    <span className="view-tool">
+      <ToggleChip
+        on={on}
+        onChange={setOn}
+        icon={<PathsIcon />}
+        label={p.toggle}
+        hint={p.toggleHint}
+      />
+      {on && <ToggleChip on={actions} onChange={setActions} label={p.actions} />}
     </span>
   );
 

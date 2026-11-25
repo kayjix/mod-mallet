@@ -834,9 +834,9 @@ export function CompareStage3D({
       <ViewToolbar
         tools={
           <>
-            <MarkingsTool legend={null} />
             <TreesTool />
             <ActionsTool />
+            <MarkingsTool legend={null} />
             {tools !== null && <span className="view-tool stage3-own-tools">{tools}</span>}
           </>
         }

@@ -33,7 +33,7 @@
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 6px 16px;
+  gap: 4px 8px;
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -57,11 +57,6 @@
   white-space: nowrap;
 }
 
-.view-tool + .view-tool {
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
-}
-
 .view-tool input[type="range"] {
   width: 96px;
 }
@@ -77,21 +72,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Every text a value can show, laid over each other: the longest sets the width. */
-.view-tool-stack {
-  display: inline-grid;
-}
-
-.view-tool-stack > span {
-  grid-area: 1 / 1;
-  visibility: hidden;
-  white-space: nowrap;
-}
-
-.view-tool-stack > span[data-shown] {
-  visibility: visible;
-}
-
 .wand-icon {
   width: 18px;
   height: 18px;
@@ -99,10 +79,6 @@
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
-}
-
-.wand[data-on] .wand-icon {
-  color: var(--brand);
 }
 
 .view-top .relief-object {
@@ -116,4 +92,16 @@
 
 .wand-took {
   font-weight: 600;
+}
+
+/* The markings with their legend may wrap, so that the bar stays low. */
+.view-tool:has(> .view-legend) {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  white-space: normal;
+}
+
+.view-tool > .view-legend {
+  flex-wrap: wrap;
 }

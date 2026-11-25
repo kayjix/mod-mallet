@@ -1,16 +1,5 @@
 /* The paths mode of the 3D views (ADR 0071): its switch, legend and problems. */
 
-.paths-mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.paths-mode-toggle[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-}
-
 .paths-mode-icon {
   width: 14px;
   height: 14px;
@@ -18,12 +7,6 @@
   stroke: currentColor;
   stroke-width: 2.4;
   stroke-linecap: round;
-}
-
-.paths-mode-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .paths-legend {

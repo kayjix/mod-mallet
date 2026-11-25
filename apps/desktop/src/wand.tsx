@@ -7,6 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useSession } from "./Actions";
 import { WAND_TOP } from "./area-layer";
 import type { Lang } from "./i18n";
+import { LevelToggle } from "./ui/kit";
 
 interface WandTexts {
   wand: string;
@@ -61,11 +62,6 @@ const wandTexts: Record<Lang, WandTexts> = {
   },
 };
 
-/** Every level's text in every language, to keep room for the longest. */
-const LEVEL_TEXTS = (Object.entries(wandTexts) as [Lang, WandTexts][]).flatMap(([lang, texts]) =>
-  texts.levels.map((text, at) => ({ lang, at, text })),
-);
-
 /** The texts of the magic wand in the language shown. */
 export function useWandTexts(): WandTexts {
   const { lang } = useSession();
@@ -87,42 +83,23 @@ export function useWandLevel(): [number, (level: number) => void] {
   ];
 }
 
-/** The magic wand's control: its level, and what that level takes along. */
-export function WandControl({
-  level,
-  onLevel,
-}: {
-  level: number;
-  onLevel: (level: number) => void;
-}) {
+/**
+ * The magic wand's control (ADR 0077): one button that turns it on and off,
+ * and a pip for each of its levels, filled up to the level set.
+ */
+export function WandTool({ level, onLevel }: { level: number; onLevel: (level: number) => void }) {
   const w = useWandTexts();
-  const { lang: shown } = useSession();
   return (
-    <label className="view-tool wand" title={w.hint} data-on={level > 0 || undefined}>
-      <WandIcon />
-      <span className="view-tool-name">{w.wand}</span>
-      <input
-        type="range"
-        min={0}
-        max={WAND_TOP}
-        step={1}
-        value={level}
-        aria-valuetext={w.levels[level]}
-        onChange={(event) => onLevel(Number(event.target.value))}
+    <span className="view-tool wand">
+      <LevelToggle
+        icon={<WandIcon />}
+        label={w.wand}
+        level={level}
+        levels={w.levels}
+        onLevel={onLevel}
+        hint={w.hint}
       />
-      <span className="view-tool-value view-tool-stack">
-        {/* Every level's text in every language, so that the bar does not jump. */}
-        {LEVEL_TEXTS.map(({ lang, at, text }) => (
-          <span
-            key={`${lang}:${at}`}
-            data-shown={(shown === lang && at === level) || undefined}
-            aria-hidden={shown !== lang || at !== level}
-          >
-            {text}
-          </span>
-        ))}
-      </span>
-    </label>
+    </span>
   );
 }
 

@@ -53,6 +53,7 @@ import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { drawPin, PIN_COLOUR } from "./pins";
 import { RealTops } from "./real-tops";
 import { watchView } from "./render-stats";
+import { ToggleChip } from "./ui/kit";
 import {
   ActionsTool,
   CameraTools,
@@ -61,7 +62,7 @@ import {
   useMarkings,
   useTreesShown,
 } from "./view-tools";
-import { useWandLevel, ViewToolbar, WandControl } from "./wand";
+import { useWandLevel, ViewToolbar, WandTool } from "./wand";
 
 interface MapView3DProps {
   world: MapWorld;
@@ -1791,11 +1792,11 @@ export function MapView3D({
         <ViewToolbar
           tools={
             <>
-              <WandControl level={level} onLevel={setLevel} />
+              <WandTool level={level} onLevel={setLevel} />
               {tools}
-              <MarkingsTool legend={markingsLegend} />
               {withObjects && <TreesTool />}
               {withObjects && <ActionsTool />}
+              <MarkingsTool legend={markingsLegend} />
             </>
           }
           camera={
@@ -1855,35 +1856,18 @@ export function MapView3D({
       </div>
       {children}
       <div className="relief-controls">
-        <label className="relief-control">
-          <input
-            type="checkbox"
-            checked={withBase}
-            onChange={(event) => setWithBase(event.target.checked)}
-          />
-          {t.mapBase}
-        </label>
-        <label className="relief-control">
-          <input
-            type="checkbox"
-            checked={withLod}
-            onChange={(event) => setWithLod(event.target.checked)}
-          />
-          {t.mapLod}
+        <ToggleChip on={withBase} onChange={setWithBase} label={t.mapBase} />
+        <span className="relief-control">
+          <ToggleChip on={withLod} onChange={setWithLod} label={t.mapLod} />
           {withLod && lodProgress !== null && (
             <span className="relief-value">
               <LoadingMallet size={18} className="loading-inline" />
               {t.mapLodProgress(lodProgress.done, lodProgress.total)}
             </span>
           )}
-        </label>
-        <label className="relief-control">
-          <input
-            type="checkbox"
-            checked={withObjects}
-            onChange={(event) => setWithObjects(event.target.checked)}
-          />
-          {t.mapNear}
+        </span>
+        <span className="relief-control">
+          <ToggleChip on={withObjects} onChange={setWithObjects} label={t.mapNear} />
           <span className="relief-value">
             {withObjects &&
               (areaState === "loading" ||
@@ -1900,7 +1884,7 @@ export function MapView3D({
                     ? t.mapNearProgress(areaState, areaProgress.done, areaProgress.total)
                     : t.mapNearCount(areaState)}
           </span>
-        </label>
+        </span>
         <InfoTip text={t.mapReliefHint} above />
       </div>
     </div>

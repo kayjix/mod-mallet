@@ -8,6 +8,7 @@ import { type ReactNode, useSyncExternalStore } from "react";
 import { useSession } from "./Actions";
 import { ActionIconsToggle } from "./action-places";
 import type { Lang } from "./i18n";
+import { ToggleChip } from "./ui/kit";
 import { viewToolTexts } from "./view-tool-texts";
 
 /** A switch remembered across the window's views and its next start. */
@@ -86,15 +87,13 @@ export function MarkingsTool({ legend }: { legend?: ReactNode }) {
   const [on, setOn] = useMarkings();
   return (
     <span className="view-tool">
-      <button
-        type="button"
-        className="small work-marks"
-        aria-pressed={on}
-        title={v.markingsHint}
-        onClick={() => setOn(!on)}
-      >
-        <Eye open={on} /> {v.markings}
-      </button>
+      <ToggleChip
+        on={on}
+        onChange={setOn}
+        icon={<Eye open={on} />}
+        label={v.markings}
+        hint={v.markingsHint}
+      />
       {on && legend !== null && (
         <span className="view-legend" aria-hidden="true">
           {legend === undefined ? <DefaultLegend lang={lang} /> : legend}
@@ -120,16 +119,15 @@ export function TreesTool() {
   const v = viewToolTexts[lang];
   const [on, setOn] = useTreesShown();
   return (
-    <label className="view-tool control-check" title={v.treesHint}>
-      <input type="checkbox" checked={on} onChange={(event) => setOn(event.target.checked)} />
-      {v.trees}
-    </label>
+    <span className="view-tool">
+      <ToggleChip on={on} onChange={setOn} label={v.trees} hint={v.treesHint} />
+    </span>
   );
 }
 
 /** The switch of the icons of places where characters do something, in the bar. */
 export function ActionsTool() {
-  return <ActionIconsToggle className="view-tool control-check" />;
+  return <ActionIconsToggle className="view-tool" />;
 }
 
 /** The camera's buttons: closer, farther, from above, and everything in view. */

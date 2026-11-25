@@ -24,8 +24,9 @@ import { moveKeysOf, moveOf } from "./moves";
 import { matchKey } from "./patch";
 import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { watchView } from "./render-stats";
+import { ToggleChip } from "./ui/kit";
 import { ActionsTool, CameraTools, MarkingsTool, TreesTool, useTreesShown } from "./view-tools";
-import { useWandLevel, ViewToolbar, WandControl } from "./wand";
+import { useWandLevel, ViewToolbar, WandTool } from "./wand";
 
 export interface InteriorViewProps {
   /** The interior cell, by its editor ID. */
@@ -623,11 +624,11 @@ export function InteriorView({
         <ViewToolbar
           tools={
             <>
-              <WandControl level={level} onLevel={setLevel} />
+              <WandTool level={level} onLevel={setLevel} />
               {tools}
-              <MarkingsTool legend={markingsLegend} />
               <TreesTool />
               <ActionsTool />
+              <MarkingsTool legend={markingsLegend} />
             </>
           }
           camera={
@@ -694,14 +695,12 @@ export function InteriorView({
       </div>
       {children}
       <div className="relief-controls">
-        <label className="relief-control" title={own.seeInsideHint}>
-          <input
-            type="checkbox"
-            checked={seeInside}
-            onChange={(event) => setSeeInside(event.target.checked)}
-          />
-          {own.seeInside}
-        </label>
+        <ToggleChip
+          on={seeInside}
+          onChange={setSeeInside}
+          label={own.seeInside}
+          hint={own.seeInsideHint}
+        />
         {area !== null && (
           <span className="relief-hint">
             {own.count(area.objects.length, progress.done, progress.total)}

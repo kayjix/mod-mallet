@@ -20,6 +20,7 @@ import { useMovesTexts } from "./moves-texts";
 import { useAnchors } from "./object-actions";
 import { chooseObject, matchKey, revealObjects } from "./patch";
 import "./action-places.css";
+import { ToggleChip } from "./ui/kit";
 
 /** What characters do at a place. */
 export type ActionKind = ActionPlace["kind"];
@@ -101,14 +102,20 @@ export function ActionIconsToggle({ className = "relief-control" }: { className?
   const a = actionPlaceTexts[useSession().lang];
   const shown = useActionIconsShown();
   return (
-    <label className={className} title={a.toggleHint}>
-      <input type="checkbox" checked={shown} onChange={(event) => setShown(event.target.checked)} />
-      <span className="action-toggle-icons" aria-hidden="true">
-        {ICON.sit}
-        {ICON.lean}
-      </span>{" "}
-      {a.toggle}
-    </label>
+    <span className={className}>
+      <ToggleChip
+        on={shown}
+        onChange={setShown}
+        icon={
+          <span className="action-toggle-icons" aria-hidden="true">
+            {ICON.sit}
+            {ICON.lean}
+          </span>
+        }
+        label={a.toggleShort}
+        hint={`${a.toggle}: ${a.toggleHint}`}
+      />
+    </span>
   );
 }
 
