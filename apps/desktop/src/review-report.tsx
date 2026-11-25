@@ -6,7 +6,6 @@
 import { useState } from "react";
 import { useDecisions, useSession } from "./Actions";
 import { objectKey } from "./area-layer";
-import { useCollisionStepTexts } from "./collision-step-texts";
 import type { RenderedReport } from "./generated/rendered-report";
 import { PairReport } from "./PairReport";
 import { passagePlace } from "./passages";
@@ -61,7 +60,6 @@ export function ReportStep({
   onStep: (step: ReviewStep) => void;
 }) {
   const s = useReviewStepTexts();
-  const c = useCollisionStepTexts();
   const { patchChoices, showPinned } = useSession();
   const { decisions } = useDecisions();
   const manager = managerOf(report);
@@ -209,7 +207,7 @@ export function ReportStep({
                             <span>{place.name}</span>
                             <span className="review-state" data-decided={!place.open}>
                               {place.kept === "both"
-                                ? c.keptHere
+                                ? s.bothKept
                                 : place.kept === null
                                   ? place.open
                                     ? s.openTitle

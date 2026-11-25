@@ -56,6 +56,7 @@ export interface ReviewStepTexts {
   pairLine: (places: number, decided: number) => string;
   keptAt: (mod: string, count: number) => string;
   bothAt: (count: number) => string;
+  bothKept: string;
   hiddenParts: (mod: string, count: number) => string;
   nothingDecided: string;
   openTitle: string;
@@ -127,6 +128,7 @@ const en: ReviewStepTexts = {
     `${decided} of ${places} ${places === 1 ? "place" : "places"} decided`,
   keptAt: (mod, count) => `${mod} kept at ${count}`,
   bothAt: (count) => `both kept at ${count}`,
+  bothKept: "✓ both stay",
   hiddenParts: (mod, count) => `${count} ${count === 1 ? "part" : "parts"} of ${mod} hidden`,
   nothingDecided: "Nothing decided yet. The collisions step is where you decide.",
   openTitle: "Still open",
@@ -199,6 +201,7 @@ const de: ReviewStepTexts = {
     `${decided} von ${places} ${places === 1 ? "Bereich" : "Bereichen"} entschieden`,
   keptAt: (mod, count) => `${mod} behalten an ${count}`,
   bothAt: (count) => `beide behalten an ${count}`,
+  bothKept: "✓ beide bleiben",
   hiddenParts: (mod, count) => `${count} ${count === 1 ? "Teil" : "Teile"} von ${mod} ausgeblendet`,
   nothingDecided: "Noch nichts entschieden. Entschieden wird im Schritt Kollisionen.",
   openTitle: "Noch offen",

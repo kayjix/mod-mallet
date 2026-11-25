@@ -56,7 +56,8 @@ practical, and the rest thin:
   by name, with what kind of thing each is (from its model's folder:
   building, furniture, small things, light, door, plant, rock, effect) and
   what is known of it (rests on another, tied in, needed, walked on). A
-  passage's summary is a compact note of the kit (ADR 0077).
+  passage's summary is a note of the kit that opens for the details (ADR
+  0077), as the kit's own work on the collisions brings it.
 - **Report** opens with four numbers (places decided, asset collisions
   decided, what is left to fix, objects the patch hides), says what the
   patch does pair by pair of mods with the way to each place, what is
