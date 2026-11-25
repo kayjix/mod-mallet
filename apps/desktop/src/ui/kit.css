@@ -526,3 +526,246 @@
   margin-right: 4px;
   vertical-align: -2px;
 }
+
+/* ---- a note that opens ------------------------------------------------------ */
+
+/* Closed it is one line; its chevron turns as it opens. */
+.note[data-opens] {
+  display: block;
+  padding: 0;
+}
+
+.note-summary-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.note-summary-line::-webkit-details-marker {
+  display: none;
+}
+
+.note[data-opens] .note-summary-line > .tone-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--tone);
+}
+
+.note-summary-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note[data-opens][open] .note-summary-text {
+  white-space: normal;
+}
+
+.note-more {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--muted);
+}
+
+.chevron-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.12s;
+}
+
+.note[data-opens][open] .chevron-icon {
+  transform: rotate(90deg);
+}
+
+.note[data-opens] > .note-body {
+  padding: 0 12px 8px 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron-icon {
+    transition: none;
+  }
+}
+
+/* ---- toggle chips ------------------------------------------------------------ */
+
+/*
+ * A switch as one chip. On: filled with its colour and ticked. Off: an
+ * empty ring, the words muted. The ring is the colour's swatch too.
+ */
+.toggle-chip {
+  --chip-colour: var(--brand);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.toggle-chip:hover:not(:disabled) {
+  border-color: var(--chip-colour);
+  color: var(--text);
+}
+
+.toggle-chip[aria-pressed="true"] {
+  border-color: var(--chip-colour);
+  background: color-mix(in srgb, var(--chip-colour) 16%, var(--surface));
+  color: var(--text);
+  font-weight: 600;
+}
+
+.toggle-chip-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--chip-colour);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.toggle-chip[aria-pressed="true"] .toggle-chip-mark {
+  background: var(--chip-colour);
+}
+
+/* The tick reads on light and dark colours alike: white with a dark edge. */
+.toggle-chip-mark .tick-icon {
+  width: 12px;
+  height: 12px;
+  color: #fff;
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 70%));
+}
+
+.toggle-chip-count {
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.toggle-chip svg:not(.tick-icon) {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* A row of them, wrapping. */
+.toggle-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* ---- search with its sorting -------------------------------------------------- */
+
+.search-sort input {
+  padding-right: 38px;
+}
+
+.search-sort-button {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.search-sort-button:hover {
+  background: var(--sunken);
+  color: var(--text);
+}
+
+.sort-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- a tool with levels -------------------------------------------------------- */
+
+/* One button: its name turns it on and off, its pips set the level. */
+.level-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.level-toggle[data-on] {
+  border-color: var(--brand);
+}
+
+.level-toggle-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.level-toggle-main[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--brand) 16%, var(--surface));
+  color: var(--text);
+  font-weight: 600;
+}
+
+.level-toggle-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 7px;
+  border-left: 1px solid var(--border);
+}
+
+/* Each pip a level: filled up to the level set, hollow above it. */
+.level-pip {
+  width: 9px;
+  height: 14px;
+  padding: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 2px;
+  background: transparent;
+}
+
+.level-pip:hover {
+  border-color: var(--brand);
+}
+
+.level-pip[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand);
+}

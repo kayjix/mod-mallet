@@ -3,9 +3,9 @@
 // button. Pages build from these instead of drawing their own, so that
 // every page looks and works like the others. The styles are in kit.css.
 
-import type { ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useSession } from "../Actions";
-import { SearchIcon, ToneIcon, UndoIcon } from "./icons";
+import { ChevronIcon, SearchIcon, SortIcon, TickIcon, ToneIcon, UndoIcon } from "./icons";
 import { type Tone, uiTexts } from "./ui-texts";
 
 export { LoadingLine, LoadingScreen } from "../LoadingMallet";
@@ -202,12 +202,14 @@ export function Chip({
  * Something the page says about itself, with the sign of its tone: a hint
  * (info), something done (ok), something to be careful about (warning) or
  * a problem (danger). A `role` of status or alert makes a screen reader say
- * it when it appears; alertdialog asks something.
+ * it when it appears; alertdialog asks something. With a `summary` it is
+ * one line that opens to the rest.
  */
 export function Note({
   tone = "info",
   role = "note",
   compact = false,
+  summary,
   actions,
   className,
   children,
@@ -216,6 +218,8 @@ export function Note({
   role?: "note" | "status" | "alert" | "alertdialog";
   /** One line with its buttons beside it, where room is short. */
   compact?: boolean;
+  /** The one line shown while closed; the children are what opens below it. */
+  summary?: ReactNode;
   /** Buttons that do something about it, below the text. */
   actions?: ReactNode;
   className?: string;
@@ -223,6 +227,29 @@ export function Note({
 }) {
   const { lang } = useSession();
   const said = uiTexts[lang].tone[tone];
+  if (summary !== undefined) {
+    return (
+      <details
+        className={className === undefined ? "note" : `note ${className}`}
+        data-tone={tone}
+        data-opens=""
+        role={role}
+      >
+        <summary className="note-summary-line">
+          <ToneIcon tone={tone} />
+          {said !== "" && <span className="visually-hidden">{said}: </span>}
+          <span className="note-summary-text">{summary}</span>
+          <span className="note-more" title={uiTexts[lang].more}>
+            <ChevronIcon />
+          </span>
+        </summary>
+        <div className="note-body">
+          {children}
+          {actions && <div className="note-actions">{actions}</div>}
+        </div>
+      </details>
+    );
+  }
   return (
     <div
       className={className === undefined ? "note" : `note ${className}`}
@@ -274,5 +301,169 @@ export function UndoButton({
       <UndoIcon />
       {label ?? uiTexts[lang].undo}
     </button>
+  );
+}
+
+/**
+ * A switch that is one chip: its colour, its name and its count together.
+ * On it is filled and ticked, off it is an empty ring and muted, so that
+ * on and off read without the colour.
+ */
+export function ToggleChip({
+  on,
+  onChange,
+  label,
+  count,
+  colour,
+  icon,
+  hint,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  label: ReactNode;
+  count?: number;
+  /** The colour of what it shows, such as a kind of collision; the brand's if none. */
+  colour?: string;
+  /** A sign after the ring, for what is not a colour. */
+  icon?: ReactNode;
+  hint?: string;
+}) {
+  const style = colour === undefined ? undefined : ({ "--chip-colour": colour } as CSSProperties);
+  return (
+    <button
+      type="button"
+      className="toggle-chip"
+      aria-pressed={on}
+      title={hint}
+      style={style}
+      onClick={() => onChange(!on)}
+    >
+      <span className="toggle-chip-mark" aria-hidden="true">
+        {on && <TickIcon />}
+      </span>
+      {icon}
+      <span className="toggle-chip-label">{label}</span>
+      {count !== undefined && <span className="toggle-chip-count">{count}</span>}
+    </button>
+  );
+}
+
+/** One order of a list that the sorting button steps through. */
+export interface SortOrder<S extends string> {
+  id: S;
+  /** What the order is, as the tooltip and a screen reader say it. */
+  label: string;
+  /** Whether the smallest come first. */
+  up: boolean;
+}
+
+/**
+ * The search above a list, with its sorting at its end: one button that
+ * steps through the orders, its arrow showing which way, its tooltip
+ * saying which.
+ */
+export function SearchSort<S extends string>({
+  value,
+  onChange,
+  placeholder,
+  orders,
+  order,
+  onOrder,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder: string;
+  orders: SortOrder<S>[];
+  order: S;
+  onOrder: (next: S) => void;
+}) {
+  const { lang } = useSession();
+  const at = Math.max(
+    0,
+    orders.findIndex((candidate) => candidate.id === order),
+  );
+  const now = orders[at];
+  const next = orders[(at + 1) % orders.length];
+  const said = now === undefined ? "" : uiTexts[lang].sortedBy(now.label);
+  return (
+    <span className="search-field search-sort" data-wide="">
+      <SearchIcon />
+      <input
+        type="search"
+        placeholder={placeholder}
+        aria-label={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {now !== undefined && next !== undefined && (
+        <button
+          type="button"
+          className="search-sort-button"
+          title={said}
+          aria-label={said}
+          onClick={() => onOrder(next.id)}
+        >
+          <SortIcon up={now.up} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A tool with levels in one button: a click turns it on or off, the pips
+ * inside set its level, filled up to the level it has. Off is level 0;
+ * turning it on again goes back to the level it had.
+ */
+export function LevelToggle({
+  icon,
+  label,
+  level,
+  levels,
+  onLevel,
+  hint,
+}: {
+  icon?: ReactNode;
+  label: string;
+  level: number;
+  /** What each level does, from off (0) to the highest. */
+  levels: string[];
+  onLevel: (level: number) => void;
+  hint?: string;
+}) {
+  const [lastOn, setLastOn] = useState(level > 0 ? level : 1);
+  const set = (next: number) => {
+    if (next > 0) {
+      setLastOn(next);
+    }
+    onLevel(next);
+  };
+  const top = levels.length - 1;
+  return (
+    <span className="level-toggle" data-on={level > 0 || undefined} title={levels[level]}>
+      <button
+        type="button"
+        className="level-toggle-main"
+        aria-pressed={level > 0}
+        title={hint}
+        onClick={() => set(level > 0 ? 0 : lastOn)}
+      >
+        {icon}
+        {label}
+      </button>
+      <span className="level-toggle-pips">
+        {Array.from({ length: top }, (_, index) => index + 1).map((step) => (
+          <button
+            type="button"
+            key={step}
+            className="level-pip"
+            aria-label={levels[step]}
+            aria-pressed={step <= level}
+            title={levels[step]}
+            onClick={() => set(step === level ? 0 : step)}
+          />
+        ))}
+      </span>
+    </span>
   );
 }

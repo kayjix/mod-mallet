@@ -81,3 +81,31 @@ export function UndoIcon() {
     </Sign>
   );
 }
+
+/** A tick, inside a toggle chip that is on. */
+export function TickIcon() {
+  return (
+    <Sign className="tick-icon">
+      <path d="M6 12.5l4 4L18 8" />
+    </Sign>
+  );
+}
+
+/** Bars getting shorter (or longer, `up`) with an arrow: the order of a list. */
+export function SortIcon({ up }: { up: boolean }) {
+  return (
+    <Sign className="sort-icon">
+      {up ? <path d="M4 7h6M4 12h9M4 17h12" /> : <path d="M4 7h12M4 12h9M4 17h6" />}
+      {up ? <path d="M19 19V5M16 8l3-3 3 3" /> : <path d="M19 5v14M16 16l3 3 3-3" />}
+    </Sign>
+  );
+}
+
+/** A chevron that turns down when what it opens is open. */
+export function ChevronIcon() {
+  return (
+    <Sign className="chevron-icon">
+      <path d="M9 6l6 6-6 6" />
+    </Sign>
+  );
+}

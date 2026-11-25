@@ -216,10 +216,8 @@ export interface Texts {
   // The collisions as a worklist, decided spot by spot (ADR 0040).
   spotKinds: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
   spotKindHints: Record<"duplicate" | "door" | "overlap" | "deep" | "touch", string>;
-  workTabSpots: string;
   workPreviewWithout: (name: string) => string;
   workPairMany: (first: string, second: string, spots: number) => string;
-  workShowSpots: string;
   workObjectGame: string;
   workObjectHide: string;
   workObjectShow: string;
@@ -246,7 +244,6 @@ export interface Texts {
   workPickSpot: string;
   workInside: string;
   workEmpty: string;
-  workMore: string;
   workGhost: string;
   workThisSpot: string;
   workSearch: string;
@@ -275,9 +272,6 @@ export interface Texts {
     | "persistent",
     (other: string, keyword: string | null) => string
   >;
-  workSortBy: string;
-  workSortOpen: string;
-  workSortSpots: string;
   workWinsEverywhere: (mod: string) => string;
   workDuelWinner: (mod: string) => string;
   duelFromCollisions: (mod: string) => string;
@@ -571,11 +565,9 @@ export const texts: Record<Lang, Texts> = {
       deep: "Two objects run into each other over 2 m or more; often two mods building the same thing.",
       touch: "Two objects reach into each other a little; often harmless.",
     },
-    workTabSpots: "Spots",
     workPreviewWithout: (name) => `Look at it without ${name}, without deciding`,
     workPairMany: (first, second, spots) =>
       `${first} and ${second} collide at ${spots} spots. Usually it is better to choose one of them:`,
-    workShowSpots: "Show the spots",
     workObjectGame:
       "This object belongs to the game itself. Hide it only if you are sure: a quest may need it.",
     workObjectHide: "Hide this object",
@@ -605,7 +597,6 @@ export const texts: Record<Lang, Texts> = {
     workPickSpot: "Pick a spot from the list.",
     workInside: "This spot is inside a building or cave; there is no 3D view of it yet.",
     workEmpty: "No collisions to decide.",
-    workMore: "Mod against mod",
     workGhost: "Red and see-through: what the patch would hide.",
     workThisSpot: "this spot",
     workSearch: "Search places, mods, objects…",
@@ -634,9 +625,6 @@ export const texts: Record<Lang, Texts> = {
         "It is drawn from afar; the distant view keeps showing it until it is generated again",
       persistent: () => "The game keeps it loaded; nothing was found that still uses it",
     },
-    workSortBy: "Order",
-    workSortOpen: "Most open",
-    workSortSpots: "Most spots",
     workWinsEverywhere: (mod) => `✓ ${mod} wins everywhere`,
     workDuelWinner: (mod) => `Duel: ${mod} wins`,
     duelFromCollisions: (mod) =>
@@ -987,11 +975,9 @@ export const texts: Record<Lang, Texts> = {
       deep: "Zwei Objekte laufen über 2 m oder mehr ineinander; oft bauen zwei Mods dasselbe.",
       touch: "Zwei Objekte ragen ein wenig ineinander; oft harmlos.",
     },
-    workTabSpots: "Stellen",
     workPreviewWithout: (name) => `Ohne ${name} ansehen, ohne zu entscheiden`,
     workPairMany: (first, second, spots) =>
       `${first} und ${second} stoßen an ${spots} Stellen zusammen. Meist ist es besser, dich für eine zu entscheiden:`,
-    workShowSpots: "Stellen ansehen",
     workObjectGame:
       "Dieses Objekt gehört zum Spiel selbst. Blende es nur aus, wenn du sicher bist: Eine Quest könnte es brauchen.",
     workObjectHide: "Dieses Objekt ausblenden",
@@ -1022,7 +1008,6 @@ export const texts: Record<Lang, Texts> = {
     workInside:
       "Diese Stelle liegt in einem Gebäude oder einer Höhle; dafür gibt es noch keine 3D-Ansicht.",
     workEmpty: "Keine Kollisionen zu entscheiden.",
-    workMore: "Mod gegen Mod",
     workGhost: "Rot und durchscheinend: was der Patch ausblenden würde.",
     workThisSpot: "diese Stelle",
     workSearch: "Orte, Mods, Objekte suchen…",
@@ -1052,9 +1037,6 @@ export const texts: Record<Lang, Texts> = {
         "Wird aus der Ferne gezeigt; die Fernansicht zeigt es weiter, bis sie neu erzeugt wird",
       persistent: () => "Das Spiel hält es geladen; nichts gefunden, das es noch nutzt",
     },
-    workSortBy: "Reihenfolge",
-    workSortOpen: "Meiste offene",
-    workSortSpots: "Meiste Stellen",
     workWinsEverywhere: (mod) => `✓ ${mod} gewinnt überall`,
     workDuelWinner: (mod) => `Duell: ${mod} gewinnt`,
     duelFromCollisions: (mod) =>

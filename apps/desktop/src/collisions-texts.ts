@@ -36,6 +36,8 @@ export interface CollisionsTexts {
   partsShow: (count: number) => string;
   partsHide: (count: number) => string;
   partsSomeTied: (count: number) => string;
+  /** The orders of the worklist's groups, as the sorting button steps through them. */
+  orders: Record<"open-down" | "open-up" | "spots-down" | "spots-up", string>;
 }
 
 export const collisionsTexts: Record<Lang, CollisionsTexts> = {
@@ -75,6 +77,12 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
     aroundCareful: (count) => `${count} of them with care`,
     aroundCarefulHint:
       "The game may miss these: they are drawn from afar, or something refers to them. Pick one in 3D to see why.",
+    orders: {
+      "open-down": "most open spots first",
+      "open-up": "fewest open spots first",
+      "spots-down": "most spots first",
+      "spots-up": "fewest spots first",
+    },
   },
   de: {
     also: "Außerdem",
@@ -112,5 +120,11 @@ export const collisionsTexts: Record<Lang, CollisionsTexts> = {
     aroundCareful: (count) => `davon ${count} mit Vorsicht`,
     aroundCarefulHint:
       "Das Spiel könnte sie vermissen: Sie werden aus der Ferne gezeigt, oder etwas verweist auf sie. Klick eines in 3D an, um zu sehen, warum.",
+    orders: {
+      "open-down": "die meisten offenen Stellen zuerst",
+      "open-up": "die wenigsten offenen Stellen zuerst",
+      "spots-down": "die meisten Stellen zuerst",
+      "spots-up": "die wenigsten Stellen zuerst",
+    },
   },
 };

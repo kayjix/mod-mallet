@@ -87,9 +87,9 @@ import {
   EmptyState,
   Note as NoteBox,
   PageHeader,
-  SearchField,
+  SearchSort,
   Segmented,
-  Tabs,
+  ToggleChip,
   Toolbar,
 } from "./ui/kit";
 import { Eye, useMarkings } from "./view-tools";
@@ -151,7 +151,10 @@ function groupOf(item: Item, by: Grouping): Group {
 }
 
 /** How the groups are ordered: by their spots, or by those still open. */
-type Sorting = "open" | "spots";
+/** How the groups are ordered: by their open spots or all their spots, most or fewest first. */
+type Sorting = "open-down" | "open-up" | "spots-down" | "spots-up";
+
+const SORTINGS: Sorting[] = ["open-down", "open-up", "spots-down", "spots-up"];
 
 /** The two mods of some findings, with what each could hide in all of them together. */
 function sidesOfMods(pairs: Pair[]): { plugin: string; objects: number }[] {
@@ -387,6 +390,12 @@ function useItems(report: RenderedReport): Item[] {
   }, [report, ignored, t, passageTitle]);
 }
 
+/** The order of two groups by their open spots or all their spots. */
+function byOrder(sort: Sorting, openA: number, openB: number, allA: number, allB: number): number {
+  const [a, b] = sort.startsWith("open") ? [openA, openB] : [allA, allB];
+  return sort.endsWith("up") ? a - b : b - a;
+}
+
 /** Groups of items, the groups with the most serious spots first, each worst first. */
 function grouped(
   items: Item[],
@@ -424,7 +433,7 @@ function grouped(
       (a, b) =>
         passageFirst(a) - passageFirst(b) ||
         done(a) - done(b) ||
-        (sort === "open" ? left(b) - left(a) : 0) ||
+        byOrder(sort, left(a), left(b), a.items.length, b.items.length) ||
         worst(a) - worst(b) ||
         serious(b) - serious(a) ||
         b.items.length - a.items.length ||
@@ -495,19 +504,6 @@ export function Collisions({
     );
     return items.find((item) => named.get(item.spot.finding) === wanted)?.mods.key ?? null;
   }, [pairAt, report, items]);
-  const [tab, setTab] = useState<"spots" | "mods">(() =>
-    start !== null
-      ? "spots"
-      : pairAt !== null
-        ? "mods"
-        : remembered<"spots" | "mods">("mallet.workTab", "spots", (value) =>
-            value === "mods" || value === "spots" ? value : null,
-          ),
-  );
-  const changeTab = (next: "spots" | "mods") => {
-    setTab(next);
-    remember("mallet.workTab", next);
-  };
   const [kinds, setKinds] = useState<Set<WorkKind>>(() =>
     remembered(
       "mallet.workKinds3",
@@ -526,8 +522,14 @@ export function Collisions({
     ),
   );
   const [sort, setSort] = useState<Sorting>(() =>
-    remembered<Sorting>("mallet.workSort", "open", (value) =>
-      value === "open" || value === "spots" ? value : null,
+    remembered<Sorting>("mallet.workSort", "open-down", (value) =>
+      value === "open"
+        ? "open-down"
+        : value === "spots"
+          ? "spots-down"
+          : SORTINGS.includes(value as Sorting)
+            ? (value as Sorting)
+            : null,
     ),
   );
   const changeSort = (next: Sorting) => {
@@ -634,7 +636,6 @@ export function Collisions({
       setCurrentKey(startKey);
       setPassageAt(null);
       setFramed(null);
-      setTab("spots");
     }
   }, [startKey]);
   // A passage handed over (from the guided review) is opened in the view.
@@ -644,14 +645,23 @@ export function Collisions({
       openPassage(startPassage);
     }
   }, [startPassage, startKey]);
-  // So is a pair handed over later.
+  // The pair of mods to decide as a whole, below the spot's panel: opened
+  // from the spot, or handed over (ADR 0048) with its worst spot.
+  const [openedPair, setOpenedPair] = useState<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a pair handed over opens.
   useEffect(() => {
-    if (focusPair !== null) {
-      setTab("mods");
+    if (focusPair === null) {
+      return;
+    }
+    setOpenedPair(focusPair);
+    const first = items
+      .filter((item) => item.mods.key === focusPair)
+      .sort((a, b) => RANK[a.kind] - RANK[b.kind])[0];
+    if (first !== undefined) {
+      setCurrentKey(first.key);
+      setPassageAt(null);
     }
   }, [focusPair]);
-  // The pair opened from a spot, on the tab of the pairs.
-  const [openedPair, setOpenedPair] = useState<string | null>(null);
   const current =
     (currentKey === null ? undefined : byKey.get(currentKey)) ??
     ordered.find((item) => decision(item) === undefined) ??
@@ -684,6 +694,7 @@ export function Collisions({
   const go = (item: Item | null) => {
     if (item !== null) {
       setCurrentKey(item.key);
+      setOpenedPair((open) => (open === item.mods.key ? open : null));
       setPassageAt(null);
       // A spot of the passage in view is picked where it is: the camera and
       // the objects read stay. Elsewhere, the view goes to the spot.
@@ -790,7 +801,6 @@ export function Collisions({
     const target = event.target as HTMLElement | null;
     if (
       openedPassage !== null ||
-      tab !== "spots" ||
       event.altKey ||
       event.ctrlKey ||
       event.metaKey ||
@@ -975,82 +985,64 @@ export function Collisions({
       </p>
     </NoteBox>
   );
-  const modCount = useMemo(
-    () => new Set(items.filter((item) => item.pairs.length > 0).map((item) => item.mods.key)).size,
-    [items],
-  );
-
-  const tabs = (
-    <Tabs
-      label={t.viewCollisions}
-      items={[
-        { id: "spots", label: t.workTabSpots, count: ordered.length },
-        { id: "mods", label: t.workMore, count: modCount },
-      ]}
-      value={tab}
-      onChange={changeTab}
-    />
-  );
   const toPatch = (
     <button type="button" className="primary" onClick={showPatch}>
       {t.workToPatch(hiddenObjects.length)}
     </button>
   );
+  // Every pair's suggestion at once.
+  const suggested = pairs.filter((pair) => pair.suggested !== null);
+  const takeSuggestions = suggested.length > 0 && (
+    <button
+      type="button"
+      onClick={() => {
+        let next = choices;
+        for (const pair of suggested) {
+          next = chooseFinding(next, pair, pair.suggested);
+        }
+        setPatchChoices(next);
+      }}
+    >
+      {own.takeSuggestions(suggested.length)}
+    </button>
+  );
+  // Collisions that name no spot to look at, listed apart.
+  const withSpots = new Set(items.map((item) => item.spot.finding));
+  const spotless = report.findings.filter(
+    (rendered) => isCollision(rendered) && !withSpots.has(rendered.finding.id),
+  ).length;
+  const also = spotless > 0 && (
+    <details className="work-also">
+      <summary>
+        {own.also} <span className="count">{spotless}</span>
+      </summary>
+      <p className="aside">{own.alsoNote}</p>
+      <TaskList findings={report.findings} filter="collisions" exclude={withSpots} />
+    </details>
+  );
 
-  if (tab === "mods" || items.length === 0) {
-    const suggested = pairs.filter((pair) => pair.suggested !== null);
-    const withSpots = new Set(items.map((item) => item.spot.finding));
+  if (items.length === 0) {
     return (
-      <section className="work work-pairs-view">
-        <PageHeader
-          tabs={tabs}
-          actions={
-            <>
-              {suggested.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    let next = choices;
-                    for (const pair of suggested) {
-                      next = chooseFinding(next, pair, pair.suggested);
-                    }
-                    setPatchChoices(next);
-                  }}
-                >
-                  {own.takeSuggestions(suggested.length)}
-                </button>
-              )}
-              {toPatch}
-            </>
-          }
-        />
-        {items.length === 0 && <EmptyState>{t.workEmpty}</EmptyState>}
+      <section className="work">
+        <PageHeader actions={toPatch} />
         {wideBanners}
-        <ModPairs
-          items={items}
-          decision={decision}
-          sort={sort}
-          duels={report.duels}
-          focus={openedPair ?? focusPair}
-          onDecideMods={decideMods}
-          onShow={(item) => {
-            changeBy("mods");
-            setCurrentKey(item.key);
-            changeTab("spots");
-          }}
-        />
-        {report.findings.some(
-          (rendered) => isCollision(rendered) && !withSpots.has(rendered.finding.id),
-        ) && (
-          <section className="work-also">
-            <h3>{own.also}</h3>
-            <p className="aside">{own.alsoNote}</p>
-            <TaskList findings={report.findings} filter="collisions" exclude={withSpots} />
-          </section>
-        )}
+        <EmptyState>{t.workEmpty}</EmptyState>
+        {also}
       </section>
     );
   }
+  // The pair opened below the spot's panel, with its spots.
+  const pairItems = openedPair === null ? [] : items.filter((item) => item.mods.key === openedPair);
+  const pairPanel = pairItems[0] !== undefined && (
+    <PairPanel
+      findings={pairItems[0].pairs}
+      spots={pairItems}
+      decision={decision}
+      duels={report.duels}
+      onDecideMods={decideMods}
+      onClose={() => setOpenedPair(null)}
+    />
+  );
   const passage = current === null ? [] : (passages.get(current.passage) ?? []);
   const currentInPassage =
     current === null
@@ -1062,7 +1054,6 @@ export function Collisions({
   return (
     <section className="work work-spots">
       <PageHeader
-        tabs={tabs}
         status={
           <div className="work-progress" title={t.workProgress(decidedCount, ordered.length)}>
             <strong>{t.workProgress(decidedCount, ordered.length)}</strong>
@@ -1075,35 +1066,63 @@ export function Collisions({
             </span>
           </div>
         }
-        actions={toPatch}
+        actions={
+          <>
+            {takeSuggestions}
+            {toPatch}
+          </>
+        }
       />
       <div className="work-bench">
         <div className="work-left">
           <Toolbar stacked className="work-filters">
-            <SearchField value={query} onChange={setQuery} placeholder={t.workSearch} wide />
-            <fieldset className="work-kinds" aria-label={t.mapCollisions}>
+            {wideBanners}
+            <fieldset className="toggle-chips" aria-label={t.mapCollisions}>
               {WORK_KINDS.map((kind) => (
-                <label key={kind} className="control-check" title={t.spotKindHints[kind]}>
-                  <input
-                    type="checkbox"
-                    checked={kinds.has(kind)}
-                    onChange={(event) => {
-                      const next = new Set(kinds);
-                      if (event.target.checked) {
-                        next.add(kind);
-                      } else {
-                        next.delete(kind);
-                      }
-                      setKinds(next);
-                      remember("mallet.workKinds3", [...next].join(","));
-                    }}
-                  />
-                  <PlaceIcon shape="circle" origin="spot" kind={kind} />
-                  {t.spotKinds[kind]} <span className="aside">{counts[kind]}</span>
-                </label>
+                <ToggleChip
+                  key={kind}
+                  on={kinds.has(kind)}
+                  colour={`var(--spot-${kind})`}
+                  label={t.spotKinds[kind]}
+                  count={counts[kind]}
+                  hint={t.spotKindHints[kind]}
+                  onChange={(on) => {
+                    const next = new Set(kinds);
+                    if (on) {
+                      next.add(kind);
+                    } else {
+                      next.delete(kind);
+                    }
+                    setKinds(next);
+                    remember("mallet.workKinds3", [...next].join(","));
+                  }}
+                />
               ))}
             </fieldset>
+            <div className="toggle-chips">
+              <ToggleChip
+                on={hideDecided}
+                label={t.workHideDecided}
+                onChange={(on) => {
+                  setHideDecided(on);
+                  remember("mallet.workHideDecided", on ? "on" : "off");
+                }}
+              />
+              {(pins.size > 0 || pinnedOnly) && (
+                <ToggleChip
+                  on={pinnedOnly}
+                  colour="var(--pin)"
+                  icon={<PinIcon />}
+                  label={pinText.filter(pins.size)}
+                  onChange={(on) => {
+                    setPinnedOnly(on);
+                    remember("mallet.workPinned", on ? "on" : "off");
+                  }}
+                />
+              )}
+            </div>
             <Segmented
+              small
               label={t.workGroupBy}
               items={[
                 { id: "region", label: t.workByRegion },
@@ -1113,40 +1132,14 @@ export function Collisions({
               value={by}
               onChange={changeBy}
             />
-            <Segmented
-              label={t.workSortBy}
-              items={[
-                { id: "open", label: t.workSortOpen },
-                { id: "spots", label: t.workSortSpots },
-              ]}
-              value={sort}
-              onChange={changeSort}
+            <SearchSort
+              value={query}
+              onChange={setQuery}
+              placeholder={t.workSearch}
+              orders={SORTINGS.map((id) => ({ id, label: own.orders[id], up: id.endsWith("up") }))}
+              order={sort}
+              onOrder={changeSort}
             />
-            <label className="control-check">
-              <input
-                type="checkbox"
-                checked={hideDecided}
-                onChange={(event) => {
-                  setHideDecided(event.target.checked);
-                  remember("mallet.workHideDecided", event.target.checked ? "on" : "off");
-                }}
-              />
-              {t.workHideDecided}
-            </label>
-            {(pins.size > 0 || pinnedOnly) && (
-              <label className="control-check">
-                <input
-                  type="checkbox"
-                  checked={pinnedOnly}
-                  onChange={(event) => {
-                    setPinnedOnly(event.target.checked);
-                    remember("mallet.workPinned", event.target.checked ? "on" : "off");
-                  }}
-                />
-                <PinIcon /> {pinText.filter(pins.size)}
-              </label>
-            )}
-            {wideBanners}
           </Toolbar>
           <WorkList
             groups={groups}
@@ -1160,6 +1153,7 @@ export function Collisions({
             passageAt={openedPassage?.key ?? null}
             onPassage={openPassage}
           />
+          {also}
         </div>
         <div className="work-stage">
           {offNote}
@@ -1276,14 +1270,9 @@ export function Collisions({
               onDecide={(plugin) => decide(shownItem, plugin)}
               onUndecide={() => undecide(shownItem)}
               onDecideMods={decideMods}
-              onOpenPair={() => {
-                setOpenedPair(shownItem.mods.key);
-                changeTab("mods");
-              }}
-              onOpenMods={(key) => {
-                setOpenedPair(key);
-                changeTab("mods");
-              }}
+              onOpenPair={() => setOpenedPair(shownItem.mods.key)}
+              onOpenMods={setOpenedPair}
+              pairPanel={pairPanel}
               onDecidePassage={decidePassage}
               onObject={hideOrShow}
               onMergeDoors={(group, plan) => mergeDoors(shownItem, group, plan)}
@@ -1522,10 +1511,12 @@ interface SpotProps {
   onDecide: (plugin: string | null) => void;
   onUndecide: () => void;
   onDecideMods: (pairs: Pair[], plugin: string | null) => void;
-  /** Opens the pair of this spot's two mods on the tab of the pairs. */
+  /** Opens the pair of this spot's two mods, to decide it as a whole. */
   onOpenPair: () => void;
-  /** Opens a pair of mods, by its key, on the tab of the pairs. */
+  /** Opens a pair of mods, by its key, to decide it as a whole. */
   onOpenMods: (key: string) => void;
+  /** The pair opened, below the panel. */
+  pairPanel: ReactNode;
   onDecidePassage: (passage: Item[], plugin: string, extra: ObjectRef[]) => void;
   onObject: (object: ObjectRef, hide: boolean) => void;
   /** Merges stacked doors into the one `plan` keeps (ADR 0067). */
@@ -2023,6 +2014,7 @@ function Spot(props: SpotProps & SpotFrameProps) {
             )}
           </>
         )}
+        {props.pairPanel}
       </div>
       <Stage
         {...props}
@@ -2401,18 +2393,6 @@ function Stage({
   );
 }
 
-interface ModPairsProps {
-  items: Item[];
-  decision: (item: Item) => string | null | undefined;
-  sort: Sorting;
-  /** The duels of the report, to tell where one was decided. */
-  duels: RenderedDuel[];
-  /** The pair to show first, by its key, if any. */
-  focus: string | null;
-  onDecideMods: (pairs: Pair[], plugin: string | null) => void;
-  onShow: (item: Item) => void;
-}
-
 /**
  * What is decided for a pair of mods: on every spot the same mod hidden,
  * and whether the duel of the two (ADR 0029) says the same.
@@ -2452,134 +2432,77 @@ function PairVerdict({
   );
 }
 
-/** The pairs of mods whose objects collide, the most first, to decide as a whole. */
-function ModPairs({ items, decision, sort, duels, focus, onDecideMods, onShow }: ModPairsProps) {
+/**
+ * A pair of mods whose objects collide, to decide as a whole: one mod's
+ * objects hidden on every spot of the two, or both kept everywhere.
+ */
+function PairPanel({
+  findings,
+  spots,
+  decision,
+  duels,
+  onDecideMods,
+  onClose,
+}: {
+  findings: Pair[];
+  spots: Item[];
+  decision: (item: Item) => string | null | undefined;
+  /** The duels of the report, to tell where one was decided. */
+  duels: RenderedDuel[];
+  onDecideMods: (pairs: Pair[], plugin: string | null) => void;
+  onClose: () => void;
+}) {
   const { t, lang, openCompare } = useSession();
   const own = collisionsTexts[lang];
-  const list = useRef<HTMLUListElement>(null);
-  // The pair opened with comes into sight.
-  useEffect(() => {
-    if (focus === null) {
-      return;
-    }
-    list.current
-      ?.querySelector<HTMLElement>(`[data-key="${CSS.escape(focus)}"]`)
-      ?.scrollIntoView({ block: "center" });
-  }, [focus]);
-  const pairs = useMemo(() => {
-    const found = new Map<string, { key: string; pairs: Pair[]; items: Item[] }>();
-    for (const item of items) {
-      if (item.pairs.length === 0) {
-        continue;
-      }
-      const entry = found.get(item.mods.key) ?? {
-        key: item.mods.key,
-        pairs: item.pairs,
-        items: [],
-      };
-      entry.items.push(item);
-      found.set(item.mods.key, entry);
-    }
-    const left = (entry: { items: Item[] }) =>
-      entry.items.filter((item) => decision(item) === undefined).length;
-    const serious = (entry: { items: Item[] }) =>
-      entry.items.filter((item) => item.kind !== "touch").length;
-    return [...found.values()].sort(
-      (a, b) =>
-        (left(a) === 0 ? 1 : 0) - (left(b) === 0 ? 1 : 0) ||
-        (sort === "open" ? left(b) - left(a) : 0) ||
-        serious(b) - serious(a) ||
-        b.items.length - a.items.length,
-    );
-  }, [items, sort, decision]);
-  if (pairs.length === 0) {
-    return null;
-  }
+  const sides = sidesOfMods(findings);
+  const decided = spots.filter((item) => decision(item) !== undefined).length;
+  // The duel of the two about files is decided among the assets.
+  const duel = duels.find((rendered) =>
+    findings.some((pair) => rendered.duel.findings.includes(pair.id)),
+  );
+  const files = duel?.duel.topics.some(
+    (topic) => topic.topic !== "objects" && topic.topic !== "contained",
+  );
   return (
-    <section className="work-pairs">
-      <ul className="work-pair-list" ref={list}>
-        {pairs.map(({ key, pairs: findings, items: spots }) => {
-          const sides = sidesOfMods(findings);
-          const decided = spots.filter((item) => decision(item) !== undefined).length;
-          const kinds = WORK_KINDS.map((kind) => ({
-            kind,
-            count: spots.filter((item) => item.kind === kind).length,
-          })).filter((entry) => entry.count > 0);
-          const first = [...spots].sort((a, b) => RANK[a.kind] - RANK[b.kind])[0];
-          return (
-            <li
-              className="work-pair-row"
-              key={key}
-              data-key={key}
-              data-focus={key === focus || undefined}
-              data-done={decided === spots.length || undefined}
-            >
-              <div className="work-pair-head">
-                <strong>{sides.map((side) => side.plugin).join(" × ")}</strong>
-                <PairVerdict findings={findings} spots={spots} decision={decision} duels={duels} />
-                <span className="work-group-counts">
-                  {kinds.map(({ kind, count }) => (
-                    <span
-                      key={kind}
-                      className="work-count"
-                      data-kind={kind}
-                      title={t.spotKinds[kind]}
-                    >
-                      {count}
-                    </span>
-                  ))}
-                  <span className="aside">
-                    {decided}/{spots.length}
-                  </span>
-                </span>
-              </div>
-              <div className="work-pair-actions">
-                {sides.map((side) => (
-                  <button
-                    type="button"
-                    className="small"
-                    key={side.plugin}
-                    disabled={side.objects === 0}
-                    onClick={() => onDecideMods(findings, side.plugin)}
-                  >
-                    {t.workEverywhere(side.plugin)}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="small"
-                  onClick={() => onDecideMods(findings, null)}
-                >
-                  {t.workKeepEverywhere}
-                </button>
-                {first !== undefined && (
-                  <button type="button" className="small primary" onClick={() => onShow(first)}>
-                    {t.workShowSpots}
-                  </button>
-                )}
-                {(() => {
-                  // The duel of the two about files is decided among the assets.
-                  const duel = duels.find((rendered) =>
-                    findings.some((pair) => rendered.duel.findings.includes(pair.id)),
-                  );
-                  const files = duel?.duel.topics.some(
-                    (topic) => topic.topic !== "objects" && topic.topic !== "contained",
-                  );
-                  return duel !== undefined && files ? (
-                    <button
-                      type="button"
-                      className="small quiet"
-                      onClick={() => openCompare(duel.duel.id)}
-                    >
-                      {own.compareFiles}
-                    </button>
-                  ) : null;
-                })()}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+    <section className="work-pair-row" aria-label={own.openThePair}>
+      <div className="work-pair-head">
+        <strong>{sides.map((side) => side.plugin).join(" × ")}</strong>
+        <PairVerdict findings={findings} spots={spots} decision={decision} duels={duels} />
+        <span className="aside">
+          {decided}/{spots.length}
+        </span>
+        <span className="spacer" />
+        <button
+          type="button"
+          className="small quiet"
+          aria-label={t.viewerClose}
+          title={t.viewerClose}
+          onClick={onClose}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="work-pair-actions">
+        {sides.map((side) => (
+          <button
+            type="button"
+            className="small"
+            key={side.plugin}
+            disabled={side.objects === 0}
+            onClick={() => onDecideMods(findings, side.plugin)}
+          >
+            {t.workEverywhere(side.plugin)}
+          </button>
+        ))}
+        <button type="button" className="small" onClick={() => onDecideMods(findings, null)}>
+          {t.workKeepEverywhere}
+        </button>
+        {duel !== undefined && files === true && (
+          <button type="button" className="small quiet" onClick={() => openCompare(duel.duel.id)}>
+            {own.compareFiles}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
