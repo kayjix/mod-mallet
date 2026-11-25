@@ -9,13 +9,15 @@ use mallet_analysis::walkways::{self, Carried, Hidden};
 use mallet_core::ObjectRef;
 use mallet_core::action_places::{SpotAsked, SpotReach, SpotState, SpotsReach};
 use mallet_core::anchors::AnchorKind;
+use mallet_core::doors::RecordChange;
 use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::grid::{cell_of, cell_of_unit, whole};
 use mallet_core::reach::{
-    Destination, DestinationKind, ReachAfter, ReachChange, ReachOutcome, Route, WalkwayReach,
+    Destination, DestinationKind, DoorReach, ReachAfter, ReachChange, ReachOutcome, Route,
+    WalkwayReach,
 };
 use mallet_game_bethesda::area::AreaObject;
 use mallet_game_bethesda::walkways::Around;
@@ -147,6 +149,109 @@ pub fn walkway_reach_after(
         after: kind,
         checked: u32::try_from(found.checked).unwrap_or(u32::MAX),
         changes,
+    })
+}
+
+/// Whether characters reach `keep`, the door kept where stacked doors are
+/// merged, and step through it, once the patch hides `hidden` (the other
+/// doors among them) and makes `changes`, the plan of the merge (ADR
+/// 0088): the paths over the hidden objects repaired as the patch repairs
+/// them, every door triangle of the plan re-attached, and every door of
+/// the plan leading where the plan says. `keep` stands in the worldspace
+/// `place` near `centre`, or, without a centre, in the interior cell
+/// `place`. `None` if the setup cannot be read.
+pub fn door_reach(
+    options: &ScanOptions,
+    place: &str,
+    centre: Option<[f32; 2]>,
+    hidden: &[ObjectRef],
+    keep: &ObjectRef,
+    changes: &[RecordChange],
+) -> Option<DoorReach> {
+    let started = std::time::Instant::now();
+    // The kept door is read too, so that the paths around it are.
+    let mut asked: Vec<ObjectRef> = hidden.to_vec();
+    asked.push(keep.clone());
+    let Looked {
+        placed,
+        near,
+        mut destinations,
+        ..
+    } = look(options, place, centre, &asked, &[])?;
+    let meshes = meshes_of(options, &placed)?;
+    let kept = record_id(keep);
+    let hidden_objects: Vec<Hidden<'_>> = placed
+        .iter()
+        .filter(|(object, _)| object.id != kept)
+        .map(|(object, model)| Hidden {
+            object,
+            mesh: model.as_ref().and_then(|model| meshes.get(model)),
+            bounds: None,
+        })
+        .collect();
+    let carried = walkways::carried(&hidden_objects, &near);
+    let mut shapes: Vec<NavmeshShape> = if carried.is_empty() {
+        near.navmeshes.clone()
+    } else {
+        crate::walkways::repaired_shapes(&near, &hidden_objects, &carried)
+    };
+    // The door triangles of the plan name the kept door.
+    let mut relinked = 0u32;
+    for change in changes {
+        let RecordChange::NavmeshDoor {
+            navmesh,
+            triangle,
+            from,
+            to,
+            ..
+        } = change
+        else {
+            continue;
+        };
+        let (navmesh, from, to) = (record_id(navmesh), record_id(from), record_id(to));
+        for shape in shapes
+            .iter_mut()
+            .filter(|shape| shape.used && shape.id == navmesh)
+        {
+            for (number, door) in &mut shape.doors {
+                if number == triangle && *door == from {
+                    door.clone_from(&to);
+                    relinked = relinked.saturating_add(1);
+                }
+            }
+        }
+    }
+    // The doors of the plan lead where it says; the hidden ones nowhere.
+    for change in changes {
+        if let RecordChange::Teleport { door, to, .. } = change {
+            let (door, to) = (record_id(door), record_id(to));
+            for destination in destinations.iter_mut().filter(|known| known.id == door) {
+                destination.leads_to = Some(to.clone());
+            }
+        }
+    }
+    let gone: HashSet<RecordId> = hidden.iter().map(record_id).collect();
+    destinations.retain(|destination| !gone.contains(&destination.id));
+    let check = reachability::door_check(&shapes, &destinations, &kept);
+    let known = shapes.iter().any(|shape| shape.used);
+    tracing::info!(
+        place,
+        door = %kept,
+        relinked,
+        triangles = check.triangles,
+        reached = check.reached,
+        through = check.through,
+        elapsed_ms = started.elapsed().as_millis(),
+        "checked whether characters use the door kept"
+    );
+    Some(DoorReach {
+        place: place.to_owned(),
+        door: keep.clone(),
+        relinked,
+        triangles: u32::try_from(check.triangles).unwrap_or(u32::MAX),
+        reached: check.reached,
+        through: check.through,
+        known,
     })
 }
 

@@ -447,12 +447,20 @@ function PatchDetail({
   const missing =
     state === "in-game" ? hidden.filter((object) => !installed.has(matchKey(object))).length : 0;
   const moved = toWrite.moves?.moves.length ?? 0;
-  const paths = toWrite.repairs?.places.filter((place) => place.every !== true).length ?? 0;
+  const paths =
+    toWrite.repairs?.places.filter((place) => place.every !== true && place.navmeshes.length > 0)
+      .length ?? 0;
+  // The paths of merged doors re-attached to the kept ones (ADR 0088).
+  const doorPaths =
+    toWrite.repairs?.places.reduce((sum, place) => sum + (place.doors?.length ?? 0), 0) ?? 0;
   const files = duelsOf(tickedOf(patch)).length;
   const count = Object.keys(patch.decisions).length;
   const doesSomething =
-    toWrite.parts.some((part) => part.objects.length > 0) || moved > 0 || paths > 0;
-  const does = p.does(hidden.length, moved, paths, files);
+    toWrite.parts.some((part) => part.objects.length > 0) ||
+    moved > 0 ||
+    paths > 0 ||
+    doorPaths > 0;
+  const does = p.does(hidden.length, moved, paths, files, doorPaths);
 
   const change = (next: PatchBook, undoText?: string) => onChange(next, undoText);
   const here = (key: string | null, text: string): PatchAt => ({

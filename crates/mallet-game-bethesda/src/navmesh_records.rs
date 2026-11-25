@@ -49,12 +49,30 @@ pub struct NavmeshRecord {
     /// IDs as [`Self::plugin`] writes them. A field may be longer than
     /// 65535 bytes; the writer then needs an `XXXX` field before it.
     pub fields: Vec<Subrecord>,
+    /// The door triangles that are to name another door in the copy (ADR
+    /// 0088). They are changed by [`Self::fields_for`], where the door kept
+    /// can be named whichever plugin it is of.
+    pub relinked: Vec<Relink>,
+}
+
+/// A door triangle that names another door in the written copy of a mesh:
+/// the paths of the characters re-attached from a hidden door to the door
+/// kept in its place (ADR 0088).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Relink {
+    /// The triangle, by its number in the mesh.
+    pub triangle: u16,
+    /// The door it names in the version copied.
+    pub from: RecordId,
+    /// The door it is to name.
+    pub to: RecordId,
 }
 
 impl NavmeshRecord {
     /// The fields with every form ID rewritten for a plugin named `own`
-    /// whose masters are `masters`. `None` if a record they name belongs
-    /// to a plugin that is neither.
+    /// whose masters are `masters`, and the door triangles of
+    /// [`Self::relinked`] naming their new doors. `None` if a record they
+    /// name belongs to a plugin that is neither.
     pub fn fields_for(&self, masters: &[String], own: &str) -> Option<Vec<Subrecord>> {
         self.fields
             .iter()
@@ -63,9 +81,37 @@ impl NavmeshRecord {
                     return Some(field.clone());
                 }
                 let mut data = NavmeshData::read(&field.data)?;
+                // Which door entries change, found while their form IDs
+                // are still those of the version copied.
+                let relinked: Vec<(usize, &RecordId)> = data
+                    .doors
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, door)| {
+                        let named = record_id(door.door, &self.masters, &self.plugin);
+                        self.relinked
+                            .iter()
+                            .find(|relink| relink.triangle == door.triangle && relink.from == named)
+                            .map(|relink| (index, &relink.to))
+                    })
+                    .collect();
                 for form_id in data.form_ids_mut() {
                     let id = record_id(*form_id, &self.masters, &self.plugin);
                     *form_id = form_id_in(&id, masters, own)?;
+                }
+                for (index, to) in relinked {
+                    data.doors.get_mut(index)?.door = form_id_in(to, masters, own)?;
+                }
+                // A triangle that named both the hidden and the kept door
+                // names the kept one once.
+                if !self.relinked.is_empty() {
+                    let mut kept: Vec<(u16, u32)> = Vec::new();
+                    data.doors.retain(|door| {
+                        let key = (door.triangle, door.door);
+                        let first = !kept.contains(&key);
+                        kept.push(key);
+                        first
+                    });
                 }
                 Some(Subrecord {
                     signature: field.signature,
@@ -237,9 +283,50 @@ fn records_of(
             cell,
             grid,
             fields,
+            relinked: relinks_of(mesh),
         });
     }
     records
+}
+
+/// The door triangles that name another door after than before: the
+/// paths re-attached to a kept door (ADR 0088). A triangle may name
+/// several doors, such as two stacked ones; its entries are matched in
+/// their order. A triangle taken out names no door any more and is not
+/// among them.
+fn relinks_of(mesh: &Repaired<'_>) -> Vec<Relink> {
+    let nth = |doors: &[(u32, RecordId)], triangle: u32, n: usize| -> Option<RecordId> {
+        doors
+            .iter()
+            .filter(|(known, _)| *known == triangle)
+            .nth(n)
+            .map(|(_, door)| door.clone())
+    };
+    let mut seen: HashMap<u32, usize> = HashMap::new();
+    let mut relinks = Vec::new();
+    for (triangle, to) in &mesh.after.doors {
+        let count = seen.entry(*triangle).or_insert(0);
+        let n = *count;
+        *count += 1;
+        if mesh.removed.contains(triangle) {
+            continue;
+        }
+        let (Some(from), Ok(number)) = (
+            nth(&mesh.before.doors, *triangle, n),
+            u16::try_from(*triangle),
+        ) else {
+            continue;
+        };
+        let relink = Relink {
+            triangle: number,
+            from,
+            to: to.clone(),
+        };
+        if relink.from != relink.to && !relinks.contains(&relink) {
+            relinks.push(relink);
+        }
+    }
+    relinks
 }
 
 /// The form ID of `id` in a plugin named `own` with `masters`.
@@ -588,6 +675,166 @@ pub(crate) mod tests {
         assert_eq!(patched.edge_links[1].navmesh, 0x0000_0BBB);
         // A plugin without the game among its masters cannot hold it.
         assert_eq!(record.fields_for(&[], "Patch.esp"), None);
+    }
+
+    #[test]
+    fn a_door_triangle_is_re_attached_to_the_kept_door_of_another_plugin() {
+        let (_directory, plugins) = setup();
+        let near = read_plugins(&plugins, &around());
+        let before = near.navmeshes.iter().find(|shape| shape.used).unwrap();
+        assert_eq!(before.doors, vec![(1, id("docks.esp", 0x900))]);
+        // The docks' door is hidden; Town.esp's door stays in its place.
+        let mut after = before.clone();
+        after.doors = vec![(1, id("town.esp", 0x800))];
+        let empty = BTreeSet::new();
+        let records = repaired_records(
+            &plugins,
+            &around(),
+            &[Repaired {
+                before,
+                after: &after,
+                removed: &empty,
+                water: &empty,
+            }],
+        );
+        assert_eq!(records.len(), 1);
+        let record = &records[0];
+        assert_eq!(
+            record.relinked,
+            vec![Relink {
+                triangle: 1,
+                from: id("docks.esp", 0x900),
+                to: id("town.esp", 0x800),
+            }]
+        );
+        // Nothing else of the field changes.
+        let field = record
+            .fields
+            .iter()
+            .find(|f| &f.signature == b"NVNM")
+            .unwrap();
+        assert_eq!(NavmeshData::read(&field.data).unwrap(), docks());
+
+        let masters = [
+            "Skyrim.esm".to_owned(),
+            "Docks.esp".to_owned(),
+            "Town.esp".to_owned(),
+        ];
+        let fields = record.fields_for(&masters, "Patch.esp").unwrap();
+        let written = NavmeshData::read(&fields[0].data).unwrap();
+        assert_eq!(written.doors.len(), 1);
+        assert_eq!(written.doors[0].door, 0x0200_0800);
+        assert_eq!(written.doors[0].kind, docks().doors[0].kind);
+        // Without the kept door's plugin among the masters it cannot be
+        // named.
+        assert_eq!(record.fields_for(&masters[..2], "Patch.esp"), None);
+
+        // A triangle taken out names no door: nothing to re-attach.
+        let removed = BTreeSet::from([1]);
+        let mut cut = after.clone();
+        cut.edges[0][2] = Beyond::Nothing;
+        cut.edges[1] = [Beyond::Nothing, Beyond::Nothing, Beyond::Nothing];
+        let records = repaired_records(
+            &plugins,
+            &around(),
+            &[Repaired {
+                before,
+                after: &cut,
+                removed: &removed,
+                water: &empty,
+            }],
+        );
+        assert_eq!(records[0].relinked, Vec::new());
+    }
+
+    #[test]
+    fn a_triangle_that_names_both_stacked_doors_names_the_kept_one_once() {
+        let shape = |doors: Vec<(u32, RecordId)>| NavmeshShape {
+            id: id("skyrim.esm", 0x210),
+            plugin: "Docks.esp".to_owned(),
+            used: true,
+            place: Place::Exterior {
+                worldspace: id("skyrim.esm", 0x3C),
+            },
+            place_name: None,
+            vertices: Vec::new(),
+            triangles: Vec::new(),
+            edges: Vec::new(),
+            doors,
+        };
+        let (hidden, kept, other) = (
+            id("docks.esp", 0x900),
+            id("town.esp", 0x800),
+            id("docks.esp", 0x901),
+        );
+        let before = shape(vec![
+            (1, hidden.clone()),
+            (1, kept.clone()),
+            (0, other.clone()),
+        ]);
+        let after = shape(vec![(1, kept.clone()), (1, kept.clone()), (0, other)]);
+        let empty = BTreeSet::new();
+        let relinks = relinks_of(&Repaired {
+            before: &before,
+            after: &after,
+            removed: &empty,
+            water: &empty,
+        });
+        assert_eq!(
+            relinks,
+            vec![Relink {
+                triangle: 1,
+                from: hidden,
+                to: kept,
+            }]
+        );
+
+        // Written, the triangle names the kept door once.
+        let mut data = docks();
+        data.doors = vec![
+            // The docks' own door, the plugin itself after its two masters.
+            DoorTriangle {
+                triangle: 1,
+                kind: 0,
+                door: 0x0200_0900,
+            },
+            // Town.esp's door, its second master.
+            DoorTriangle {
+                triangle: 1,
+                kind: 0,
+                door: 0x0100_0800,
+            },
+        ];
+        let record = NavmeshRecord {
+            navmesh: id("skyrim.esm", 0x210),
+            plugin: "Docks.esp".to_owned(),
+            masters: vec!["Skyrim.esm".to_owned(), "Town.esp".to_owned()],
+            flags: 0,
+            form_version: 44,
+            place: before.place.clone(),
+            cell: id("skyrim.esm", 0x200),
+            grid: Some((5, 3)),
+            fields: vec![Subrecord {
+                signature: *b"NVNM",
+                data: data.write().unwrap(),
+            }],
+            relinked: relinks,
+        };
+        let masters = [
+            "Skyrim.esm".to_owned(),
+            "Docks.esp".to_owned(),
+            "Town.esp".to_owned(),
+        ];
+        let fields = record.fields_for(&masters, "Patch.esp").unwrap();
+        let written = NavmeshData::read(&fields[0].data).unwrap();
+        assert_eq!(
+            written.doors,
+            vec![DoorTriangle {
+                triangle: 1,
+                kind: 0,
+                door: 0x0200_0800,
+            }]
+        );
     }
 
     #[test]

@@ -109,6 +109,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "apps/desktop/src/generated/spots-reach.ts",
     ),
     (
+        "schemas/door-reach.schema.json",
+        "apps/desktop/src/generated/door-reach.ts",
+    ),
+    (
         "schemas/created-moves.schema.json",
         "apps/desktop/src/generated/created-moves.ts",
     ),
@@ -167,6 +171,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::ScanProgress>("schemas/scan-progress.schema.json")?,
         schema_of::<mallet_core::reach::WalkwayReach>("schemas/walkway-reach.schema.json")?,
         schema_of::<mallet_core::action_places::SpotsReach>("schemas/spots-reach.schema.json")?,
+        schema_of::<mallet_core::reach::DoorReach>("schemas/door-reach.schema.json")?,
         schema_of::<mallet_core::moves::CreatedMoves>("schemas/created-moves.schema.json")?,
         schema_of::<WalkwayRepair>("schemas/walkway-repair.schema.json")?,
         schema_of::<mallet_core::walkway_repair::CreatedPaths>(

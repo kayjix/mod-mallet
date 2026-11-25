@@ -43,13 +43,35 @@ pub struct RepairPlace {
     /// over what it hides by itself (ADR 0070).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub every: bool,
+    /// Door triangles there that are to name another door: those that
+    /// named a door the patch hides because stacked doors were merged into
+    /// the kept one (ADR 0067, ADR 0088). They are written into the plugin
+    /// of paths with the repairs, in the same copies of the meshes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub doors: Vec<DoorRelink>,
 }
 
 impl RepairPlace {
-    /// Whether anything is to be repaired there.
+    /// Whether anything is to be repaired or re-attached there.
     pub fn wanted(&self) -> bool {
-        self.every || !self.navmeshes.is_empty()
+        self.every || !self.navmeshes.is_empty() || !self.doors.is_empty()
     }
+}
+
+/// A door triangle of a navigation mesh that is to name another door: a
+/// path of the characters re-attached from a hidden door to the door kept
+/// in its place (ADR 0088).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorRelink {
+    /// The navigation mesh, by the plugin that first defined it.
+    pub navmesh: crate::ObjectRef,
+    /// The triangle, by its number in the mesh.
+    pub triangle: u32,
+    /// The door it names now: the one the patch hides.
+    pub from: crate::ObjectRef,
+    /// The door it is to name: the one that stays.
+    pub to: crate::ObjectRef,
 }
 
 /// The plugin of paths as written into Mod Mallet's own folder.
@@ -67,6 +89,15 @@ pub struct CreatedPaths {
     pub light: bool,
     /// The meshes chosen that it does not repair, and why.
     pub refused: Vec<RefusedPath>,
+    /// The door triangles it re-attaches from hidden doors to the doors
+    /// kept in their place (ADR 0088).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relinked: Vec<DoorRelink>,
+    /// The re-attachments asked for that it does not make: a repair took
+    /// the triangle out, or the mesh, the triangle or the door was not
+    /// found.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub not_relinked: Vec<DoorRelink>,
 }
 
 /// A mesh that was chosen for repair but is not repaired.

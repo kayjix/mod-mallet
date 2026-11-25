@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use mallet_core::walkway_repair::{
-    CreatedPaths, PATHS_NAME, PathRefusal, PathRepairs, RefusedPath,
+    CreatedPaths, DoorRelink, PATHS_NAME, PathRefusal, PathRepairs, RefusedPath,
 };
 use mallet_game_bethesda::catalogue::string_table;
 use mallet_game_bethesda::lod_library::LodLibrary;
@@ -37,7 +37,10 @@ pub fn paths_file(options: &ManagerOptions) -> Option<PathBuf> {
 /// meshes other than Mod Mallet's own repairs. Each place is repaired with
 /// every object hidden there; the meshes chosen for it are kept, or, for a
 /// place repaired by itself (ADR 0070), every mesh whose path the game uses
-/// runs over a hidden object. Also returns the meshes that cannot be repaired, and why.
+/// runs over a hidden object. The door triangles of each place are
+/// re-attached to their kept doors in the same copies (ADR 0088). Also
+/// returns the meshes that cannot be repaired, and why, and which
+/// re-attachments are made and which not.
 ///
 /// # Errors
 ///
@@ -46,33 +49,46 @@ pub(crate) fn paths_plugin(
     scan: &ScanOptions,
     repairs: &PathRepairs,
     own: &str,
-) -> Result<
-    (
-        mallet_game_bethesda::paths_plugin::PathsPlugin,
-        Vec<RefusedPath>,
-    ),
-    EngineError,
-> {
+) -> Result<BuiltPaths, EngineError> {
     let game = scan.game()?;
     let (game_dir, _) = scan.located_game_dir().ok_or(EngineError::GameNotFound)?;
 
     // The records of every place, each mesh once.
     let mut records: BTreeMap<String, NavmeshRecord> = BTreeMap::new();
     let mut refused: Vec<RefusedPath> = Vec::new();
-    for place in &repairs.places {
+    let mut not_relinked: Vec<DoorRelink> = Vec::new();
+    for place in repairs.places.iter().filter(|place| place.wanted()) {
         let centre = place.centre.map(|[x, y]| [as_f32(x), as_f32(y)]);
         // A place repaired by itself takes every mesh that needs it there.
         let chosen: std::collections::BTreeSet<String> = place.navmeshes.iter().cloned().collect();
-        let found = crate::walkways::repaired_navmeshes(
+        let Some((found, missed)) = crate::walkways::repaired_navmeshes(
             scan,
             &place.place,
             centre,
             &repairs.hidden,
             (!place.every).then_some(&chosen),
-        )
-        .unwrap_or_default();
+            &place.doors,
+        ) else {
+            not_relinked.extend(place.doors.iter().cloned());
+            continue;
+        };
+        not_relinked.extend(missed);
         for record in found {
-            records.entry(record.navmesh.to_string()).or_insert(record);
+            match records.entry(record.navmesh.to_string()) {
+                std::collections::btree_map::Entry::Vacant(slot) => {
+                    slot.insert(record);
+                }
+                // Two places may reach the same mesh: the door triangles
+                // either re-attaches are kept.
+                std::collections::btree_map::Entry::Occupied(mut slot) => {
+                    let known = slot.get_mut();
+                    for relink in record.relinked {
+                        if !known.relinked.contains(&relink) {
+                            known.relinked.push(relink);
+                        }
+                    }
+                }
+            }
         }
     }
     for place in &repairs.places {
@@ -113,7 +129,43 @@ pub(crate) fn paths_plugin(
         navmesh: navmesh.to_string(),
         reason: reason.clone(),
     }));
-    Ok((built, refused))
+    // What was asked for and is in the plugin, and what not.
+    let refused_meshes: std::collections::BTreeSet<String> = built
+        .refused
+        .iter()
+        .map(|(navmesh, _)| navmesh.to_string())
+        .collect();
+    let mut relinked: Vec<DoorRelink> = Vec::new();
+    for relink in repairs.places.iter().flat_map(|place| &place.doors) {
+        let navmesh = crate::walkways::record_id(&relink.navmesh).to_string();
+        if not_relinked.contains(relink) || relinked.contains(relink) {
+            continue;
+        }
+        if refused_meshes.contains(&navmesh) {
+            not_relinked.push(relink.clone());
+        } else {
+            relinked.push(relink.clone());
+        }
+    }
+    not_relinked.dedup();
+    Ok(BuiltPaths {
+        plugin: built,
+        refused,
+        relinked,
+        not_relinked,
+    })
+}
+
+/// The plugin of paths as built, with what it leaves out.
+pub(crate) struct BuiltPaths {
+    /// The plugin.
+    pub(crate) plugin: mallet_game_bethesda::paths_plugin::PathsPlugin,
+    /// The meshes chosen that it does not repair, and why.
+    pub(crate) refused: Vec<RefusedPath>,
+    /// The door triangles it re-attaches to kept doors (ADR 0088).
+    pub(crate) relinked: Vec<DoorRelink>,
+    /// Those it was asked to re-attach and does not.
+    pub(crate) not_relinked: Vec<DoorRelink>,
 }
 
 /// Writes the plugin that carries the repaired paths of `repairs` into the
@@ -135,7 +187,12 @@ pub fn create_paths(
 ) -> Result<CreatedPaths, EngineError> {
     let started = std::time::Instant::now();
     let own = mallet_game_bethesda::paths_plugin::file_name();
-    let (built, refused) = paths_plugin(scan, repairs, &own)?;
+    let BuiltPaths {
+        plugin: built,
+        refused,
+        relinked,
+        not_relinked,
+    } = paths_plugin(scan, repairs, &own)?;
     let repaired: Vec<String> = built.repaired.iter().map(ToString::to_string).collect();
     let Some(bytes) = built.bytes else {
         tracing::info!(
@@ -148,6 +205,8 @@ pub fn create_paths(
             masters: built.masters,
             light: built.light,
             refused,
+            relinked: Vec::new(),
+            not_relinked: relinked.into_iter().chain(not_relinked).collect(),
         });
     };
     let archive = paths_file(options).ok_or(EngineError::ManagerNotFound)?;
@@ -157,6 +216,8 @@ pub fn create_paths(
         path = %archive.display(),
         repaired = repaired.len(),
         refused = refused.len(),
+        relinked = relinked.len(),
+        not_relinked = not_relinked.len(),
         masters = built.masters.len(),
         light = built.light,
         elapsed_ms = started.elapsed().as_millis(),
@@ -168,6 +229,8 @@ pub fn create_paths(
         masters: built.masters,
         light: built.light,
         refused,
+        relinked,
+        not_relinked,
     })
 }
 

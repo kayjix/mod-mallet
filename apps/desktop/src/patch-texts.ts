@@ -19,7 +19,7 @@ export interface PatchTexts {
   decisions: (count: number) => string;
   state: Record<"in-game" | "switched-off" | "not-installed" | "off-here" | "differs", string>;
 
-  does: (hidden: number, moved: number, paths: number, files: number) => string;
+  does: (hidden: number, moved: number, paths: number, files: number, doorPaths: number) => string;
   nothing: string;
   foreignNote: (author: string, version: string | null) => string;
   authorUnproven: string;
@@ -145,11 +145,14 @@ const en: PatchTexts = {
     differs: "changed since installing",
   },
 
-  does: (hidden, moved, paths, files) => {
+  does: (hidden, moved, paths, files, doorPaths) => {
     const parts = [
       ...(hidden > 0 ? [`hides ${plural(hidden, "object", "objects")}`] : []),
       ...(moved > 0 ? [`moves ${plural(moved, "object", "objects")}`] : []),
       ...(paths > 0 ? [`repairs the paths in ${plural(paths, "place", "places")}`] : []),
+      ...(doorPaths > 0
+        ? [`re-attaches ${plural(doorPaths, "path", "paths")} of the characters to the doors kept`]
+        : []),
       ...(files > 0 ? [`keeps ${plural(files, "file choice", "file choices")}`] : []),
     ];
     if (parts.length === 0) {
@@ -324,11 +327,16 @@ const de: PatchTexts = {
     differs: "seit dem Installieren geändert",
   },
 
-  does: (hidden, moved, paths, files) => {
+  does: (hidden, moved, paths, files, doorPaths) => {
     const parts = [
       ...(hidden > 0 ? [`blendet ${hidden === 1 ? "1 Objekt" : `${hidden} Objekte`} aus`] : []),
       ...(moved > 0 ? [`verschiebt ${moved === 1 ? "1 Objekt" : `${moved} Objekte`}`] : []),
       ...(paths > 0 ? [`repariert die Wege an ${paths === 1 ? "1 Ort" : `${paths} Orten`}`] : []),
+      ...(doorPaths > 0
+        ? [
+            `schließt ${doorPaths === 1 ? "1 Weg" : `${doorPaths} Wege`} der Figuren an die behaltenen Türen an`,
+          ]
+        : []),
       ...(files > 0
         ? [`hält ${files === 1 ? "1 Dateientscheidung" : `${files} Dateientscheidungen`} fest`]
         : []),

@@ -13,6 +13,7 @@ import type { AssetVersions } from "./generated/asset-versions";
 import type { Catalogue } from "./generated/catalogue";
 import type { CreatedMoves } from "./generated/created-moves";
 import type { CreatedPaths } from "./generated/created-paths";
+import type { DoorReach } from "./generated/door-reach";
 import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview } from "./generated/file-preview";
 import type { GameChoice } from "./generated/game-choice";
@@ -33,6 +34,7 @@ import type {
   ObjectRef,
   Patch,
   PathRepairs,
+  RecordChange,
   RenderedReport,
 } from "./generated/rendered-report";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
@@ -177,6 +179,19 @@ export interface Api {
     y: number | null,
     objects: ObjectRef[],
   ): Promise<WalkwayReach | null>;
+  /**
+   * Whether characters reach the door `keep`, kept where stacked doors are
+   * merged, and walk through it once the patch hides `hidden` and makes the
+   * plan's `changes` (ADR 0088). `null` if the setup cannot be read.
+   */
+  doorReach(
+    worldOrCell: string,
+    x: number | null,
+    y: number | null,
+    hidden: ObjectRef[],
+    keep: ObjectRef,
+    changes: RecordChange[],
+  ): Promise<DoorReach | null>;
   /** What repairing the paths over objects about to be hidden does (ADR 0058). */
   walkwayRepair(
     worldOrCell: string,
@@ -315,6 +330,8 @@ const tauriApi: Api = {
     invoke<HiddenWalkways | null>("hidden_walkways", { worldOrCell, x, y, objects }),
   walkwayReach: (worldOrCell, x, y, objects) =>
     invoke<WalkwayReach | null>("walkway_reach", { worldOrCell, x, y, objects }),
+  doorReach: (worldOrCell, x, y, hidden, keep, changes) =>
+    invoke<DoorReach | null>("door_reach", { worldOrCell, x, y, hidden, keep, changes }),
   walkwayRepair: (worldOrCell, x, y, objects) =>
     invoke<WalkwayRepair | null>("walkway_repair", { worldOrCell, x, y, objects }),
   walkwayRepairReach: (worldOrCell, x, y, objects) =>

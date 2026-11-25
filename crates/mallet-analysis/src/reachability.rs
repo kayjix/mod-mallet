@@ -167,6 +167,86 @@ pub fn reachability(
     Reachability { checked, reaches }
 }
 
+/// Whether characters use one door over the paths (ADR 0088).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DoorCheck {
+    /// How many triangles of the paths name the door and lead somewhere.
+    pub triangles: usize,
+    /// Whether a way leads to one of them from the rest of the paths.
+    pub reached: bool,
+    /// Whether characters step through it: it leads to a door on the other
+    /// side, and that door's triangles join it, or the other side was not
+    /// read and the game finds it there.
+    pub through: bool,
+}
+
+/// Whether characters reach `door` over the paths `shapes` and step
+/// through it, with `destinations` for the doors that lead through. Only
+/// versions of meshes the game uses count. A way to the door is one from
+/// where the paths lead on into the rest of the world, other than the door
+/// itself; where nothing leads out, from the largest part of the paths.
+pub fn door_check(
+    shapes: &[NavmeshShape],
+    destinations: &[PlacedDestination],
+    door: &RecordId,
+) -> DoorCheck {
+    let graph = Graph::new(shapes, destinations);
+    let nodes_of = |wanted: &RecordId| -> Vec<usize> {
+        graph
+            .first
+            .iter()
+            .flat_map(|(id, (_, shape))| {
+                shape
+                    .doors
+                    .iter()
+                    .filter(move |(_, named)| named == wanted)
+                    .filter_map(|(triangle, _)| graph.node(&(*id, *triangle)))
+            })
+            .filter(|node| graph.ways.get(*node).is_some_and(|ways| !ways.is_empty()))
+            .collect()
+    };
+    let mut own = nodes_of(door);
+    own.sort_unstable();
+    own.dedup();
+    if own.is_empty() {
+        return DoorCheck::default();
+    }
+    let mut starts: Vec<usize> = sources(&graph.exits)
+        .into_iter()
+        .filter(|node| !own.contains(node))
+        .collect();
+    if starts.is_empty()
+        && let Some(key) = graph.largest_kept(&graph)
+        && let Some(node) = graph.node(&key)
+        && !own.contains(&node)
+    {
+        starts.push(node);
+    }
+    let paths = graph.paths(&starts, &[]);
+    let reached = own.iter().any(|node| paths.reached(*node));
+    let places: HashSet<&Place> = graph
+        .first
+        .values()
+        .map(|(_, shape)| &shape.place)
+        .collect();
+    let through = destinations
+        .iter()
+        .find(|destination| &destination.id == door)
+        .and_then(|destination| destination.leads_to.as_ref())
+        .is_some_and(|other| {
+            let read = destinations
+                .iter()
+                .find(|destination| &destination.id == other)
+                .is_some_and(|destination| places.contains(&destination.place));
+            !read || !nodes_of(other).is_empty()
+        });
+    DoorCheck {
+        triangles: own.len(),
+        reached,
+        through,
+    }
+}
+
 /// How far from a spot the nearest ground characters reach is looked for,
 /// in game units: about 30 metres.
 pub const GROUND_WITHIN: f64 = 2048.0;
@@ -1191,6 +1271,75 @@ mod tests {
             outcomes(&found),
             vec![(0, Outcome::Gone), (1, Outcome::CutOff)]
         );
+    }
+
+    #[test]
+    fn a_kept_door_is_reached_and_stepped_through_once_its_triangles_name_it() {
+        // The jetty's end has the door 0x30 into a house, whose door 0x31
+        // leads back. A mod's door 0x40 stands in front of 0x30.
+        let mut outside = jetty();
+        outside.doors = vec![(7, id("Docks.esp", 0x30))];
+        let mut house = grid(0x300, &[(10, 10), (11, 10)]);
+        house.place = Place::Interior {
+            cell: id("Docks.esp", 0x400),
+        };
+        house.doors = vec![(0, id("Docks.esp", 0x31))];
+        let door = |local_id: u32, other: u32, place: Place, x: i32, y: i32| PlacedDestination {
+            place,
+            leads_to: Some(id("Docks.esp", other)),
+            ..at(local_id, DestinationKind::Door, x, y)
+        };
+        let kept = id("Town.esp", 0x40);
+        // Before: no path names the mod's door.
+        let before = vec![outside.clone(), house.clone()];
+        let mut mods_door = door(0x40, 0x31, world(), 3, 0);
+        mods_door.id = kept.clone();
+        let destinations = [
+            door(0x30, 0x31, world(), 3, 0),
+            door(0x31, 0x30, house.place.clone(), 10, 10),
+            mods_door.clone(),
+        ];
+        assert_eq!(
+            door_check(&before, &destinations, &kept),
+            DoorCheck::default()
+        );
+        assert!(door_check(&before, &destinations, &id("Docks.esp", 0x30)).reached);
+
+        // After: the game's door is hidden, its triangle names the mod's
+        // door, and the house's door leads to it.
+        outside.doors = vec![(7, kept.clone())];
+        let after = vec![outside, house];
+        let mut back = door(
+            0x31,
+            0x40,
+            Place::Interior {
+                cell: id("Docks.esp", 0x400),
+            },
+            10,
+            10,
+        );
+        back.leads_to = Some(kept.clone());
+        let destinations = [back, mods_door];
+        assert_eq!(
+            door_check(&after, &destinations, &kept),
+            DoorCheck {
+                triangles: 1,
+                reached: true,
+                through: true,
+            }
+        );
+
+        // With the house read but no path through its door, the kept door
+        // leads nowhere characters can go on.
+        let mut bare_house = grid(0x300, &[(10, 10), (11, 10)]);
+        bare_house.place = Place::Interior {
+            cell: id("Docks.esp", 0x400),
+        };
+        let mut outside = jetty();
+        outside.doors = vec![(7, kept.clone())];
+        let check = door_check(&[outside, bare_house], &destinations, &kept);
+        assert!(check.reached);
+        assert!(!check.through);
     }
 
     #[test]

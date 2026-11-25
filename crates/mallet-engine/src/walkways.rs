@@ -15,7 +15,7 @@ use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden, PlacedDestination}
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::grid::whole;
 use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
-use mallet_core::walkway_repair::{RepairedPaths, WalkwayRepair};
+use mallet_core::walkway_repair::{DoorRelink, RepairedPaths, WalkwayRepair};
 use mallet_core::{Facts, InstalledPatch, ObjectRef};
 use mallet_game_bethesda::Game;
 use mallet_game_bethesda::area::AreaObject;
@@ -274,7 +274,7 @@ pub fn walkway_repair(
     objects: &[ObjectRef],
 ) -> Option<WalkwayRepair> {
     let started = std::time::Instant::now();
-    let (gathered, repair, records) = repaired(options, place, centre, objects)?;
+    let (gathered, repair, records, _) = repaired(options, place, centre, objects, None, &[])?;
     let corners = |shape: &mallet_core::facts::navmeshes::NavmeshShape, triangle: u32| {
         let corners = shape.triangles.get(usize::try_from(triangle).ok()?)?;
         let at = |vertex: u32| shape.vertices.get(usize::try_from(vertex).ok()?).copied();
@@ -332,24 +332,22 @@ pub fn walkway_repair(
 /// the repair changes, a copy of the version the game uses with its
 /// geometry repaired. `objects` are all the objects the patch hides in
 /// `place`, as for [`hidden_walkways`]; `navmeshes`, if given, keeps only
-/// the meshes the user chose to repair, named as in
-/// [`RepairedPaths::navmesh`]. `None` if the setup cannot be read.
+/// the repairs of the meshes the user chose, named as in
+/// [`RepairedPaths::navmesh`]. The door triangles of `relinks` are
+/// re-attached to their kept doors in the same copies, a mesh that needs
+/// nothing else copied for them alone (ADR 0088). Also returns the
+/// re-attachments that could not be made. `None` if the setup cannot be
+/// read.
 pub fn repaired_navmeshes(
     options: &ScanOptions,
     place: &str,
     centre: Option<[f32; 2]>,
     objects: &[ObjectRef],
     navmeshes: Option<&BTreeSet<String>>,
-) -> Option<Vec<NavmeshRecord>> {
-    let (_, _, records) = repaired(options, place, centre, objects)?;
-    Some(
-        records
-            .into_iter()
-            .filter(|record| {
-                navmeshes.is_none_or(|chosen| chosen.contains(&record.navmesh.to_string()))
-            })
-            .collect(),
-    )
+    relinks: &[DoorRelink],
+) -> Option<(Vec<NavmeshRecord>, Vec<DoorRelink>)> {
+    let (_, _, records, missed) = repaired(options, place, centre, objects, navmeshes, relinks)?;
+    Some((records, missed))
 }
 
 /// The versions the game uses of the meshes in `near` with the paths over
@@ -374,31 +372,62 @@ pub(crate) fn repaired_shapes(
         .collect()
 }
 
-/// The repair of the paths over `objects`, and the records it writes.
+/// The repair of the paths over `objects`, the records it writes, and the
+/// re-attachments of `relinks` that could not be made. With `chosen`, only
+/// the meshes named there are repaired; a mesh with door triangles to
+/// re-attach is copied for them all the same, unrepaired.
 fn repaired(
     options: &ScanOptions,
     place: &str,
     centre: Option<[f32; 2]>,
     objects: &[ObjectRef],
-) -> Option<(Gathered, PathsRepair, Vec<NavmeshRecord>)> {
-    let gathered = gather(options, place, centre, objects, true)?;
+    chosen: Option<&BTreeSet<String>>,
+    relinks: &[DoorRelink],
+) -> Option<(Gathered, PathsRepair, Vec<NavmeshRecord>, Vec<DoorRelink>)> {
+    // The hidden doors are read with the other objects, so that the meshes
+    // around them are read as well.
+    let mut asked: Vec<ObjectRef> = objects.to_vec();
+    for relink in relinks {
+        if !asked.contains(&relink.from) {
+            asked.push(relink.from.clone());
+        }
+    }
+    let gathered = gather(options, place, centre, &asked, true)?;
     let hidden = gathered.hidden();
     let carried = walkways::carried(&hidden, &gathered.near);
     let repair = navmesh_repair::repair(&gathered.near, &hidden, &carried);
     let empty = BTreeSet::new();
-    let repaired: Vec<Repaired<'_>> = repair
+    let wanted = |index: usize| {
+        chosen.is_none_or(|chosen| {
+            gathered
+                .near
+                .navmeshes
+                .get(index)
+                .is_some_and(|shape| chosen.contains(&shape.id.to_string()))
+        })
+    };
+    // Each mesh that changes, by its place among those read: after the
+    // repair, with the triangles taken out and those in water.
+    let mut changed: BTreeMap<usize, (NavmeshShape, &BTreeSet<u32>, &BTreeSet<u32>)> = repair
         .navmeshes
         .iter()
-        .filter_map(|mesh| {
+        .filter(|mesh| wanted(mesh.navmesh))
+        .map(|mesh| {
+            (
+                mesh.navmesh,
+                (mesh.after.clone(), &mesh.removed, &mesh.water),
+            )
+        })
+        .collect();
+    let (made, mut missed) = relink(&gathered.near.navmeshes, &mut changed, relinks, &empty);
+    let repaired: Vec<Repaired<'_>> = changed
+        .iter()
+        .filter_map(|(index, (after, removed, water))| {
             Some(Repaired {
-                before: gathered.near.navmeshes.get(mesh.navmesh)?,
-                after: &mesh.after,
-                removed: if mesh.removed.is_empty() {
-                    &empty
-                } else {
-                    &mesh.removed
-                },
-                water: &mesh.water,
+                before: gathered.near.navmeshes.get(*index)?,
+                after,
+                removed,
+                water,
             })
         })
         .collect();
@@ -409,8 +438,75 @@ fn repaired(
         let reader = reader.lock().ok()?;
         reader.navmesh_records(&gathered.around, &repaired)
     };
+    // A re-attachment whose mesh could not be copied is not made.
+    for relink in made {
+        let navmesh = record_id(&relink.navmesh);
+        let written = records.iter().any(|record| {
+            record.navmesh == navmesh
+                && record.relinked.iter().any(|done| {
+                    u32::from(done.triangle) == relink.triangle
+                        && done.from == record_id(&relink.from)
+                })
+        });
+        if !written {
+            missed.push(relink.clone());
+        }
+    }
+    drop(repaired);
     drop(hidden);
-    Some((gathered, repair, records))
+    Some((gathered, repair, records, missed))
+}
+
+/// A mesh as it changes: after the repair, with the triangles taken out
+/// and those in water.
+type Changed<'a> = (NavmeshShape, &'a BTreeSet<u32>, &'a BTreeSet<u32>);
+
+/// Re-attaches the door triangles of `relinks` in the meshes that change,
+/// by their place among `navmeshes`; a mesh that does not change yet is
+/// added unrepaired. Returns the re-attachments made, and those that could
+/// not be: the mesh or the entry is not there, or the triangle is taken
+/// out.
+fn relink<'a, 'r>(
+    navmeshes: &[NavmeshShape],
+    changed: &mut BTreeMap<usize, Changed<'a>>,
+    relinks: &'r [DoorRelink],
+    empty: &'a BTreeSet<u32>,
+) -> (Vec<&'r DoorRelink>, Vec<DoorRelink>) {
+    let mut missed: Vec<DoorRelink> = Vec::new();
+    let mut made: Vec<&'r DoorRelink> = Vec::new();
+    for relink in relinks {
+        let (navmesh, from, to) = (
+            record_id(&relink.navmesh),
+            record_id(&relink.from),
+            record_id(&relink.to),
+        );
+        let found = navmeshes
+            .iter()
+            .position(|shape| shape.used && shape.id == navmesh);
+        let Some((index, shape)) = found.and_then(|index| Some((index, navmeshes.get(index)?)))
+        else {
+            missed.push(relink.clone());
+            continue;
+        };
+        let (after, removed, _) = changed
+            .entry(index)
+            .or_insert_with(|| (shape.clone(), empty, empty));
+        let mut hit = false;
+        if !removed.contains(&relink.triangle) {
+            for (triangle, door) in &mut after.doors {
+                if *triangle == relink.triangle && *door == from {
+                    door.clone_from(&to);
+                    hit = true;
+                }
+            }
+        }
+        if hit {
+            made.push(relink);
+        } else {
+            missed.push(relink.clone());
+        }
+    }
+    (made, missed)
 }
 
 /// Square game units per square metre: a metre is about 70 units.

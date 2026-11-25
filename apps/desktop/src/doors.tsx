@@ -3,17 +3,20 @@
 // of them means. The collisions' page and the guided review show it; the
 // choice itself is the patch's, as for any other spot.
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import "./doors.css";
 import { useSession } from "./Actions";
 import { mergedBy } from "./decisions";
 import { type DoorTexts, doorTexts } from "./door-texts";
+import type { DoorReach as DoorReachFound } from "./generated/door-reach";
 import type {
   DoorGroup,
   DoorMerge,
+  DoorRelink,
   MapSpot,
   ObjectMove,
   ObjectRef,
+  RepairPlace,
   StackedDoor,
 } from "./generated/rendered-report";
 import { decisionAt, keptBy, matchKey, type PatchChoices, spotKey } from "./patch";
@@ -172,6 +175,7 @@ export function DoorPanel({
                     <PlanNotes
                       group={group}
                       plan={itsPlan}
+                      checked={merged !== null && sameObject(merged, door.object)}
                       nameOf={nameOf}
                       modOf={modOf}
                       place={place}
@@ -193,6 +197,7 @@ export function DoorPanel({
 function PlanNotes({
   group,
   plan,
+  checked,
   nameOf,
   modOf,
   place,
@@ -200,6 +205,8 @@ function PlanNotes({
 }: {
   group: DoorGroup;
   plan: DoorMerge;
+  /** Whether the spot is merged into this plan's door: the ways to it are then checked. */
+  checked: boolean;
   nameOf: (object: ObjectRef) => string;
   modOf: (object: ObjectRef) => string;
   place: string | null;
@@ -278,12 +285,21 @@ function PlanNotes({
             {plan.changes.some((change) => change.type === "teleport") && (
               <p className="aside">{d.viaMoves}</p>
             )}
-            {navmeshDoors > 0 && <p className="aside">{d.pathsLater}</p>}
+            {navmeshDoors > 0 && <p className="aside">{d.viaPaths}</p>}
           </div>
         </Note>
       )}
       {full && changes.length === 0 && <p className="aside">{d.nothingElse}</p>}
       <DoorReach place={place} centre={centre} hide={plan.hide} />
+      {checked && group.apart !== true && (
+        <KeptDoorReach
+          place={place}
+          centre={centre}
+          plan={plan}
+          name={nameOf(plan.keep)}
+          anyWalked={group.doors.some((door) => door.walkable)}
+        />
+      )}
     </>
   );
 }
@@ -334,6 +350,107 @@ function DoorReach(props: {
   hide: ObjectRef[];
 }) {
   return <ReachNote reach={useReach(props.place, props.centre, props.hide)} />;
+}
+
+/** The answers of the engine about kept doors, by what was asked. */
+const doorsAsked = new Map<string, Promise<DoorReachFound | null>>();
+
+/**
+ * Whether characters reach the kept door of `plan` and walk through it on
+ * the paths as the patch leaves them (ADR 0088). `undefined` while asking,
+ * `null` if the setup cannot be read.
+ */
+function useDoorReach(
+  place: string | null,
+  centre: [number, number] | null,
+  plan: DoorMerge,
+): DoorReachFound | null | undefined {
+  const { api } = useSession();
+  const key =
+    place === null
+      ? null
+      : JSON.stringify([
+          place,
+          centre?.map(Math.round) ?? null,
+          plan.keep,
+          plan.hide,
+          plan.changes,
+        ]);
+  const [found, setFound] = useState<{ key: string; reach: DoorReachFound | null } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the plan is compared by `key`.
+  useEffect(() => {
+    if (key === null || place === null) {
+      return;
+    }
+    let outdated = false;
+    let answer = doorsAsked.get(key);
+    if (answer === undefined) {
+      answer = api.doorReach(
+        place,
+        centre?.[0] ?? null,
+        centre?.[1] ?? null,
+        plan.hide,
+        plan.keep,
+        plan.changes,
+      );
+      doorsAsked.set(key, answer);
+      answer.catch(() => doorsAsked.delete(key));
+    }
+    answer
+      .then((reach) => {
+        if (!outdated) {
+          setFound({ key, reach });
+        }
+      })
+      .catch(() => {
+        if (!outdated) {
+          setFound({ key, reach: null });
+        }
+      });
+    return () => {
+      outdated = true;
+    };
+  }, [api, key]);
+  return key !== null && found !== null && found.key === key ? found.reach : undefined;
+}
+
+/** Says whether characters reach the kept door and walk through it. */
+function KeptDoorReach({
+  place,
+  centre,
+  plan,
+  name,
+  anyWalked,
+}: {
+  place: string | null;
+  centre: [number, number] | null;
+  plan: DoorMerge;
+  name: string;
+  /** Whether characters walked through any door of the group before. */
+  anyWalked: boolean;
+}) {
+  const { lang } = useSession();
+  const d = doorTexts[lang];
+  const reach = useDoorReach(place, centre, plan);
+  if (reach === undefined || reach === null || !reach.known) {
+    return null;
+  }
+  if (!reach.reached && !anyWalked) {
+    return (
+      <Note tone="info" summary={d.reachOtherShort} hint={d.reachNoneAll}>
+        <p className="door-reach">{d.reachNoneAll}</p>
+      </Note>
+    );
+  }
+  const ok = reach.reached && reach.through;
+  const text = ok ? d.reachOk(name) : reach.reached ? d.reachNotThrough(name) : d.reachNone(name);
+  return (
+    <Note tone={ok ? "ok" : "bad"} summary={ok ? d.reachOkShort : d.reachBadShort} hint={text}>
+      <p className="door-reach" data-ok={ok}>
+        {text}
+      </p>
+    </Note>
+  );
 }
 
 /** A record's number in its plugin, as xEdit shows it without the load order's byte. */
@@ -520,6 +637,56 @@ export function withDoorMoves(
     }
   }
   return [...all.values()].sort((a, b) => matchKey(a.object).localeCompare(matchKey(b.object)));
+}
+
+/**
+ * The door triangles of the merged doors to re-attach to the kept ones,
+ * place by place (ADR 0088): for each spot of doors whose choice keeps one
+ * of them, the paths its plan points at the kept door. They go into the
+ * plugin of paths with the repairs (ADR 0058, 0070).
+ */
+export function doorRelinksOf(choices: PatchChoices, spots: Map<string, MapSpot[]>): RepairPlace[] {
+  const places = new Map<string, RepairPlace>();
+  const seen = new Set<string>();
+  for (const [finding, list] of spots) {
+    for (const spot of list) {
+      const key = spotKey(spot);
+      if (spot.doors === null || spot.doors === undefined || key === null || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const plan = mergedBy(spot.doors, decisionAt(choices, finding, key, spot.parts ?? []));
+      const doors: DoorRelink[] = (plan?.changes ?? []).flatMap((change) =>
+        change.type === "navmesh-door"
+          ? [
+              {
+                navmesh: change.navmesh,
+                triangle: change.triangle,
+                from: change.from,
+                to: change.to,
+              },
+            ]
+          : [],
+      );
+      if (plan === null || plan === undefined || doors.length === 0) {
+        continue;
+      }
+      const kept = spot.doors.doors.find((door) => sameObject(door.object, plan.keep));
+      const location = spot.location;
+      const place = location.type === "interior" ? location.cell : location.world;
+      const at = kept?.position;
+      const centre: [number, number] | null =
+        location.type === "interior" || at === undefined ? null : [at[0], at[1]];
+      if (location.type !== "interior" && centre === null) {
+        continue;
+      }
+      const where = `${place}|${centre?.join(",") ?? ""}`;
+      const known = places.get(where) ?? { place, centre, navmeshes: [], every: false, doors: [] };
+      known.doors = [...(known.doors ?? []), ...doors];
+      places.set(where, known);
+    }
+  }
+  return [...places.values()];
 }
 
 /** How the worklist names a spot's choice that keeps one door, if it is one. */

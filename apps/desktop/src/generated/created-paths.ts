@@ -17,6 +17,12 @@ export interface CreatedPaths {
    */
   navmeshes: string[];
   /**
+   * The re-attachments asked for that it does not make: a repair took
+   * the triangle out, or the mesh, the triangle or the door was not
+   * found.
+   */
+  notRelinked?: DoorRelink[];
+  /**
    * The archive that holds it, ready for the mod manager; empty if
    * nothing was written.
    */
@@ -25,6 +31,64 @@ export interface CreatedPaths {
    * The meshes chosen that it does not repair, and why.
    */
   refused: RefusedPath[];
+  /**
+   * The door triangles it re-attaches from hidden doors to the doors
+   * kept in their place (ADR 0088).
+   */
+  relinked?: DoorRelink[];
+}
+/**
+ * A door triangle of a navigation mesh that is to name another door: a
+ * path of the characters re-attached from a hidden door to the door kept
+ * in its place (ADR 0088).
+ */
+export interface DoorRelink {
+  from: ObjectRef;
+  navmesh: ObjectRef1;
+  to: ObjectRef2;
+  /**
+   * The triangle, by its number in the mesh.
+   */
+  triangle: number;
+}
+/**
+ * The door it names now: the one the patch hides.
+ */
+export interface ObjectRef {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * The navigation mesh, by the plugin that first defined it.
+ */
+export interface ObjectRef1 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * The door it is to name: the one that stays.
+ */
+export interface ObjectRef2 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
 }
 /**
  * A mesh that was chosen for repair but is not repaired.

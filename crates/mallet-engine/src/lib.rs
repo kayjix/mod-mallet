@@ -74,7 +74,9 @@ pub use moves::{create_moves, moves_file};
 pub use patch_archive::load_patch;
 pub use paths::{create_paths, paths_file};
 pub use preview::file_preview;
-pub use reach::{spots_reach, walkway_reach, walkway_reach_after, walkway_repair_reach};
+pub use reach::{
+    door_reach, spots_reach, walkway_reach, walkway_reach_after, walkway_repair_reach,
+};
 pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
     select_game, setup_fingerprint, update_settings,

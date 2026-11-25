@@ -35,10 +35,20 @@ export interface DoorTexts {
   nothingElse: string;
   /** Where the teleports go: the plugin of moves. */
   viaMoves: string;
-  /** The paths are re-attached in a later version. */
-  pathsLater: string;
-  /** No path leads through the kept door. */
+  /** Where the re-attached paths go: the plugin of paths. */
+  viaPaths: string;
+  /** No path leads through this door; keeping it re-attaches those of the others. */
   keptNotOnPaths: string;
+  /** What the check of the ways says about the kept door (ADR 0088). */
+  reachOk: (door: string) => string;
+  reachNotThrough: (door: string) => string;
+  reachNone: (door: string) => string;
+  /** No door of the group was on the paths before either. */
+  reachNoneAll: string;
+  /** The summary of the check, short. */
+  reachOkShort: string;
+  reachBadShort: string;
+  reachOtherShort: string;
   /** In the list of moves: a door led to another door. */
   ledTo: (door: string) => string;
   /** Looks at one door alone in the 3D view. */
@@ -100,16 +110,27 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     arrivalMoves: "You come out in front of it.",
     paths: (count, to) =>
       count === 1
-        ? `1 path of the characters is to be attached to ${to} (later).`
-        : `${count} paths of the characters are to be attached to ${to} (later).`,
+        ? `1 path of the characters is re-attached to ${to}.`
+        : `${count} paths of the characters are re-attached to ${to}.`,
     lost: (place, from) => `${place} can then no longer be entered here: only ${from} led there.`,
     nothingElse: "Hiding is all it takes: nothing else used the other doors.",
     viaMoves:
       "The patch hides the other doors. Leading the doors on the other side to the kept one goes into the plugin Mod Mallet - Moves: write and install it on the patch page.",
-    pathsLater:
-      "Re-attaching the paths of the characters comes with the repair of the paths in a later version. Until then they walk to where the hidden door stood, right beside the kept one.",
+    viaPaths:
+      "Re-attaching the paths goes into the plugin Mod Mallet - Paths of the patch, which is written and installed with it on the patch page. Until then characters walk to where the hidden door stood, right beside the kept one.",
     keptNotOnPaths:
-      "No path of the characters leads through the kept door yet; they use the paths of the hidden one, beside it.",
+      "Keeping it re-attaches the paths of the other doors to it, so that characters walk through it.",
+    reachOk: (door) =>
+      `Checked on the paths as the patch leaves them: characters reach ${door} and walk through it.`,
+    reachNotThrough: (door) =>
+      `Checked on the paths as the patch leaves them: characters reach ${door}, but no path leads on from the door on the other side.`,
+    reachNone: (door) =>
+      `Checked on the paths as the patch leaves them: no path of the characters leads to ${door}. They will not use it; keeping another door may be better.`,
+    reachNoneAll:
+      "No path of the characters leads through any of these doors, before or after: they go their own way here. Open Cities, for example, gives them a hidden door of its own nearby. Nothing needs re-attaching.",
+    reachOkShort: "Characters use it",
+    reachBadShort: "Characters cannot use it",
+    reachOtherShort: "Characters go another way",
     ledTo: (door) => `leads to the door ${door}`,
     lookAlone: "Look at this door alone in the view; the others show as ghosts",
     locate: "Show where this door is: it blinks in the view for a moment",
@@ -157,17 +178,28 @@ export const doorTexts: Record<Lang, DoorTexts> = {
     arrivalMoves: "Du kommst vor ihr heraus.",
     paths: (count, to) =>
       count === 1
-        ? `1 Weg der Figuren wird an ${to} angeschlossen (später).`
-        : `${count} Wege der Figuren werden an ${to} angeschlossen (später).`,
+        ? `1 Weg der Figuren wird an ${to} neu angeschlossen.`
+        : `${count} Wege der Figuren werden an ${to} neu angeschlossen.`,
     lost: (place, from) =>
       `${place} ist dann hier nicht mehr zu betreten: Nur ${from} führte dorthin.`,
     nothingElse: "Ausblenden genügt: Nichts anderes hat die anderen Türen benutzt.",
     viaMoves:
       "Der Patch blendet die anderen Türen aus. Die Türen auf der anderen Seite zur behaltenen zu führen, kommt in das Plugin Mod Mallet - Moves: Schreibe und installiere es auf der Patch-Seite.",
-    pathsLater:
-      "Die Wege der Figuren neu anzuschließen, kommt mit der Reparatur der Wege in einer späteren Version. Bis dahin gehen sie dorthin, wo die ausgeblendete Tür stand, direkt neben der behaltenen.",
+    viaPaths:
+      "Das neue Anschließen der Wege kommt in das Plugin Mod Mallet - Paths des Patches, das mit ihm auf der Patch-Seite geschrieben und installiert wird. Bis dahin gehen die Figuren dorthin, wo die ausgeblendete Tür stand, direkt neben der behaltenen.",
     keptNotOnPaths:
-      "Noch führt kein Weg der Figuren durch die behaltene Tür; sie nehmen die Wege der ausgeblendeten, direkt daneben.",
+      "Wenn du sie behältst, werden die Wege der anderen Türen an sie angeschlossen, sodass Figuren durch sie gehen.",
+    reachOk: (door) =>
+      `Geprüft an den Wegen, wie der Patch sie hinterlässt: Figuren erreichen ${door} und gehen durch sie hindurch.`,
+    reachNotThrough: (door) =>
+      `Geprüft an den Wegen, wie der Patch sie hinterlässt: Figuren erreichen ${door}, aber von der Tür auf der anderen Seite führt kein Weg weiter.`,
+    reachNone: (door) =>
+      `Geprüft an den Wegen, wie der Patch sie hinterlässt: Kein Weg der Figuren führt zu ${door}. Sie werden sie nicht benutzen; eine andere Tür zu behalten ist vielleicht besser.`,
+    reachNoneAll:
+      "Kein Weg der Figuren führt durch eine dieser Türen, weder vorher noch nachher: Sie gehen hier ihren eigenen Weg. Open Cities zum Beispiel gibt ihnen in der Nähe eine eigene, unsichtbare Tür. Nichts muss neu angeschlossen werden.",
+    reachOkShort: "Figuren benutzen sie",
+    reachBadShort: "Figuren können sie nicht benutzen",
+    reachOtherShort: "Figuren gehen einen anderen Weg",
     ledTo: (door) => `führt zur Tür ${door}`,
     lookAlone: "Nur diese Tür in der Ansicht zeigen; die anderen erscheinen als Geister",
     locate: "Zeigen, wo diese Tür ist: Sie blinkt kurz in der Ansicht",

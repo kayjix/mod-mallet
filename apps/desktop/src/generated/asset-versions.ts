@@ -377,6 +377,13 @@ export interface RepairPlace {
    */
   centre?: [number, number] | null;
   /**
+   * Door triangles there that are to name another door: those that
+   * named a door the patch hides because stacked doors were merged into
+   * the kept one (ADR 0067, ADR 0088). They are written into the plugin
+   * of paths with the repairs, in the same copies of the meshes.
+   */
+  doors?: DoorRelink[];
+  /**
    * Whether every mesh there whose path the game uses runs over a hidden
    * object is repaired, not only those chosen: a patch repairs the paths
    * over what it hides by itself (ADR 0070).
@@ -390,6 +397,65 @@ export interface RepairPlace {
    * The worldspace, or the interior cell by its editor ID.
    */
   place: string;
+}
+/**
+ * A door triangle of a navigation mesh that is to name another door: a
+ * path of the characters re-attached from a hidden door to the door kept
+ * in its place (ADR 0088).
+ */
+export interface DoorRelink {
+  from: ObjectRef3;
+  navmesh: ObjectRef4;
+  to: ObjectRef5;
+  /**
+   * The triangle, by its number in the mesh.
+   */
+  triangle: number;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef3 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef4 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
+}
+/**
+ * A placed object, by the plugin that placed it first and its number in
+ * that plugin. Unlike a form ID as the game shows it, this does not
+ * depend on the load order.
+ */
+export interface ObjectRef5 {
+  /**
+   * The object's number in that plugin.
+   */
+  localId: number;
+  /**
+   * The plugin's file name.
+   */
+  plugin: string;
 }
 /**
  * The moves to carry into the game, as one plugin.

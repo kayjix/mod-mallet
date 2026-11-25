@@ -11,7 +11,7 @@
 // in the order of the book; on the same key the later one wins, so the
 // user's own decisions win over loaded ones.
 
-import { placeName, withDoorMoves } from "./doors";
+import { doorRelinksOf, placeName, withDoorMoves } from "./doors";
 import type { BookPatch, PatchBook } from "./generated/patch-book";
 import type {
   MapSpot,
@@ -159,6 +159,8 @@ export function writtenPatch(
       repairs.places.push({ place: area.place, centre: area.centre, navmeshes: [], every: true });
     }
   }
+  // The paths of merged doors re-attached to the kept ones (ADR 0088).
+  repairs.places.push(...doorRelinksOf(active, spots));
   const plugins = [...pluginsOf(ticked).values()].sort((a, b) => a.localeCompare(b));
   const mods = [
     ...new Set(plugins.map(modOfPlugin).filter((mod): mod is string => mod !== null)),

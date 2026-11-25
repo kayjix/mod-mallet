@@ -273,6 +273,9 @@ pub struct CreatedPatch {
     pub moved: usize,
     /// How many navigation meshes its plugin of paths repairs.
     pub repaired: usize,
+    /// How many door triangles its plugin of paths re-attaches to the
+    /// doors kept where stacked doors are merged (ADR 0088).
+    pub relinked: usize,
 }
 
 /// Whether a patch would do anything: hide, move or repair.
@@ -330,6 +333,7 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
         }
     }
     let mut repaired = 0;
+    let mut relinked = 0;
     if let Some(repairs) = patch.repairs.as_ref().filter(|repairs| {
         repairs
             .places
@@ -338,7 +342,20 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
     }) {
         let scan = options.setup.as_ref().ok_or(EngineError::SetupUnknown)?;
         let own = swap::paths_plugin_name(&patch.name);
-        let (built, refused) = crate::paths::paths_plugin(scan, repairs, &own)?;
+        let crate::paths::BuiltPaths {
+            plugin: built,
+            refused,
+            relinked: made,
+            not_relinked,
+        } = crate::paths::paths_plugin(scan, repairs, &own)?;
+        relinked = made.len();
+        for relink in &not_relinked {
+            tracing::info!(
+                navmesh = %crate::walkways::record_id(&relink.navmesh),
+                triangle = relink.triangle,
+                "door path not re-attached"
+            );
+        }
         repaired = built.repaired.len();
         for refused in &refused {
             tracing::info!(navmesh = refused.navmesh, reason = ?refused.reason, "path not repaired");
@@ -360,6 +377,7 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
         objects = objects.len(),
         moved,
         repaired,
+        relinked,
         "patch written"
     );
     Ok(CreatedPatch {
@@ -367,6 +385,7 @@ pub fn create_patch(patch: &Patch, options: &ManagerOptions) -> Result<CreatedPa
         objects: objects.len(),
         moved,
         repaired,
+        relinked,
     })
 }
 

@@ -221,9 +221,16 @@ fn refusal(reason: MoveRefusal) -> PathRefusal {
 }
 
 /// The plugins a repaired mesh names: its own, the one it was copied
-/// from, and those of the records its field refers to.
+/// from, those of the records its field refers to, and those of the doors
+/// its door triangles are re-attached to (ADR 0088).
 fn navmesh_plugins(record: &NavmeshRecord) -> Vec<String> {
     let mut names = vec![record.plugin.clone(), record.navmesh.plugin.clone()];
+    names.extend(
+        record
+            .relinked
+            .iter()
+            .map(|relink| relink.to.plugin.clone()),
+    );
     if let Some(mut data) = record
         .fields
         .iter()

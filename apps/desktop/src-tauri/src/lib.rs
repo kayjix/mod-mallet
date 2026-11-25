@@ -656,6 +656,31 @@ fn walkway_reach(
     ))
 }
 
+/// Whether characters reach the door `keep`, kept where stacked doors are
+/// merged, and step through it once the patch hides `hidden` and makes the
+/// plan's `changes` (ADR 0088): in a worldspace near the point `x`, `y`,
+/// or, without a point, in an interior cell by its editor ID.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn door_reach(
+    world_or_cell: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    hidden: Vec<ObjectRef>,
+    keep: ObjectRef,
+    changes: Vec<mallet_core::doors::RecordChange>,
+) -> Result<Option<mallet_core::reach::DoorReach>, String> {
+    let centre = x.zip(y).map(|(x, y)| [x, y]);
+    Ok(mallet_engine::door_reach(
+        &settings()?.scan_options(),
+        &world_or_cell,
+        centre,
+        &hidden,
+        &keep,
+        &changes,
+    ))
+}
+
 /// Whether characters can reach places where they do something, where
 /// they stand or would stand after a move (ADR 0069): in a worldspace near
 /// the point `x`, `y`, or, without a point, in an interior cell by its
@@ -984,6 +1009,7 @@ pub fn run() -> tauri::Result<()> {
             object_anchors,
             hidden_walkways,
             walkway_reach,
+            door_reach,
             spots_reach,
             walkway_repair,
             walkway_repair_reach,

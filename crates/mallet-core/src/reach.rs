@@ -48,6 +48,32 @@ pub struct WalkwayReach {
     pub changes: Vec<ReachChange>,
 }
 
+/// Whether characters reach the door kept where stacked doors are merged,
+/// and step through it, on the paths as the patch leaves them: the paths
+/// over what it hides repaired, the door triangles of the hidden doors
+/// re-attached to the kept one, the doors on the other side leading to it
+/// (ADR 0088).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorReach {
+    /// The worldspace or interior cell asked about.
+    pub place: String,
+    /// The kept door.
+    pub door: ObjectRef,
+    /// How many door triangles of the hidden doors were found and are
+    /// re-attached to it.
+    pub relinked: u32,
+    /// How many triangles of the paths name it then.
+    pub triangles: u32,
+    /// Whether a way leads to it from the rest of the paths.
+    pub reached: bool,
+    /// Whether characters step through it to the other side.
+    pub through: bool,
+    /// Whether the paths around were read at all; if not, nothing above
+    /// is known.
+    pub known: bool,
+}
+
 /// What the paths after hiding are.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]

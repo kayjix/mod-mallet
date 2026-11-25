@@ -497,6 +497,36 @@
         "lost"
       ]
     },
+    "DoorRelink": {
+      "description": "A door triangle of a navigation mesh that is to name another door: a\npath of the characters re-attached from a hidden door to the door kept\nin its place (ADR 0088).",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The door it names now: the one the patch hides.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "navmesh": {
+          "description": "The navigation mesh, by the plugin that first defined it.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "to": {
+          "description": "The door it is to name: the one that stays.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "triangle": {
+          "description": "The triangle, by its number in the mesh.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "navmesh",
+        "triangle",
+        "from",
+        "to"
+      ]
+    },
     "DoorTarget": {
       "description": "Where a door is to lead: the door on the other side, and where the\nplayer arrives there (ADR 0067).",
       "type": "object",
@@ -2528,6 +2558,13 @@
           },
           "maxItems": 2,
           "minItems": 2
+        },
+        "doors": {
+          "description": "Door triangles there that are to name another door: those that\nnamed a door the patch hides because stacked doors were merged into\nthe kept one (ADR 0067, ADR 0088). They are written into the plugin\nof paths with the repairs, in the same copies of the meshes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DoorRelink"
+          }
         },
         "every": {
           "description": "Whether every mesh there whose path the game uses runs over a hidden\nobject is repaired, not only those chosen: a patch repairs the paths\nover what it hides by itself (ADR 0070).",

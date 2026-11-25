@@ -1797,6 +1797,19 @@ export const sampleApi: Api = {
         : [],
     });
   },
+  // The kept door of a merge is reached and walked through (made up).
+  doorReach: (worldOrCell, _x, _y, _hidden, keep, changes) => {
+    const relinked = changes.filter((change) => change.type === "navmesh-door").length;
+    return Promise.resolve({
+      place: worldOrCell,
+      door: keep,
+      relinked,
+      triangles: Math.max(relinked, 1),
+      reached: true,
+      through: true,
+      known: true,
+    });
+  },
   // The repair of the dock's paths (made up): two pieces on the planks
   // taken out, four laid on the bed of the water below.
   walkwayRepair: (worldOrCell, x, y, objects) => {

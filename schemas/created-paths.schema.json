@@ -22,6 +22,13 @@
         "type": "string"
       }
     },
+    "notRelinked": {
+      "description": "The re-attachments asked for that it does not make: a repair took\nthe triangle out, or the mesh, the triangle or the door was not\nfound.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DoorRelink"
+      }
+    },
     "path": {
       "description": "The archive that holds it, ready for the mod manager; empty if\nnothing was written.",
       "type": "string"
@@ -31,6 +38,13 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/RefusedPath"
+      }
+    },
+    "relinked": {
+      "description": "The door triangles it re-attaches from hidden doors to the doors\nkept in their place (ADR 0088).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DoorRelink"
       }
     }
   },
@@ -42,6 +56,56 @@
     "refused"
   ],
   "$defs": {
+    "DoorRelink": {
+      "description": "A door triangle of a navigation mesh that is to name another door: a\npath of the characters re-attached from a hidden door to the door kept\nin its place (ADR 0088).",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The door it names now: the one the patch hides.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "navmesh": {
+          "description": "The navigation mesh, by the plugin that first defined it.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "to": {
+          "description": "The door it is to name: the one that stays.",
+          "$ref": "#/$defs/ObjectRef"
+        },
+        "triangle": {
+          "description": "The triangle, by its number in the mesh.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "navmesh",
+        "triangle",
+        "from",
+        "to"
+      ]
+    },
+    "ObjectRef": {
+      "description": "A placed object, by the plugin that placed it first and its number in\nthat plugin. Unlike a form ID as the game shows it, this does not\ndepend on the load order.",
+      "type": "object",
+      "properties": {
+        "localId": {
+          "description": "The object's number in that plugin.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "plugin": {
+          "description": "The plugin's file name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "localId"
+      ]
+    },
     "PathRefusal": {
       "description": "Why a mesh is not repaired.",
       "oneOf": [
