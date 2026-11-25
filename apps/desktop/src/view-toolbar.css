@@ -94,6 +94,28 @@
   font-weight: 600;
 }
 
+/* What a level of the magic wand pointed at would take, below its pips. */
+.view-tool.wand {
+  position: relative;
+}
+
+.wand-preview {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  max-width: min(420px, 80vw);
+  padding: 4px 8px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+
 /* The markings with their legend may wrap, so that the bar stays low. */
 .view-tool:has(> .view-legend) {
   flex: 0 1 auto;

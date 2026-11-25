@@ -2246,7 +2246,7 @@ function sampleArea(world: string, cx: number, cy: number, radius: number): Area
     );
     // A pavilion of Old Town nearby: a roof on four posts, a bench with a cup
     // on it a step away, around a signpost of the game, and a banner pole of
-    // Water Mod through its roof. The magic wand at "the whole structure"
+    // Water Mod through its roof. The magic wand at "this structure"
     // takes a post's roof and the other posts along, not the pole; at level
     // 1 the bench takes its cup (ADR 0055).
     const [px, py] = [cx, cy + 340];

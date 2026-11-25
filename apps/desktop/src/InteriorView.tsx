@@ -26,7 +26,7 @@ import { PathsLayer, type PathsOverlay } from "./paths-layer";
 import { watchView } from "./render-stats";
 import { ToggleChip } from "./ui/kit";
 import { ActionsTool, CameraTools, MarkingsTool, TreesTool, useTreesShown } from "./view-tools";
-import { useWandLevel, ViewToolbar, WandTool } from "./wand";
+import { useWandLevel, ViewToolbar, type WandPreview, WandTool } from "./wand";
 
 export interface InteriorViewProps {
   /** The interior cell, by its editor ID. */
@@ -127,12 +127,20 @@ export function InteriorView({
   // What the magic wand takes along with the picked object (ADR 0055).
   const [level, setLevel] = useWandLevel();
   const [selection, setSelection] = useState<AreaObject[]>([]);
+  // A level pointed at on the wand: what it would take is lit meanwhile.
+  const [previewLevel, setPreviewLevel] = useState<number | null>(null);
+  const [preview, setPreview] = useState<WandPreview | null>(null);
   useEffect(() => {
     const found = picked === null ? [] : (layer.current?.wand(picked, level) ?? [picked]);
     setSelection(found);
-    layer.current?.showChain(found.slice(1));
+    const shown =
+      previewLevel === null || picked === null
+        ? null
+        : (layer.current?.wand(picked, previewLevel) ?? [picked]);
+    setPreview(previewLevel === null ? null : { level: previewLevel, parts: shown });
+    layer.current?.showChain((shown ?? found).slice(1));
     redrawNow.current();
-  }, [picked, level]);
+  }, [picked, level, previewLevel]);
   const [seeInside, setSeeInside] = useState(true);
   const [failed, setFailed] = useState(false);
   const camera = useRef<Camera>({
@@ -624,7 +632,12 @@ export function InteriorView({
         <ViewToolbar
           tools={
             <>
-              <WandTool level={level} onLevel={setLevel} />
+              <WandTool
+                level={level}
+                onLevel={setLevel}
+                preview={preview}
+                onPreview={setPreviewLevel}
+              />
               {tools}
               <TreesTool />
               <ActionsTool />

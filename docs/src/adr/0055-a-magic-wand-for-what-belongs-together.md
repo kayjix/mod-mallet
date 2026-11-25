@@ -130,3 +130,78 @@ the left, and did not show that a spot is about two mods.
   The levels decide by what a part is instead.
 - **Separate settings** for likeness, connection and contents. The user
   wanted one control that does not overwhelm.
+
+## Amendment 2026-11-25: the levels take a structure and a building
+
+The user tested the wand in Whiterun, where open cities skyrim and JKs
+Skyrim both build at the gate. They picked a hidden scaffold part of JK's
+(`WRScafStr02`) to bring back its scaffold guard tower. Levels 1 to 3 did
+what their names say, and level 3 took 10 parts. Level 4, "the whole
+structure", jumped to 130 parts: 74 hidden and 56 visible, across the
+neighbouring buildings. Walls, stairs and fences touch from house to
+house, so a chain by touch runs on until the wand's reach ends.
+
+### Decision
+
+1. **The wand has six levels.** Levels 1 to 3 stay as they were.
+   - 4: **this structure.** The parts of the same set of models (the folder
+     a model lies in, such as Whiterun's scaffolds) that are built into one
+     another or stand on one another, with what lies on or in them.
+   - 5: **the whole building**, of any set of models, the same way.
+   - 6: **everything joined to it**: the old level 4, which chains by touch
+     through what is of the same sort. It also holds what levels 4 and 5
+     take. The old level 5 (the structure with gaps of 2 m) is gone; it only
+     ever took more of the neighbours.
+
+   A sixth level is worth its pip because "the structure" and "the
+   building" are both things the user asks for. In Whiterun, the scaffold
+   tower is one set of models; JK's gatehouse is that tower with a guard
+   house, a stone gate and pieces of the city wall.
+2. **Built together, not touching.** Two parts are built together where a
+   quarter of one lies in the other's surfaces, or where one stands on the
+   other: its lowest surfaces lie on the other's top, and its middle is
+   clearly higher. This is the rule the passages use (ADR 0072). A part
+   that stands beside another at the same height is not built together
+   with it. Neither is a part on something at least 7 m long and eight
+   times longer than itself, which is the ground under it: a city wall, a
+   cliff, a slab.
+3. **Surfaces, not boxes.** When a model is read, its box is cut into
+   6 × 6 × 6 cells, and the cells its triangles pass through are noted. A
+   house's box is hollow inside, and a stair's box is empty above the
+   steps. Being built together and lying on or in something are measured
+   on these cells, so a tower does not take what stands in its empty
+   middle or merely within its box.
+4. **A building ends where it hangs on the rest by little.** From the
+   picked part, the wand takes the part with the largest share of its
+   links into what it has taken, one after another. Once at most a tenth
+   of the links of what it took lead out of it, it goes on only while one
+   more part ties it more loosely still, and only with a part that has more
+   than half of its links into it. A part with exactly half joins if it
+   stands on what is taken. So a stair between two houses, or the next
+   piece of a city wall a tower is set into, stays.
+5. **The mod and the state.** Only the picked part's mod's parts are links,
+   as before (for an object of the game, the mod whose version wins).
+   What the card offers is unchanged: from a hidden part it shows the hidden
+   parts again, and from a visible part it hides the visible ones.
+6. **Preview.** Pointing at a pip lights what that level would take in the
+   3D view, and a note below the pips says how many parts that is and how
+   many of them are hidden. The level set and the card stay as they are
+   until a pip is clicked.
+
+### Consequences
+
+- In Whiterun, from `WRScafStr02` (JKs Skyrim.esp), read from the real
+  setup: level 3 takes 10 parts, level 4 takes 30 parts (all hidden: the
+  seven scaffold parts with the barrels, crates, sacks and ropes on them,
+  and the stone columns and arches standing inside the tower), level 5
+  takes 72 parts (69 hidden, 3 visible: JK's gatehouse), and level 6 takes
+  123 parts (70 hidden, 53 visible). Before, level 4 took 127 parts in the
+  same reading (130 in the app).
+- The set of models is a guess from the folder. A mod that builds one
+  house from two sets gets the part's set at level 4 and the whole house
+  at level 5.
+- The cells cost one pass over a model's triangles when it is read.
+  Growing a building in Whiterun takes about 25 ms.
+- The wand's logic now lives in `wand-chain.ts` and the geometry of boxes
+  in `boxes.ts`. Both are pure, and `test/wand-chain.test.ts` tests them
+  with scenes of made-up boxes.

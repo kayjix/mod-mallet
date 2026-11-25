@@ -9,6 +9,7 @@
 
 import { rememberActions } from "./action-places";
 import type { Api } from "./api";
+import { boxesTouch, occupancy, type PlacedBox, placedBox } from "./boxes.ts";
 import { isGamePlugin } from "./game-plugins";
 import type { AreaObject, AreaObjects } from "./generated/area-objects";
 import type { LodMesh } from "./generated/lod-mesh";
@@ -18,6 +19,19 @@ import { CELL } from "./map-places";
 import { MeshPool, normalsOf, POOL_LOCATIONS, Sight } from "./mesh-pool";
 import { type Move, movedMatrix } from "./moves";
 import { noteMeshes } from "./render-stats";
+import {
+  isDecor,
+  isFlora,
+  isNature,
+  kindOf,
+  sizeOf,
+  WAND_TOP,
+  type WandPart,
+  wandChain,
+} from "./wand-chain.ts";
+
+export { boxesTouch, overlapDepth, type PlacedBox, placedBox } from "./boxes.ts";
+export { isFlora, isNature, WAND_TOP };
 
 /** How many meshes are fetched at once. */
 const PARALLEL = 6;
@@ -417,73 +431,12 @@ export function placement(object: AreaObject): Float32Array {
 export const TOUCHING = 14;
 
 /**
- * Folders of models of nature and the like: trees, plants, grass, rocks and
- * the rest of the landscape, effects and lights. They stand next to what is
- * built and touch it, but never belong to it.
- */
-const NATURE =
-  /(^|[\\/])(landscape|trees|plants|flora|grass|rocks?|effects|fx|lights?|sky|water|actors|creatures)[\\/]/i;
-
-/**
  * The mod an object belongs to, by plugin: the one that placed it, or,
  * for an object of the game, the one whose version of it wins (a mod that
  * moves a vanilla book onto its shelf makes the book its own, ADR 0032).
  */
 export function ownerOf(object: AreaObject): string {
   return (isGamePlugin(object.id.plugin) ? object.plugin : object.id.plugin).toLowerCase();
-}
-
-/** Folders of trees, which stay out of structures even as leaves. */
-const TREES = /(^|[\\/])trees[\\/]/i;
-
-/** Folders of small plants: decor a mod puts on what it builds. */
-const PLANTS = /(^|[\\/])(plants|flora|grass)[\\/]/i;
-
-/** The folder of clutter: crates, barrels, sacks and whatever else lies about. */
-const CLUTTER = /(^|[\\/])clutter[\\/]/i;
-
-/** Folders of trees, plants and grass. */
-const FLORA = /(^|[\\/])(trees|plants|flora|grass)[\\/]/i;
-
-/** Whether a model is a tree, a plant or grass. */
-export function isFlora(model: string): boolean {
-  return FLORA.test(model);
-}
-
-/** Whether a model is nature rather than something placed by hand: trees, rocks, landscape. */
-export function isNature(model: string): boolean {
-  return NATURE.test(model);
-}
-
-/** Below this longest side, in game units (about 35 cm), a part is clutter, not building. */
-const SMALL = 24;
-
-/**
- * Whether a part is decor that a built structure takes along where it
- * touches it: clutter, or small plants; never trees, rocks or landscape.
- */
-function isDecor(model: string, kind: "nature" | "clutter" | "built"): boolean {
-  if (TREES.test(model)) {
-    return false;
-  }
-  return kind === "clutter" || PLANTS.test(model);
-}
-
-/**
- * What a part is, for growing a structure: nature, clutter lying about
- * (by its folder or its size), or something built.
- */
-function kindOf(model: string, size: number): "nature" | "clutter" | "built" {
-  if (NATURE.test(model)) {
-    return "nature";
-  }
-  return CLUTTER.test(model) || size < SMALL ? "clutter" : "built";
-}
-
-/** The longest side of a model's box at `scale`, in game units. */
-function sizeOf(box: [[number, number, number], [number, number, number]], scale: number): number {
-  const [low, high] = box;
-  return Math.max(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * scale;
 }
 
 /** What the card of a picked object knows of the view it was picked in. */
@@ -496,235 +449,8 @@ export interface PartTools {
   layer?: AreaLayer;
 }
 
-/** A box turned and placed in the world: its middle, its three axes (unit length) and half sizes. */
-export interface PlacedBox {
-  centre: [number, number, number];
-  axes: [[number, number, number], [number, number, number], [number, number, number]];
-  half: [number, number, number];
-}
-
-/** A model's box as `matrix` (column by column, with scale) places it. */
-export function placedBox(
-  box: [[number, number, number], [number, number, number]],
-  matrix: Float32Array,
-): PlacedBox {
-  const [low, high] = box;
-  const middle = [0, 1, 2].map((axis) => ((low[axis] ?? 0) + (high[axis] ?? 0)) / 2);
-  const at = (row: number) =>
-    (matrix[row] ?? 0) * (middle[0] ?? 0) +
-    (matrix[4 + row] ?? 0) * (middle[1] ?? 0) +
-    (matrix[8 + row] ?? 0) * (middle[2] ?? 0) +
-    (matrix[12 + row] ?? 0);
-  const column = (index: number): [number, number, number] => [
-    matrix[index * 4] ?? 0,
-    matrix[index * 4 + 1] ?? 0,
-    matrix[index * 4 + 2] ?? 0,
-  ];
-  const axes = [column(0), column(1), column(2)];
-  const lengths = axes.map((axis) => Math.hypot(...axis) || 1);
-  return {
-    centre: [at(0), at(1), at(2)],
-    axes: axes.map((axis, index) => axis.map((value) => value / (lengths[index] ?? 1))) as [
-      [number, number, number],
-      [number, number, number],
-      [number, number, number],
-    ],
-    half: [0, 1, 2].map(
-      (axis) => (((high[axis] ?? 0) - (low[axis] ?? 0)) / 2) * (lengths[axis] ?? 1),
-    ) as [number, number, number],
-  };
-}
-
-const dot = (a: readonly number[], b: readonly number[]) =>
-  (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
-
-const cross = (a: readonly number[], b: readonly number[]): [number, number, number] => [
-  (a[1] ?? 0) * (b[2] ?? 0) - (a[2] ?? 0) * (b[1] ?? 0),
-  (a[2] ?? 0) * (b[0] ?? 0) - (a[0] ?? 0) * (b[2] ?? 0),
-  (a[0] ?? 0) * (b[1] ?? 0) - (a[1] ?? 0) * (b[0] ?? 0),
-];
-
-/**
- * Whether two placed boxes overlap or come within `margin` of each other:
- * no axis separates them (the separating axis test, fifteen axes).
- */
-export function boxesMeet(a: PlacedBox, b: PlacedBox, margin: number): boolean {
-  const between = [0, 1, 2].map((axis) => (b.centre[axis] ?? 0) - (a.centre[axis] ?? 0));
-  const reach = (box: PlacedBox, axis: readonly number[]) =>
-    box.axes.reduce(
-      (sum, own, index) => sum + Math.abs(dot(own, axis)) * (box.half[index] ?? 0),
-      0,
-    );
-  const axes: [number, number, number][] = [...a.axes, ...b.axes];
-  for (const own of a.axes) {
-    for (const other of b.axes) {
-      const axis = cross(own, other);
-      const length = Math.hypot(...axis);
-      if (length > 1e-6) {
-        axes.push(axis.map((value) => value / length) as [number, number, number]);
-      }
-    }
-  }
-  return axes.every(
-    (axis) => Math.abs(dot(between, axis)) <= reach(a, axis) + reach(b, axis) + margin,
-  );
-}
-
-/**
- * How far two placed boxes reach into each other, in game units: the
- * least overlap along any separating axis. Zero or less where they do not
- * meet; then minus the gap between them.
- */
-export function overlapDepth(a: PlacedBox, b: PlacedBox): number {
-  const between = [0, 1, 2].map((axis) => (b.centre[axis] ?? 0) - (a.centre[axis] ?? 0));
-  const reach = (box: PlacedBox, axis: readonly number[]) =>
-    box.axes.reduce(
-      (sum, own, index) => sum + Math.abs(dot(own, axis)) * (box.half[index] ?? 0),
-      0,
-    );
-  const axes: [number, number, number][] = [...a.axes, ...b.axes];
-  for (const own of a.axes) {
-    for (const other of b.axes) {
-      const axis = cross(own, other);
-      const length = Math.hypot(...axis);
-      if (length > 1e-6) {
-        axes.push(axis.map((value) => value / length) as [number, number, number]);
-      }
-    }
-  }
-  return Math.min(
-    ...axes.map((axis) => reach(a, axis) + reach(b, axis) - Math.abs(dot(between, axis))),
-  );
-}
-
-/**
- * Whether two placed boxes meet within `margin`, exactly as
- * {@link boxesMeet} tells, after a quick test that rules out boxes too far
- * apart for it: most parts of a place are far from each other.
- *
- * Where no axis of `a` separates them, the middles are at most
- * `ra + √3·rb + √3·margin` apart (`ra`, `rb` half their diagonals): the
- * reach of `b` along three axes at right angles is at most `√3·rb` in
- * all; and the same the other way round.
- */
-export function boxesTouch(a: PlacedBox, b: PlacedBox, margin: number): boolean {
-  const dx = b.centre[0] - a.centre[0];
-  const dy = b.centre[1] - a.centre[1];
-  const dz = b.centre[2] - a.centre[2];
-  const ra = outerRadius(a);
-  const rb = outerRadius(b);
-  // A little over √3, for rounding.
-  const root3 = 1.7321;
-  const reach = Math.min(ra + root3 * rb, root3 * ra + rb) + root3 * margin;
-  return dx * dx + dy * dy + dz * dz <= reach * reach && boxesMeet(a, b, margin);
-}
-
-/** Half the diagonal of a placed box: no point of it is farther from its middle. */
-function outerRadius(box: PlacedBox): number {
-  return Math.hypot(...box.half);
-}
-
-/** Whether the point `at` lies inside the placed box `box`. */
-function holds(box: PlacedBox, at: readonly number[]): boolean {
-  const between = [0, 1, 2].map((axis) => (at[axis] ?? 0) - (box.centre[axis] ?? 0));
-  return box.axes.every((axis, index) => Math.abs(dot(between, axis)) <= (box.half[index] ?? 0));
-}
-
-/**
- * The parts reached from the part at `start` link by link, at most `most`:
- * two parts link where their boxes come within `gap` game units of each
- * other. The caller passes only the parts that may link. Returns the
- * indices of the chain's parts, the start first.
- */
-export function chainFrom(
-  boxes: PlacedBox[],
-  start: number,
-  gap: number,
-  most = Number.POSITIVE_INFINITY,
-): number[] {
-  if (boxes[start] === undefined) {
-    return [];
-  }
-  const outer = boxes.map(outerRadius);
-  const found = [start];
-  const left = new Set(boxes.map((_, index) => index));
-  left.delete(start);
-  for (let at = 0; at < found.length && found.length < most; at += 1) {
-    const from = found[at] ?? start;
-    const box = boxes[from];
-    if (box === undefined) {
-      continue;
-    }
-    for (const other of [...left]) {
-      const candidate = boxes[other];
-      if (candidate === undefined || found.length >= most) {
-        continue;
-      }
-      // Far apart by their spheres already: no axis needed.
-      const apart = Math.hypot(
-        candidate.centre[0] - box.centre[0],
-        candidate.centre[1] - box.centre[1],
-        candidate.centre[2] - box.centre[2],
-      );
-      if (apart > (outer[from] ?? 0) + (outer[other] ?? 0) + gap) {
-        continue;
-      }
-      if (boxesMeet(box, candidate, gap)) {
-        found.push(other);
-        left.delete(other);
-      }
-    }
-  }
-  return found;
-}
-
-/**
- * A model's family: its file name without the number of the variant, so
- * that `UpperShelf01` and `UpperShelf02`, or every piece of a stone wall,
- * are alike.
- */
-export function modelFamily(model: string): string {
-  const name = (model.split(/[\\/]/).pop() ?? model).toLowerCase().replace(/\.nif$/, "");
-  return name.replace(/[\d_ -]+[a-z]?$/, "") || name;
-}
-
-/** The highest level of the magic wand (ADR 0055); level 0 takes the object alone. */
-export const WAND_TOP = 5;
-
-/**
- * What the magic wand chains at each level from 2 on: which parts are
- * alike (the same model, the same family of models, or the same kind of
- * thing: built, clutter or nature), and how far apart two links may be, in
- * game units. Level 1 takes only what lies on or in the object.
- */
-const WAND_STEPS: Record<number, { alike: "model" | "family" | "kind"; gap: number }> = {
-  2: { alike: "model", gap: 14 },
-  3: { alike: "family", gap: 140 },
-  4: { alike: "kind", gap: 14 },
-  5: { alike: "kind", gap: 140 },
-};
-
-/** How far from the picked object the magic wand reaches at most, in game units (about 30 m). */
-const WAND_REACH = 2048;
-
 /** How long a located object glows, in milliseconds: as long as its arrow points. */
 const PULSE_MS = LOCATE_MS;
-
-/** How many parts the magic wand chains at most. */
-const WAND_MOST = 300;
-
-/** How close decor must come to a part to lie on it, in game units. */
-const CONTENT_MARGIN = 4;
-
-/**
- * At the levels of a whole structure, how many times longer than the
- * picked part a link may be: a road or a slab of ground of the same mod
- * touches half a town, and hiding it tears holes.
- */
-const WAND_LARGER = 4;
-
-/** A link may always be this long, in game units (about 7 m). */
-const WAND_LARGE = 512;
 
 /**
  * How an object is drawn: plainly, as part of a collision, picked, as part
@@ -762,6 +488,8 @@ interface Model {
   count: number;
   /** The sphere around all its objects as placed, in game units: x, y, z and radius. */
   bounds: [number, number, number, number];
+  /** Which cells of its box hold surfaces (see `occupancy`), once read. */
+  cells: Uint8Array | null;
 }
 
 /** The camera a frame is drawn with, and what it sees; reused while the matrix stays. */
@@ -835,6 +563,11 @@ export class AreaLayer {
   private moves = new Map<string, Move>();
   /** What growing a structure asks of each object, until the objects change. */
   private facts: { version: number; known: Map<Instance, Facts> } = {
+    version: -1,
+    known: new Map(),
+  };
+  /** What the magic wand knows of each object, until the objects change. */
+  private wandParts: { version: number; known: Map<Instance, WandPart> } = {
     version: -1,
     known: new Map(),
   };
@@ -1174,93 +907,53 @@ export class AreaLayer {
 
   /**
    * What the magic wand takes along with `object` at `level` (ADR 0055),
-   * the object first: from level 1 what lies on or in it, from level 2 on
-   * the parts of its mod alike enough to it in a chain, with what lies on
-   * or in them. Parts of other mods and of the game are passed over. Only
-   * parts within {@link WAND_REACH} of the object count, and their models
-   * must be read.
+   * the object first (see {@link wandChain}). Only parts whose models are
+   * read count.
    */
   wand(object: AreaObject, level: number): AreaObject[] {
     if (level <= 0) {
       return [object];
     }
-    const owner = ownerOf(object);
-    const isStart = (other: AreaObject) =>
-      other.id.plugin === object.id.plugin && other.id.localId === object.id.localId;
-    const [x, y, z] = object.position;
-    const parts = this.instances.flatMap((instance) => {
-      const other = instance.object;
-      const ours =
-        isStart(other) || ownerOf(other) === owner || other.plugin.toLowerCase() === owner;
-      const model = this.models.get(other.model);
-      const [ox, oy, oz] = other.position;
-      if (
-        !ours ||
-        model === undefined ||
-        !Array.isArray(model.surfaces) ||
-        Math.hypot(ox - x, oy - y, oz - z) > WAND_REACH
-      ) {
-        return [];
-      }
-      return [
-        {
-          object: other,
+    if (this.wandParts.version !== this.changes) {
+      this.wandParts = { version: this.changes, known: new Map() };
+    }
+    const objects: AreaObject[] = [];
+    const parts: WandPart[] = [];
+    let start = -1;
+    for (const instance of this.instances) {
+      let part = this.wandParts.known.get(instance);
+      if (part === undefined) {
+        const model = this.models.get(instance.object.model);
+        if (model === undefined || !Array.isArray(model.surfaces)) {
+          continue;
+        }
+        const other = instance.object;
+        part = {
+          model: other.model,
+          owner: ownerOf(other),
+          plugin: other.plugin.toLowerCase(),
           box: placedBox(model.box, instance.matrix),
-          kind: kindOf(other.model, sizeOf(model.box, other.scale)),
           size: sizeOf(model.box, other.scale),
-        },
-      ];
-    });
-    const start = parts.findIndex((part) => isStart(part.object));
-    const first = parts[start];
-    if (first === undefined) {
+          cells: model.cells,
+        };
+        this.wandParts.known.set(instance, part);
+      }
+      if (
+        instance.object.id.plugin === object.id.plugin &&
+        instance.object.id.localId === object.id.localId
+      ) {
+        start = parts.length;
+      }
+      objects.push(instance.object);
+      parts.push(part);
+    }
+    if (start < 0) {
       return [object];
     }
-    let chain = [start];
-    const step = WAND_STEPS[level];
-    if (step !== undefined) {
-      const family = modelFamily(first.object.model);
-      const alike = (part: (typeof parts)[number]) =>
-        step.alike === "model"
-          ? part.object.model.toLowerCase() === first.object.model.toLowerCase()
-          : step.alike === "family"
-            ? modelFamily(part.object.model) === family
-            : part.kind === first.kind &&
-              part.size <= Math.max(first.size * WAND_LARGER, WAND_LARGE);
-      const links = parts.flatMap((part, index) =>
-        index === start || (ownerOf(part.object) === owner && alike(part)) ? [index] : [],
-      );
-      chain = chainFrom(
-        links.map((index) => parts[index]?.box ?? first.box),
-        links.indexOf(start),
-        step.gap,
-        WAND_MOST,
-      ).map((at) => links[at] ?? start);
-    }
-    const inChain = new Set(chain);
-    const holders = chain.flatMap((index) => {
-      const part = parts[index];
-      return part === undefined ? [] : [part.box];
+    return wandChain(parts, start, level).flatMap((index) => {
+      const found = objects[index];
+      return found === undefined ? [] : [found];
     });
-    // What lies on or in the chain: decor touching it, or anything whose
-    // middle is inside one of its parts. The chain does not grow from it.
-    const contents = parts.flatMap((part, index) => {
-      if (inChain.has(index)) {
-        return [];
-      }
-      const decor = isDecor(part.object.model, part.kind);
-      const held = holders.some((box) =>
-        decor ? boxesTouch(box, part.box, CONTENT_MARGIN) : holds(box, part.box.centre),
-      );
-      return held ? [part.object] : [];
-    });
-    return [
-      ...chain.flatMap((index) => {
-        const part = parts[index];
-        return part === undefined ? [] : [part.object];
-      }),
-      ...contents,
-    ];
   }
 
   /**
@@ -1513,6 +1206,7 @@ export class AreaLayer {
         base,
         count,
         bounds: [0, 0, 0, 0],
+        cells: null,
       };
       this.models.set(name, model);
       this.api
@@ -1556,12 +1250,14 @@ export class AreaLayer {
       `${shape.alphaTest ? 1 : 0}${shape.texture ?? ""}`;
     const shapes = [...mesh.shapes].sort((a, b) => materialOf(a).localeCompare(materialOf(b)));
     const surfaces: Surface[] = [];
+    const read: { positions: Float32Array; indices: Uint32Array }[] = [];
     for (const shape of shapes) {
       const positions = new Float32Array(bytesOf(shape.positions));
       const indices = new Uint32Array(bytesOf(shape.indices));
       if (positions.length === 0 || indices.length === 0) {
         continue;
       }
+      read.push({ positions, indices });
       for (let index = 0; index + 2 < positions.length; index += 3) {
         sum = [
           (sum[0] ?? 0) + (positions[index] ?? 0),
@@ -1611,6 +1307,8 @@ export class AreaLayer {
         [low[0] ?? 0, low[1] ?? 0, low[2] ?? 0],
         [high[0] ?? 0, high[1] ?? 0, high[2] ?? 0],
       ];
+      // Where in its box it really has surfaces, for the magic wand (ADR 0055).
+      model.cells = occupancy(model.box, read);
     }
   }
 

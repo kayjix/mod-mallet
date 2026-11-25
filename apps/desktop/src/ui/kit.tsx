@@ -422,6 +422,7 @@ export function LevelToggle({
   levels,
   onLevel,
   hint,
+  onPreview,
 }: {
   icon?: ReactNode;
   label: string;
@@ -430,6 +431,11 @@ export function LevelToggle({
   levels: string[];
   onLevel: (level: number) => void;
   hint?: string;
+  /**
+   * Called with the level of the pip pointed at or focused, to show what
+   * it would do before it is set; null when none is.
+   */
+  onPreview?: (level: number | null) => void;
 }) {
   const [lastOn, setLastOn] = useState(level > 0 ? level : 1);
   const set = (next: number) => {
@@ -451,7 +457,7 @@ export function LevelToggle({
         {icon}
         {label}
       </button>
-      <span className="level-toggle-pips">
+      <span className="level-toggle-pips" onPointerLeave={() => onPreview?.(null)}>
         {Array.from({ length: top }, (_, index) => index + 1).map((step) => (
           <button
             type="button"
@@ -461,6 +467,9 @@ export function LevelToggle({
             aria-pressed={step <= level}
             title={levels[step]}
             onClick={() => set(step === level ? 0 : step)}
+            onPointerEnter={() => onPreview?.(step)}
+            onFocus={() => onPreview?.(step)}
+            onBlur={() => onPreview?.(null)}
           />
         ))}
       </span>

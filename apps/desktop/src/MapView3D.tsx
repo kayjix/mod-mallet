@@ -62,7 +62,7 @@ import {
   useMarkings,
   useTreesShown,
 } from "./view-tools";
-import { useWandLevel, ViewToolbar, WandTool } from "./wand";
+import { useWandLevel, ViewToolbar, type WandPreview, WandTool } from "./wand";
 
 interface MapView3DProps {
   world: MapWorld;
@@ -562,14 +562,22 @@ export function MapView3D({
   // What the magic wand takes along with the picked object (ADR 0055).
   const [level, setLevel] = useWandLevel();
   const [selection, setSelection] = useState<AreaObject[]>([]);
+  // A level pointed at on the wand: what it would take is lit meanwhile.
+  const [previewLevel, setPreviewLevel] = useState<number | null>(null);
+  const [preview, setPreview] = useState<WandPreview | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the layer is read when the pick or the level changes.
   useEffect(() => {
     const found =
       pickedObject === null ? [] : (area.current?.wand(pickedObject, level) ?? [pickedObject]);
     setSelection(found);
-    area.current?.showChain(found.slice(1));
+    const shown =
+      previewLevel === null || pickedObject === null
+        ? null
+        : (area.current?.wand(pickedObject, previewLevel) ?? [pickedObject]);
+    setPreview(previewLevel === null ? null : { level: previewLevel, parts: shown });
+    area.current?.showChain((shown ?? found).slice(1));
     redraw();
-  }, [pickedObject, level]);
+  }, [pickedObject, level, previewLevel]);
   const areaTimer = useRef<number | null>(null);
   const [areaState, setAreaState] = useState<"far" | "loading" | number>("far");
   const wantArea = useRef<(target: Vec3, distance: number) => void>(() => {});
@@ -1792,7 +1800,12 @@ export function MapView3D({
         <ViewToolbar
           tools={
             <>
-              <WandTool level={level} onLevel={setLevel} />
+              <WandTool
+                level={level}
+                onLevel={setLevel}
+                preview={preview}
+                onPreview={setPreviewLevel}
+              />
               {tools}
               {withObjects && <TreesTool />}
               {withObjects && <ActionsTool />}
