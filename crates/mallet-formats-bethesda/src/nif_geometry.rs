@@ -3,8 +3,9 @@
 //!
 //! Three kinds of shape are read:
 //!
-//! * `NiTriShape` with `NiTriShapeData`: meshes in the format of the first
-//!   Skyrim, which mods still ship and the game still loads.
+//! * `NiTriShape` (and `BSLODTriShape`, in trees and bushes) with
+//!   `NiTriShapeData`: meshes in the format of the first Skyrim, which mods
+//!   still ship and the game still loads.
 //! * `BSTriShape` (and its relatives `BSMeshLODTriShape`,
 //!   `BSSubIndexTriShape`): the format of Skyrim Special Edition, with all
 //!   of a point's data packed together as the shape's vertex description
@@ -818,7 +819,10 @@ pub fn shapes(data: &[u8]) -> Result<Vec<Shape>, NifError> {
                     });
                 }
             }
-            "NiTriShape" => {
+            // `BSLODTriShape`, in trees and bushes of the first Skyrim's
+            // format, is an `NiTriShape` with the sizes of its levels of
+            // detail after it.
+            "NiTriShape" | "BSLODTriShape" => {
                 let Some((local, data_index, shader, alpha)) = read_ni_tri_shape(bytes, bs_version)
                 else {
                     continue;
@@ -1173,6 +1177,74 @@ mod tests {
         }
         out.extend(0u32.to_le_bytes()); // particle data
         out
+    }
+
+    /// An `NiTriShape` of the first Skyrim (version 83) using the data
+    /// in block `data`; with `lod`, the three level sizes of a
+    /// `BSLODTriShape` after it.
+    fn ni_tri_shape(data: i32, lod: bool) -> Vec<u8> {
+        let mut out = av_object([0.0, 0.0, 5.0]);
+        out.extend(data.to_le_bytes());
+        out.extend((-1i32).to_le_bytes()); // skin
+        out.extend(0u32.to_le_bytes()); // materials
+        out.extend(0u32.to_le_bytes()); // active material
+        out.push(0); // dirty
+        out.extend((-1i32).to_le_bytes()); // shader
+        out.extend((-1i32).to_le_bytes()); // alpha
+        if lod {
+            for size in [1u32, 0, 0] {
+                out.extend(size.to_le_bytes());
+            }
+        }
+        out
+    }
+
+    /// `NiTriShapeData` with one triangle and texture coordinates.
+    fn ni_tri_shape_data() -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend(0u32.to_le_bytes()); // group
+        out.extend(3u16.to_le_bytes());
+        out.extend([0u8, 0]); // keep, compress
+        out.push(1);
+        for value in [0.0f32, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0.0] {
+            out.extend(value.to_le_bytes());
+        }
+        out.extend(1u16.to_le_bytes()); // one set of texture coordinates
+        out.extend(0u32.to_le_bytes()); // material checksum
+        out.push(0); // no normals
+        out.extend([0u8; 16]); // centre and radius
+        out.push(0); // no colours
+        for value in [0.0f32, 0.0, 1.0, 0.0, 0.0, 1.0] {
+            out.extend(value.to_le_bytes());
+        }
+        out.extend(0u16.to_le_bytes()); // consistency
+        out.extend(0u32.to_le_bytes()); // additional data
+        out.extend(1u16.to_le_bytes());
+        out.extend(3u32.to_le_bytes());
+        out.push(1);
+        for index in [0u16, 1, 2] {
+            out.extend(index.to_le_bytes());
+        }
+        out
+    }
+
+    #[test]
+    fn shapes_of_the_first_skyrim_are_read_also_in_trees_and_bushes() {
+        for kind in ["NiTriShape", "BSLODTriShape"] {
+            let data = mesh(
+                83,
+                &[
+                    ("BSFadeNode", node(&[1])),
+                    (kind, ni_tri_shape(2, kind == "BSLODTriShape")),
+                    ("NiTriShapeData", ni_tri_shape_data()),
+                ],
+            );
+            let found = shapes(&data).unwrap();
+            assert_eq!(found.len(), 1, "{kind}");
+            assert_eq!(found[0].indices, vec![0, 1, 2]);
+            assert_eq!(found[0].positions[2], 5.0, "{kind} is placed");
+            assert_eq!(found[0].uvs, vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]);
+        }
     }
 
     #[test]
