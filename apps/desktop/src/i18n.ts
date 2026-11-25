@@ -207,6 +207,8 @@ export interface Texts {
   mapNearLoading: string;
   mapNearCount: (count: number) => string;
   mapNearProgress: (count: number, done: number, total: number) => string;
+  /** While the game's level of detail for the view loads: blocks and textures there of all. */
+  mapLodProgress: (done: number, total: number) => string;
   mapObjectFrom: string;
   mapObjectPlacedBy: string;
   mapObjectId: string;
@@ -550,6 +552,7 @@ export const texts: Record<Lang, Texts> = {
     mapNearLoading: "loading…",
     mapNearCount: (count) => (count === 1 ? "1 object" : `${count} objects`),
     mapNearProgress: (count, done, total) => `${count} objects · models ${done} of ${total}`,
+    mapLodProgress: (done, total) => `loading ${done} of ${total}`,
     mapObjectFrom: "Version from",
     mapObjectPlacedBy: "Placed by",
     mapObjectId: "Number in that plugin",
@@ -965,6 +968,7 @@ export const texts: Record<Lang, Texts> = {
     mapNearLoading: "wird geladen …",
     mapNearCount: (count) => (count === 1 ? "1 Objekt" : `${count} Objekte`),
     mapNearProgress: (count, done, total) => `${count} Objekte · Modelle ${done} von ${total}`,
+    mapLodProgress: (done, total) => `lädt ${done} von ${total}`,
     mapObjectFrom: "Version aus",
     mapObjectPlacedBy: "Aufgestellt von",
     mapObjectId: "Nummer in diesem Plugin",

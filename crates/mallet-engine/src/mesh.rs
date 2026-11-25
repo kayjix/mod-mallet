@@ -13,6 +13,10 @@ use crate::ScanOptions;
 /// The largest width or height of a texture sent to the window.
 const TEXTURE_SIDE: u32 = 512;
 
+/// The folders whose files the index of the setup's meshes and textures
+/// has.
+const INDEXED: [&str; 2] = ["textures/", "meshes/"];
+
 /// Where face meshes lie, and where their face textures.
 const FACE_MESHES: &str = "meshes/actors/character/facegendata/facegeom/";
 const FACE_TEXTURES: &str = "textures/actors/character/facegendata/facetint/";
@@ -36,10 +40,20 @@ pub fn mesh_view(options: &ScanOptions, path: &str, version: Option<usize>) -> O
         Origin::Loose => None,
         Origin::Archive(name) => Some(name),
     };
+    // Textures from the index of every mesh and texture: looking for each
+    // in every archive again took a third of a second per texture. Other
+    // files, such as materials, are looked for as before.
+    let library = crate::area::library(options);
     let read = |path: &str| {
-        files::versions(game, &game_dir, local_dir, path)
-            .pop()
-            .map(|version| version.bytes)
+        let normalized = files::normalize(path);
+        match &library {
+            Some(library) if INDEXED.iter().any(|folder| normalized.starts_with(folder)) => {
+                library.read(&normalized)
+            }
+            _ => files::versions(game, &game_dir, local_dir, path)
+                .pop()
+                .map(|version| version.bytes),
+        }
     };
     render(path, &chosen.bytes, archive, &read)
 }
@@ -134,7 +148,7 @@ pub(crate) fn render(
 /// that folder, with it, or with the folders of the machine they were made
 /// on in front (`C:\Projects\...\Data\materials\...`); the game reads
 /// from the folder's name on.
-fn below(raw: &str, folder: &str) -> String {
+pub(crate) fn below(raw: &str, folder: &str) -> String {
     let normalized = raw.replace('\\', "/").to_ascii_lowercase();
     let normalized = normalized.trim_start_matches('/');
     if normalized.starts_with(folder) {

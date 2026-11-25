@@ -209,6 +209,11 @@ export class LodLayer {
   /** The blocks drawn last, and a name for that set. */
   drawnTiles: LodTile[] = [];
   drawnKey = "";
+  /**
+   * How much of what the last view wants is there: its blocks and the
+   * textures of what is drawn (ADR 0085), for a progress readout.
+   */
+  progress = { done: 0, total: 0 };
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -328,6 +333,7 @@ export class LodLayer {
     gl.uniform1i(at("u_texture"), 0);
     gl.enable(gl.POLYGON_OFFSET_FILL);
     gl.polygonOffset(2, 8);
+    const textured = new Set<string>();
     for (const tile of drawn.values()) {
       const loaded = this.loaded.get(key(tile.level, tile.x, tile.y));
       if (loaded === undefined) {
@@ -335,25 +341,41 @@ export class LodLayer {
       }
       loaded.used = this.frame;
       if (Array.isArray(loaded.land)) {
-        this.drawSurfaces(loaded.land, at, true);
+        this.drawSurfaces(loaded.land, at, true, textured);
       }
       if (Array.isArray(loaded.objects)) {
-        this.drawSurfaces(loaded.objects, at, false);
+        this.drawSurfaces(loaded.objects, at, false, textured);
       }
     }
     gl.bindVertexArray(null);
     gl.disable(gl.POLYGON_OFFSET_FILL);
     this.evict(drawn);
+
+    const blocksThere = wanted.filter((tile) => {
+      const loaded = this.loaded.get(key(tile.level, tile.x, tile.y));
+      return loaded !== undefined && loaded.land !== "loading" && loaded.objects !== "loading";
+    }).length;
+    const texturesThere = [...textured].filter(
+      (path) => this.textures.get(path) !== "loading",
+    ).length;
+    this.progress = {
+      done: blocksThere + texturesThere,
+      total: wanted.length + textured.size,
+    };
   }
 
   private drawSurfaces(
     surfaces: Surface[],
     at: (name: string) => WebGLUniformLocation | null,
     land: boolean,
+    textured: Set<string>,
   ) {
     const { gl } = this;
     gl.uniform1i(at("u_land"), land ? 1 : 0);
     for (const surface of surfaces) {
+      if (surface.texture !== null) {
+        textured.add(surface.texture);
+      }
       const texture = surface.texture === null ? null : this.texture(surface.texture, surface);
       if (surface.texture !== null && texture === null) {
         // Its texture is still on its way.

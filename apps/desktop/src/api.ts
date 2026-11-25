@@ -22,6 +22,8 @@ import type { LoadedPatch } from "./generated/loaded-patch";
 import type { LodMesh } from "./generated/lod-mesh";
 import type { LodTiles } from "./generated/lod-tiles";
 import type { MapImage } from "./generated/map-image";
+import type { MeshThumbnail } from "./generated/mesh-thumbnail";
+import type { MeshThumbnailRequest } from "./generated/mesh-thumbnail-request";
 import type { MeshView } from "./generated/mesh-view";
 import type { ObjectAnchors } from "./generated/object-anchors";
 import type { PatchBook } from "./generated/patch-book";
@@ -132,6 +134,8 @@ export interface Api {
   compareFiles(paths: string[], mods: string[]): Promise<FileComparison[] | null>;
   /** A version of a mesh, ready to draw; the one in the game unless `version` names another. */
   meshView(path: string, version: number | null): Promise<MeshView | null>;
+  /** Small pictures of mesh versions for lists, `side` pixels square, in the order asked. */
+  meshThumbnails(requests: MeshThumbnailRequest[], side: number): Promise<MeshThumbnail[]>;
   /** Everything placed within `radius` game units of a point. */
   areaObjects(world: string, x: number, y: number, radius: number): Promise<AreaObjects | null>;
   /** The game's ground of the cells within `radius` game units of a point. */
@@ -310,6 +314,8 @@ const tauriApi: Api = {
   filePreview: (path) => invoke<FilePreview | null>("file_preview", { path }),
   compareFiles: (paths, mods) => invoke<FileComparison[] | null>("compare_files", { paths, mods }),
   meshView: (path, version) => invoke<MeshView | null>("mesh_view", { path, version }),
+  meshThumbnails: (requests, side) =>
+    invoke<MeshThumbnail[]>("mesh_thumbnails", { requests, side }),
   catalogue: (lang) => invoke<Catalogue | null>("catalogue", { lang }),
   assetVersions: (models) => invoke<AssetVersions | null>("asset_versions", { models }),
   assetView: (path, version) => invoke<MeshView | null>("asset_view", { path, version }),

@@ -281,3 +281,53 @@ pub struct Walkway {
     /// How many of its triangles lie on the object.
     pub triangles: u32,
 }
+
+/// One version of a mesh asked for as a small picture in a list
+/// (ADR 0085).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MeshThumbnailRequest {
+    /// The mesh, below the data directory.
+    pub path: String,
+    /// The version, as the catalogue names versions (`AssetVersion::id`);
+    /// `None` for the one the game uses.
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// A small picture of one version of a mesh, seen from a fixed angle
+/// under a neutral light, or why there is none (ADR 0085).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MeshThumbnail {
+    /// The mesh, as asked for.
+    pub path: String,
+    /// The version, as asked for.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// The picture, as a PNG `data:` address with a transparent
+    /// background; `None` when there is nothing to show.
+    pub image: Option<String>,
+    /// Why there is no picture; `None` when there is one.
+    pub gap: Option<MeshGap>,
+}
+
+/// Why a mesh has no picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum MeshGap {
+    /// The setup has no such version of the file.
+    Missing,
+    /// The file is not a mesh Mod Mallet can read: damaged, or of a
+    /// version it does not know.
+    Unreadable,
+    /// A skeleton: bones and nothing to draw around them.
+    Skeleton,
+    /// Light, not a body: glow, mist, flames or particles, which the game
+    /// makes in its own way.
+    Effects,
+    /// Nothing the game shows: a marker, a camera or an empty node.
+    Empty,
+    /// It has surfaces of a kind Mod Mallet cannot draw yet.
+    Unsupported,
+}

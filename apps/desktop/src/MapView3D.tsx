@@ -554,6 +554,9 @@ export function MapView3D({
   // How far the models of the area have come, and the object picked.
   const [areaProgress, setAreaProgress] = useState<{ done: number; total: number } | null>(null);
   const progressKey = useRef("");
+  // How far the game's level of detail for the view has come (ADR 0085).
+  const [lodProgress, setLodProgress] = useState<{ done: number; total: number } | null>(null);
+  const lodProgressKey = useRef("");
   const [pickedObject, setPickedObject] = useState<AreaObject | null>(null);
   // What the magic wand takes along with the picked object (ADR 0055).
   const [level, setLevel] = useWandLevel();
@@ -830,6 +833,12 @@ export function MapView3D({
       if (layer.drawnKey !== coveredKey.current) {
         coveredKey.current = layer.drawnKey;
         uploadCovered(gl, current.covered, terrain, layer.drawnTiles);
+      }
+      const { done, total } = layer.progress;
+      const shownKey = done < total ? `${done}/${total}` : "";
+      if (shownKey !== lodProgressKey.current) {
+        lodProgressKey.current = shownKey;
+        setLodProgress(done < total ? { done, total } : null);
       }
     }
     const lodDrawn = layer !== null && layer.drawnTiles.length > 0;
@@ -1861,6 +1870,12 @@ export function MapView3D({
             onChange={(event) => setWithLod(event.target.checked)}
           />
           {t.mapLod}
+          {withLod && lodProgress !== null && (
+            <span className="relief-value">
+              <LoadingMallet size={18} className="loading-inline" />
+              {t.mapLodProgress(lodProgress.done, lodProgress.total)}
+            </span>
+          )}
         </label>
         <label className="relief-control">
           <input

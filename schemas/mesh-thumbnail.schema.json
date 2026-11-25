@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MeshThumbnail",
+  "description": "A small picture of one version of a mesh, seen from a fixed angle\nunder a neutral light, or why there is none (ADR 0085).",
+  "type": "object",
+  "properties": {
+    "gap": {
+      "description": "Why there is no picture; `None` when there is one.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MeshGap"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "image": {
+      "description": "The picture, as a PNG `data:` address with a transparent\nbackground; `None` when there is nothing to show.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The mesh, as asked for.",
+      "type": "string"
+    },
+    "version": {
+      "description": "The version, as asked for.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "$defs": {
+    "MeshGap": {
+      "description": "Why a mesh has no picture.",
+      "oneOf": [
+        {
+          "description": "The setup has no such version of the file.",
+          "type": "string",
+          "const": "missing"
+        },
+        {
+          "description": "The file is not a mesh Mod Mallet can read: damaged, or of a\nversion it does not know.",
+          "type": "string",
+          "const": "unreadable"
+        },
+        {
+          "description": "A skeleton: bones and nothing to draw around them.",
+          "type": "string",
+          "const": "skeleton"
+        },
+        {
+          "description": "Light, not a body: glow, mist, flames or particles, which the game\nmakes in its own way.",
+          "type": "string",
+          "const": "effects"
+        },
+        {
+          "description": "Nothing the game shows: a marker, a camera or an empty node.",
+          "type": "string",
+          "const": "empty"
+        },
+        {
+          "description": "It has surfaces of a kind Mod Mallet cannot draw yet.",
+          "type": "string",
+          "const": "unsupported"
+        }
+      ]
+    }
+  }
+}

@@ -27,6 +27,7 @@ import type {
 } from "./generated/rendered-report";
 import type { Texts } from "./i18n";
 import { InfoTip } from "./info-tip";
+import { MeshThumb } from "./mesh-thumb";
 import { fileDuels } from "./Overview";
 import { PageHeader, SearchField, Tabs, Toolbar, UndoButton } from "./ui/kit";
 import { Stage, type StageItem } from "./Viewer3D";
@@ -696,20 +697,19 @@ function FileRow({
         aria-current={selected ? "true" : undefined}
         onClick={onSelect}
       >
-        <span
-          className="compare-thumb"
-          data-kind={other !== null ? "other" : isMesh(file.path) ? "mesh" : "texture"}
-        >
-          {image !== null ? (
-            <img className="compare-thumb-image" src={image} alt="" />
-          ) : other !== null ? (
-            other.short
-          ) : isMesh(file.path) ? (
-            "3D"
-          ) : (
-            "2D"
-          )}
-        </span>
+        {other === null && isMesh(file.path) ? (
+          <MeshThumb className="compare-thumb" path={file.path} />
+        ) : (
+          <span className="compare-thumb" data-kind={other !== null ? "other" : "texture"}>
+            {image !== null ? (
+              <img className="compare-thumb-image" src={image} alt="" />
+            ) : other !== null ? (
+              other.short
+            ) : (
+              "2D"
+            )}
+          </span>
+        )}
         <span className="compare-file-text">
           <strong className="compare-file-name">{file.object ?? fileName(file.path)}</strong>
           <span className="aside">

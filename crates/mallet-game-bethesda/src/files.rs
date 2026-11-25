@@ -134,10 +134,25 @@ pub fn mesh_shapes(bytes: &[u8]) -> Vec<mallet_formats_bethesda::nif_geometry::S
     mallet_formats_bethesda::nif_geometry::shapes(bytes).unwrap_or_default()
 }
 
+/// The shapes of a mesh as [`mesh_shapes`] gives them; `None` if it is
+/// not a mesh that can be read, rather than no shapes.
+pub fn readable_mesh_shapes(
+    bytes: &[u8],
+) -> Option<Vec<mallet_formats_bethesda::nif_geometry::Shape>> {
+    mallet_formats_bethesda::nif_geometry::shapes(bytes).ok()
+}
+
 /// The bones of a mesh, for drawing a skeleton as lines; empty if it has
 /// none or cannot be read.
 pub fn mesh_bones(bytes: &[u8]) -> Vec<mallet_formats_bethesda::nif_geometry::Bone> {
     mallet_formats_bethesda::nif_geometry::bones(bytes)
+}
+
+/// The kind of every block of a mesh, such as `BSTriShape` or
+/// `NiParticleSystem`: what it is made of, to tell why nothing of it can
+/// be drawn. Empty if it cannot be read.
+pub fn mesh_parts(bytes: &[u8]) -> Vec<String> {
+    mallet_formats_bethesda::nif::block_kinds(bytes).unwrap_or_default()
 }
 
 /// A texture as a picture no wider or higher than `max_side`, from the

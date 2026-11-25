@@ -34,10 +34,12 @@ mod patch_archive;
 mod paths;
 mod png;
 mod preview;
+mod raster;
 mod reach;
 mod settings;
 mod staging;
 mod switched_off;
+mod thumbnail;
 mod toolbox;
 mod unreal;
 mod versions;
@@ -83,6 +85,7 @@ pub use settings::{
     select_game, setup_fingerprint, update_settings,
 };
 pub use switched_off::data_file;
+pub use thumbnail::mesh_thumbnails;
 pub use toolbox::{game_art, restart_manager, toolbox};
 pub use versions::{asset_versions, asset_view};
 pub use walkways::{NavmeshRecord, hidden_walkways, repaired_navmeshes, walkway_repair};
@@ -745,7 +748,7 @@ pub fn default_cache_path() -> Option<PathBuf> {
     )
 }
 
-fn open_store(cache_path: &Path) -> Result<Store, EngineError> {
+pub(crate) fn open_store(cache_path: &Path) -> Result<Store, EngineError> {
     if let Some(directory) = cache_path
         .parent()
         .filter(|dir| !dir.as_os_str().is_empty())

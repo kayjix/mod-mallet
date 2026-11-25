@@ -21,6 +21,7 @@ import type {
 import type { Action, ModRef } from "./generated/rendered-report";
 import { InfoTip } from "./info-tip";
 import { LoadingLine, LoadingScreen } from "./LoadingMallet";
+import { MeshThumb } from "./mesh-thumb";
 import { Stage, type StageItem } from "./Viewer3D";
 import "./catalogue.css";
 import { PageHeader, SearchField, Segmented, Tabs, Toolbar } from "./ui/kit";
@@ -717,6 +718,11 @@ function ItemPage({
                         checked={on}
                         disabled={all.length === 1 || (!on && onStage.length >= SIDE_BY_SIDE)}
                         onChange={() => toggle(version.id)}
+                      />
+                      <MeshThumb
+                        className="catalogue-version-thumb"
+                        path={path}
+                        version={version.id}
                       />
                       <span className="catalogue-version-name">
                         {versionLabel(version, index, c)}

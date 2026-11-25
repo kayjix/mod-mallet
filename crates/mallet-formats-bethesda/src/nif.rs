@@ -319,6 +319,19 @@ fn parse_layout(data: &[u8]) -> Result<Layout, NifError> {
     })
 }
 
+/// The type of every block of the mesh in `data`, such as `BSTriShape` or
+/// `bhkCollisionObject`, in the file's order: what a mesh is made of, to
+/// tell why nothing of it can be drawn.
+///
+/// # Errors
+///
+/// If the data is not a mesh of a supported version. Meshes of Oblivion
+/// are not read for this.
+pub fn block_kinds(data: &[u8]) -> Result<Vec<String>, NifError> {
+    let (_, found, _) = blocks(data)?;
+    Ok(found.into_iter().map(|block| block.kind).collect())
+}
+
 /// One block of a mesh: its type and where its bytes lie in the file.
 pub(crate) struct BlockInfo {
     /// The block type, such as `BSTriShape`.
@@ -484,6 +497,16 @@ mod tests {
     }
 
     #[test]
+    fn the_kinds_of_blocks_are_listed_in_order() {
+        let kinds = block_kinds(&fixture::nif(&[WALL])).unwrap();
+        assert!(
+            kinds.iter().any(|kind| kind == "BSShaderTextureSet"),
+            "{kinds:?}"
+        );
+        assert_eq!(block_kinds(b"not a mesh"), Err(NifError::NotAMesh));
+    }
+
+    #[test]
     fn other_files_are_rejected() {
         assert_eq!(texture_paths(b""), Err(NifError::NotAMesh));
         assert_eq!(texture_paths(b"BSA\0 and more"), Err(NifError::NotAMesh));
@@ -616,6 +639,7 @@ mod tests {
         #[test]
         fn never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..512)) {
             let _ = texture_paths(&data);
+            let _ = block_kinds(&data);
             let _ = variant(&data);
         }
 
@@ -630,6 +654,7 @@ mod tests {
                 *byte = value;
             }
             mesh.truncate(mesh.len().saturating_sub(cut));
+            let _ = block_kinds(&mesh);
             let _ = texture_paths(&mesh);
             let _ = read_texture_paths(&mut std::io::Cursor::new(&mesh));
         }

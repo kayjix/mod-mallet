@@ -31,7 +31,7 @@ const MAX_FILES: usize = 40;
 const MAX_STAGED: u64 = 64 * 1024 * 1024;
 
 /// Where every file of the setup can come from, found once per setup.
-struct Sources {
+pub(crate) struct Sources {
     key: String,
     game: Game,
     library: LodLibrary,
@@ -45,7 +45,7 @@ struct Sources {
 /// The sources of the setup last asked about.
 static KEPT: Mutex<Option<Arc<Sources>>> = Mutex::new(None);
 
-fn sources(options: &ScanOptions) -> Option<Arc<Sources>> {
+pub(crate) fn sources(options: &ScanOptions) -> Option<Arc<Sources>> {
     let (game, game_dir) = options.known_game()?;
     let key = format!(
         "{}|{}|{}",
@@ -192,7 +192,7 @@ impl Sources {
     }
 
     /// The copy of `path` that `version` brings, if it has one.
-    fn read(&self, path: &str, version: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read(&self, path: &str, version: &str) -> Option<Vec<u8>> {
         let path = files::normalize(path);
         if let Some(folder) = version.strip_prefix("mod:") {
             // The mod's own folder first: that is where a loose copy lies,
@@ -223,7 +223,7 @@ impl Sources {
     }
 
     /// The copy of `path` the game uses.
-    fn read_shown(&self, path: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read_shown(&self, path: &str) -> Option<Vec<u8>> {
         self.read(path, &self.winner(path)?)
     }
 

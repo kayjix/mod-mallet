@@ -11,6 +11,7 @@ import type { AssetVersion, AssetVersions } from "../generated/asset-versions";
 import type { Catalogue, CatalogueItem } from "../generated/catalogue";
 import type { GameChoice, KnownGame } from "../generated/game-choice";
 import type { LodMesh } from "../generated/lod-mesh";
+import type { MeshThumbnail } from "../generated/mesh-thumbnail";
 import type { MeshView } from "../generated/mesh-view";
 import type { AnchorOther, ObjectAnchors } from "../generated/object-anchors";
 import type { PatchBook } from "../generated/patch-book";
@@ -1490,8 +1491,23 @@ function soon<T>(value: T): Promise<T> {
 }
 
 /** Results arrive a little later, as they do from the real backend. */
-function later<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), 400));
+function later<T>(value: T, delay = 400): Promise<T> {
+  return new Promise((resolve) => setTimeout(() => resolve(value), delay));
+}
+
+/**
+ * A small picture for a sample mesh: a cube in the version's colour, or
+ * for a skeleton and for effects the reason there is none.
+ */
+function sampleThumbnail(path: string, colour = "#b07a4a"): Pick<MeshThumbnail, "image" | "gap"> {
+  if (path.endsWith("skeleton.nif")) {
+    return { image: null, gap: "skeleton" };
+  }
+  if (path.includes("/effects/")) {
+    return { image: null, gap: "effects" };
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 12 86 30v40L50 88 14 70V30z" fill="${colour}"/><path d="M50 12 86 30 50 48 14 30z" fill="#fff" fill-opacity=".35"/><path d="M50 48v40L14 70V30z" fill="#000" fill-opacity=".25"/></svg>`;
+  return { image: `data:image/svg+xml,${encodeURIComponent(svg)}`, gap: null };
 }
 
 // The made-up machine: nothing is agreed to and the link is missing until
@@ -1649,6 +1665,16 @@ export const sampleApi: Api = {
   // The sample has no pictures; the page shows its placeholder.
   gameArt: () => later(null),
   meshView: (path) => later(sampleCube(path)),
+  meshThumbnails: (requests) =>
+    later(
+      requests.map(({ path, version }) => ({
+        path,
+        version: version ?? null,
+        ...sampleThumbnail(path, version == null ? undefined : SAMPLE_COLOURS[version]),
+      })),
+      // Slower than other answers, so the shimmer can be seen.
+      600,
+    ),
   catalogue: () => later(sampleCatalogue()),
   assetVersions: (models) => later(withChoices(sampleVersions(models))),
   assetView: (path, version) => later(sampleCube(path, SAMPLE_COLOURS[version] ?? "#8a8a8a")),

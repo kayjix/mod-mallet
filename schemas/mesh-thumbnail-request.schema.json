@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MeshThumbnailRequest",
+  "description": "One version of a mesh asked for as a small picture in a list\n(ADR 0085).",
+  "type": "object",
+  "properties": {
+    "path": {
+      "description": "The mesh, below the data directory.",
+      "type": "string"
+    },
+    "version": {
+      "description": "The version, as the catalogue names versions (`AssetVersion::id`);\n`None` for the one the game uses.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "path"
+  ]
+}

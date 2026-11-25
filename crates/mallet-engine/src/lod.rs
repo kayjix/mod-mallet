@@ -3,6 +3,7 @@
 //! they use. Only reads.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use mallet_core::encoding::base64;
@@ -18,6 +19,23 @@ const KEPT: usize = 3;
 
 /// The smallest and largest side of a texture sent to the window.
 const TEXTURE_SIDES: (u32, u32) = (16, 2048);
+
+/// Where large level-of-detail textures are kept between runs.
+const CACHE_NAMESPACE: &str = "lod-texture";
+
+/// Changes whenever the kept pictures would come out differently.
+const KEPT_PICTURES: &str = "p1";
+
+/// Pictures asked for at least this large are looked for in the cache:
+/// the textures many blocks share, such as the atlas of the objects and
+/// the textures of mountains and water. The textures of single land blocks
+/// are asked for smaller, are quick to make, and are not kept, which keeps
+/// the cache small.
+const KEPT_FROM: u32 = 1024;
+
+/// Pictures at least this long as text are kept: about 1024 by 1024 pixels
+/// and more.
+const KEPT_FROM_LENGTH: usize = 2_000_000;
 
 /// The indexes made so far, the most recent last, by game, folder and
 /// worldspace. Making one reads the file lists of every archive; keeping it
@@ -162,24 +180,58 @@ fn cell_units(cell: i32) -> f32 {
 
 /// The texture at `path` below the data directory as a PNG `data:` address
 /// no wider or higher than `max_side`; from the worldspace's own files where
-/// they have it, and else as the game finds it.
+/// they have it, and else as the game finds it. Large pictures are kept in
+/// the cache at `cache_path` between runs (ADR 0085): making one takes a
+/// fifth of a second, reading it back a few milliseconds.
 pub fn lod_texture(
     options: &ScanOptions,
+    cache_path: Option<&Path>,
     world: &str,
     path: &str,
     max_side: u32,
 ) -> Option<String> {
     let started = std::time::Instant::now();
     let path = texture_path(path);
+    let key = format!("{}|{path}|{max_side}", world.to_ascii_lowercase());
+    let fingerprint = || format!("{KEPT_PICTURES}|{}", crate::setup_fingerprint(options));
+    let worth_keeping = cache_path.is_some() && max_side >= KEPT_FROM;
+    if worth_keeping {
+        let fingerprint = fingerprint();
+        if let Some(kept) = crate::thumbnail::with_cache(cache_path, |store| {
+            store
+                .cached_text(CACHE_NAMESPACE, &key, &fingerprint)
+                .ok()
+                .flatten()
+        })
+        .flatten()
+        {
+            tracing::debug!(
+                path,
+                elapsed_ms = started.elapsed().as_millis(),
+                "level-of-detail texture from the cache"
+            );
+            return Some(kept);
+        }
+    }
     let picture = lod_picture(options, world, &path, max_side);
-    if picture.is_none() {
-        tracing::info!(path, "level-of-detail texture cannot be shown");
-    } else {
-        tracing::debug!(
-            path,
-            elapsed_ms = started.elapsed().as_millis(),
-            "level-of-detail texture"
-        );
+    match &picture {
+        None => tracing::info!(path, "level-of-detail texture cannot be shown"),
+        Some(found) => {
+            tracing::debug!(
+                path,
+                elapsed_ms = started.elapsed().as_millis(),
+                "level-of-detail texture"
+            );
+            if worth_keeping && found.len() >= KEPT_FROM_LENGTH {
+                let fingerprint = fingerprint();
+                crate::thumbnail::with_cache(cache_path, |store| {
+                    if let Err(error) = store.cache_text(CACHE_NAMESPACE, &key, &fingerprint, found)
+                    {
+                        tracing::warn!(%error, "level-of-detail texture could not be cached");
+                    }
+                });
+            }
+        }
     }
     picture
 }
@@ -187,13 +239,12 @@ pub fn lod_texture(
 /// The texture at `path` (normalized) as for [`lod_texture`].
 fn lod_picture(options: &ScanOptions, world: &str, path: &str, max_side: u32) -> Option<String> {
     let library = library(options, world)?;
-    let bytes = library.read(path).or_else(|| {
-        let game = options.game().ok()?;
-        let (game_dir, _) = options.located_game_dir()?;
-        files::versions(game, &game_dir, options.local_dir.as_deref(), path)
-            .pop()
-            .map(|version| version.bytes)
-    })?;
+    // Textures outside the worldspace's folders, such as of water and
+    // mountains, come from the index of every texture: looking for each in
+    // every archive again took half a second.
+    let bytes = library
+        .read(path)
+        .or_else(|| crate::area::library(options)?.read(path))?;
     picture_of(&bytes, max_side)
 }
 

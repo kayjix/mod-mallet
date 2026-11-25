@@ -794,6 +794,7 @@ fn lod_mesh(
 fn lod_texture(world: String, path: String, max_side: u32) -> Result<Option<String>, String> {
     Ok(mallet_engine::lod_texture(
         &settings()?.scan_options(),
+        mallet_engine::default_cache_path().as_deref(),
         &world,
         &path,
         max_side,
@@ -839,6 +840,22 @@ fn mesh_view(
         &settings()?.scan_options(),
         &path,
         version,
+    ))
+}
+
+/// Small pictures of mesh versions for lists (ADR 0085), from the cache
+/// where they were drawn before. Only reads the setup.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn mesh_thumbnails(
+    requests: Vec<mallet_core::mesh::MeshThumbnailRequest>,
+    side: u32,
+) -> Result<Vec<mallet_core::mesh::MeshThumbnail>, String> {
+    Ok(mallet_engine::mesh_thumbnails(
+        &settings()?.scan_options(),
+        mallet_engine::default_cache_path().as_deref(),
+        &requests,
+        side,
     ))
 }
 
@@ -994,6 +1011,7 @@ pub fn run() -> tauri::Result<()> {
             decisions,
             set_decision,
             mesh_view,
+            mesh_thumbnails,
             catalogue,
             asset_versions,
             asset_choices,

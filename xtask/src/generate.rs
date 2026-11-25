@@ -61,6 +61,14 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
         "apps/desktop/src/generated/mesh-view.ts",
     ),
     (
+        "schemas/mesh-thumbnail.schema.json",
+        "apps/desktop/src/generated/mesh-thumbnail.ts",
+    ),
+    (
+        "schemas/mesh-thumbnail-request.schema.json",
+        "apps/desktop/src/generated/mesh-thumbnail-request.ts",
+    ),
+    (
         "schemas/catalogue.schema.json",
         "apps/desktop/src/generated/catalogue.ts",
     ),
@@ -160,6 +168,10 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<mallet_core::MapImage>("schemas/map-image.schema.json")?,
         schema_of::<mallet_core::FilePreview>("schemas/file-preview.schema.json")?,
         schema_of::<mallet_core::mesh::MeshView>("schemas/mesh-view.schema.json")?,
+        schema_of::<mallet_core::mesh::MeshThumbnail>("schemas/mesh-thumbnail.schema.json")?,
+        schema_of::<mallet_core::mesh::MeshThumbnailRequest>(
+            "schemas/mesh-thumbnail-request.schema.json",
+        )?,
         schema_of::<mallet_core::GameChoice>("schemas/game-choice.schema.json")?,
         schema_of::<mallet_core::mesh::LodTiles>("schemas/lod-tiles.schema.json")?,
         schema_of::<mallet_core::mesh::LodMesh>("schemas/lod-mesh.schema.json")?,
