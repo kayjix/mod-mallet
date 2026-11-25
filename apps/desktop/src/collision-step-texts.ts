@@ -81,6 +81,12 @@ export interface CollisionStepTexts {
   otherChoices: string;
   change: string;
   sectionParts: (count: number) => string;
+  /** What a section's decision did, in one line, and what of it stays. */
+  sectionKept: (section: number, mod: string) => string;
+  sectionBoth: (section: number) => string;
+  sectionOpen: (section: number, mod: string) => string;
+  sectionStays: (count: number, mod: string) => string;
+  sectionStaysWhy: (count: number, mod: string) => string;
   /** What is left of the losing mod after a decision. */
   left: (count: number, mod: string) => string;
   leftKeepBoth: string;
@@ -186,6 +192,16 @@ const en: CollisionStepTexts = {
   otherChoices: "Other choices",
   change: "Change",
   sectionParts: (count) => `The ${count} parts`,
+  sectionKept: (section, mod) => `Section ${section}: ${mod}'s is kept.`,
+  sectionBoth: (section) => `Section ${section}: both stay.`,
+  sectionOpen: (section, mod) =>
+    `Section ${section} stays open: nothing of ${mod} here can go on its own, and it has no spot of its own to decide.`,
+  sectionStays: (count, mod) =>
+    count === 1 ? `1 part of ${mod} stays` : `${count} parts of ${mod} stay`,
+  sectionStaysWhy: (count, mod) =>
+    count === 1
+      ? `The 1 ${mod} part here is tied in or walked on: it stays unless you hide it anyway.`
+      : `The ${count} ${mod} parts here are tied in or walked on: they stay unless you hide them anyway.`,
   left: (count, mod) =>
     count === 1
       ? `1 ${mod} part remains and still collides here`
@@ -305,6 +321,16 @@ const de: CollisionStepTexts = {
   otherChoices: "Andere Möglichkeiten",
   change: "Ändern",
   sectionParts: (count) => `Die ${count} Teile`,
+  sectionKept: (section, mod) => `Abschnitt ${section}: die Fassung von ${mod} bleibt.`,
+  sectionBoth: (section) => `Abschnitt ${section}: beide bleiben.`,
+  sectionOpen: (section, mod) =>
+    `Abschnitt ${section} bleibt offen: von ${mod} kann hier nichts von selbst weg, und er hat keine eigene Stelle zum Entscheiden.`,
+  sectionStays: (count, mod) =>
+    count === 1 ? `1 Teil von ${mod} bleibt` : `${count} Teile von ${mod} bleiben`,
+  sectionStaysWhy: (count, mod) =>
+    count === 1
+      ? `Das 1 Teil von ${mod} hier ist eingebunden oder wird begangen: es bleibt, außer du blendest es trotzdem aus.`
+      : `Die ${count} Teile von ${mod} hier sind eingebunden oder werden begangen: sie bleiben, außer du blendest sie trotzdem aus.`,
   left: (count, mod) =>
     count === 1
       ? `1 Teil von ${mod} bleibt und kollidiert hier noch`

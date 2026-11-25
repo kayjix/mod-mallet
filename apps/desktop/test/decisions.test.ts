@@ -25,6 +25,7 @@ import {
   chooseDuel,
   type DecisionWorld,
   decidedOf,
+  decidedOfParts,
   keepSide,
   leftoversOf,
   mergeDoors,
@@ -495,11 +496,14 @@ test("a side kept in the review shows on every page, and the leftover line names
   // Hidden from the map's object card after all: the line goes there too.
   window.change((d) => d.hide([ladder.object]));
   assert.equal(leftoversOf(window.decisions, reviewPlace()), null);
-  // The crate shown again on the map: the review names it, the passage has an exception.
+  // The crate shown again on the map: the passage has an exception. The
+  // crate is all of its section, which is now kept as "Keep both" there
+  // keeps it, so it is no longer given up and nothing is left over.
   window.change((d) => d.show([crate.object]));
+  assert.equal(leftoversOf(window.decisions, reviewPlace()), null);
   assert.deepEqual(
-    leftoversOf(window.decisions, reviewPlace())?.parts.map((part) => matchKey(part.id)),
-    [matchKey(crate.object)],
+    decidedOfParts(window.decisions, [crate.object], { type: "hidden", plugin: TOWN }),
+    { type: "kept" },
   );
   assert.deepEqual(window.decisions.decisionOfPassage(passage as never), {
     type: "mixed",
@@ -548,4 +552,112 @@ test("asking 'what if' keeps the world: set-aside findings and waiting decisions
   assert.equal(then.waits(doorC.object), true);
   assert.equal(then.spots.has(DOORS), false);
   assert.equal(now.whatIf(now.choices), now);
+});
+
+// A passage's other parts as a section of their own, without spots, whose
+// only part of the side given up is tied in: the crate, as the review would
+// ask the game about it. Deciding the section must be recorded and read
+// back, whatever it can hide.
+function crateSection(accepted: Set<string> = new Set()) {
+  const entries = [walls, top].map((spot) => ({
+    key: spotKey(spot as never) as string,
+    spot: spot as never,
+    finding: PAIR,
+  }));
+  return {
+    sides: passage.plugins,
+    spots: entries,
+    partOf: (part: { object: { plugin: string; localId: number } }) => ({ id: part.object }),
+    sections: [
+      {
+        spots: entries,
+        parts: [
+          [{ id: wall.object }, { id: roof.object }],
+          [{ id: townWall.object }, { id: ladder.object }],
+        ] as const,
+      },
+      { spots: [], parts: [[], [{ id: crate.object }]] as const },
+    ],
+    accepted,
+  };
+}
+
+test("a section of a passage's other parts, its only part tied: kept, both kept, undone, hidden anyway", () => {
+  const window = fresh();
+  const placeSpots = [walls, top].map((spot) => ({ spot: spot as never, finding: PAIR }));
+  // What the review shows for the place and for the crate's section.
+  const place = () => decidedOf(placeSpots, window.decisions.choices, passage as never);
+  const section = () => decidedOfParts(window.decisions, [crate.object], place());
+
+  // The place decided: House kept, the crate is tied in and stays.
+  window.change((d) =>
+    d.keepSide({
+      kept: [wall.object, roof.object],
+      gone: [townWall.object, ladder.object],
+      spots: keys,
+      loser: TOWN,
+      stays: [crate.object],
+    }),
+  );
+  assert.deepEqual(place(), { type: "hidden", plugin: TOWN });
+  // The section goes with the place: decided, though its crate stays.
+  assert.deepEqual(section(), { type: "hidden", plugin: TOWN });
+  assert.deepEqual(window.look(crate.object), shown);
+  assert.deepEqual(
+    leftoversOf(window.decisions, crateSection())?.parts.map((part) => matchKey(part.id)),
+    [matchKey(crate.object)],
+  );
+  const history = [window.book];
+
+  // "Keep both" for the section: recorded, the section says both stay, nothing is left over.
+  window.change((d) => d.keepSide({ kept: [crate.object], gone: [], spots: [], loser: null }));
+  assert.deepEqual(section(), { type: "kept" });
+  assert.equal(window.decisions.shownAgain(crate.object), true);
+  assert.equal(leftoversOf(window.decisions, crateSection()), null);
+  // For the place, the crate kept is an exception.
+  assert.deepEqual(place(), { type: "mixed", open: 0 });
+  history.push(window.book);
+
+  // "Keep House's" for the section: nothing can go, the crate's own choice
+  // goes and the section is decided with the place again.
+  window.change((d) =>
+    d.keepSide({ kept: [], gone: [], spots: [], loser: TOWN, stays: [crate.object] }),
+  );
+  assert.deepEqual(section(), { type: "hidden", plugin: TOWN });
+  assert.deepEqual(place(), { type: "hidden", plugin: TOWN });
+  assert.equal(window.decisions.shownAgain(crate.object), false);
+  assert.deepEqual(window.look(crate.object), shown);
+
+  // Undone: back to both kept, then to the place's decision alone.
+  window.book = history.pop() as PatchBook;
+  assert.deepEqual(section(), { type: "kept" });
+  window.book = history.pop() as PatchBook;
+  assert.deepEqual(section(), { type: "hidden", plugin: TOWN });
+
+  // "Hide anyway": the crate goes, nothing is left over.
+  window.change((d) => d.hide([crate.object]));
+  assert.deepEqual(section(), { type: "hidden", plugin: TOWN });
+  assert.equal(window.decisions.isHidden(crate.object), true);
+  assert.equal(leftoversOf(window.decisions, crateSection()), null);
+});
+
+test("a section without spots in a place still open: its own choices decide it, a tied part alone cannot", () => {
+  const window = fresh();
+  const placeSpots = [walls, top].map((spot) => ({ spot: spot as never, finding: PAIR }));
+  const place = () => decidedOf(placeSpots, window.decisions.choices, passage as never);
+  const section = () => decidedOfParts(window.decisions, [crate.object], place());
+  assert.deepEqual(section(), { type: "open" });
+  // House kept there, the crate tied: nothing to hide, nothing to record.
+  const before = window.decisions.choices;
+  window.change((d) =>
+    d.keepSide({ kept: [], gone: [], spots: [], loser: TOWN, stays: [crate.object] }),
+  );
+  assert.deepEqual(window.decisions.choices, before);
+  assert.deepEqual(section(), { type: "open" });
+  // Both kept: recorded.
+  window.change((d) => d.keepSide({ kept: [crate.object], gone: [], spots: [], loser: null }));
+  assert.deepEqual(section(), { type: "kept" });
+  // House kept with the crate free to go: recorded as Town's hidden.
+  window.change((d) => d.keepSide({ kept: [], gone: [crate.object], spots: [], loser: TOWN }));
+  assert.deepEqual(section(), { type: "hidden", plugin: TOWN });
 });

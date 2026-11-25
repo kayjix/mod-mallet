@@ -520,6 +520,12 @@ export interface SidePlan {
   spots: string[];
   /** The plugin given up, or null to keep both. */
   loser: string | null;
+  /**
+   * The parts of the side given up that stay, as tied ones: where one was
+   * shown again on purpose, that goes, so it follows the decision again.
+   * A part hidden on its own stays hidden.
+   */
+  stays?: ObjectRef[];
 }
 
 /** The choices with a {@link SidePlan} applied. */
@@ -532,10 +538,51 @@ export function keepSide(
   for (const object of plan.loser === null ? [] : plan.gone) {
     next = chooseObject(next, object, true);
   }
+  const again = shownAgainKeys(next);
+  const forgotten = (plan.loser === null ? [] : (plan.stays ?? [])).filter((object) =>
+    again.has(matchKey(object)),
+  );
+  if (forgotten.length > 0) {
+    next = forgetObjects(next, forgotten);
+  }
   for (const key of plan.spots) {
     next = chooseSpot(next, key, plan.loser);
   }
   return next;
+}
+
+/**
+ * What is decided for parts of a place that no spot names, as a passage's
+ * other parts: by their own choices where they have some (one side's parts
+ * hidden: that side goes; every part shown again on purpose: both stay),
+ * else what the whole `place` decided, as they go with it.
+ */
+export function decidedOfParts(
+  decisions: Decisions,
+  parts: readonly ObjectRef[],
+  place: Decided,
+): Decided {
+  if (parts.length === 0) {
+    return place;
+  }
+  const hidden = new Set(
+    parts.filter((part) => decisions.isHidden(part)).map((part) => part.plugin.toLowerCase()),
+  );
+  const [only] = hidden;
+  if (hidden.size > 1) {
+    return { type: "mixed", open: 0 };
+  }
+  if (only !== undefined) {
+    const plugin = parts.find((part) => part.plugin.toLowerCase() === only)?.plugin ?? only;
+    // A part of the other side hidden as well makes it one with exceptions.
+    return place.type === "hidden" && place.plugin.toLowerCase() !== only
+      ? { type: "mixed", open: 0 }
+      : { type: "hidden", plugin };
+  }
+  if (parts.every((part) => decisions.shownAgain(part))) {
+    return { type: "kept" };
+  }
+  return place.type === "mixed" ? { type: "open" } : place;
 }
 
 /** A part of a place as the review lists it. */
@@ -564,7 +611,8 @@ export interface LeftoverPlace<P extends PlacePart> {
   /**
    * Where the place is a passage (ADR 0072): its sections, each with its
    * spots and each side's parts. A section without spots counts as given
-   * up with its side.
+   * up with its side, unless its own choices keep both there
+   * ({@link decidedOfParts}).
    */
   sections?: readonly {
     spots: readonly { spot: MapSpot; finding: string }[];
@@ -617,8 +665,17 @@ export function leftoversOf<P extends PlacePart>(
       }
     }
     for (const section of place.sections ?? []) {
-      const given =
-        section.spots.length === 0 || givenUp(decidedOf([...section.spots], then.choices));
+      // A section without spots goes with the place, unless its own
+      // choices say otherwise (both kept there, say).
+      const given = givenUp(
+        section.spots.length === 0
+          ? decidedOfParts(
+              then,
+              [...section.parts[0], ...section.parts[1]].map((part) => part.id),
+              { type: "hidden", plugin: loser },
+            )
+          : decidedOf([...section.spots], then.choices),
+      );
       for (const part of given ? section.parts[side] : []) {
         if (!hidden.has(matchKey(part.id))) {
           found.set(matchKey(part.id), part);

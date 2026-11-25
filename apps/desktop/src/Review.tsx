@@ -14,7 +14,7 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { useCollisionStepTexts } from "./collision-step-texts";
-import { keepSide, leftoversOf, mergeDoors } from "./decisions";
+import { decidedOfParts, keepSide, leftoversOf, mergeDoors } from "./decisions";
 import { DoorPanel } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
@@ -412,6 +412,14 @@ export function CollisionsStep({
   const [sectionChoices, setSectionChoices] = useState<number | null>(null);
   // What the last click in the views did.
   const [note, setNote] = useState<string | null>(null);
+  // What the last decision of a section did, in one line under it, with
+  // the parts of the side given up it could not hide on its own.
+  const [sectionNote, setSectionNote] = useState<{
+    index: number;
+    text: string;
+    stays: Part[];
+    loser: string;
+  } | null>(null);
   // Parts shown in the views with the rest dimmed (ADR 0080): what a
   // button names, such as the parts a choice hides.
   const [shownApart, setShownApart] = useState<{
@@ -440,6 +448,7 @@ export function CollisionsStep({
   useEffect(() => {
     setSegments([]);
     setSectionChoices(null);
+    setSectionNote(null);
     setNote(null);
     setShownApart(null);
     setPointed(null);
@@ -512,6 +521,7 @@ export function CollisionsStep({
         if (previous !== undefined) {
           setHistory(history.slice(0, -1));
           setPatchChoices(previous);
+          setSectionNote(null);
         }
       }}
     />
@@ -686,28 +696,46 @@ export function CollisionsStep({
   const keep = (side: 0 | 1, chosen: StageSegment[], moveOn: boolean, anyway = false) => {
     const effect = effectOf(side, chosen);
     const gone = anyway ? [...effect.go, ...effect.careful, ...effect.walked] : effect.go;
+    const stays = anyway ? effect.locked : [...effect.careful, ...effect.walked, ...effect.locked];
     // Every spot of the segments is decided, also where the losing side's
     // parts there are the game's own and stay.
-    apply(
-      shared.keepSide({
-        kept: partsOf(chosen, side).map((part) => part.id),
-        gone: gone.map((part) => part.id),
-        spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
-        loser: sides[side === 0 ? 1 : 0],
-      }),
-      moveOn,
+    const next = shared.keepSide({
+      kept: partsOf(chosen, side).map((part) => part.id),
+      gone: gone.map((part) => part.id),
+      spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
+      loser: sides[side === 0 ? 1 : 0],
+      stays: stays.map((part) => part.id),
+    });
+    apply(next, moveOn);
+    return next;
+  };
+  const keepBoth = (chosen: StageSegment[], moveOn: boolean) => {
+    const next = shared.keepSide({
+      kept: [...partsOf(chosen, 0), ...partsOf(chosen, 1)].map((part) => part.id),
+      gone: [],
+      spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
+      loser: null,
+    });
+    apply(next, moveOn);
+    return next;
+  };
+  /**
+   * What is decided for a section: by its spots; a section without any
+   * (a passage's other parts) by its parts' own choices, else as the
+   * whole place (ADR 0081).
+   */
+  const sectionDecided = (segment: StageSegment, choices: PatchChoices) => {
+    const here = spotsOf(segment);
+    if (here.length > 0) {
+      return decidedOf(here, choices);
+    }
+    const then = shared.whatIf(choices);
+    return decidedOfParts(
+      then,
+      [...partsOf([segment], 0), ...partsOf([segment], 1)].map((part) => part.id),
+      decidedOf(cluster.spots, choices, cluster.passage?.passage),
     );
   };
-  const keepBoth = (chosen: StageSegment[], moveOn: boolean) =>
-    apply(
-      shared.keepSide({
-        kept: [...partsOf(chosen, 0), ...partsOf(chosen, 1)].map((part) => part.id),
-        gone: [],
-        spots: chosen.flatMap((segment) => spotsOf(segment).map(({ key }) => key)),
-        loser: null,
-      }),
-      moveOn,
-    );
   const placeKept = keptSideOf(placeDecided);
   // The suggested side of this place, by size (ADR 0050): from the stage's
   // segments, else from the check of every place.
@@ -947,6 +975,7 @@ export function CollisionsStep({
     const isHidden = (part: Part) => hidden.has(objectKey(part.id.plugin, part.id.localId));
     const all = [...partsOf([segment], 0), ...partsOf([segment], 1)];
     let exceptions = 0;
+    let stays = 0;
     if (decided.type === "hidden") {
       const loser = decided.plugin.toLowerCase();
       exceptions = all.filter((part) =>
@@ -954,15 +983,25 @@ export function CollisionsStep({
           ? !isHidden(part) && fateOf(part) === "go"
           : isHidden(part),
       ).length;
+      stays = all.filter((part) => {
+        const fate = fateOf(part);
+        return (
+          part.id.plugin.toLowerCase() === loser &&
+          !isHidden(part) &&
+          (fate === "careful" || fate === "walked")
+        );
+      }).length;
     } else if (decided.type === "kept") {
       exceptions = all.filter(isHidden).length;
     } else if (decided.type === "open") {
       const single = all.filter(isHidden).length;
       return single > 0 ? `${r.stateOpen} · ${r.singlyHidden(single)}` : r.stateOpen;
     }
-    return exceptions > 0
-      ? `${describe(decided)} ${r.withExceptions(exceptions)}`
-      : describe(decided);
+    const said =
+      exceptions > 0 ? `${describe(decided)} ${r.withExceptions(exceptions)}` : describe(decided);
+    return decided.type === "hidden" && stays > 0
+      ? `${said} · ${c.sectionStays(stays, short(decided.plugin))}`
+      : said;
   };
   const asked = anchors !== null && anchors.key === askingKey && walked !== null;
   const effects = [effectOf(0, shownSegments), effectOf(1, shownSegments)] as const;
@@ -1339,7 +1378,7 @@ export function CollisionsStep({
         <ol>
           {shownSegments.map((segment, index) => {
             const here = spotsOf(segment);
-            const decided = decidedOf(here, patchChoices);
+            const decided = sectionDecided(segment, patchChoices);
             const kept = keptSideOf(decided);
             const counts = [segment.parts[0].length, segment.parts[1].length] as const;
             const kinds = new Set(here.map(({ item }) => item.kind));
@@ -1383,8 +1422,33 @@ export function CollisionsStep({
                   ? "both"
                   : null;
             const offered: (0 | 1 | "both")[] = recommended === null ? [0, 1] : [recommended];
-            const choose = (choice: 0 | 1 | "both") =>
-              choice === "both" ? keepBoth([segment], false) : keep(choice, [segment], false);
+            // Every choice is recorded and said in one line under the
+            // section, with what of the side given up stays and why.
+            const choose = (choice: 0 | 1 | "both") => {
+              setSectionChoices(null);
+              if (choice === "both") {
+                keepBoth([segment], false);
+                setSectionNote({ index, text: c.sectionBoth(index + 1), stays: [], loser: "" });
+                return;
+              }
+              const effect = effectOf(choice, [segment]);
+              const loser = names[choice === 0 ? 1 : 0];
+              const next = keep(choice, [segment], false);
+              // What stays once decided: a spot's decision hides tied parts at it too.
+              const then = shared.whatIf(next).hiddenKeys;
+              const stays = [...effect.careful, ...effect.walked].filter(
+                (part) => !then.has(keyOfPart(part)),
+              );
+              setSectionNote({
+                index,
+                text:
+                  sectionDecided(segment, next).type === "open"
+                    ? c.sectionOpen(index + 1, loser)
+                    : c.sectionKept(index + 1, names[choice]),
+                stays,
+                loser,
+              });
+            };
             const label = (choice: 0 | 1 | "both") =>
               choice === "both" ? r.keepBothHere : r.keepHere(names[choice]);
             const others = ([0, 1, "both"] as const).filter(
@@ -1485,6 +1549,36 @@ export function CollisionsStep({
                       </>
                     )}
                   </div>
+                  {sectionNote?.index === index && (
+                    <Note
+                      role="status"
+                      compact
+                      className="review-section-note"
+                      actions={
+                        <>
+                          {sectionNote.stays.length > 0 && (
+                            <button
+                              type="button"
+                              className="small"
+                              onClick={() => {
+                                apply(shared.hide(sectionNote.stays.map((part) => part.id)), false);
+                                setSectionNote({ ...sectionNote, stays: [] });
+                              }}
+                            >
+                              {r.hideAnyway(sectionNote.loser, sectionNote.stays.length)}
+                            </button>
+                          )}
+                          {undo}
+                        </>
+                      }
+                    >
+                      <p>
+                        {sectionNote.text}
+                        {sectionNote.stays.length > 0 &&
+                          ` ${c.sectionStaysWhy(sectionNote.stays.length, sectionNote.loser)}`}
+                      </p>
+                    </Note>
+                  )}
                   {parts.length > 0 && (
                     <details className="review-section-parts">
                       <summary className="more">{c.sectionParts(parts.length)}</summary>
