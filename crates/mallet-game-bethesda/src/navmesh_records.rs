@@ -682,10 +682,10 @@ pub(crate) mod tests {
         let (_directory, plugins) = setup();
         let near = read_plugins(&plugins, &around());
         let before = near.navmeshes.iter().find(|shape| shape.used).unwrap();
-        assert_eq!(before.doors, vec![(1, id("docks.esp", 0x900))]);
+        assert_eq!(before.doors, vec![(1, RecordId::new("docks.esp", 0x900))]);
         // The docks' door is hidden; Town.esp's door stays in its place.
         let mut after = before.clone();
-        after.doors = vec![(1, id("town.esp", 0x800))];
+        after.doors = vec![(1, RecordId::new("town.esp", 0x800))];
         let empty = BTreeSet::new();
         let records = repaired_records(
             &plugins,
@@ -703,8 +703,8 @@ pub(crate) mod tests {
             record.relinked,
             vec![Relink {
                 triangle: 1,
-                from: id("docks.esp", 0x900),
-                to: id("town.esp", 0x800),
+                from: RecordId::new("docks.esp", 0x900),
+                to: RecordId::new("town.esp", 0x800),
             }]
         );
         // Nothing else of the field changes.
@@ -750,11 +750,11 @@ pub(crate) mod tests {
     #[test]
     fn a_triangle_that_names_both_stacked_doors_names_the_kept_one_once() {
         let shape = |doors: Vec<(u32, RecordId)>| NavmeshShape {
-            id: id("skyrim.esm", 0x210),
+            id: RecordId::new("skyrim.esm", 0x210),
             plugin: "Docks.esp".to_owned(),
             used: true,
             place: Place::Exterior {
-                worldspace: id("skyrim.esm", 0x3C),
+                worldspace: RecordId::new("skyrim.esm", 0x3C),
             },
             place_name: None,
             vertices: Vec::new(),
@@ -763,9 +763,9 @@ pub(crate) mod tests {
             doors,
         };
         let (hidden, kept, other) = (
-            id("docks.esp", 0x900),
-            id("town.esp", 0x800),
-            id("docks.esp", 0x901),
+            RecordId::new("docks.esp", 0x900),
+            RecordId::new("town.esp", 0x800),
+            RecordId::new("docks.esp", 0x901),
         );
         let before = shape(vec![
             (1, hidden.clone()),
@@ -806,13 +806,13 @@ pub(crate) mod tests {
             },
         ];
         let record = NavmeshRecord {
-            navmesh: id("skyrim.esm", 0x210),
+            navmesh: RecordId::new("skyrim.esm", 0x210),
             plugin: "Docks.esp".to_owned(),
             masters: vec!["Skyrim.esm".to_owned(), "Town.esp".to_owned()],
             flags: 0,
             form_version: 44,
             place: before.place.clone(),
-            cell: id("skyrim.esm", 0x200),
+            cell: RecordId::new("skyrim.esm", 0x200),
             grid: Some((5, 3)),
             fields: vec![Subrecord {
                 signature: *b"NVNM",
