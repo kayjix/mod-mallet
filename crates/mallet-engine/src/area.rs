@@ -35,8 +35,7 @@ static LAND_TEXTURES: Mutex<Option<(String, Arc<LandTextures>)>> = Mutex::new(No
 
 /// A key for the setup `options` describe.
 pub(crate) fn setup_key(options: &ScanOptions) -> Option<String> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     Some(format!("{}|{}", game.id(), game_dir.display()))
 }
 
@@ -48,8 +47,7 @@ pub(crate) fn reader(options: &ScanOptions) -> Option<Arc<Mutex<AreaReader>>> {
     {
         return Some(Arc::clone(reader));
     }
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let reader = Arc::new(Mutex::new(AreaReader::open(
         game,
         &game_dir,
@@ -67,8 +65,7 @@ pub(crate) fn library(options: &ScanOptions) -> Option<Arc<LodLibrary>> {
     {
         return Some(Arc::clone(library));
     }
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let started = std::time::Instant::now();
     let library = Arc::new(LodLibrary::with_prefixes(
         game,
@@ -228,8 +225,7 @@ fn drawable(
 /// The bytes of a file of the setup as the game uses it.
 fn file(options: &ScanOptions, path: &str) -> Option<Vec<u8>> {
     library(options)?.read(path).or_else(|| {
-        let game = options.game().ok()?;
-        let (game_dir, _) = options.located_game_dir()?;
+        let (game, game_dir) = options.known_game()?;
         files::versions(game, &game_dir, options.local_dir.as_deref(), path)
             .pop()
             .map(|version| version.bytes)
@@ -362,8 +358,7 @@ fn land_textures(options: &ScanOptions) -> Option<Arc<LandTextures>> {
     {
         return Some(Arc::clone(textures));
     }
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let started = std::time::Instant::now();
     let textures = Arc::new(LandTextures::open(
         game,

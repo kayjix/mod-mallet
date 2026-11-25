@@ -159,6 +159,16 @@ impl ScanOptions {
         let (dir, origin) = locate::game_dir(game)?;
         Some((locate::data_root(game, &dir), origin))
     }
+
+    /// The game these options are about and its directory, as
+    /// [`ScanOptions::located_game_dir`] finds it; `None` for an unknown
+    /// game or one that is not found. What the looks at single places
+    /// start from.
+    pub(crate) fn known_game(&self) -> Option<(Game, PathBuf)> {
+        let game = self.game().ok()?;
+        let (game_dir, _) = self.located_game_dir()?;
+        Some((game, game_dir))
+    }
 }
 
 /// Why a scan could not be completed.

@@ -15,8 +15,7 @@ use crate::ScanOptions;
 static READER: Mutex<Option<(String, Arc<Mutex<AnchorReader>>)>> = Mutex::new(None);
 
 fn reader(options: &ScanOptions) -> Option<Arc<Mutex<AnchorReader>>> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let key = format!("{}|{}", game.id(), game_dir.display());
     let mut kept = READER.lock().ok()?;
     if let Some((known, reader)) = kept.as_ref()

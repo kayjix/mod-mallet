@@ -46,8 +46,7 @@ struct Sources {
 static KEPT: Mutex<Option<Arc<Sources>>> = Mutex::new(None);
 
 fn sources(options: &ScanOptions) -> Option<Arc<Sources>> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let key = format!(
         "{}|{}|{}",
         game.id(),

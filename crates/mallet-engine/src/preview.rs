@@ -16,8 +16,7 @@ const MAX_SIDE: u32 = 256;
 /// setup has, as pictures where the file is a texture that can be shown;
 /// the version the game uses comes last. Only reads.
 pub fn file_preview(options: &ScanOptions, path: &str) -> Option<FilePreview> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let found = files::versions(game, &game_dir, options.local_dir.as_deref(), path);
     let mods = deployment(options, &game_dir);
     let inside = |name: &str| GamePath::new(&format!("data/{name}"));

@@ -18,8 +18,7 @@ static KEPT: Mutex<Option<(String, Arc<Catalogue>)>> = Mutex::new(None);
 /// `lang` (`en`, `de`) where the game has them, and the mod that brings
 /// each plugin. `None` if the setup cannot be read.
 pub fn catalogue(options: &ScanOptions, lang: &str) -> Option<Arc<Catalogue>> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let key = format!(
         "{}|{}|{lang}|{}",
         game.id(),

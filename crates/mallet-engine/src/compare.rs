@@ -42,8 +42,7 @@ pub fn compare_files(
     paths: &[String],
     mods: &[String],
 ) -> Option<Vec<FileComparison>> {
-    let game = options.game().ok()?;
-    let (game_dir, _) = options.located_game_dir()?;
+    let (game, game_dir) = options.known_game()?;
     let data_dir = game_dir.join("Data");
     let paths: Vec<&str> = paths.iter().take(MAX_FILES).map(String::as_str).collect();
     let found = files::versions_of_each(game, &game_dir, options.local_dir.as_deref(), &paths);
