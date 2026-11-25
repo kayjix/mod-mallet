@@ -1031,13 +1031,6 @@ mod tests {
 
     const MASTER: &str = "Skyrim.esm";
 
-    fn grid(x: i32, y: i32) -> Vec<u8> {
-        let mut data = x.to_le_bytes().to_vec();
-        data.extend(y.to_le_bytes());
-        data.extend(0u32.to_le_bytes());
-        data
-    }
-
     fn ids(values: &[u32]) -> Vec<u8> {
         values
             .iter()
@@ -1061,7 +1054,7 @@ mod tests {
             })
             .with(*b"OFST", vec![1, 2, 3, 4]);
         let cell = RecordSpec::new(*b"CELL", 0x9001)
-            .with(*b"XCLC", grid(0, 0))
+            .with(*b"XCLC", fixture::cell_grid(0, 0))
             .with(*b"XCLR", ids(&[0x0000_0B01, 0x0000_0B02]));
         let room = RecordSpec::new(*b"CELL", 0x5555).with(*b"EDID", fixture::zstring("Room"));
         fixture::plugin_with_raw_groups(
@@ -1108,7 +1101,7 @@ mod tests {
     /// keyword of the master and to an object of its own.
     fn town() -> Vec<u8> {
         let world = RecordSpec::new(*b"WRLD", 0x3C).with(*b"EDID", fixture::zstring("Tamriel"));
-        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", grid(0, 0));
+        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", fixture::cell_grid(0, 0));
         let changed = fixture::reference(
             0x0000_0812,
             0x0100_0900,
@@ -1130,16 +1123,7 @@ mod tests {
     }
 
     fn setup(plugins: &[(&str, Vec<u8>)]) -> (tempfile::TempDir, Vec<(String, PathBuf)>) {
-        let dir = tempfile::tempdir().unwrap();
-        let list = plugins
-            .iter()
-            .map(|(name, bytes)| {
-                let path = dir.path().join(name);
-                std::fs::write(&path, bytes).unwrap();
-                ((*name).to_owned(), path)
-            })
-            .collect();
-        (dir, list)
+        crate::test_support::plugin_files(plugins)
     }
 
     fn movement(
@@ -1184,7 +1168,7 @@ mod tests {
         // The game's door in the room leads to its door outside (0x812);
         // a mod's door outside (0x800) is kept instead.
         let world = RecordSpec::new(*b"WRLD", 0x3C).with(*b"EDID", fixture::zstring("Tamriel"));
-        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", grid(0, 0));
+        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", fixture::cell_grid(0, 0));
         let room = RecordSpec::new(*b"CELL", 0x5555).with(*b"EDID", fixture::zstring("Room"));
         let mut xtel = ids(&[0x0000_0812]);
         for value in [100.0f32, 150.0, 0.0, 0.0, 0.0, 1.0] {
@@ -1381,7 +1365,7 @@ mod tests {
     #[test]
     fn unknown_fields_missing_objects_and_other_games_are_refused() {
         let world = RecordSpec::new(*b"WRLD", 0x3C);
-        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", grid(0, 0));
+        let cell = RecordSpec::new(*b"CELL", 0x9001).with(*b"XCLC", fixture::cell_grid(0, 0));
         let odd = fixture::reference(0x812, 0x10, [100.0, 200.0, 0.0], [0.0; 3], None)
             .with(*b"XCVL", vec![0; 12]);
         let plugin = fixture::plugin_with_raw_groups(

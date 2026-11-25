@@ -128,13 +128,6 @@ mod tests {
         .unwrap()
     }
 
-    fn grid(x: i32, y: i32) -> Vec<u8> {
-        let mut data = x.to_le_bytes().to_vec();
-        data.extend(y.to_le_bytes());
-        data.extend(0u32.to_le_bytes());
-        data
-    }
-
     /// The geometry of a Skyrim navigation mesh with one triangle, through
     /// whose door characters reach `door`.
     fn geometry(door: u32) -> Vec<u8> {
@@ -158,7 +151,8 @@ mod tests {
         let inn = RecordSpec::new(*b"CELL", 0x0000_0100).with(*b"EDID", fixture::zstring("Inn"));
         let world =
             RecordSpec::new(*b"WRLD", 0x0000_003C).with(*b"EDID", fixture::zstring("Tamriel"));
-        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, -3));
+        let field =
+            RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", fixture::cell_grid(5, -3));
         fixture::plugin_with_raw_groups(
             &["Skyrim.esm"],
             0,

@@ -383,9 +383,6 @@ fn as_f32(value: i32) -> f32 {
 #[cfg(test)]
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) mod tests {
-    use std::fs::File;
-    use std::io::Write;
-
     use mallet_formats_bethesda::fixture::{self, RecordSpec};
     use mallet_formats_bethesda::navmesh_write::{DoorTriangle, Grid, SKYRIM_VERSION};
     use proptest::prelude::*;
@@ -444,26 +441,13 @@ pub(crate) mod tests {
         }
     }
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_owned(),
-            local_id,
-        }
-    }
-
-    fn grid(x: i32, y: i32) -> Vec<u8> {
-        let mut data = x.to_le_bytes().to_vec();
-        data.extend(y.to_le_bytes());
-        data.extend(0u32.to_le_bytes());
-        data
-    }
-
     /// The game and `Docks.esp`, which changes the game's mesh 0x210 in
     /// cell 5,3 of Tamriel; written into a folder.
     pub(crate) fn setup() -> (tempfile::TempDir, Vec<(String, PathBuf)>) {
         let world =
             RecordSpec::new(*b"WRLD", 0x0000_003C).with(*b"EDID", fixture::zstring("Tamriel"));
-        let cell = || RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
+        let cell =
+            || RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", fixture::cell_grid(5, 3));
         let mesh = |data: Vec<u8>| {
             RecordSpec::new(*b"NAVM", 0x0000_0210)
                 .with(*b"NVNM", data)
@@ -490,14 +474,7 @@ pub(crate) mod tests {
                 &[(cell(), vec![mesh(docks().write().unwrap())])],
             )],
         );
-        let directory = tempfile::tempdir().unwrap();
-        let mut plugins = Vec::new();
-        for (name, data) in [("Skyrim.esm", game), ("Docks.esp", docks)] {
-            let path = directory.path().join(name);
-            File::create(&path).unwrap().write_all(&data).unwrap();
-            plugins.push((name.to_owned(), path));
-        }
-        (directory, plugins)
+        crate::test_support::plugin_files(&[("Skyrim.esm", game), ("Docks.esp", docks)])
     }
 
     pub(crate) fn around() -> Around {
@@ -530,7 +507,7 @@ pub(crate) mod tests {
         after.edges.push([
             Beyond::Triangle(0),
             Beyond::Link {
-                navmesh: id("skyrim.esm", 0xBBB),
+                navmesh: RecordId::new("skyrim.esm", 0xBBB),
                 triangle: 9,
             },
             Beyond::Nothing,
@@ -549,15 +526,15 @@ pub(crate) mod tests {
         );
         assert_eq!(records.len(), 1);
         let record = &records[0];
-        assert_eq!(record.navmesh, id("skyrim.esm", 0x210));
+        assert_eq!(record.navmesh, RecordId::new("skyrim.esm", 0x210));
         assert_eq!(record.plugin, "Docks.esp");
         assert_eq!(record.masters, vec!["Skyrim.esm".to_owned()]);
-        assert_eq!(record.cell, id("skyrim.esm", 0x200));
+        assert_eq!(record.cell, RecordId::new("skyrim.esm", 0x200));
         assert_eq!(record.grid, Some((5, 3)));
         assert_eq!(
             record.place,
             Place::Exterior {
-                worldspace: id("skyrim.esm", 0x3C)
+                worldspace: RecordId::new("skyrim.esm", 0x3C)
             }
         );
         assert_ne!(record.flags & 0x0004_0000, 0);
@@ -639,15 +616,15 @@ pub(crate) mod tests {
     fn form_ids_name_the_plugin_by_its_place_among_the_masters() {
         let masters = ["Skyrim.esm".to_owned(), "Docks.esp".to_owned()];
         assert_eq!(
-            form_id_in(&id("docks.esp", 0x900), &masters, "Patch.esp"),
+            form_id_in(&RecordId::new("docks.esp", 0x900), &masters, "Patch.esp"),
             Some(0x0100_0900)
         );
         assert_eq!(
-            form_id_in(&id("patch.esp", 0x800), &masters, "Patch.esp"),
+            form_id_in(&RecordId::new("patch.esp", 0x800), &masters, "Patch.esp"),
             Some(0x0200_0800)
         );
         assert_eq!(
-            form_id_in(&id("other.esp", 0x800), &masters, "Patch.esp"),
+            form_id_in(&RecordId::new("other.esp", 0x800), &masters, "Patch.esp"),
             None
         );
     }
@@ -663,10 +640,10 @@ pub(crate) mod tests {
             let written = data.write().unwrap();
             let geometry = mallet_formats_bethesda::navmesh::geometry(&written).unwrap();
             let before = NavmeshShape {
-                id: id("skyrim.esm", 0x210),
+                id: RecordId::new("skyrim.esm", 0x210),
                 plugin: "Docks.esp".to_owned(),
                 used: true,
-                place: Place::Exterior { worldspace: id("skyrim.esm", 0x3C) },
+                place: Place::Exterior { worldspace: RecordId::new("skyrim.esm", 0x3C) },
                 place_name: None,
                 vertices: geometry.vertices.iter().map(|v| v.map(|value| value.round() as i32)).collect(),
                 triangles: geometry.triangles.iter().map(|t| t.map(u32::from)).collect(),

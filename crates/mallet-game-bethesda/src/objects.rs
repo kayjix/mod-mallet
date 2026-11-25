@@ -485,13 +485,6 @@ mod tests {
         collector
     }
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_owned(),
-            local_id,
-        }
-    }
-
     #[test]
     fn placed_objects_are_read_with_their_place_and_base() {
         let facts = setup().finish();
@@ -499,13 +492,13 @@ mod tests {
         let [room, outside] = facts.placed.as_slice() else {
             panic!("expected two objects, got {:?}", facts.placed);
         };
-        assert_eq!(room.id, id("village.esp", 0x20));
+        assert_eq!(room.id, RecordId::new("village.esp", 0x20));
         assert_eq!(room.plugin, "Village.esp");
-        assert_eq!(room.base, id("skyrim.esm", 0x01_0001));
+        assert_eq!(room.base, RecordId::new("skyrim.esm", 0x01_0001));
         assert_eq!(
             room.place,
             Place::Interior {
-                cell: id("village.esp", 0x10)
+                cell: RecordId::new("village.esp", 0x10)
             }
         );
         assert_eq!(room.position, [10, 21, -5]);
@@ -514,7 +507,7 @@ mod tests {
         assert_eq!(
             outside.place,
             Place::Exterior {
-                worldspace: id("skyrim.esm", 0x3C)
+                worldspace: RecordId::new("skyrim.esm", 0x3C)
             }
         );
         assert_eq!(outside.position, [4096, -8192, 100]);
@@ -611,7 +604,7 @@ mod tests {
         let [object] = placed.as_slice() else {
             panic!("expected one object, got {placed:?}");
         };
-        assert_eq!(object.id, id("skyrim.esm", 0x20));
+        assert_eq!(object.id, RecordId::new("skyrim.esm", 0x20));
         assert_eq!(object.position, [500; 3]);
         let moved = object.moved.as_ref().unwrap();
         assert_eq!(moved.by, "mover.esp");
@@ -643,11 +636,11 @@ mod tests {
     #[test]
     fn a_full_turn_is_no_turn() {
         let object = |rotation| PlacedObject {
-            id: id("skyrim.esm", 1),
+            id: RecordId::new("skyrim.esm", 1),
             plugin: "Skyrim.esm".to_owned(),
-            base: id("skyrim.esm", HOUSE),
+            base: RecordId::new("skyrim.esm", HOUSE),
             place: Place::Interior {
-                cell: id("skyrim.esm", 0x10),
+                cell: RecordId::new("skyrim.esm", 0x10),
             },
             position: [0; 3],
             rotation,
@@ -711,7 +704,10 @@ mod tests {
             subrecords: Vec::new(),
             groups: Vec::new(),
         };
-        assert_eq!(placed("A.esp", &[], &record, id("a.esp", 1)), None);
+        assert_eq!(
+            placed("A.esp", &[], &record, RecordId::new("a.esp", 1)),
+            None
+        );
         assert_eq!(whole(f32::NAN), None);
         assert_eq!(whole(1.0e9), None);
         assert_eq!(whole(-2.5), Some(-3));
@@ -739,7 +735,7 @@ mod tests {
                 ],
                 groups: Vec::new(),
             };
-            let _ = placed("A.esp", &[], &record, id("a.esp", 1));
+            let _ = placed("A.esp", &[], &record, RecordId::new("a.esp", 1));
             let _ = bounds(&obnd);
             let _ = large_references(&obnd);
         }

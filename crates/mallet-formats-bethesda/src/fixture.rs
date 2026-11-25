@@ -17,6 +17,15 @@ use crate::plugin::Signature;
 
 const FLAG_COMPRESSED: u32 = 0x0004_0000;
 
+/// The grid position field (`XCLC`) of an outside cell in column `x` and
+/// row `y`.
+pub fn cell_grid(x: i32, y: i32) -> Vec<u8> {
+    let mut data = x.to_le_bytes().to_vec();
+    data.extend(y.to_le_bytes());
+    data.extend(0u32.to_le_bytes());
+    data
+}
+
 /// A record to be written by [`plugin`] or [`record`].
 #[derive(Debug, Clone)]
 pub struct RecordSpec {

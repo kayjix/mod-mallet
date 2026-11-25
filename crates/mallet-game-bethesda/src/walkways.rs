@@ -465,13 +465,6 @@ mod tests {
         data
     }
 
-    fn grid(x: i32, y: i32) -> Vec<u8> {
-        let mut data = x.to_le_bytes().to_vec();
-        data.extend(y.to_le_bytes());
-        data.extend(0u32.to_le_bytes());
-        data
-    }
-
     fn heights(offset: f32) -> Vec<u8> {
         let mut data = offset.to_le_bytes().to_vec();
         data.extend(vec![0u8; 33 * 33]);
@@ -487,8 +480,8 @@ mod tests {
     /// one inside the inn.
     fn game() -> Vec<u8> {
         let inn = RecordSpec::new(*b"CELL", 0x0000_0100).with(*b"EDID", fixture::zstring("Inn"));
-        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
-        let far = RecordSpec::new(*b"CELL", 0x0000_0300).with(*b"XCLC", grid(40, 40));
+        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", fixture::cell_grid(5, 3));
+        let far = RecordSpec::new(*b"CELL", 0x0000_0300).with(*b"XCLC", fixture::cell_grid(40, 40));
         fixture::plugin_with_raw_groups(
             &[],
             0,
@@ -521,7 +514,7 @@ mod tests {
 
     /// A mod that changes the outside mesh of the game.
     fn a_mod() -> Vec<u8> {
-        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
+        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", fixture::cell_grid(5, 3));
         fixture::plugin_with_raw_groups(
             &["Skyrim.esm"],
             0,
@@ -540,33 +533,19 @@ mod tests {
     }
 
     fn setup() -> (tempfile::TempDir, Vec<(String, PathBuf)>) {
-        let directory = tempfile::tempdir().unwrap();
-        let mut plugins = Vec::new();
-        for (name, data) in [("Skyrim.esm", game()), ("Docks.esp", a_mod())] {
-            let path = directory.path().join(name);
-            File::create(&path).unwrap().write_all(&data).unwrap();
-            plugins.push((name.to_owned(), path));
-        }
-        (directory, plugins)
+        crate::test_support::plugin_files(&[("Skyrim.esm", game()), ("Docks.esp", a_mod())])
     }
 
     /// A version as compared: the mesh, the plugin of the version, whether
     /// it is used, where it lies and the height of its first corner.
     type Version<'a> = (&'a str, u32, &'a str, bool, Option<&'a str>, i32);
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_owned(),
-            local_id,
-        }
-    }
-
     #[test]
     fn every_version_of_the_meshes_in_the_chosen_cells_is_read() {
         let (_directory, plugins) = setup();
         let around = Around {
             worlds: BTreeMap::from([("tamriel".to_owned(), BTreeSet::from([(5, 3)]))]),
-            interiors: BTreeSet::from([id("skyrim.esm", 0x100)]),
+            interiors: BTreeSet::from([RecordId::new("skyrim.esm", 0x100)]),
         };
         let near = read_plugins(&plugins, &around);
 
@@ -610,7 +589,7 @@ mod tests {
         assert_eq!(
             near.navmeshes[0].place,
             Place::Exterior {
-                worldspace: id("skyrim.esm", 0x3C)
+                worldspace: RecordId::new("skyrim.esm", 0x3C)
             }
         );
         // The ground: 8 units per step of the heights' offset.
@@ -631,7 +610,7 @@ mod tests {
             &[fixture::record(&door), fixture::record(&bed)].concat(),
         );
         let inn = RecordSpec::new(*b"CELL", 0x0000_0100).with(*b"EDID", fixture::zstring("Inn"));
-        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", grid(5, 3));
+        let field = RecordSpec::new(*b"CELL", 0x0000_0200).with(*b"XCLC", fixture::cell_grid(5, 3));
         let mut xtel = 0x0000_0211u32.to_le_bytes().to_vec();
         xtel.extend([0; 28]);
         let inner_door = fixture::reference(0x0000_0111, 0x50, [1.0, 2.0, 3.0], [0.0; 3], None)
@@ -661,7 +640,7 @@ mod tests {
         File::create(&path).unwrap().write_all(&game).unwrap();
         let around = Around {
             worlds: BTreeMap::from([("Tamriel".to_owned(), BTreeSet::from([(5, 3)]))]),
-            interiors: BTreeSet::from([id("skyrim.esm", 0x100)]),
+            interiors: BTreeSet::from([RecordId::new("skyrim.esm", 0x100)]),
         };
         let (_, found) =
             read_plugins_with_destinations(&[("Skyrim.esm".to_owned(), path)], &around);
@@ -675,19 +654,19 @@ mod tests {
                 (
                     0x111,
                     mallet_core::reach::DestinationKind::Door,
-                    Some(id("skyrim.esm", 0x211))
+                    Some(RecordId::new("skyrim.esm", 0x211))
                 ),
                 (
                     0x211,
                     mallet_core::reach::DestinationKind::Door,
-                    Some(id("skyrim.esm", 0x111))
+                    Some(RecordId::new("skyrim.esm", 0x111))
                 ),
             ]
         );
         assert_eq!(
             found.first().map(|found| found.place.clone()),
             Some(Place::Interior {
-                cell: id("skyrim.esm", 0x100)
+                cell: RecordId::new("skyrim.esm", 0x100)
             })
         );
     }
@@ -699,7 +678,7 @@ mod tests {
         let world = world().with(*b"DNAM", world_heights);
         let cell = |form_id: u32, x: i32, own: Option<f32>| {
             let mut spec = RecordSpec::new(*b"CELL", form_id)
-                .with(*b"XCLC", grid(x, 3))
+                .with(*b"XCLC", fixture::cell_grid(x, 3))
                 .with(*b"DATA", vec![0x02, 0]);
             if let Some(height) = own {
                 spec = spec.with(*b"XCLW", height.to_le_bytes().to_vec());

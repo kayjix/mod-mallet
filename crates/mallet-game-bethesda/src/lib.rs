@@ -59,6 +59,8 @@ mod records;
 pub mod skse_log;
 pub mod swap;
 pub mod terrain;
+#[cfg(test)]
+mod test_support;
 pub mod tools;
 pub mod unreal;
 pub mod versions;

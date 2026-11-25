@@ -33,10 +33,7 @@ pub(crate) const MAX_COORDINATE: f32 = 1.0e7;
 /// lower case, and its number there.
 pub(crate) fn record_id(form_id: u32, masters: &[String], plugin_name: &str) -> RecordId {
     let (origin, local_id) = plugin::resolve_form_id(form_id, masters, plugin_name);
-    RecordId {
-        plugin: origin.to_lowercase(),
-        local_id,
-    }
+    RecordId::new(origin, local_id)
 }
 
 /// The internal name of a record (`EDID`), if it has a non-empty one.

@@ -167,28 +167,21 @@ mod tests {
 
     use super::*;
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_owned(),
-            local_id,
-        }
-    }
-
     #[test]
     fn cells_are_found_by_name_whatever_its_case() {
         let mut cells = HashMap::new();
         cells.insert(
-            id("skyrim.esm", 0x10),
+            RecordId::new("skyrim.esm", 0x10),
             (
                 Some("WhiterunBanneredMare".to_owned()),
                 vec![(0, 0x10), (3, 0x10)],
             ),
         );
-        cells.insert(id("skyrim.esm", 0x11), (None, vec![(0, 0x11)]));
+        cells.insert(RecordId::new("skyrim.esm", 0x11), (None, vec![(0, 0x11)]));
         let interiors = index_by_name(cells);
         assert_eq!(interiors.len(), 1);
         let found = interiors.get("whiterunbanneredmare").unwrap();
-        assert_eq!(found.cell, id("skyrim.esm", 0x10));
+        assert_eq!(found.cell, RecordId::new("skyrim.esm", 0x10));
         assert_eq!(found.versions, vec![(0, 0x10), (3, 0x10)]);
     }
 
@@ -196,15 +189,18 @@ mod tests {
     fn a_shared_name_stays_with_the_first_cell() {
         let mut cells = HashMap::new();
         cells.insert(
-            id("b.esp", 0x20),
+            RecordId::new("b.esp", 0x20),
             (Some("Cave".to_owned()), vec![(2, 0x0100_0020)]),
         );
         cells.insert(
-            id("a.esp", 0x20),
+            RecordId::new("a.esp", 0x20),
             (Some("cave".to_owned()), vec![(1, 0x0100_0020)]),
         );
         let interiors = index_by_name(cells);
-        assert_eq!(interiors.get("cave").unwrap().cell, id("a.esp", 0x20));
+        assert_eq!(
+            interiors.get("cave").unwrap().cell,
+            RecordId::new("a.esp", 0x20)
+        );
     }
 
     #[test]

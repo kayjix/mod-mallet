@@ -841,13 +841,6 @@ mod tests {
     const MAIN: &str = "Main.esm";
     const MOD: &str = "Mod.esp";
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_lowercase(),
-            local_id,
-        }
-    }
-
     fn placed(form_id: u32, base: u32, z: f32) -> RecordSpec {
         fixture::reference(form_id, base, [0.0, 0.0, z], [0.0; 3], None)
     }
@@ -959,11 +952,11 @@ mod tests {
         let found = reader.anchors(
             "tamriel",
             &[
-                id(MAIN, 0x800),
-                id(MAIN, 0x802),
-                id(MAIN, 0x803),
-                id(MAIN, 0x900),
-                id(MOD, 0x800),
+                RecordId::new(MAIN, 0x800),
+                RecordId::new(MAIN, 0x802),
+                RecordId::new(MAIN, 0x803),
+                RecordId::new(MAIN, 0x900),
+                RecordId::new(MOD, 0x800),
             ],
         );
         let [stone, lever, door, tower, well] = found.as_slice() else {

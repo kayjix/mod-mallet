@@ -690,13 +690,6 @@ mod tests {
         collector.finish()
     }
 
-    fn id(plugin: &str, local_id: u32) -> RecordId {
-        RecordId {
-            plugin: plugin.to_owned(),
-            local_id,
-        }
-    }
-
     #[test]
     fn the_doors_of_the_game_and_of_mods_are_kept_with_where_they_lead() {
         let facts = setup();
@@ -704,7 +697,7 @@ mod tests {
         let own = facts
             .doors
             .iter()
-            .find(|door| door.id == id("mod.esp", 0x800))
+            .find(|door| door.id == RecordId::new("mod.esp", 0x800))
             .unwrap();
         assert_eq!(own.plugin, "mod.esp");
         assert_eq!(own.position, [104, 6, 0]);
@@ -712,19 +705,19 @@ mod tests {
         assert!(own.visible);
         assert_eq!(own.bounds, Some([[-60, -10, 0], [60, 10, 200]]));
         let teleport = own.teleport.as_ref().unwrap();
-        assert_eq!(teleport.door, id("game.esm", 0xA01));
+        assert_eq!(teleport.door, RecordId::new("game.esm", 0xA01));
         assert_eq!(teleport.position, [0, 60, 0]);
         assert_eq!(teleport.rotation, [0, 0, 1500]);
         assert!(matches!(own.place, Place::Exterior { .. }));
         let inner = facts
             .doors
             .iter()
-            .find(|door| door.id == id("game.esm", 0xA01))
+            .find(|door| door.id == RecordId::new("game.esm", 0xA01))
             .unwrap();
         assert_eq!(
             inner.place,
             Place::Interior {
-                cell: id("game.esm", 0xE00)
+                cell: RecordId::new("game.esm", 0xE00)
             }
         );
     }
@@ -735,10 +728,10 @@ mod tests {
         assert_eq!(
             facts.links,
             vec![DoorLink {
-                navmesh: id("mod.esp", 0x801),
+                navmesh: RecordId::new("mod.esp", 0x801),
                 plugin: "mod.esp".to_owned(),
                 triangle: 0,
-                door: id("mod.esp", 0x800),
+                door: RecordId::new("mod.esp", 0x800),
             }]
         );
         assert!(
@@ -820,7 +813,7 @@ mod tests {
                 .first()
                 .and_then(|door| door.enable_parent.clone()),
             Some(EnableParent {
-                parent: id("game.esm", 0xB00),
+                parent: RecordId::new("game.esm", 0xB00),
                 opposite: true
             })
         );

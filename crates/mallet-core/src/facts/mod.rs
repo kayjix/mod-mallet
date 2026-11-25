@@ -161,6 +161,17 @@ pub struct RecordId {
     pub local_id: u32,
 }
 
+impl RecordId {
+    /// The record numbered `local_id` in the plugin `plugin`, whose name
+    /// is kept in lower case.
+    pub fn new(plugin: &str, local_id: u32) -> Self {
+        Self {
+            plugin: plugin.to_lowercase(),
+            local_id,
+        }
+    }
+}
+
 impl std::fmt::Display for RecordId {
     /// The plugin and the record's number in it, for example
     /// `skyrim.esm:013BA1`. Unlike a form ID as the game shows it, this does
