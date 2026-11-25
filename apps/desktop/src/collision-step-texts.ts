@@ -4,6 +4,9 @@
 
 import { useSession } from "./Actions";
 import type { Lang } from "./i18n";
+import type { WorkKind } from "./map-places";
+import type { PartKind } from "./part-groups";
+import type { PartNote } from "./part-list";
 
 export interface CollisionStepTexts {
   measure: (count: number) => string;
@@ -54,6 +57,30 @@ export interface CollisionStepTexts {
   gameOwn: string;
   hideOne: (name: string) => string;
   showOne: (name: string) => string;
+  partsCount: (count: number) => string;
+  hiddenCount: (count: number) => string;
+  kind: Record<PartKind, string>;
+  note: Record<PartNote, string>;
+  /** The sections of a place (ADR 0083). */
+  sectionsTitle: string;
+  sectionShow: string;
+  sectionShowTip: string;
+  sectionOnly: (mod: string, parts: number) => string;
+  sectionBigger: (
+    winner: string,
+    a: number,
+    roomA: string,
+    loser: string,
+    b: number,
+    roomB: string,
+  ) => string;
+  sectionAlike: (first: string, a: number, second: string, b: number) => string;
+  spotKind: Record<WorkKind, string>;
+  recommended: string;
+  recommendedTip: string;
+  otherChoices: string;
+  change: string;
+  sectionParts: (count: number) => string;
   /** What is left of the losing mod after a decision. */
   left: (count: number, mod: string) => string;
   leftKeepBoth: string;
@@ -118,6 +145,47 @@ const en: CollisionStepTexts = {
   gameOwn: "the game's own",
   hideOne: (name) => `Hide ${name}`,
   showOne: (name) => `Show ${name} again`,
+  partsCount: (count) => (count === 1 ? "1 part" : `${count} parts`),
+  hiddenCount: (count) => `${count} hidden`,
+  kind: {
+    building: "building",
+    furniture: "furniture",
+    clutter: "small things",
+    light: "light",
+    door: "door",
+    plant: "plant",
+    rock: "rock",
+    effect: "effect",
+    other: "",
+  },
+  note: {
+    rests: "rests on another",
+    tied: "tied in",
+    needed: "needed",
+    walked: "walked on",
+    game: "the game's own",
+  },
+  sectionsTitle: "Sections of this place",
+  sectionShow: "Show",
+  sectionShowTip: "Shows this section in the views, the rest dimmed",
+  sectionOnly: (mod, parts) =>
+    `only ${mod}: ${parts} ${parts === 1 ? "part" : "parts"} around the collisions`,
+  sectionBigger: (winner, a, roomA, loser, b, roomB) =>
+    `${winner} builds more here: ${a} ${a === 1 ? "part" : "parts"} (about ${roomA} m³) against ${b} of ${loser} (about ${roomB} m³)`,
+  sectionAlike: (first, a, second, b) =>
+    `both build here: ${first} ${a} ${a === 1 ? "part" : "parts"}, ${second} ${b}`,
+  spotKind: {
+    duplicate: "built twice",
+    door: "stacked doors",
+    overlap: "inside each other",
+    deep: "crossing",
+    touch: "touching",
+  },
+  recommended: "Recommended:",
+  recommendedTip: "The bigger version is kept, the other one's parts go. Other choices are below.",
+  otherChoices: "Other choices",
+  change: "Change",
+  sectionParts: (count) => `The ${count} parts`,
   left: (count, mod) =>
     count === 1
       ? `1 ${mod} part remains and still collides here`
@@ -195,6 +263,48 @@ const de: CollisionStepTexts = {
   gameOwn: "vom Spiel",
   hideOne: (name) => `${name} ausblenden`,
   showOne: (name) => `${name} wieder zeigen`,
+  partsCount: (count) => (count === 1 ? "1 Teil" : `${count} Teile`),
+  hiddenCount: (count) => `${count} ausgeblendet`,
+  kind: {
+    building: "Gebäude",
+    furniture: "Möbel",
+    clutter: "Kleinkram",
+    light: "Licht",
+    door: "Tür",
+    plant: "Pflanze",
+    rock: "Fels",
+    effect: "Effekt",
+    other: "",
+  },
+  note: {
+    rests: "liegt auf",
+    tied: "eingebunden",
+    needed: "gebraucht",
+    walked: "begangen",
+    game: "vom Spiel",
+  },
+  sectionsTitle: "Abschnitte dieses Bereichs",
+  sectionShow: "Zeigen",
+  sectionShowTip: "Zeigt diesen Abschnitt in den Ansichten, den Rest abgedunkelt",
+  sectionOnly: (mod, parts) =>
+    `nur ${mod}: ${parts} ${parts === 1 ? "Teil" : "Teile"} rund um die Kollisionen`,
+  sectionBigger: (winner, a, roomA, loser, b, roomB) =>
+    `${winner} baut hier mehr: ${a} ${a === 1 ? "Teil" : "Teile"} (etwa ${roomA} m³) gegen ${b} von ${loser} (etwa ${roomB} m³)`,
+  sectionAlike: (first, a, second, b) =>
+    `beide bauen hier: ${first} ${a} ${a === 1 ? "Teil" : "Teile"}, ${second} ${b}`,
+  spotKind: {
+    duplicate: "doppelt gebaut",
+    door: "gestapelte Türen",
+    overlap: "ineinander",
+    deep: "kreuzt sich",
+    touch: "berührt sich",
+  },
+  recommended: "Empfohlen:",
+  recommendedTip:
+    "Die größere Fassung bleibt, die Teile der anderen fallen weg. Andere Möglichkeiten stehen darunter.",
+  otherChoices: "Andere Möglichkeiten",
+  change: "Ändern",
+  sectionParts: (count) => `Die ${count} Teile`,
   left: (count, mod) =>
     count === 1
       ? `1 Teil von ${mod} bleibt und kollidiert hier noch`

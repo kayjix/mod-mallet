@@ -295,7 +295,6 @@
   list-style: none;
 }
 
-.review-segment,
 .review-report-line {
   display: flex;
   flex-wrap: wrap;
@@ -304,19 +303,6 @@
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-small);
-}
-
-.review-segment[data-focus="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.review-segment-name {
-  font-weight: 600;
-}
-
-.review-segment button[aria-pressed="true"] {
-  box-shadow: 0 0 0 2px var(--ok);
 }
 
 .review-report {
@@ -421,34 +407,8 @@
 }
 
 /* What each side brings, a click's result, and a segment's objects one by one. */
-.review-compared,
-.review-segment-parts {
+.review-compared {
   flex-basis: 100%;
-}
-
-.review-segment-sides {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: 6px;
-}
-
-.review-segment-sides ul {
-  display: grid;
-  gap: 2px;
-  max-height: 260px;
-  margin: 4px 0 0;
-  padding: 0;
-  overflow: auto;
-  list-style: none;
-}
-
-.review-segment-sides li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.85rem;
 }
 
 /* Suggestions by size, and taking them all at once. */
@@ -690,4 +650,58 @@
   .review-sides {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---- the sections of a place, as a list that guides (ADR 0083) -------------- */
+
+.review-section {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.review-section[data-decided] {
+  border-left: 3px solid var(--ok);
+}
+
+.review-section-show[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.review-section-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.review-section-head,
+.review-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.review-section-what {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.review-section-actions button[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.review-section-parts > summary {
+  font-size: 0.85rem;
+}
+
+.review-section-parts .part-list {
+  margin-top: 6px;
 }

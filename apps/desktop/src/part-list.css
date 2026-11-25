@@ -47,14 +47,6 @@
   box-shadow: inset 3px 0 0 var(--side-colour);
 }
 
-.part-list[data-side="0"] {
-  --side-colour: #0072b2;
-}
-
-.part-list[data-side="1"] {
-  --side-colour: #e69f00;
-}
-
 .part-row-open {
   display: grid;
   place-items: center;
@@ -126,4 +118,46 @@
 .part-row-eye .eye {
   width: 16px;
   height: 16px;
+}
+
+/* A mod's head where the list holds both mods' parts. */
+.part-list-side {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.part-list-side:first-child {
+  border-top: 0;
+}
+
+.part-row[data-side="0"] {
+  --side-colour: #0072b2;
+}
+
+.part-row[data-side="1"] {
+  --side-colour: #e69f00;
+}
+
+.part-row-kind {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.part-row-note {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.part-row-note[data-note="tied"],
+.part-row-note[data-note="needed"] {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
 }

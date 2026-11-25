@@ -28,12 +28,13 @@ import type {
 } from "./generated/rendered-report";
 import { reportSpots } from "./health";
 import { InfoTip } from "./info-tip";
-import { CELL } from "./map-places";
+import { CELL, type WorkKind } from "./map-places";
 import { fileDuels } from "./Overview";
 import { AnchorReasons, isGameObject } from "./object-actions";
 import { PairReport } from "./PairReport";
 import { counted, rememberObjects } from "./pair-report";
-import { type ListedPart, PartList } from "./part-list";
+import { partKind } from "./part-groups";
+import { type ListedPart, PartList, type PartNote } from "./part-list";
 import { usePassageTexts } from "./passage-texts";
 import { PassageSummary } from "./passages";
 import { matchKey, type PatchChoices, pinsOf } from "./patch";
@@ -408,6 +409,15 @@ function MapStep({
   );
 }
 
+/** Game units in a cubic metre: 70 to the metre. */
+const ROOM_UNITS = 70 ** 3;
+
+/** How many times the room of the other side makes a section's side the bigger one. */
+const BIGGER = 1.5;
+
+/** The kinds of collisions, the worst first, to name a section by its worst. */
+const SPOT_ORDER: WorkKind[] = ["duplicate", "door", "overlap", "deep", "touch"];
+
 /** A plugin's name without its extension, to name a side. */
 const short = (plugin: string) => plugin.replace(/\.(esp|esm|esl)$/i, "");
 
@@ -500,7 +510,8 @@ export function CollisionsStep({
     key: string;
     byPart: Map<string, ObjectAnchors>;
   } | null>(null);
-  const [focus, setFocus] = useState<number | null>(null);
+  // The section whose other choices are open, if any.
+  const [sectionChoices, setSectionChoices] = useState<number | null>(null);
   // What the last click in the views did.
   const [note, setNote] = useState<string | null>(null);
   // Parts shown in the views with the rest dimmed (ADR 0080): what a
@@ -530,7 +541,7 @@ export function CollisionsStep({
   // biome-ignore lint/correctness/useExhaustiveDependencies: the structures belong to the place.
   useEffect(() => {
     setSegments([]);
-    setFocus(null);
+    setSectionChoices(null);
     setNote(null);
     setShownApart(null);
     setPointed(null);
@@ -663,6 +674,7 @@ export function CollisionsStep({
         id: object.id,
         game: isGameObject(object) && isGamePlugin(object.plugin),
         name: object.name ?? object.model.split(/[\\/]/).pop() ?? object.model,
+        model: object.model,
       }));
     }
     return chosen.flatMap((segment) =>
@@ -798,13 +810,6 @@ export function CollisionsStep({
       }),
       moveOn,
     );
-  const focused = focus === null ? null : shownSegments[focus];
-  const focusKeys =
-    focused == null
-      ? null
-      : [...focused.parts[0], ...focused.parts[1]].map((part) =>
-          objectKey(part.id.plugin, part.id.localId),
-        );
   const placeKept = keptSideOf(placeDecided);
   // The suggested side of this place, by size (ADR 0050): from the stage's
   // segments, else from the check of every place.
@@ -1071,15 +1076,26 @@ export function CollisionsStep({
     setShownApart((before) =>
       before?.id === id || parts.length === 0 ? null : { id, keys: parts.map(keyOfPart), label },
     );
+  const decor = new Set(shownSegments.flatMap((segment) => segment.decor));
   /** A part as the lists show it. */
   const listed = (part: Part): ListedPart => {
     const key = keyOfPart(part);
     const fate = fateOf(part);
     const isHidden = hidden.has(key);
+    const notes: PartNote[] = [
+      ...(fate === "careful" ? (["tied"] as const) : []),
+      ...(fate === "locked" ? (["needed"] as const) : []),
+      ...(fate === "walked" ? (["walked"] as const) : []),
+      ...(fate === "game" ? (["game"] as const) : []),
+      ...(decor.has(key) ? (["rests"] as const) : []),
+    ];
     return {
       key,
       id: part.id,
       name: part.name,
+      side: part.id.plugin.toLowerCase() === sides[0].toLowerCase() ? 0 : 1,
+      kind: partKind(part.model ?? ""),
+      notes,
       hidden: isHidden,
       stays: fate === "game" ? "game" : fate === "locked" && !isHidden ? "locked" : null,
       walked: walked?.get(key) ?? 0,
@@ -1090,10 +1106,10 @@ export function CollisionsStep({
     apply(shared.hide(chosen.map((part) => part.id)), false);
   const showParts = (chosen: ListedPart[]) =>
     apply(shared.show(chosen.map((part) => part.id)), false);
-  const partList = (parts: Part[], side: 0 | 1) => (
+  const partList = (parts: Part[]) => (
     <PartList
       parts={parts.map(listed)}
-      side={side}
+      names={names}
       picked={picked}
       onPicked={setPicked}
       onHide={hideParts}
@@ -1112,7 +1128,6 @@ export function CollisionsStep({
     stagePlace === null || stagePlace.place.type === "interior"
       ? null
       : [cluster.centre[0], cluster.centre[1]];
-  const decor = new Set(shownSegments.flatMap((segment) => segment.decor));
   const openInMap = () => {
     if (cluster.passage !== undefined) {
       decidePassage(first.item.spot, cluster.key);
@@ -1220,7 +1235,7 @@ export function CollisionsStep({
         reach={reach}
         within={cluster.passage?.keys ?? null}
         radius={radius}
-        focus={doorLook === null ? focusKeys : [matchKey(doorLook.object)]}
+        focus={doorLook === null ? null : [matchKey(doorLook.object)]}
         names={names}
         hidden={stageHidden}
         walked={walked}
@@ -1341,7 +1356,7 @@ export function CollisionsStep({
             onSingles={() =>
               setSingles(side === 0 ? [!singles[0], singles[1]] : [singles[0], !singles[1]])
             }
-            list={partList(partsOf(shownSegments, side), side)}
+            list={partList(partsOf(shownSegments, side))}
           />
         ))}
       </div>
@@ -1416,93 +1431,163 @@ export function CollisionsStep({
         )}
       </div>
       <section className="review-segments">
-        <h4>{r.segmentsTitle}</h4>
+        <h4>{c.sectionsTitle}</h4>
         <ol>
           {shownSegments.map((segment, index) => {
-            const decided = decidedOf(spotsOf(segment), patchChoices);
+            const here = spotsOf(segment);
+            const decided = decidedOf(here, patchChoices);
             const kept = keptSideOf(decided);
+            const counts = [segment.parts[0].length, segment.parts[1].length] as const;
+            const kinds = new Set(here.map(({ item }) => item.kind));
+            const worst = SPOT_ORDER.find((kind) => kinds.has(kind));
+            const suggestion = suggestionOf([segment]);
+            // In m³; one side counts as bigger with half again the room.
+            const room = [
+              segment.volumes[0] / ROOM_UNITS,
+              segment.volumes[1] / ROOM_UNITS,
+            ] as const;
+            const larger: 0 | 1 = room[0] >= room[1] ? 0 : 1;
+            const bigger: 0 | 1 | null =
+              suggestion?.side ??
+              (counts[0] === 0 ||
+              counts[1] === 0 ||
+              room[larger] < BIGGER * room[larger === 0 ? 1 : 0]
+                ? null
+                : larger);
+            const what =
+              counts[0] === 0 || counts[1] === 0
+                ? c.sectionOnly(names[counts[0] === 0 ? 1 : 0], counts[0] + counts[1])
+                : bigger !== null
+                  ? c.sectionBigger(
+                      names[bigger],
+                      counts[bigger],
+                      roomText(room[bigger]),
+                      names[bigger === 0 ? 1 : 0],
+                      counts[bigger === 0 ? 1 : 0],
+                      roomText(room[bigger === 0 ? 1 : 0]),
+                    )
+                  : c.sectionAlike(names[0], counts[0], names[1], counts[1]);
+            // One thing to do: keep the bigger version, or what the whole
+            // place keeps; where neither can hide anything, keep both.
+            // Without a reason, the two versions are offered alike.
+            const wanted = bigger ?? placeKept;
+            const canKeep = (side: 0 | 1) => asked && canGo(effectOf(side, [segment]));
+            const recommended: 0 | 1 | "both" | null =
+              wanted !== null && canKeep(wanted)
+                ? wanted
+                : asked && !canKeep(0) && !canKeep(1)
+                  ? "both"
+                  : null;
+            const offered: (0 | 1 | "both")[] = recommended === null ? [0, 1] : [recommended];
+            const choose = (choice: 0 | 1 | "both") =>
+              choice === "both" ? keepBoth([segment], false) : keep(choice, [segment], false);
+            const label = (choice: 0 | 1 | "both") =>
+              choice === "both" ? r.keepBothHere : r.keepHere(names[choice]);
+            const others = ([0, 1, "both"] as const).filter(
+              (choice) => decided.type !== "open" || !offered.includes(choice),
+            );
+            const parts = [...partsOf([segment], 0), ...partsOf([segment], 1)];
+            const showId = `section:${index}`;
+            const choicesOpen = sectionChoices === index;
             return (
               <li
                 key={segment.groups.join(",")}
-                className="review-segment"
-                data-focus={focus === index}
+                className="review-section"
+                data-decided={decided.type !== "open" ? "" : undefined}
               >
-                <span className="review-segment-name">
-                  {segment.groups.length === 0 && cluster.passage !== undefined
-                    ? p.looseParts(index + 1)
-                    : r.segmentName(index + 1, segment.groups.length)}
-                </span>
-                <span className="aside">
-                  {r.segmentParts(
-                    names[0],
-                    segment.parts[0].length,
-                    names[1],
-                    segment.parts[1].length,
-                  )}
-                </span>
-                <span className="review-state" data-decided={decided.type !== "open"}>
-                  {describeSegment(segment, decided)}
-                </span>
-                {suggestionOf([segment]) !== null && (
-                  <span className="suggested-mark">
-                    {r.segmentSuggested(names[suggestionOf([segment])?.side ?? 0])}
-                  </span>
-                )}
-                <span className="spacer" />
                 <button
                   type="button"
-                  className="small quiet"
-                  aria-pressed={focus === index}
-                  onClick={() => setFocus(focus === index ? null : index)}
+                  className="review-section-show small"
+                  aria-pressed={shownApart?.id === showId}
+                  title={c.sectionShowTip}
+                  disabled={parts.length === 0}
+                  onClick={() =>
+                    showApart(
+                      showId,
+                      parts,
+                      segment.groups.length === 0 && cluster.passage !== undefined
+                        ? p.looseParts(index + 1)
+                        : r.segmentName(index + 1, segment.groups.length),
+                    )
+                  }
                 >
-                  {r.showSegment}
+                  <Eye open /> {c.sectionShow}
                 </button>
-                <button
-                  type="button"
-                  className="small"
-                  aria-pressed={kept === 0}
-                  disabled={!asked || !canGo(effectOf(0, [segment]))}
-                  onClick={() => keep(0, [segment], false)}
-                >
-                  {names[0]}
-                </button>
-                <button
-                  type="button"
-                  className="small"
-                  aria-pressed={kept === 1}
-                  disabled={!asked || !canGo(effectOf(1, [segment]))}
-                  onClick={() => keep(1, [segment], false)}
-                >
-                  {names[1]}
-                </button>
-                <button
-                  type="button"
-                  className="small"
-                  aria-pressed={decided.type === "kept"}
-                  onClick={() => keepBoth([segment], false)}
-                >
-                  {r.keepBoth}
-                </button>
-                <PinButton
-                  keys={spotsOf(segment)
-                    .filter(({ item }) => item.state === "open")
-                    .map(({ key }) => key)}
-                />
-                <details className="review-segment-parts">
-                  <summary className="more">
-                    {r.partsTitle(segment.parts[0].length + segment.parts[1].length)}
-                  </summary>
-                  <div className="review-segment-sides">
-                    {([0, 1] as const).map((side) => (
-                      <div key={side}>
-                        <strong className="stage3-swatch" data-side={side}>
-                          {names[side]}
-                        </strong>
-                        {partList(partsOf([segment], side), side)}
-                      </div>
-                    ))}
+                <div className="review-section-body">
+                  <div className="review-section-head">
+                    <strong>
+                      {segment.groups.length === 0 && cluster.passage !== undefined
+                        ? p.looseParts(index + 1)
+                        : r.segmentName(index + 1, segment.groups.length)}
+                    </strong>
+                    {worst !== undefined && <Chip>{c.spotKind[worst]}</Chip>}
+                    <span className="review-state" data-decided={decided.type !== "open"}>
+                      {decided.type === "open"
+                        ? r.stateOpen
+                        : `✓ ${describeSegment(segment, decided)}`}
+                    </span>
                   </div>
-                </details>
+                  <p className="review-section-what">{what}</p>
+                  <div className="review-section-actions">
+                    {decided.type === "open" ? (
+                      <>
+                        {recommended !== null && <span className="aside">{c.recommended}</span>}
+                        {offered.map((choice) => (
+                          <button
+                            type="button"
+                            key={choice}
+                            className={recommended === null ? "small" : "small primary"}
+                            disabled={choice !== "both" && !canKeep(choice)}
+                            title={recommended === null ? undefined : c.recommendedTip}
+                            onClick={() => choose(choice)}
+                          >
+                            {label(choice)}
+                          </button>
+                        ))}
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="small quiet"
+                      aria-expanded={choicesOpen}
+                      onClick={() => setSectionChoices(choicesOpen ? null : index)}
+                    >
+                      {decided.type === "open" ? c.otherChoices : c.change}{" "}
+                      <span aria-hidden="true">{choicesOpen ? "▾" : "▸"}</span>
+                    </button>
+                    {choicesOpen && (
+                      <>
+                        {others.map((choice) => (
+                          <button
+                            type="button"
+                            key={choice}
+                            className="small"
+                            aria-pressed={
+                              choice === "both" ? decided.type === "kept" : kept === choice
+                            }
+                            disabled={
+                              choice !== "both" && (!asked || !canGo(effectOf(choice, [segment])))
+                            }
+                            onClick={() => choose(choice)}
+                          >
+                            {label(choice)}
+                          </button>
+                        ))}
+                        <PinButton
+                          keys={here
+                            .filter(({ item }) => item.state === "open")
+                            .map(({ key }) => key)}
+                        />
+                      </>
+                    )}
+                  </div>
+                  {parts.length > 0 && (
+                    <details className="review-section-parts">
+                      <summary className="more">{c.sectionParts(parts.length)}</summary>
+                      {partList(parts)}
+                    </details>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -1539,6 +1624,8 @@ interface Part {
   name: string;
   /** What the scan says of the spot's own parts: whether the patch may hide it. */
   hideable?: boolean;
+  /** Its model below the data directory, where the stage knows it. */
+  model?: string;
 }
 
 /**

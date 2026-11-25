@@ -3,7 +3,13 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupByName, pickRows, readableName, stillColliding } from "../src/part-groups.ts";
+import {
+  groupByName,
+  partKind,
+  pickRows,
+  readableName,
+  stillColliding,
+} from "../src/part-groups.ts";
 
 test("a model's path reads as its file name without the ending", () => {
   assert.equal(readableName("meshes\\architecture\\WRIntShield02.nif"), "WRIntShield02");
@@ -89,4 +95,16 @@ test("what of the losing mod is left where the winner is still there", () => {
     spots: [],
     parts: [],
   });
+});
+
+test("a part's kind is read from the folders of its model", () => {
+  assert.equal(partKind("meshes\\architecture\\whiterun\\wrbridge01.nif"), "building");
+  assert.equal(partKind("meshes/clutter/barrel01.nif"), "clutter");
+  assert.equal(partKind("meshes/furniture/bench01.nif"), "furniture");
+  assert.equal(partKind("meshes/landscape/trees/treepine01.nif"), "plant");
+  assert.equal(partKind("meshes/landscape/rocks/rock01.nif"), "rock");
+  assert.equal(partKind("meshes/architecture/farmhouse/fhdoor01.nif"), "door");
+  assert.equal(partKind("meshes/clutter/candles/candle01.nif"), "light");
+  assert.equal(partKind("meshes/mymod/thing.nif"), "other");
+  assert.equal(partKind(""), "other");
 });

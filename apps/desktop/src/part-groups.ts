@@ -122,3 +122,38 @@ export function stillColliding(
   }
   return found;
 }
+
+/** What a part is, roughly, by where its model lies: to tell a list of names apart at a glance. */
+export type PartKind =
+  | "building"
+  | "furniture"
+  | "clutter"
+  | "light"
+  | "door"
+  | "plant"
+  | "rock"
+  | "effect"
+  | "other";
+
+/** The folders of models and the kind each stands for, the most telling first. */
+const KIND_FOLDERS: [RegExp, PartKind][] = [
+  [/(^|\/)(doors?\/|[^/]*door[^/]*\.nif$)/i, "door"],
+  [/(^|\/)(furniture|beds?|chairs?|tables?|benches?)(\/|$)/i, "furniture"],
+  [/(^|\/)(lights?|lighting|candles?|torch(es)?|lanterns?)(\/|$)/i, "light"],
+  [/(^|\/)(plants|trees|flora|grass)(\/|$)/i, "plant"],
+  [/(^|\/)(rocks?|cliffs?|landscape|mountains?)(\/|$)/i, "rock"],
+  [/(^|\/)(effects|fx|magic)(\/|$)/i, "effect"],
+  [/(^|\/)(clutter|containers?|loot|props?)(\/|$)/i, "clutter"],
+  [/(^|\/)(architecture|buildings?|dungeons|towns?|walls?|bridges?|docks?)(\/|$)/i, "building"],
+];
+
+/** The kind of a part from its model's path below the data directory; "other" where it says nothing. */
+export function partKind(model: string): PartKind {
+  const path = model.replaceAll("\\", "/").replace(/^(data\/)?meshes\//i, "");
+  for (const [folder, kind] of KIND_FOLDERS) {
+    if (folder.test(path)) {
+      return kind;
+    }
+  }
+  return "other";
+}
