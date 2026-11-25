@@ -26,12 +26,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use mallet_core::facts::RecordId;
 use mallet_core::facts::doors::PlacedDoor;
 use mallet_core::facts::objects::Place;
+use mallet_core::grid::cell_of_unit;
 use mallet_core::{
     DoorDestination, DoorGroup, DoorMerge, Finding, MapSpot, ObjectRef, RecordChange, SpotKind,
     SpotLocation, SpotPart, StackedDoor, kinds,
 };
 
-use crate::objects::{Owners, cell_of, console};
+use crate::objects::{Owners, console};
 use crate::{Analysis, Context, examples};
 
 /// How many examples a finding names.
@@ -154,8 +155,8 @@ impl<'a> Doors<'a> {
             },
             Place::Exterior { worldspace } => SpotLocation::Exterior {
                 world: self.name_of(worldspace),
-                x: cell_of(position[0]),
-                y: cell_of(position[1]),
+                x: cell_of_unit(position[0]),
+                y: cell_of_unit(position[1]),
             },
         }
     }

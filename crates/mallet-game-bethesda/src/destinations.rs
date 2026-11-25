@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::PlacedDestination;
 use mallet_core::facts::objects::Place;
+use mallet_core::grid::whole;
 use mallet_core::reach::DestinationKind;
 use mallet_formats_bethesda::plugin::{Record, Signature};
 
@@ -184,13 +185,6 @@ fn placed(
         },
         at,
     ))
-}
-
-/// A coordinate in whole game units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> i32 {
-    // Bounded by MAX_COORDINATE before converting.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
 }
 
 #[cfg(test)]

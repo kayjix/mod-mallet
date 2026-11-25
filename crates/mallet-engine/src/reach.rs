@@ -13,6 +13,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
+use mallet_core::grid::{cell_of, cell_of_unit, whole};
 use mallet_core::reach::{
     Destination, DestinationKind, ReachAfter, ReachChange, ReachOutcome, Route, WalkwayReach,
 };
@@ -229,7 +230,7 @@ pub fn spots_reach(
                 SpotState::Unknown
             },
             metres_off: found.off.map(metres),
-            ground: found.ground.map(|point| point.map(whole_f64)),
+            ground: found.ground.map(|point| point.map(whole)),
         })
         .collect();
     tracing::info!(
@@ -456,19 +457,14 @@ fn cell_name(place: &str, inside: bool, destination: &PlacedDestination) -> Stri
         return place.to_owned();
     }
     let [x, y, _] = destination.position;
-    let cell = |value: i32| value.div_euclid(4096);
-    format!("{place} {},{}", cell(x), cell(y))
+    format!("{place} {},{}", cell_of_unit(x), cell_of_unit(y))
 }
 
 /// A way as the window draws it.
 fn route(found: &FoundRoute) -> Route {
     Route {
         metres: metres(found.length),
-        points: found
-            .points
-            .iter()
-            .map(|point| point.map(whole_f64))
-            .collect(),
+        points: found.points.iter().map(|point| point.map(whole)).collect(),
     }
 }
 
@@ -479,27 +475,6 @@ fn metres(length: f64) -> u32 {
     (length / UNITS_PER_METRE)
         .round()
         .clamp(0.0, f64::from(u32::MAX)) as u32
-}
-
-/// A number rounded to whole units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole_f64(value: f64) -> i32 {
-    // Bounded before converting; positions of the games are far inside.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
-}
-
-/// The cell a coordinate in game units lies in.
-#[allow(clippy::cast_possible_truncation)]
-fn cell_of(coordinate: f32) -> i32 {
-    // Worldspaces lie within a few hundred cells of their origin.
-    (coordinate / 4096.0).floor().clamp(-32_768.0, 32_767.0) as i32
-}
-
-/// A number rounded to whole units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> i32 {
-    // Bounded before converting; positions of the games are far inside.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
 }
 
 #[cfg(test)]

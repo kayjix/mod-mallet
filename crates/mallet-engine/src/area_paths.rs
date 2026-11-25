@@ -16,6 +16,7 @@ use mallet_core::area_paths::{AreaNavmesh, AreaPaths, MakerKind, PathsMaker, Pat
 use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::{Beyond, NavmeshShape, NearHidden};
 use mallet_core::facts::objects::PlacedObject;
+use mallet_core::grid::cell_of;
 use mallet_game_bethesda::Game;
 use mallet_game_bethesda::area::AreaReader;
 use mallet_game_bethesda::walkways::Around;
@@ -24,12 +25,9 @@ use crate::ScanOptions;
 use crate::area::{library, reader, setup_key};
 use crate::walkways::{models_of, placed_object, record_id};
 
-/// Game units per cell side.
-const CELL: f32 = 4096.0;
-
 /// The farthest around the point that is read, in game units: two and a
-/// half cells, so at most six cells across.
-const MAX_RADIUS: f32 = 2.5 * CELL;
+/// half cells of 4096 units, so at most six cells across.
+const MAX_RADIUS: f32 = 2.5 * 4096.0;
 
 /// How many sets of cells are kept.
 const KEPT: usize = 6;
@@ -202,10 +200,8 @@ fn paths_over_hidden(
 }
 
 /// The cells within `radius` game units of `centre` in both directions.
-#[allow(clippy::cast_possible_truncation)]
 fn cells_around(centre: [f32; 2], radius: f32) -> BTreeSet<(i32, i32)> {
-    // Worldspaces lie within a few hundred cells of their origin.
-    let cell = |value: f32| (value / CELL).floor().clamp(-32_768.0, 32_767.0) as i32;
+    let cell = |value: f32| cell_of(value);
     let mut cells = BTreeSet::new();
     for x in cell(centre[0] - radius)..=cell(centre[0] + radius) {
         for y in cell(centre[1] - radius)..=cell(centre[1] + radius) {

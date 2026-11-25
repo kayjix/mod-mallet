@@ -17,28 +17,12 @@ use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, group_ty
 
 use crate::records::record_id;
 
-/// Game units per side of an outside cell.
-pub(crate) const CELL_SIDE: i32 = 4096;
-
 /// The groups that hold what is placed in a cell.
 pub(crate) const CHILDREN: [u32; 3] = [
     group_type::CELL_CHILDREN,
     group_type::CELL_PERSISTENT_CHILDREN,
     group_type::CELL_TEMPORARY_CHILDREN,
 ];
-
-/// The outside cell a coordinate in game units lies in. A coordinate that
-/// is not a number counts as the origin.
-#[allow(clippy::cast_possible_truncation)]
-pub(crate) fn cell_at(coordinate: f32) -> i32 {
-    // Worldspaces lie within a few hundred cells of their origin.
-    (coordinate / 4096.0).floor().clamp(-32_768.0, 32_767.0) as i32
-}
-
-/// The outside cell a coordinate in whole game units lies in.
-pub(crate) fn cell_of_unit(coordinate: i32) -> i32 {
-    coordinate.div_euclid(CELL_SIDE)
-}
 
 /// The place of a block or sub-block of outside cells: its size in cells
 /// and its column and row in blocks of that size. `None` for every other
@@ -149,17 +133,6 @@ mod tests {
     }
 
     #[test]
-    fn cells_are_found_from_game_units() {
-        assert_eq!(cell_at(0.0), 0);
-        assert_eq!(cell_at(4095.0), 0);
-        assert_eq!(cell_at(4096.0), 1);
-        assert_eq!(cell_at(-1.0), -1);
-        assert_eq!(cell_at(f32::NAN), 0);
-        assert_eq!(cell_of_unit(4095), 0);
-        assert_eq!(cell_of_unit(-1), -1);
-    }
-
-    #[test]
     fn only_blocks_around_the_point_are_entered() {
         // Cells 4 to 6 east, -2 to 0 north: block (0, -1) and (0, 0).
         let cells = (4, 6, -2, 0);
@@ -234,15 +207,12 @@ mod tests {
             label in any::<u32>(),
             x in any::<i32>(),
             y in any::<i32>(),
-            coordinate in any::<f32>(),
         ) {
             let group = GroupLabel { group_type, label };
             let (x, y) = (x / 2, y / 2);
             let _ = holds_any(group, &BTreeSet::from([(x, y)]));
             let _ = holds_within(group, (x, x, y, y));
             let _ = holds_near(group, &[(x, y)]);
-            let _ = cell_at(coordinate);
-            let _ = cell_of_unit(x);
         }
     }
 

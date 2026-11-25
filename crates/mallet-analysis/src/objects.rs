@@ -27,6 +27,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use mallet_core::facts::models::{ModelFacts, ModelMesh};
 use mallet_core::facts::objects::{BaseObject, Place, PlacedObject};
 use mallet_core::facts::{PluginFacts, RecordId};
+use mallet_core::grid::cell_of_unit;
 use mallet_core::{
     Finding, GamePath, MapPassage, MapSpot, ModRef, ObjectRef, Party, SpotKind, SpotLocation,
     SpotPart, Subject, kinds,
@@ -534,8 +535,8 @@ fn location_of(
             let [x, y, _] = position;
             SpotLocation::Exterior {
                 world: name_of(worldspace),
-                x: cell_of(x),
-                y: cell_of(y),
+                x: cell_of_unit(x),
+                y: cell_of_unit(y),
             }
         }
     }
@@ -562,12 +563,6 @@ pub(crate) fn middle([ax, ay, az]: [i32; 3], [bx, by, bz]: [i32; 3]) -> [i32; 3]
         i32::try_from((i64::from(a) + i64::from(b)).div_euclid(2)).unwrap_or(a)
     };
     [half(ax, bx), half(ay, by), half(az, bz)]
-}
-
-/// The cell a coordinate lies in. The world is laid out in cells of 4096
-/// units.
-pub(crate) fn cell_of(coordinate: i32) -> i32 {
-    coordinate.div_euclid(4096)
 }
 
 /// The command of the game's console that takes the player to a spot.

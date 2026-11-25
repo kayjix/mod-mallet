@@ -21,6 +21,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden};
 use mallet_core::facts::objects::{BaseObject, Bounds, Place, PlacedObject};
+use mallet_core::grid::{CELL_SIDE, cell_of};
 use mallet_core::{Facts, Finding, GamePath, Party, Subject, kinds};
 
 use crate::contact::Point;
@@ -48,8 +49,7 @@ const SQUARE: f64 = 64.0;
 /// Most squares along a side; a larger object gets larger squares.
 const MAX_SQUARES: f64 = 512.0;
 
-/// Game units per side of an outside cell, and between its land heights.
-const CELL: f64 = 4096.0;
+/// Game units between the land heights of an outside cell.
 const GROUND_STEP: f64 = 128.0;
 const GROUND_POINTS: usize = 33;
 
@@ -619,7 +619,7 @@ impl<'a> Ground<'a> {
         let (column, row) = (cell_of(x), cell_of(y));
         let heights = self.cells.get(&(world, column, row))?;
         let local = |value: f64, cell: i32| {
-            ((value - f64::from(cell) * CELL) / GROUND_STEP).clamp(0.0, 32.0)
+            ((value - f64::from(cell) * f64::from(CELL_SIDE)) / GROUND_STEP).clamp(0.0, 32.0)
         };
         let (east, north) = (local(x, column), local(y, row));
         // The point south-west of it, and how far it lies from there.
@@ -646,13 +646,6 @@ fn whole_index(value: f64) -> usize {
 fn index_value(index: usize) -> f64 {
     // At most 32.
     index as f64
-}
-
-/// The cell a coordinate lies in.
-#[allow(clippy::cast_possible_truncation)]
-pub(crate) fn cell_of(coordinate: f64) -> i32 {
-    // Worldspaces lie within a few hundred cells of their origin.
-    (coordinate / CELL).floor().clamp(-32_768.0, 32_767.0) as i32
 }
 
 /// The corners of a box: bit 1 of the number picks the larger x, bit 2

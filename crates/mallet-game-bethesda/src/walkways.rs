@@ -14,12 +14,11 @@ use mallet_core::facts::navmeshes::{
     Beyond, GroundCell, NavmeshShape, NearHidden, PlacedDestination,
 };
 use mallet_core::facts::objects::Place;
+use mallet_core::grid::{self, whole};
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, group_type};
 
-use crate::cells::{
-    CHILDREN, cell_at, cell_position, holds_any, land_parent, read_where, world_of,
-};
+use crate::cells::{CHILDREN, cell_position, holds_any, land_parent, read_where, world_of};
 use crate::destinations::{self, Collector};
 use crate::game::Game;
 use crate::ingest;
@@ -302,7 +301,7 @@ fn placed_outside(
         plugin_name,
         localized,
         place,
-        |[x, y, _]| chosen.contains(&(cell_at(x), cell_at(y))),
+        |[x, y, _]| chosen.contains(&(grid::cell_of(x), grid::cell_of(y))),
     );
 }
 
@@ -435,13 +434,6 @@ fn cell_of<'a>(
         .iter()
         .find(|group| group.group_type == group_type::CELL_CHILDREN)?;
     cells.get(&record_id(cell.label, masters, plugin_name))
-}
-
-/// A length in whole game units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> i32 {
-    // Bounded before converting; coordinates of the games are far inside.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
 }
 
 #[cfg(test)]

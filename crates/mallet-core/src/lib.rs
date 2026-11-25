@@ -27,6 +27,7 @@ pub mod duel;
 pub mod encoding;
 pub mod facts;
 pub mod finding;
+pub mod grid;
 pub mod kinds;
 pub mod managers;
 pub mod mesh;

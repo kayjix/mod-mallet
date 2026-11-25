@@ -13,6 +13,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::models::ModelMesh;
 use mallet_core::facts::navmeshes::{NavmeshShape, NearHidden, PlacedDestination};
 use mallet_core::facts::objects::{Place, PlacedObject};
+use mallet_core::grid::whole;
 use mallet_core::mesh::{CutOffPath, HiddenWalkways, PathRepair, Walkway};
 use mallet_core::walkway_repair::{RepairedPaths, WalkwayRepair};
 use mallet_core::{Facts, InstalledPatch, ObjectRef};
@@ -431,7 +432,7 @@ fn path_repair(near: &NearHidden, carried: &[Carried]) -> PathRepair {
                     .navmeshes
                     .iter()
                     .find_map(|index| near.navmeshes.get(*index)?.place_name.clone()),
-                centre: part.centre.map(whole_f64),
+                centre: part.centre.map(whole),
                 square_metres: square_metres(part.area),
                 doors: part.doors.iter().map(ToString::to_string).collect(),
             })
@@ -447,13 +448,6 @@ fn square_metres(area: f64) -> u32 {
     (area / UNITS_PER_SQUARE_METRE)
         .round()
         .clamp(0.0, f64::from(u32::MAX)) as u32
-}
-
-/// A number rounded to whole units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole_f64(value: f64) -> i32 {
-    // Bounded before converting; positions of the games are far inside.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
 }
 
 /// An object as the window names it, by the identity the plugins use.
@@ -485,11 +479,4 @@ pub(crate) fn placed_object(object: &AreaObject, cell: Option<&RecordId>) -> Opt
         large: false,
         moved: None,
     })
-}
-
-/// A number rounded to whole units.
-#[allow(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> i32 {
-    // Bounded before converting; positions of the games are far inside.
-    value.round().clamp(-1.0e9, 1.0e9) as i32
 }

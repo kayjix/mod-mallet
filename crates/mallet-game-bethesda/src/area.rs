@@ -14,9 +14,10 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use mallet_core::facts::RecordId;
+use mallet_core::grid::cell_of;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, group_type};
 
-use crate::cells::{cell_at, cell_position, holds_within, land_parent, world_of};
+use crate::cells::{cell_position, holds_within, land_parent, world_of};
 use crate::game::Game;
 use crate::ingest;
 use crate::records::{
@@ -372,10 +373,10 @@ impl AreaReader {
 /// `centre` in both directions.
 fn cells_around(centre: [f32; 2], radius: f32) -> Cells {
     (
-        cell_at(centre[0] - radius),
-        cell_at(centre[0] + radius),
-        cell_at(centre[1] - radius),
-        cell_at(centre[1] + radius),
+        cell_of(centre[0] - radius),
+        cell_of(centre[0] + radius),
+        cell_of(centre[1] - radius),
+        cell_of(centre[1] + radius),
     )
 }
 

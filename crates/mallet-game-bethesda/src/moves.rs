@@ -26,13 +26,14 @@ use std::path::{Path, PathBuf};
 
 use mallet_core::ObjectRef;
 use mallet_core::facts::RecordId;
+use mallet_core::grid::cell_of_unit;
 use mallet_core::moves::{DoorTarget, MoveRefusal, ObjectMove, RefusedMove};
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, Subrecord, group_type};
 use mallet_formats_bethesda::plugin_write::{
     Children, Format, PluginBuilder, WriteError, WrittenRecord,
 };
 
-use crate::cells::{CHILDREN, cell_of_unit, holds_near};
+use crate::cells::{CHILDREN, holds_near};
 use crate::game::Game;
 use crate::records::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, record_id};
 

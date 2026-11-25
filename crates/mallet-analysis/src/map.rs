@@ -13,6 +13,7 @@ use mallet_core::facts::RecordId;
 use mallet_core::facts::markers::MapMarkerFact;
 use mallet_core::facts::objects::{Place, PlacedObject};
 use mallet_core::facts::terrain::{SAMPLES_PER_CELL, TerrainWorld, WorldspaceFacts};
+use mallet_core::grid::cell_of_unit;
 use mallet_core::{
     MapBounds, MapCell, MapMarker, MapSpot, MapTerrain, MapWorld, SpotLocation, WorldMap,
     WorldOrigin,
@@ -221,7 +222,7 @@ fn count_cells<'a>(
         let cell = worlds
             .entry(host(worldspace))
             .or_default()
-            .entry((x.div_euclid(4096), y.div_euclid(4096)))
+            .entry((cell_of_unit(x), cell_of_unit(y)))
             .or_default();
         cell.0 = cell.0.saturating_add(1);
         cell.1.insert(object.owner());
@@ -436,7 +437,7 @@ fn occupied(cells: &[MapCell], markers: &[MapMarker]) -> Vec<(i32, i32)> {
         .map(|cell| (cell.x, cell.y))
         .chain(markers.iter().map(|marker| {
             let [x, y, _] = marker.position;
-            (x.div_euclid(4096), y.div_euclid(4096))
+            (cell_of_unit(x), cell_of_unit(y))
         }))
         .collect()
 }
@@ -463,7 +464,7 @@ fn map_marker(
         owner: origin.plugin.map(owner),
         moved_from: origin.moved_from,
         renamed_from: origin.renamed_from.map(str::to_owned),
-        console: format!("cow {world} {} {}", x.div_euclid(4096), y.div_euclid(4096)),
+        console: format!("cow {world} {} {}", cell_of_unit(x), cell_of_unit(y)),
     }
 }
 

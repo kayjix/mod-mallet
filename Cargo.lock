@@ -2311,6 +2311,7 @@ dependencies = [
 name = "mallet-core"
 version = "0.2.2"
 dependencies = [
+ "proptest",
  "schemars 1.2.3",
  "serde",
  "serde_json",

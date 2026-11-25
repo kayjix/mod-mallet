@@ -34,10 +34,11 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use mallet_core::facts::RecordId;
 use mallet_core::facts::navmeshes::{Beyond, NavmeshShape, NearHidden};
 use mallet_core::facts::objects::Place;
+use mallet_core::grid::cell_of;
 
 use crate::contact::Point;
 use crate::tin::{Tin, orient};
-use crate::walkways::{Carried, Ground, Hidden, RAISED, Surface, cell_of};
+use crate::walkways::{Carried, Ground, Hidden, RAISED, Surface};
 
 /// How far from a hidden object, seen from above, new paths are laid and
 /// the paths around it are joined, in game units. The Creation Kit keeps
