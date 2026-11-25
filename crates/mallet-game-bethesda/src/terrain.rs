@@ -20,6 +20,7 @@ use mallet_core::facts::terrain::{
 };
 use mallet_formats_bethesda::plugin::{Plugin, Record, group_type};
 
+use crate::cells::cell_position;
 use crate::game::{Family, Game};
 use crate::records::{editor_id, full_name, record_id};
 
@@ -445,14 +446,6 @@ fn corner_bounds(record: &Record) -> Option<[i32; 4]> {
     let bounds = [cell(low.0)?, cell(low.1)?, cell(high.0)?, cell(high.1)?];
     let [west, south, east, north] = bounds;
     (west < east && south < north).then_some(bounds)
-}
-
-/// The grid position of an outside cell; `None` for a cell inside.
-pub(crate) fn cell_position(record: &Record) -> Option<(i32, i32)> {
-    let position = record.first(b"XCLC")?;
-    let x = i32::from_le_bytes(position.get(0..4)?.try_into().ok()?);
-    let y = i32::from_le_bytes(position.get(4..8)?.try_into().ok()?);
-    Some((x, y))
 }
 
 /// Whether a cell has water, and the height it sets for it, if any

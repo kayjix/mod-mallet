@@ -32,6 +32,7 @@ use mallet_formats_bethesda::plugin_write::{
     Children, Format, PluginBuilder, WriteError, WrittenRecord,
 };
 
+use crate::cells::{CHILDREN, cell_of_unit, holds_near};
 use crate::game::Game;
 use crate::records::{FLAG_DELETED, FLAG_INITIALLY_DISABLED, editor_id, record_id};
 
@@ -372,7 +373,7 @@ fn find(plugins: &[(String, PathBuf)], moves: &[&ObjectMove]) -> Found {
     let points: Vec<(i32, i32)> = moves
         .iter()
         .filter(|each| each.cell.is_none())
-        .map(|each| (cell_of(each.from[0]), cell_of(each.from[1])))
+        .map(|each| (cell_of_unit(each.from[0]), cell_of_unit(each.from[1])))
         .collect();
     let rooms: Vec<String> = moves
         .iter()
@@ -396,16 +397,13 @@ fn find(plugins: &[(String, PathBuf)], moves: &[&ObjectMove]) -> Found {
     }
 
     for (index, (name, path)) in plugins.iter().enumerate() {
-        let near = |group: GroupLabel| near_points(group, &points);
+        let near = |group: GroupLabel| holds_near(group, &points);
         if !points.is_empty() {
             read_into(&mut found, index, name, path, &[*b"WRLD"], &near, &wanted);
         }
         if let Some(ids) = room_ids.get(&index) {
-            let inside = |group: GroupLabel| match group.group_type {
-                group_type::CELL_CHILDREN
-                | group_type::CELL_PERSISTENT_CHILDREN
-                | group_type::CELL_TEMPORARY_CHILDREN => ids.contains(&group.label),
-                _ => true,
+            let inside = |group: GroupLabel| {
+                !CHILDREN.contains(&group.group_type) || ids.contains(&group.label)
             };
             read_into(&mut found, index, name, path, &[*b"CELL"], &inside, &wanted);
         }
@@ -477,12 +475,7 @@ fn rooms_named(plugins: &[(String, PathBuf)], rooms: &[String]) -> Vec<(usize, u
         nested_records: &[*b"CELL"],
         nested_overrides: &[],
     };
-    let children = [
-        group_type::CELL_CHILDREN,
-        group_type::CELL_PERSISTENT_CHILDREN,
-        group_type::CELL_TEMPORARY_CHILDREN,
-    ];
-    let descend = |group: GroupLabel| !children.contains(&group.group_type);
+    let descend = |group: GroupLabel| !CHILDREN.contains(&group.group_type);
     // Every cell's versions, and whether one of them has a name asked for.
     let mut versions: HashMap<RecordId, (bool, Vec<(usize, u32)>)> = HashMap::new();
     for (index, (name, path)) in plugins.iter().enumerate() {
@@ -507,30 +500,6 @@ fn rooms_named(plugins: &[(String, PathBuf)], rooms: &[String]) -> Vec<(usize, u
         .filter(|(named, _)| *named)
         .flat_map(|(_, versions)| versions)
         .collect()
-}
-
-/// Whether a nested group may hold the cells around `points` (cell
-/// columns and rows): blocks and sub-blocks are entered only near them,
-/// everything else always.
-pub(crate) fn near_points(group: GroupLabel, points: &[(i32, i32)]) -> bool {
-    let size = match group.group_type {
-        group_type::EXTERIOR_BLOCK => 32,
-        group_type::EXTERIOR_SUB_BLOCK => 8,
-        _ => return true,
-    };
-    let [y0, y1, x0, x1] = group.label.to_le_bytes();
-    let x = i32::from(i16::from_le_bytes([x0, x1]));
-    let y = i32::from(i16::from_le_bytes([y0, y1]));
-    points.iter().any(|&(px, py)| {
-        // The cell itself and its neighbours, for objects on an edge.
-        (px - 1..=px + 1).any(|cx| cx.div_euclid(size) == x)
-            && (py - 1..=py + 1).any(|cy| cy.div_euclid(size) == y)
-    })
-}
-
-/// The cell a coordinate in whole game units lies in.
-fn cell_of(coordinate: i32) -> i32 {
-    coordinate.div_euclid(4096)
 }
 
 /// Changes the position and rotation of a copied object as `each` says.

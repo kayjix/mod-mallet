@@ -10,9 +10,10 @@ use std::fs::File;
 use std::io::BufReader;
 
 use mallet_core::facts::RecordId;
-use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, group_type};
+use mallet_formats_bethesda::plugin::{self, GroupLabel, Record};
 
 use super::{AreaObject, AreaReader, area_object};
+use crate::cells::CHILDREN;
 use crate::records::{editor_id, record_id};
 
 /// An interior cell as the plugins have it.
@@ -28,13 +29,6 @@ pub(super) struct Interior {
 /// A cell as listed: the editor ID of its latest version, if any, and
 /// each plugin with a version of it with the form ID it writes.
 type Listed = (Option<String>, Vec<(usize, u32)>);
-
-/// The children of a cell: what is placed in it.
-const CHILDREN: [u32; 3] = [
-    group_type::CELL_CHILDREN,
-    group_type::CELL_PERSISTENT_CHILDREN,
-    group_type::CELL_TEMPORARY_CHILDREN,
-];
 
 impl AreaReader {
     /// The interior cell whose editor ID is `cell` (case does not matter),
@@ -169,6 +163,8 @@ fn in_cell(record: &Record, form_id: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use mallet_formats_bethesda::plugin::group_type;
+
     use super::*;
 
     fn id(plugin: &str, local_id: u32) -> RecordId {

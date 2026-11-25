@@ -20,10 +20,10 @@ use mallet_formats_bethesda::navmesh_write::NavmeshData;
 use mallet_formats_bethesda::plugin::{GroupLabel, resolve_form_id};
 use mallet_formats_bethesda::plugin_write::{Children, PluginBuilder, WriteError, WrittenRecord};
 
+use crate::cells::{CHILDREN, holds_near};
 use crate::game::Game;
 use crate::moves::{self, Found, RecordVersion};
 use crate::navmesh_records::{NavmeshRecord, form_id_in};
-use crate::walkways::CHILDREN;
 
 /// The plugin of paths, and what could not go into it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -261,7 +261,7 @@ fn find(plugins: &[(String, PathBuf)], records: &[NavmeshRecord]) -> Found {
     let inside = records
         .iter()
         .any(|record| matches!(record.place, Place::Interior { .. }));
-    let near = |group: GroupLabel| moves::near_points(group, &points);
+    let near = |group: GroupLabel| holds_near(group, &points);
     let no_children = |group: GroupLabel| !CHILDREN.contains(&group.group_type);
     for (index, (name, path)) in plugins.iter().enumerate() {
         if !points.is_empty() {

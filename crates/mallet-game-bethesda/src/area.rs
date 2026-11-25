@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use mallet_core::facts::RecordId;
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, Signature, group_type};
 
+use crate::cells::{cell_at, cell_position, holds_within, land_parent, world_of};
 use crate::game::Game;
 use crate::ingest;
 use crate::records::{
@@ -25,9 +26,6 @@ use crate::records::{
 use crate::terrain;
 
 mod interior;
-
-/// Game units per cell side.
-const CELL: f32 = 4096.0;
 
 /// The base objects that can be seen in the world, with a model.
 const MODEL_TYPES: [Signature; 19] = [
@@ -274,7 +272,7 @@ impl AreaReader {
     /// Reads the objects and the land of `cells` of `world` from every
     /// plugin, later plugins replacing earlier ones.
     fn pass(&self, world: &str, cells: Cells) -> Pass {
-        let descend = |group: GroupLabel| wanted(group, cells);
+        let descend = |group: GroupLabel| holds_within(group, cells);
         let request = plugin::Request {
             flat: &[],
             nested: &[*b"WRLD"],
@@ -334,7 +332,7 @@ impl AreaReader {
                     b"CELL" => {
                         if world_id.is_some()
                             && world_of(record, masters, name) == world_id
-                            && let Some(position) = terrain::cell_position(record)
+                            && let Some(position) = cell_position(record)
                         {
                             positions.insert(record_id(record.form_id, masters, name), position);
                         }
@@ -382,10 +380,10 @@ impl AreaReader {
 /// `centre` in both directions.
 fn cells_around(centre: [f32; 2], radius: f32) -> Cells {
     (
-        cell_of(centre[0] - radius),
-        cell_of(centre[0] + radius),
-        cell_of(centre[1] - radius),
-        cell_of(centre[1] + radius),
+        cell_at(centre[0] - radius),
+        cell_at(centre[0] + radius),
+        cell_at(centre[1] - radius),
+        cell_at(centre[1] + radius),
     )
 }
 
@@ -408,49 +406,6 @@ fn cell_land(record: &Record, (x, y): (i32, i32)) -> Option<CellLand> {
         colours,
         quarters: Vec::new(),
     })
-}
-
-/// The cell a coordinate in game units lies in.
-#[allow(clippy::cast_possible_truncation)]
-fn cell_of(coordinate: f32) -> i32 {
-    // Worldspaces lie within a few hundred cells of their origin.
-    (coordinate / CELL).floor().clamp(-32_768.0, 32_767.0) as i32
-}
-
-/// Whether a nested group may hold objects of the cells `cells` (west,
-/// east, south, north). Blocks of 32 × 32 and 8 × 8 cells are labelled with
-/// their place; everything else is entered.
-fn wanted(group: GroupLabel, cells: (i32, i32, i32, i32)) -> bool {
-    let size = match group.group_type {
-        group_type::EXTERIOR_BLOCK => 32,
-        group_type::EXTERIOR_SUB_BLOCK => 8,
-        _ => return true,
-    };
-    let [y0, y1, x0, x1] = group.label.to_le_bytes();
-    let x = i32::from(i16::from_le_bytes([x0, x1]));
-    let y = i32::from(i16::from_le_bytes([y0, y1]));
-    let (west, east, south, north) = cells;
-    x <= east.div_euclid(size)
-        && x >= west.div_euclid(size)
-        && y <= north.div_euclid(size)
-        && y >= south.div_euclid(size)
-}
-
-/// The worldspace whose land the worldspace `record` uses (its parent,
-/// `WNAM`, if its parent flags, `PNAM`, say so), if any.
-fn land_parent(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
-    let flags = u16::from_le_bytes(record.first(b"PNAM")?.get(..2)?.try_into().ok()?);
-    let parent = u32::from_le_bytes(record.first(b"WNAM")?.get(..4)?.try_into().ok()?);
-    (flags & 0x01 != 0 && parent != 0).then(|| record_id(parent, masters, plugin_name))
-}
-
-/// The worldspace a placed object is in, if it is outside.
-fn world_of(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
-    record
-        .groups
-        .iter()
-        .find(|group| group.group_type == group_type::WORLD_CHILDREN)
-        .map(|group| record_id(group.label, masters, plugin_name))
 }
 
 /// A placed object as the game shows it; `None` where this version
@@ -531,30 +486,6 @@ fn read_models(plugins: &[(String, PathBuf)]) -> HashMap<RecordId, BaseModel> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn block(group_type: u32, x: i16, y: i16) -> GroupLabel {
-        let [y0, y1] = y.to_le_bytes();
-        let [x0, x1] = x.to_le_bytes();
-        GroupLabel {
-            group_type,
-            label: u32::from_le_bytes([y0, y1, x0, x1]),
-        }
-    }
-
-    #[test]
-    fn only_blocks_around_the_point_are_entered() {
-        // Cells 4 to 6 east, -2 to 0 north: block (0, -1) and (0, 0).
-        let cells = (4, 6, -2, 0);
-        assert!(wanted(block(group_type::EXTERIOR_BLOCK, 0, -1), cells));
-        assert!(wanted(block(group_type::EXTERIOR_BLOCK, 0, 0), cells));
-        assert!(!wanted(block(group_type::EXTERIOR_BLOCK, 1, 0), cells));
-        assert!(!wanted(block(group_type::EXTERIOR_BLOCK, -1, -1), cells));
-        // Sub-blocks of 8 cells: x 0 (cells 0 to 7), y -1 (cells -8 to -1).
-        assert!(wanted(block(group_type::EXTERIOR_SUB_BLOCK, 0, -1), cells));
-        assert!(!wanted(block(group_type::EXTERIOR_SUB_BLOCK, 1, -1), cells));
-        // Cells and their children are always entered.
-        assert!(wanted(block(group_type::CELL_CHILDREN, 99, 99), cells));
-    }
 
     fn land(fields: Vec<(&[u8; 4], Vec<u8>)>, flags: u32) -> Record {
         Record {
@@ -660,68 +591,6 @@ mod tests {
             flags in proptest::prelude::any::<u32>(),
         ) {
             let _ = cell_land(&land(vec![(b"VHGT", vhgt), (b"VCLR", vclr)], flags), (0, 0));
-        }
-    }
-
-    #[test]
-    fn cells_are_found_from_game_units() {
-        assert_eq!(cell_of(0.0), 0);
-        assert_eq!(cell_of(4095.0), 0);
-        assert_eq!(cell_of(4096.0), 1);
-        assert_eq!(cell_of(-1.0), -1);
-        assert_eq!(cell_of(f32::NAN), 0);
-    }
-
-    #[test]
-    fn a_city_uses_its_parents_land_only_if_its_flags_say_so() {
-        let world = |fields: Vec<(&[u8; 4], Vec<u8>)>| Record {
-            signature: *b"WRLD",
-            form_id: 0x1A26F,
-            flags: 0,
-            subrecords: fields
-                .into_iter()
-                .map(|(signature, data)| plugin::Subrecord {
-                    signature: *signature,
-                    data,
-                })
-                .collect(),
-            groups: Vec::new(),
-        };
-        let masters = vec!["Skyrim.esm".to_owned()];
-        let tamriel = RecordId {
-            plugin: "skyrim.esm".to_owned(),
-            local_id: 0x3C,
-        };
-        let city = world(vec![
-            (b"WNAM", 0x3Cu32.to_le_bytes().to_vec()),
-            (b"PNAM", 0x5Fu16.to_le_bytes().to_vec()),
-        ]);
-        assert_eq!(land_parent(&city, &masters, "Mod.esp"), Some(tamriel));
-        let own_land = world(vec![
-            (b"WNAM", 0x3Cu32.to_le_bytes().to_vec()),
-            (b"PNAM", 0x04u16.to_le_bytes().to_vec()),
-        ]);
-        assert_eq!(land_parent(&own_land, &masters, "Mod.esp"), None);
-        assert_eq!(land_parent(&world(Vec::new()), &masters, "Mod.esp"), None);
-    }
-
-    proptest::proptest! {
-        #[test]
-        fn a_parent_never_panics_on_arbitrary_fields(
-            wnam in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..6),
-            pnam in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..3),
-        ) {
-            let record = Record {
-                signature: *b"WRLD",
-                form_id: 1,
-                flags: 0,
-                subrecords: vec![
-                    plugin::Subrecord { signature: *b"WNAM", data: wnam },
-                    plugin::Subrecord { signature: *b"PNAM", data: pnam },
-                ],
-                groups: Vec::new(),
-            };
-            let _ = land_parent(&record, &[], "Mod.esp");
         }
     }
 }

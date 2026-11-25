@@ -7,8 +7,6 @@
 //! chosen with the same cells. Nothing is written.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs::File;
-use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use mallet_core::facts::RecordId;
@@ -17,8 +15,11 @@ use mallet_core::facts::navmeshes::{
 };
 use mallet_core::facts::objects::Place;
 use mallet_formats_bethesda::navmesh;
-use mallet_formats_bethesda::plugin::{self, GroupLabel, Plugin, Record, group_type};
+use mallet_formats_bethesda::plugin::{self, GroupLabel, Record, group_type};
 
+use crate::cells::{
+    CHILDREN, cell_at, cell_position, holds_any, land_parent, read_where, world_of,
+};
 use crate::destinations::{self, Collector};
 use crate::game::Game;
 use crate::ingest;
@@ -242,10 +243,10 @@ fn outside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
                     worlds.insert(id, own_name.unwrap_or_default());
                 }
                 b"CELL" => {
-                    let Some(world) = in_world(record, masters, name) else {
+                    let Some(world) = world_of(record, masters, name) else {
                         continue;
                     };
-                    let Some(position) = terrain::cell_position(record) else {
+                    let Some(position) = cell_position(record) else {
                         continue;
                     };
                     if found
@@ -304,7 +305,7 @@ fn placed_outside(
     plugin_name: &str,
     localized: bool,
 ) {
-    let Some(world) = in_world(record, masters, plugin_name) else {
+    let Some(world) = world_of(record, masters, plugin_name) else {
         return;
     };
     let Some(chosen) = found.cells.get(&world) else {
@@ -319,13 +320,6 @@ fn placed_outside(
         place,
         |[x, y, _]| chosen.contains(&(cell_at(x), cell_at(y))),
     );
-}
-
-/// The outside cell a coordinate in game units lies in.
-#[allow(clippy::cast_possible_truncation)]
-fn cell_at(coordinate: f32) -> i32 {
-    // Worldspaces lie within a few hundred cells of their origin.
-    (coordinate / 4096.0).floor().clamp(-32_768.0, 32_767.0) as i32
 }
 
 /// Reads the chosen interior cells of every plugin.
@@ -390,13 +384,6 @@ fn inside(plugins: &[(String, PathBuf)], around: &Around, found: &mut Found) {
         }
     }
 }
-
-/// The groups that hold what is placed in a cell.
-pub(crate) const CHILDREN: [u32; 3] = [
-    group_type::CELL_CHILDREN,
-    group_type::CELL_PERSISTENT_CHILDREN,
-    group_type::CELL_TEMPORARY_CHILDREN,
-];
 
 /// One plugin's version of a navigation mesh; `None` in the second place
 /// if it deletes the mesh or its geometry cannot be read.
@@ -466,47 +453,6 @@ fn cell_of<'a>(
     cells.get(&record_id(cell.label, masters, plugin_name))
 }
 
-/// The worldspace a record lies in, if it is outside.
-pub(crate) fn in_world(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
-    record
-        .groups
-        .iter()
-        .find(|group| group.group_type == group_type::WORLD_CHILDREN)
-        .map(|group| record_id(group.label, masters, plugin_name))
-}
-
-/// The worldspace whose land the worldspace `record` uses, if any.
-fn land_parent(record: &Record, masters: &[String], plugin_name: &str) -> Option<RecordId> {
-    let flags = u16::from_le_bytes(record.first(b"PNAM")?.get(..2)?.try_into().ok()?);
-    let parent = u32::from_le_bytes(record.first(b"WNAM")?.get(..4)?.try_into().ok()?);
-    (flags & 0x01 != 0 && parent != 0).then(|| record_id(parent, masters, plugin_name))
-}
-
-/// Whether a block of outside cells holds one of `cells`. Groups that are
-/// not blocks are entered.
-pub(crate) fn holds_any(group: GroupLabel, cells: &BTreeSet<(i32, i32)>) -> bool {
-    let size = match group.group_type {
-        group_type::EXTERIOR_BLOCK => 32,
-        group_type::EXTERIOR_SUB_BLOCK => 8,
-        _ => return true,
-    };
-    let [y0, y1, x0, x1] = group.label.to_le_bytes();
-    let x = i32::from(i16::from_le_bytes([x0, x1]));
-    let y = i32::from(i16::from_le_bytes([y0, y1]));
-    cells
-        .iter()
-        .any(|(cx, cy)| cx.div_euclid(size) == x && cy.div_euclid(size) == y)
-}
-
-pub(crate) fn read_where(
-    path: &Path,
-    request: &plugin::Request<'_>,
-    descend: &dyn Fn(GroupLabel) -> bool,
-) -> Option<Plugin> {
-    let file = File::open(path).ok()?;
-    plugin::read_request_where(&mut BufReader::new(file), request, descend).ok()
-}
-
 /// A length in whole game units.
 #[allow(clippy::cast_possible_truncation)]
 fn whole(value: f32) -> i32 {
@@ -516,6 +462,7 @@ fn whole(value: f32) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
     use std::io::Write;
 
     use mallet_formats_bethesda::fixture::{self, RecordSpec};

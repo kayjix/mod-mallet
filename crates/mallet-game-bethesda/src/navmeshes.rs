@@ -15,6 +15,7 @@ use mallet_core::facts::navmeshes::{NavmeshChange, NavmeshChanges};
 use mallet_formats_bethesda::navmesh;
 use mallet_formats_bethesda::plugin::{self, Plugin, Record, Signature, group_type};
 
+use crate::cells::cell_position;
 use crate::records::{FLAG_DELETED, editor_id, record_id};
 
 /// The record type of navigation meshes.
@@ -84,11 +85,7 @@ fn cell_name(cell: &Record, worlds: &HashMap<u32, String>) -> Option<String> {
         .iter()
         .find(|group| group.group_type == group_type::WORLD_CHILDREN)
         .and_then(|group| worlds.get(&group.label));
-    let grid = cell.first(b"XCLC").and_then(|data| {
-        let x = i32::from_le_bytes(data.get(0..4)?.try_into().ok()?);
-        let y = i32::from_le_bytes(data.get(4..8)?.try_into().ok()?);
-        Some((x, y))
-    });
+    let grid = cell_position(cell);
     match (world, grid) {
         (Some(world), Some((x, y))) => Some(format!("{world} {x},{y}")),
         _ => editor_id(cell),

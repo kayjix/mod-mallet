@@ -19,9 +19,10 @@ use mallet_core::facts::objects::Place;
 use mallet_formats_bethesda::navmesh_write::{EdgeLink, NONE, NavmeshData, Triangle, flags};
 use mallet_formats_bethesda::plugin::{self, GroupLabel, Signature, Subrecord, group_type};
 
+use crate::cells::{CHILDREN, cell_position, holds_any, world_of};
 use crate::navmeshes::NAVMESH;
 use crate::records::record_id;
-use crate::walkways::{Around, CHILDREN, holds_any, in_world};
+use crate::walkways::Around;
 
 /// A navigation mesh repaired, ready to be written as an override.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +178,7 @@ fn records_of(
     let mut records = Vec::new();
     for (record, form_version) in read {
         if &record.signature == b"CELL" {
-            if let Some(position) = crate::terrain::cell_position(record) {
+            if let Some(position) = cell_position(record) {
                 grids.insert(record_id(record.form_id, masters, name), position);
             }
             continue;
@@ -219,7 +220,7 @@ fn records_of(
                 },
             })
             .collect();
-        let place = match in_world(record, masters, name) {
+        let place = match world_of(record, masters, name) {
             Some(worldspace) => Place::Exterior { worldspace },
             None => Place::Interior { cell: cell.clone() },
         };

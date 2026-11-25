@@ -32,6 +32,7 @@ mod archive_meshes;
 pub mod archives;
 pub mod area;
 pub mod catalogue;
+mod cells;
 pub mod crash_logs;
 mod destinations;
 pub mod doors;
