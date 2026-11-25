@@ -80,6 +80,15 @@ button.quiet {
   color: var(--brand);
 }
 
+/* A button that is a switch shows when it is on: framed and tinted, not by
+   colour alone. As weak as a rule can be, so that every own style wins. */
+button:where([aria-pressed="true"]:not(.primary)),
+button.quiet:where([aria-pressed="true"]) {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
 .aside,
 .meta {
   color: var(--muted);

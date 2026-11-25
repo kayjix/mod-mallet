@@ -31,7 +31,7 @@ import { Note } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
 import { walkedOn } from "./walkways";
 import "./moves.css";
-import { Note as NoteBox, UndoButton } from "./ui/kit";
+import { Note as NoteBox, ToggleChip, UndoButton } from "./ui/kit";
 
 /** The steps a nudge can take, in game units: about 10 cm, 50 cm, 1 m and 5 m. */
 const STEPS = [7, 35, 70, 350];
@@ -307,14 +307,13 @@ export function MoveControls({
         </button>
       </div>
       {canTogether && (
-        <label className="move-together">
-          <input
-            type="checkbox"
-            checked={together}
-            onChange={(event) => setTogether(event.target.checked)}
+        <span className="move-together">
+          <ToggleChip
+            on={together}
+            onChange={setTogether}
+            label={m.moveTogether(selection.length)}
           />
-          {m.moveTogether(selection.length)}
-        </label>
+        </span>
       )}
       {stuck ? (
         <>

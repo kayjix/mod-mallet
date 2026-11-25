@@ -1906,22 +1906,18 @@ function Spot(props: SpotProps & SpotFrameProps) {
                 </button>
               </span>
               <span className="work-nav-more">
-                <label className="control-check aside" title={t.workAfterDecideHint}>
-                  <input
-                    type="checkbox"
-                    checked={props.advance}
-                    onChange={(event) => props.onAdvance(event.target.checked)}
-                  />
-                  {t.workAfterDecide}
-                </label>
-                <label className="control-check aside" title={n.showNotesHint}>
-                  <input
-                    type="checkbox"
-                    checked={props.notesInFull}
-                    onChange={(event) => props.onNotesInFull(event.target.checked)}
-                  />
-                  {n.showNotes}
-                </label>
+                <ToggleChip
+                  on={props.advance}
+                  onChange={props.onAdvance}
+                  label={t.workAfterDecide}
+                  hint={t.workAfterDecideHint}
+                />
+                <ToggleChip
+                  on={props.notesInFull}
+                  onChange={props.onNotesInFull}
+                  label={n.showNotes}
+                  hint={n.showNotesHint}
+                />
                 <PinButton keys={decided === undefined ? [item.key] : []} />
                 {spot.location.type === "exterior" && (
                   <button type="button" className="small quiet" onClick={() => showOnMap(spot)}>
