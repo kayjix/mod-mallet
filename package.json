@@ -19,8 +19,8 @@
     "desktop": "npm run tauri --workspace apps/desktop --"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.9",
     "json-schema-to-typescript": "16.0.0",
-    "lefthook": "2.2.2"
+    "lefthook": "2.2.4"
   }
 }
