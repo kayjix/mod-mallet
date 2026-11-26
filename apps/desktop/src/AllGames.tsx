@@ -188,7 +188,7 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
                 : !playable
                   ? t.gameNotInstalled
                   : knownGame.support === "basic"
-                    ? t.gameBasic
+                    ? (game.reach ?? t.gameBasic)
                     : null;
             return (
               <li
