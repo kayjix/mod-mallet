@@ -38,6 +38,7 @@ desktop app's own dependencies go into `apps/desktop/package.json`.
 | Texts | `fluent-bundle`, `unic-langid` | |
 | Cache | `rusqlite` (bundled SQLite) | Compiles SQLite from source; needs a C compiler |
 | Load order | `libloadorder` | GPL-3.0, by the LOOT team. Brings `esplugin` with it |
+| Masterlist metadata | `libloot` | GPL-3.0, by the LOOT team, who ask to be contacted about derived works. Added with milestone 8 (see [ADR 0030](../adr/0030-rules-from-the-loot-masterlist.md)) |
 | Compressed records | `flate2` | With its pure Rust backend |
 | Files in Skyrim SE archives | `lz4_flex` | Pure Rust, no `unsafe` by default |
 | Installer descriptions | `roxmltree` | Read-only XML tree, no dependencies of its own. The text is decoded from UTF-8 or UTF-16 before parsing |
@@ -62,14 +63,10 @@ desktop app's own dependencies go into `apps/desktop/package.json`.
 |---|---|---|
 | Reading zip, 7z and rar archives | a 7-Zip that is on the machine | See [ADR 0019](../adr/0019-archives-through-7zip.md). The RAR library's license is not compatible with the GPL |
 
-## Planned, not yet added
+## Still to be checked
 
-These were examined when the project was set up and will be added with
-their milestone. The notes save the next person the research.
-
-| Purpose | Candidate | Note |
-|---|---|---|
-| Masterlist metadata | `libloot` | GPL-3.0. The LOOT team asks to be contacted about derived works |
-
-The license of the LOOT masterlist itself has not been checked yet and must
-be before milestone 8.
+`libloot` is added (see above), but the license of the LOOT masterlist
+itself, the data it reads, has still not been checked. It must be before
+Mod Mallet ships a copy of the masterlist: today the app only reads the copy
+that Vortex or LOOT keep on the machine and quotes its messages
+([ADR 0030](../adr/0030-rules-from-the-loot-masterlist.md), [ADR 0035](../adr/0035-loots-messages-are-quoted.md)).

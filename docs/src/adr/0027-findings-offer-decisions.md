@@ -58,3 +58,8 @@ each drew its own boxes with its own distances.
   decision of its own.
 - LOD tiles inside archives are not read yet; a worldspace without loose
   LOD tiles keeps the height relief as its ground.
+  *Amended 2026-11-26:* done. The level-of-detail files are found in the
+  archives in load order and in the loose files, and read on demand
+  ([ADR 0037](0037-the-map-draws-the-games-own-lod.md); `lod_library.rs` in
+  `mallet-game-bethesda`). The height relief is the ground only of a
+  worldspace that has no level-of-detail files at all.
