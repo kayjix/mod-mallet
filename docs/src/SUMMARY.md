@@ -102,6 +102,7 @@
   - [0086 Preferences between mods, learned from the decisions](adr/0086-preferences-learned-from-decisions.md)
   - [0088 The paths of merged doors are re-attached to the kept door](adr/0088-door-paths-re-attached-to-the-kept-door.md)
   - [0089 When the game rewrites the load order, it is told why](adr/0089-when-the-game-rewrites-the-load-order.md)
+  - [0090 The vision draws its lines where Mod Mallet's own work ends](adr/0090-the-vision-catches-up.md)
   - [Template](adr/template.md)
 
 # Reference

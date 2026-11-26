@@ -113,3 +113,4 @@ write a new ADR and mark the old one `superseded by NNNN`.
 | [0086](0086-preferences-learned-from-decisions.md) | Preferences between mods, learned from the decisions | accepted |
 | [0088](0088-door-paths-re-attached-to-the-kept-door.md) | The paths of merged doors are re-attached to the kept door | accepted |
 | [0089](0089-when-the-game-rewrites-the-load-order.md) | When the game rewrites the load order, it is told why | accepted |
+| [0090](0090-the-vision-catches-up.md) | The vision draws its lines where Mod Mallet's own work ends | accepted |

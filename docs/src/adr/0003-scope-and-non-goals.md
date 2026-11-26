@@ -1,6 +1,6 @@
 # 0003 Scope and non-goals
 
-- Status: accepted
+- Status: accepted, changed by [ADR 0090](0090-the-vision-catches-up.md)
 - Date: 2026-11-15
 
 ## Context
