@@ -89,9 +89,9 @@ New Vegas were not installed.
 
 **LOOT's rules.** Every game but Morrowind. Oblivion Remastered is handed
 to LOOT's library from its installation's top folder, which finds the old
-game's data below it. Only Skyrim Special Edition's masterlist was on the
-reference machine; the other games were checked with a masterlist written
-for the check.
+game's data below it (ADR 0092). Only Skyrim Special Edition's masterlist
+was on the reference machine; Oblivion Remastered was checked with a
+masterlist written for the check.
 
 **Meshes and their textures.** Oblivion: its meshes name textures in an
 older way, read only in part. Oblivion Remastered: the meshes in its data
