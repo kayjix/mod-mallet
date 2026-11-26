@@ -2,6 +2,8 @@
 
 - Status: accepted, amended 2026-11-25 (large objects are careful)
 - Date: 2026-11-18
+- Changes: ADR 0025 (patches hide objects through Base Object Swapper) and
+  ADR 0040 (collisions as a worklist): which objects can be hidden on their own
 
 ## Context
 

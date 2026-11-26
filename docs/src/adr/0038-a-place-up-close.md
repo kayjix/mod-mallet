@@ -1,6 +1,6 @@
 # 0038 A place up close: the objects themselves around a point
 
-- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): the order in which a placed object is turned; by [ADR 0075](0075-one-call-per-material-for-a-place-up-close.md): one call per material instead of one per model's shape
+- Status: accepted; changed by [ADR 0040](0040-collisions-as-a-worklist.md): the order in which a placed object is turned; by [ADR 0075](0075-one-call-per-material-for-a-place-up-close.md): one call per material instead of one per model's shape; [ADR 0041](0041-the-games-own-ground-up-close.md): the objects stand on the game's own ground; [ADR 0074](0074-level-of-detail-makes-room-for-real-objects.md): the level of detail makes room for real objects; extended to interior cells by [ADR 0042](0042-interiors-in-3d.md)
 - Date: 2026-11-17
 - Changes: ADR 0011 (no renderer of our own), for a small area around a point
 

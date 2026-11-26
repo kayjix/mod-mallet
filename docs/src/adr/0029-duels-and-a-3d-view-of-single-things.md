@@ -1,6 +1,6 @@
 # 0029 Mods are decided pair by pair; single things are shown in 3D
 
-- Status: accepted; changed by [ADR 0033](0033-comparison-stage-and-ranking.md) (comparison view, stage, ranking)
+- Status: accepted; changed by [ADR 0033](0033-comparison-stage-and-ranking.md) (comparison view, stage, ranking); [ADR 0031](0031-places-on-the-map-and-a-3d-relief.md): the land, drawn as a relief; [ADR 0048](0048-one-job-per-page.md): where duels and the ranking are shown
 - Date: 2026-11-16
 - Changes: ADR 0011 (no renderer of our own), for single objects and heads
 

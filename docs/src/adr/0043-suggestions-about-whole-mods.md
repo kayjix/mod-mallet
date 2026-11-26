@@ -1,6 +1,6 @@
 # 0043 Suggestions about whole mods
 
-- Status: accepted, amended by [0049](0049-the-files-every-mod-brings.md) and [0061](0061-switched-off-mods-and-mods-to-remove.md)
+- Status: accepted, amended by [0049](0049-the-files-every-mod-brings.md) and [0061](0061-switched-off-mods-and-mods-to-remove.md); also amended in place on 2026-11-18 (after the comparison of JK's standalone mods)
 - Date: 2026-11-18
 
 ## Context

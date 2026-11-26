@@ -1,6 +1,6 @@
 # 0070 Several patches, each its own mod, that say what they decide
 
-- Status: accepted
+- Status: accepted, amended 2026-11-22 (buttons moved into the sidebar; a patch is "being edited")
 - Date: 2026-11-22
 - Changes: [ADR 0053](0053-shareable-patches-in-parts.md) (one patch with
   parts), [ADR 0060](0060-objects-moved-a-little-through-a-plugin.md) and

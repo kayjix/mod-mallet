@@ -1,6 +1,6 @@
 # 0027 Findings offer decisions; the window has a home and themes
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0045](0045-a-health-score-and-tasks-by-what-to-do.md): the home page shows a health score and a verdict; [ADR 0048](0048-one-job-per-page.md): home is the overview of the game in use, and the list of all games is a level above
 - Date: 2026-11-16
 
 ## Context

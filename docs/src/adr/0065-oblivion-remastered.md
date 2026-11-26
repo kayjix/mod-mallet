@@ -1,6 +1,6 @@
 # 0065 Oblivion Remastered: the old game's data below the installation, Unreal mods beside it
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0078](0078-other-games-closer-to-skyrim.md): pages that do not apply are said so
 - Date: 2026-11-21
 - Changes: ADR 0036 (one adapter for the Bethesda family)
 

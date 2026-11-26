@@ -1,6 +1,6 @@
 # 0077 One UI kit for every page
 
-- Status: accepted
+- Status: accepted, amended 2026-11-25 (switches, sorting and notes that open)
 - Date: 2026-11-22
 
 ## Context

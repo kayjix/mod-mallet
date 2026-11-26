@@ -1,6 +1,6 @@
 # 0055 A magic wand for what belongs together, and one column per mod
 
-- Status: accepted
+- Status: accepted, amended 2026-11-25 (the levels take a structure and a building)
 - Date: 2026-11-19
 - Changes: ADR 0040 (what the card of a picked object takes along, and how
   a spot's choices are laid out)

@@ -1,6 +1,6 @@
 # 0041 The game's own ground up close
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0047](0047-the-ground-painted-as-the-game-paints-it.md): the ground is painted as the game paints it
 - Date: 2026-11-17
 - Changes: ADR 0038 (a place up close), whose objects stood on the level of
   detail's land

@@ -1,7 +1,9 @@
 # 0080 The collisions step is decided by side, with the pictures
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0083](0083-step-by-step-says-what-is-at-stake.md): how the sections of a place and their parts are laid out
 - Date: 2026-11-22
+- Changes: ADR 0050 (a guided review through the homes): the collisions step
+  is laid out by side, with the pictures
 
 ## Context
 

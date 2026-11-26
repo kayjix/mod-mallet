@@ -1,6 +1,6 @@
 # 0053 Shareable patches in parts, with an installer
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0060](0060-objects-moved-a-little-through-a-plugin.md): moving objects through a plugin of overrides; [ADR 0070](0070-several-patches-that-say-what-they-decide.md): several patches, each its own mod
 - Date: 2026-11-19
 - Changes: [ADR 0025](0025-patches-through-base-object-swapper.md) (one patch file)
 

@@ -1,6 +1,6 @@
 # 0052 Paths over hidden objects are cut out of the navigation meshes
 
-- Status: accepted; changed by [ADR 0058](0058-paths-repaired-on-the-ground-below.md): new paths are laid on the ground below
+- Status: accepted; changed by [ADR 0058](0058-paths-repaired-on-the-ground-below.md): new paths are laid on the ground below; [ADR 0059](0059-where-characters-still-go.md): where characters still go is checked as well; [ADR 0078](0078-other-games-closer-to-skyrim.md): navigation meshes of other games are read
 - Date: 2026-11-19
 - Changes: the vision's non-goal "not an automatic navmesh generator"
   (repairing is no longer only manual work); ADR 0051 (its repair, "a

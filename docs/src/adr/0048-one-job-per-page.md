@@ -1,6 +1,6 @@
 # 0048 One job per page, and a home for each thing
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0050](0050-a-guided-review-through-the-homes.md): a second exception, the guided review; [ADR 0054](0054-a-catalogue-of-the-games-things.md): the sidebar gets a catalogue page
 - Date: 2026-11-18
 - Changes: ADR 0027 (the home page), ADR 0026 (the toolbox in the
   sidebar), ADR 0029 and 0033 (where duels and the ranking are shown),

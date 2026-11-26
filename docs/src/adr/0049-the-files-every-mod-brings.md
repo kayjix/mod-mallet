@@ -1,6 +1,6 @@
 # 0049 The files every mod brings, from the mod manager's staging folder
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0054](0054-a-catalogue-of-the-games-things.md): what is read in the staging folder; [ADR 0056](0056-missing-textures-found-in-switched-off-mods.md): missing textures are looked for in switched-off mods
 - Date: 2026-11-18
 - Changes: ADR 0043 (suggestions about whole mods)
 
