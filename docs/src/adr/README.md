@@ -71,7 +71,7 @@ used; no record with these numbers was ever committed.
 | [0024](0024-views-map-and-live-scans.md) | The desktop app has views, a map, and scans again by itself | accepted |
 | [0025](0025-patches-through-base-object-swapper.md) | Patches hide objects through Base Object Swapper | accepted; changed by 0040, 0046, 0051, 0052, 0053, 0060, 0067 |
 | [0026](0026-toolbox-log-and-restarting-vortex.md) | The app has a toolbox, a log, and can restart Vortex | accepted; changed by 0048 |
-| [0027](0027-findings-offer-decisions.md) | Findings offer decisions; the window has a home and themes | accepted; changed by 0045, 0048 |
+| [0027](0027-findings-offer-decisions.md) | Findings offer decisions; the window has a home and themes | accepted; changed by 0045, 0048; also amended 2026-11-26 |
 | [0028](0028-pictures-of-textures.md) | Findings show the textures they are about | accepted |
 | [0029](0029-duels-and-a-3d-view-of-single-things.md) | Mods are decided pair by pair; single things are shown in 3D | accepted; changed by 0031, 0033, 0048 |
 | [0030](0030-rules-from-the-loot-masterlist.md) | Rules from the LOOT masterlist, evaluated by libloot | accepted |
