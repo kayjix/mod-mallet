@@ -26,7 +26,7 @@ New Vegas were not installed.
 | Archives and loose files | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
 | Meshes and their textures | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ◐ | ✘ | ✘ |
 | Faces against their records | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ |
-| Script extender log | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ◐ | ◐ | ✘ | ✘ |
+| Script extender log | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ◐ | ◐ | ◐ | ✘ |
 | Crash reports | ✔ | ✔° | ✔° | ◐ | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ |
 | Placed objects colliding, by their models | ✔ | ✔° | ✔° | ◐ | ✔ | ✔° | ✔° | ✔ | ✘ | ✘ |
 | A place up close in 3D | ✔ | ✔° | ✔° | ◐ | ✔ | ✔° | ✔° | ✔ | ✘ | ✘ |
@@ -70,7 +70,14 @@ New Vegas were not installed.
   it draws (ADR 0065). LOOT's rules: its 20 active plugins were checked
   against a masterlist written for the check that named them; a missing
   master, an incompatible pair and a note on a condition came out as
-  findings, a rule on a switched-off plugin did not.
+  findings, a rule on a switched-off plugin did not. OBSE64 0.1.0 is
+  installed, with its library for game version 0.411.140, but the game's
+  program says it is 1.512.105 (in the text of its version information;
+  the numbers beside it are Unreal Engine's, 5.3.2, which the versions
+  page shows today). OBSE64 is behind the game there, which Mod Mallet
+  cannot tell yet. It has never written a log on that machine; a log
+  written for the check, naming its one plugin, was read with the plugin
+  found in OBSE64's folder beside the Unreal program.
 - **Enderal Special Edition** is not installed: only an empty folder of the
   first Enderal (on Skyrim 2011) remains in the Steam library on `D:`. Its
   support is built and tested against a made-up installation; the numbers
@@ -96,7 +103,15 @@ compare.
 
 **Script extender log.** Fallout 3, New Vegas and Oblivion: the log is
 listed, but the extenders of these games log less, and the game version is
-not read from it. Oblivion Remastered: OBSE64's log is not read yet.
+not read from it. Oblivion Remastered: OBSE64, forked from SFSE, writes
+SKSE's lines into `My Games/Oblivion Remastered/OBSE/Logs/obse64.txt`
+(the place and the lines are taken from its library, since no log was on
+the reference machine); which plugins it loaded or refused is read, the
+game version is not: OBSE64 packs it as SKSE does, and this game's
+versions (0.411.140, 1.512.105) do not fit that packing, nor the one Mod
+Mallet compares versions in. For the same reason its library per game
+version is not checked against the game.
+
 
 **Crash reports.** The readers know Crash Logger, Trainwreck and .NET Script
 Framework, made for Skyrim Special Edition; Buffout 4 writes the same shape

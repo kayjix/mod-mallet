@@ -117,7 +117,12 @@ fn script_extender(game: Game, game_dir: &Path, game_version: Option<&str>) -> T
     };
     // The extender ships one library per game version it supports, named
     // after it.
-    let library = game_dir.join(format!("{prefix}_{}.dll", version.replace('.', "_")));
+    // The libraries lie beside the loader: in the installation, or for
+    // Oblivion Remastered beside its Unreal program.
+    let library = loader
+        .parent()
+        .unwrap_or(game_dir)
+        .join(format!("{prefix}_{}.dll", version.replace('.', "_")));
     let state = if library.is_file() {
         ToolState::Ready
     } else {

@@ -10,8 +10,14 @@
 ### say what happened, why it matters in the game, and what to do.
 
 extender-plugin-incompatible = Script extender plugin does not support this game version
-    .headline = { $file } does not support game version { $gameVersion }
-    .summary = { $file } was switched off because it was not built for game version { $gameVersion }.
+    .headline = { $gameVersion ->
+        [unknown] { $file } does not support your game version
+       *[other] { $file } does not support game version { $gameVersion }
+    }
+    .summary = { $gameVersion ->
+        [unknown] { $file } was switched off because it was not built for your game version.
+       *[other] { $file } was switched off because it was not built for game version { $gameVersion }.
+    }
     .explanation = The script extender loads native plugins (DLL files) that mods use for features the game cannot provide on its own. Each plugin states which game versions it supports. This one does not support yours, so the script extender refused to load it. The game still starts, but everything the plugin provides is missing, and other mods that rely on it may misbehave.
     .remedy = Look on the mod's page for a version built for your game version and install it. If there is none yet, disable the mod until it has been updated.
 

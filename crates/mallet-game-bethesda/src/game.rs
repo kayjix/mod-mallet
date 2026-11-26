@@ -77,7 +77,8 @@ pub enum ArchiveNaming {
 pub enum LogPlace {
     /// In a folder below the game's folder in `Documents/My Games`.
     MyGames {
-        /// The folder below the game's own, such as `SKSE`.
+        /// The folder below the game's own, such as `SKSE` or `OBSE/Logs`,
+        /// its parts separated by `/`.
         folder: &'static str,
         /// The log's file name.
         file: &'static str,
@@ -642,14 +643,20 @@ impl Game {
                 page: "https://github.com/llde/xOBSE",
             },
             // OBSE64 runs with the Steam version only. Its plugins lie
-            // beside the game's Unreal program, not in the data folder,
-            // and its log is not read yet (ADR 0065).
+            // beside the game's Unreal program, not in the data folder
+            // (ADR 0065). It is forked from SFSE and logs in SKSE's shapes
+            // (ADR 0092).
             Self::OblivionRemastered => ScriptExtender {
                 tool: "obse64",
                 short_name: "OBSE64",
                 loader: "OblivionRemastered/Binaries/Win64/obse64_loader.exe",
                 plugin_dir: "oblivionremastered/binaries/win64/obse/plugins",
-                log: None,
+                log: Some(LogPlace::MyGames {
+                    folder: "OBSE/Logs",
+                    file: "obse64.txt",
+                }),
+                // It ships one library per game version, but the versions of
+                // this game do not fit the packing versions are compared in.
                 versioned_library: None,
                 page: "https://www.nexusmods.com/oblivionremastered/mods/282",
             },
@@ -857,7 +864,13 @@ mod tests {
         assert_eq!(game.unreal_pak_folders().len(), 2);
         assert_eq!(Game::Oblivion.unreal_pak_folders().len(), 0);
         assert!(game.editor().is_none());
-        assert!(game.script_extender().log.is_none());
+        assert_eq!(
+            game.script_extender().log,
+            Some(LogPlace::MyGames {
+                folder: "OBSE/Logs",
+                file: "obse64.txt"
+            })
+        );
         assert!(game.is_official("AltarESPMain.esp"));
     }
 

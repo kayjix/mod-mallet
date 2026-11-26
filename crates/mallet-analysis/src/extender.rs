@@ -51,7 +51,9 @@ fn finding_for(
         ExtenderPluginStatus::IncompatibleGameVersion => {
             Finding::new(&kinds::EXTENDER_PLUGIN_INCOMPATIBLE, subject)
                 .with_arg("file", file)
-                .with_arg("gameVersion", report.game_version.as_deref().unwrap_or("?"))
+                // The game version may be unknown: OBSE64 logs none Mod Mallet
+                // can read (ADR 0092).
+                .with_arg("gameVersion", report.game_version.as_deref().unwrap_or("unknown"))
         }
         ExtenderPluginStatus::NoVersionData => {
             Finding::new(&kinds::EXTENDER_PLUGIN_NO_VERSION_DATA, subject).with_arg("file", file)

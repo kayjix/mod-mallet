@@ -834,7 +834,7 @@ fn gather_facts(
                 found: text.is_some(),
             });
             text.map(|text| {
-                without_removed_plugins(skse_log::parse(game, &text), game_dir, virtual_data)
+                without_removed_plugins(skse_log::parse(game, &text), game, game_dir, virtual_data)
             })
         }
         None => None,
@@ -986,6 +986,7 @@ fn load_mod_source(
 /// and reporting it would ask the user to fix what they already fixed.
 fn without_removed_plugins(
     mut report: ExtenderReport,
+    game: Game,
     game_dir: &Path,
     virtual_data: &VirtualData,
 ) -> ExtenderReport {
@@ -994,7 +995,10 @@ fn without_removed_plugins(
     if !locate::on_disk(game_dir, "data").is_dir() {
         return report;
     }
-    let dir = locate::on_disk(game_dir, report.plugin_dir.as_str());
+    // The plugin folder lies below the installation, which for Oblivion
+    // Remastered is not the folder the checks read (ADR 0065).
+    let install = locate::install_dir(game, game_dir);
+    let dir = locate::on_disk(&install, report.plugin_dir.as_str());
     // Mod Organizer shows the game the plugins in the mods' folders.
     let below_data = report.plugin_dir.strip_base(&GamePath::new("data"));
     let virtual_dirs: Vec<PathBuf> = below_data.map_or_default(|below| {

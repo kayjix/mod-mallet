@@ -1,6 +1,7 @@
 //! Reads the log a script extender writes every time the game starts:
 //! `skse64.log` for SKSE, and the logs of its siblings (F4SE, SKSEVR,
-//! F4SEVR), which come from the same authors and share its lines.
+//! F4SEVR, and OBSE64, forked from SFSE), which come from the same authors
+//! and share its lines.
 //!
 //! The log is the game's own account of which native plugins it accepted,
 //! so everything derived from it is a fact, not a guess.
@@ -45,7 +46,7 @@ pub fn parse(game: Game, text: &str) -> ExtenderReport {
     for line in text.lines() {
         let line = line.trim_end();
         if let Some(header) = header_of(line) {
-            let (extender_version, game_version) = parse_header(header);
+            let (extender_version, game_version) = parse_header(game, header);
             report.extender_version = extender_version;
             report.game_version = game_version;
         } else if let Some(plugin) = parse_plugin_line(line) {
@@ -65,20 +66,26 @@ fn header_of(line: &str) -> Option<&str> {
 
 /// Parses the part of the header after `version = `, for example
 /// `2.3.1 01070680 01DD748122C36157, os = 6.2 (9200))`.
-fn parse_header(header: &str) -> (Option<String>, Option<String>) {
+fn parse_header(game: Game, header: &str) -> (Option<String>, Option<String>) {
     let versions = header.split(',').next().unwrap_or(header);
     let mut tokens = versions.split_whitespace();
     let extender_version = tokens.next().map(str::to_owned);
-    let game_version = tokens.next().and_then(decode_runtime_version);
+    let game_version = tokens
+        .next()
+        .and_then(|hex| decode_runtime_version(game, hex));
     (extender_version, game_version)
 }
 
 /// Decodes the game version SKSE logs as eight hex digits.
 ///
 /// SKSE packs a version as `major << 24 | minor << 16 | build << 4 | sub`,
-/// so `01070680` is version 1.7.104.
-fn decode_runtime_version(hex: &str) -> Option<String> {
-    if hex.len() != 8 {
+/// so `01070680` is version 1.7.104. OBSE64 packs the same way, but
+/// Oblivion Remastered's versions (0.411.140, 1.512.105) have a minor
+/// number too large for its eight bits, which runs into the major's: its
+/// library for 0.411.140 holds `019B08C0`. Such a number cannot be told
+/// back into a version, so none is read for this game (ADR 0092).
+fn decode_runtime_version(game: Game, hex: &str) -> Option<String> {
+    if hex.len() != 8 || game == Game::OblivionRemastered {
         return None;
     }
     let packed = u32::from_str_radix(hex, 16).ok()?;
@@ -208,15 +215,53 @@ plugin 1 allocated 1536 bytes from local pool
     #[test]
     fn decodes_packed_game_versions() {
         assert_eq!(
-            decode_runtime_version("01070680").as_deref(),
+            decode_runtime_version(Game::SkyrimSe, "01070680").as_deref(),
             Some("1.7.104")
         );
         assert_eq!(
-            decode_runtime_version("01050610").as_deref(),
+            decode_runtime_version(Game::SkyrimSe, "01050610").as_deref(),
             Some("1.5.97")
         );
-        assert_eq!(decode_runtime_version("0106").as_deref(), None);
-        assert_eq!(decode_runtime_version("zzzzzzzz").as_deref(), None);
+        assert_eq!(
+            decode_runtime_version(Game::SkyrimSe, "0106").as_deref(),
+            None
+        );
+        assert_eq!(
+            decode_runtime_version(Game::SkyrimSe, "zzzzzzzz").as_deref(),
+            None
+        );
+    }
+
+    /// A shortened log in the shapes OBSE64 0.1.0's library writes them, as
+    /// its format strings give them. Names and paths are made up.
+    const OBSE64_SAMPLE: &str = "\
+OBSE64 runtime: initialize (version = 0.1.0 019B08C0 01DBB1F2A4C3E000, os = 6.2 (9200))
+plugin directory = C:\\Games\\Oblivion Remastered\\OblivionRemastered\\Binaries\\Win64\\OBSE\\Plugins\\
+scanning plugin directory C:\\Games\\Oblivion Remastered\\OblivionRemastered\\Binaries\\Win64\\OBSE\\Plugins\\
+checking plugin Achievements.dll
+checking plugin Stale.dll
+plugin Achievements.dll (00000001 Achievements 00000001) loaded correctly (handle 1)
+plugin Stale.dll (00000001 Stale 00000001) disabled, incompatible with current version of the game 0 (handle 0)
+";
+
+    #[test]
+    fn obse64_logs_in_the_same_shapes_with_a_version_of_its_own() {
+        let report = parse(Game::OblivionRemastered, OBSE64_SAMPLE);
+        assert_eq!(report.extender_version.as_deref(), Some("0.1.0"));
+        // The game version does not fit the packing; it is not read.
+        assert_eq!(report.game_version, None);
+        assert_eq!(
+            report.plugin_dir.as_str(),
+            "oblivionremastered/binaries/win64/obse/plugins"
+        );
+        assert_eq!(
+            status_of(&report, "Achievements.dll"),
+            &ExtenderPluginStatus::Loaded
+        );
+        assert_eq!(
+            status_of(&report, "Stale.dll"),
+            &ExtenderPluginStatus::IncompatibleGameVersion
+        );
     }
 
     #[test]
@@ -327,6 +372,7 @@ plugin 1 allocated 1536 bytes from local pool
         #[test]
         fn never_panics_on_arbitrary_text(text in ".*") {
             let _ = parse(Game::SkyrimSe, &text);
+            let _ = parse(Game::OblivionRemastered, &text);
         }
 
         #[test]
@@ -337,6 +383,12 @@ plugin 1 allocated 1536 bytes from local pool
         ) {
             let _ = parse(Game::SkyrimSe, &format!("plugin {name}.dll ({info}) {tail}"));
             let _ = parse(Game::SkyrimSe, &format!("plugin {name}.dll (00000001 {info} 00000001) {tail} (handle 1)"));
+        }
+
+        #[test]
+        fn any_runtime_number_decodes_without_panicking(hex in "[0-9A-Fa-f]{8}") {
+            let _ = decode_runtime_version(Game::OblivionRemastered, &hex);
+            let _ = decode_runtime_version(Game::SkyrimSe, &hex);
         }
     }
 }

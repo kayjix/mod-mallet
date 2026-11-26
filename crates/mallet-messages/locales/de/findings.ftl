@@ -4,8 +4,14 @@
 ### Ausgangssprache: Dort kommt eine neue Befundart zuerst hinein.
 
 extender-plugin-incompatible = Script-Extender-Plugin passt nicht zur Spielversion
-    .headline = { $file } passt nicht zur Spielversion { $gameVersion }
-    .summary = { $file } wurde abgeschaltet, weil es nicht für die Spielversion { $gameVersion } gebaut ist.
+    .headline = { $gameVersion ->
+        [unknown] { $file } passt nicht zu deiner Spielversion
+       *[other] { $file } passt nicht zur Spielversion { $gameVersion }
+    }
+    .summary = { $gameVersion ->
+        [unknown] { $file } wurde abgeschaltet, weil es nicht für deine Spielversion gebaut ist.
+       *[other] { $file } wurde abgeschaltet, weil es nicht für die Spielversion { $gameVersion } gebaut ist.
+    }
     .explanation = Der Script Extender lädt native Plugins (DLL-Dateien), mit denen Mods Funktionen nachrüsten, die das Spiel allein nicht bietet. Jedes Plugin gibt an, welche Spielversionen es unterstützt. Dieses unterstützt deine Version nicht, deshalb hat der Script Extender es nicht geladen. Das Spiel startet trotzdem, aber alles, was das Plugin bereitstellt, fehlt. Andere Mods, die darauf aufbauen, können sich falsch verhalten.
     .remedy = Sieh auf der Seite der Mod nach, ob es eine Version für deine Spielversion gibt, und installiere sie. Gibt es noch keine, deaktiviere die Mod, bis sie aktualisiert wurde.
 
