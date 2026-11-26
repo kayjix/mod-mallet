@@ -101,31 +101,6 @@
   font-weight: 400;
 }
 
-.work-count {
-  min-width: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--spot-overlap);
-  color: #1b2a2e;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-.work-count[data-kind="duplicate"] {
-  background: var(--spot-duplicate);
-  color: #fff;
-}
-
-.work-count[data-kind="door"] {
-  background: var(--spot-door);
-  color: #fff;
-}
-
-.work-count[data-kind="touch"] {
-  background: var(--spot-touch);
-}
-
 .work-items {
   margin: 0;
   padding: 0;
@@ -215,29 +190,6 @@
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
-}
-
-.work-kind {
-  padding: 1px 10px;
-  border-radius: 999px;
-  background: var(--spot-overlap);
-  color: #1b2a2e;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.work-kind[data-kind="duplicate"] {
-  background: var(--spot-duplicate);
-  color: #fff;
-}
-
-.work-kind[data-kind="door"] {
-  background: var(--spot-door);
-  color: #fff;
-}
-
-.work-kind[data-kind="touch"] {
-  background: var(--spot-touch);
 }
 
 .work-choice {
@@ -338,9 +290,7 @@
   min-height: 0;
 }
 
-.swatch-spot[data-kind="deep"],
-.work-count[data-kind="deep"],
-.work-kind[data-kind="deep"] {
+.swatch-spot[data-kind="deep"] {
   background: var(--spot-deep);
   color: #1b2a2e;
 }

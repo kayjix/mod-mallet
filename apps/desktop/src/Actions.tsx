@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import type { Api } from "./api";
-import type { Decisions } from "./decisions";
+import { type Decisions, withLeftOnPurpose } from "./decisions";
 import type { DependencyTarget } from "./dependencies";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedOutcome } from "./generated/rendered-outcome";
@@ -137,9 +137,19 @@ export function useSession(): Session {
 export function useDecisions(): {
   decisions: Decisions;
   setChoices: (choices: PatchChoices) => void;
+  /** Leaves parts as they are where they still collide (ADR 0080), by their keys. */
+  leaveOnPurpose: (keys: string[]) => void;
 } {
-  const { decided, setPatchChoices } = useSession();
-  return { decisions: decided, setChoices: setPatchChoices };
+  const { decided, setPatchChoices, book, setBook } = useSession();
+  return {
+    decisions: decided,
+    setChoices: setPatchChoices,
+    leaveOnPurpose: (keys) => {
+      if (book !== null) {
+        setBook(withLeftOnPurpose(book, keys));
+      }
+    },
+  };
 }
 
 /** An action as one finding sees it: how to start it and what became of it. */

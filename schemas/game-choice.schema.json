@@ -36,6 +36,26 @@
         }
       ]
     },
+    "HealthVerdict": {
+      "description": "What a setup is like, in one word (ADR 0045).",
+      "oneOf": [
+        {
+          "description": "It plays well.",
+          "type": "string",
+          "const": "good"
+        },
+        {
+          "description": "It plays, but will look wrong in places.",
+          "type": "string",
+          "const": "suffers"
+        },
+        {
+          "description": "It is likely to crash.",
+          "type": "string",
+          "const": "crashes"
+        }
+      ]
+    },
     "KnownGame": {
       "description": "A game Mod Mallet knows, and where it is on this machine.",
       "type": "object",
@@ -50,6 +70,17 @@
         "id": {
           "description": "Identifier of the game, the same the mod manager uses, for example\n`skyrimse`.",
           "type": "string"
+        },
+        "lastHealth": {
+          "description": "How healthy its setup was when the user last looked at it, so that\nevery game scanned shows its score, not only the one in use (ADR\n0048). `None` while it has none.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LastHealth"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "name": {
           "description": "The game's name.",
@@ -80,6 +111,34 @@
         "name",
         "support",
         "scriptExtender"
+      ]
+    },
+    "LastHealth": {
+      "description": "The health of a game's setup as the window last weighed it (ADR 0045),\nkept with the game's settings. The window weighs it from the last scan\nand the decisions; the engine only keeps it.",
+      "type": "object",
+      "properties": {
+        "scannedAt": {
+          "description": "When the scan it was weighed from was made, in seconds since 1970.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "score": {
+          "description": "The score, from 0 to 100.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "verdict": {
+          "description": "The verdict in one word.",
+          "$ref": "#/$defs/HealthVerdict"
+        }
+      },
+      "required": [
+        "score",
+        "verdict",
+        "scannedAt"
       ]
     },
     "LocationOrigin": {

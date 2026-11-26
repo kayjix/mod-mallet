@@ -75,9 +75,10 @@ People who install mods read pictures faster than sentences.
 - The views carry what the sentences said; the texts left are short
   enough to translate and to read at a glance.
 - The 3D layer has one more look, dimmed, for objects in the background.
-- Parts left on purpose are remembered in the window's own storage, not in
-  the patch's choices: they change nothing in the patch, and a new window
-  on another machine asks again.
+- Parts left on purpose are not choices of a patch: they change nothing
+  in the patch. They were first remembered in the window's own storage, so
+  that another machine asked again; they are now kept in the settings (see
+  the amendment below).
 - More than two mods at a place stay a fallback: the others are named in
   the line under the views and can be picked out there; columns are for
   the two mods a passage is about.
@@ -92,3 +93,15 @@ People who install mods read pictures faster than sentences.
 - **A column for every mod at the place.** A passage is a pair by
   construction; a third column for a mod with a handful of objects would
   take the room of the views.
+
+## Amendment 2026-11-26: parts left on purpose are kept with the decisions
+
+Kept in the window's storage, "Keep both for those" was asked again on
+another machine, after the window's storage was cleared, or after a new
+installation. The parts left on purpose now go into the user's book of
+patches (ADR 0070) beside the pins, as `leftOnPurpose`, by the object's
+key. Like a pin, the list is no decision and belongs to no patch: it is
+not written into a patch and does not change what any patch hides. Every
+page reads it from the one snapshot of the decisions (ADR 0081). The
+review moves the parts it kept in the window's storage into the book the
+next time it is open, and forgets them there.

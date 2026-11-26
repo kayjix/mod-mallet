@@ -32,6 +32,12 @@ export interface KnownGame {
    */
   id: string;
   /**
+   * How healthy its setup was when the user last looked at it, so that
+   * every game scanned shows its score, not only the one in use (ADR
+   * 0048). `None` while it has none.
+   */
+  lastHealth?: LastHealth | null;
+  /**
    * The game's name.
    */
   name: string;
@@ -47,4 +53,23 @@ export interface KnownGame {
    * How far Mod Mallet can look at a setup of this game.
    */
   support: "full" | "basic";
+}
+/**
+ * The health of a game's setup as the window last weighed it (ADR 0045),
+ * kept with the game's settings. The window weighs it from the last scan
+ * and the decisions; the engine only keeps it.
+ */
+export interface LastHealth {
+  /**
+   * When the scan it was weighed from was made, in seconds since 1970.
+   */
+  scannedAt: number;
+  /**
+   * The score, from 0 to 100.
+   */
+  score: number;
+  /**
+   * The verdict in one word.
+   */
+  verdict: "good" | "suffers" | "crashes";
 }

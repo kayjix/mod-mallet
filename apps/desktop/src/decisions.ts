@@ -142,6 +142,12 @@ export interface Decisions {
    * `duel:` choices of the patches that count, as every other decision.
    */
   readonly duels: Record<string, number>;
+  /**
+   * The parts the user said to leave as they are where they still collide
+   * after a decision (ADR 0080), by {@link matchKey}. Kept in the book like
+   * the pins: no decision, in no patch, and the same on every machine.
+   */
+  readonly leftOnPurpose: ReadonlySet<string>;
   /** The patches that count and make a choice, by its key, in the order they count. */
   patchesOf(key: string): PatchRef[];
   /**
@@ -455,6 +461,7 @@ export function decisionsOf(input: DecisionInput): Decisions {
     choices,
     spots,
     duels,
+    leftOnPurpose: new Set(book?.leftOnPurpose ?? []),
     patchesOf: (key) => patchesOf([key]),
     hiddenKeys,
     hiddenObjects: [...hiddenObjects.values()],
@@ -819,4 +826,16 @@ export function chooseDuel(choices: PatchChoices, id: string, side: number | nul
     next[`${DUEL}${id}`] = String(side);
   }
   return next;
+}
+
+/**
+ * The book with `keys` added to the parts left on purpose where they still
+ * collide (ADR 0080); the same book if all of them were there already.
+ * The review's old storage in the window moves in with it once.
+ */
+export function withLeftOnPurpose(book: PatchBook, keys: Iterable<string>): PatchBook {
+  const before = book.leftOnPurpose ?? [];
+  const known = new Set(before);
+  const added = [...new Set(keys)].filter((key) => key !== "" && !known.has(key));
+  return added.length === 0 ? book : { ...book, leftOnPurpose: [...before, ...added] };
 }

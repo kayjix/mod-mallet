@@ -12,6 +12,14 @@ export interface PatchBook {
    */
   active: string;
   /**
+   * The parts the user said to leave as they are where they still
+   * collide after a decision, by the window's key of the object (ADR
+   * 0080). Like a pin, this is no decision and belongs to no patch: it
+   * changes nothing in the game, it only keeps the review from asking
+   * again.
+   */
+  leftOnPurpose?: string[];
+  /**
    * The patches, in the order in which they count: on the same decision
    * the later one wins.
    */

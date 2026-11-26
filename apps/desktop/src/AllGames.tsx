@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./Actions";
 import { openTaskCount } from "./arrange";
+import { gameScoreOf, lastHealthOf } from "./game-health";
 import { type Games, isPlayable } from "./games";
 import type { RenderedReport } from "./generated/rendered-report";
 import type { Health } from "./health";
@@ -75,6 +76,11 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
   const installed = report?.installedPatch?.objects.length;
   const r = useReviewTexts();
   const review = activeId === undefined ? null : storedReview(activeId);
+  // Every game scanned shows a score: the one in use as it stands, the
+  // others as they were when the user last looked at them (ADR 0048).
+  const now = report === null || health === null ? null : lastHealthOf(health, report.scannedAt);
+  const when = (seconds: number) =>
+    new Date(seconds * 1000).toLocaleString(lang, { dateStyle: "short", timeStyle: "short" });
 
   const tiles: { target: StartTarget; value: string; label: string }[] =
     report === null || health === null
@@ -174,6 +180,7 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
             const isActive = game.id === activeId;
             const knownGame = known.get(game.id);
             const playable = isPlayable(knownGame);
+            const score = gameScoreOf(knownGame, isActive, now, playable);
             const state = isActive
               ? null
               : knownGame === undefined
@@ -200,7 +207,18 @@ export function AllGames({ games, report, health, scanning, onScan, onOpen }: Al
                 <div className="game-text">
                   <strong>{game.name}</strong>
                   {isActive && <span className="game-in-use">{j.inUse}</span>}
-                  {isActive && report === null && <span className="aside">{j.notScanned}</span>}
+                  {score.type === "score" && (
+                    <div className="game-score" data-verdict={score.health.verdict}>
+                      <ScoreRing score={score.health.score} />
+                      <span className="game-score-words">
+                        <strong>{o.verdict[score.health.verdict]}</strong>
+                        <span className="aside">
+                          {score.now ? j.scoreNow : j.scoreAt(when(score.health.scannedAt))}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  {score.type === "unscanned" && <span className="aside">{j.notScanned}</span>}
                   {state !== null && <span className="aside">{state}</span>}
                   {knownGame !== undefined && scanTexts[lang].quips[game.id] !== undefined && (
                     <span className="aside game-quip">{scanTexts[lang].quips[game.id]}</span>

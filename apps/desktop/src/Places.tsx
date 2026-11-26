@@ -10,6 +10,9 @@ import type {
 } from "./generated/rendered-places";
 import type { Texts } from "./i18n";
 import { type ManagerTexts, managerTexts } from "./managers-texts";
+import { dialogStart, placeKind } from "./place-kinds";
+import { placesTexts } from "./places-texts";
+import { FileIcon, FolderIcon } from "./ui/icons";
 import { Note } from "./ui/kit";
 
 interface PlacesProps {
@@ -29,9 +32,9 @@ interface PlacesProps {
  * The places a scan reads, shown before anything is read (ADR 0018), and
  * the mod manager they belong to (ADR 0064).
  *
- * Each place comes with the rule that found it. The user agrees or enters
- * another path. A field that is left as suggested stays "found by its
- * rule": only what was typed is remembered as the user's choice. Picking
+ * Each place comes with the rule that found it. The user agrees, types or
+ * pastes another path, or picks one in the system's dialog. A field that is left as suggested stays "found by its
+ * rule": only what was changed is remembered as the user's choice. Picking
  * another manager shows the places it would read; nothing is kept until the
  * user confirms.
  */
@@ -241,7 +244,12 @@ interface PlaceFieldProps {
 }
 
 function PlaceField({ place, value, onChange, t }: PlaceFieldProps) {
+  const { api, lang } = useSession();
+  const b = placesTexts[lang];
   const { location } = place;
+  const kind = placeKind(location.role);
+  const [picking, setPicking] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const unchanged = value.trim() === location.path;
   // What is said about a path only holds for the path it was said about.
   const state = !unchanged
@@ -251,19 +259,55 @@ function PlaceField({ place, value, onChange, t }: PlaceFieldProps) {
       : location.path === ""
         ? t.placeUnknown
         : `${t.notFound} · ${place.originLabel}`;
+  const inputId = `place-${location.role}`;
+
+  // The system's own dialog, as a way besides typing (ADR 0018).
+  const browse = () => {
+    setPicking(true);
+    setFailure(null);
+    api
+      .pickPlace(kind, dialogStart(value), place.roleLabel)
+      .then((picked) => {
+        if (picked !== null) {
+          onChange(picked);
+        }
+      })
+      .catch((error: unknown) => setFailure(b.browseFailed(String(error))))
+      .finally(() => setPicking(false));
+  };
 
   return (
-    <label className="place" data-found={unchanged ? location.found : undefined}>
-      <span className="place-role">{place.roleLabel}</span>
-      <input
-        type="text"
-        value={value}
-        spellCheck={false}
-        placeholder={t.placeAutomatic}
-        autoComplete="off"
-        onChange={(event) => onChange(event.target.value)}
-      />
+    <div className="place" data-found={unchanged ? location.found : undefined}>
+      <label className="place-role" htmlFor={inputId}>
+        {place.roleLabel}
+      </label>
+      <div className="place-input">
+        <input
+          id={inputId}
+          type="text"
+          value={value}
+          spellCheck={false}
+          placeholder={t.placeAutomatic}
+          autoComplete="off"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="place-browse"
+          title={b.browseHint[kind]}
+          disabled={picking}
+          onClick={browse}
+        >
+          {kind === "folder" ? <FolderIcon /> : <FileIcon />}
+          {b.browse}
+        </button>
+      </div>
       <span className="place-origin">{state ?? " "}</span>
-    </label>
+      {failure !== null && (
+        <Note tone="danger" role="alert" compact>
+          <p>{failure}</p>
+        </Note>
+      )}
+    </div>
   );
 }

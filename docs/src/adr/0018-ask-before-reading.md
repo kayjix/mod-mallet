@@ -43,7 +43,8 @@ All five points are implemented. The settings are a JSON file,
 settings (`%APPDATA%mod-mallet` on Windows). It holds whether the user
 has agreed, and the places the user named; a place that is not named there
 is found by its rule every time. Paths are typed or pasted into the
-screen; a button that opens a folder dialog is still missing.
+screen, or picked with the button beside each place (see the amendment
+below).
 
 ## Consequences
 
@@ -55,3 +56,20 @@ screen; a button that opens a folder dialog is still missing.
   given to other people.
 - The scan report contains paths of the user's machine. An export meant for
   sharing has to shorten them (ADR 0014).
+
+## Amendment 2026-11-26: a button opens the system's dialog
+
+Typing a path is hard for someone who has never looked into the game's
+folders. Each place now has a "Browse…" button beside its field, on the
+first run and under Settings. It opens the system's own dialog: a file
+dialog for the places that are files (the list of plugins, the script
+extender's log, the mod manager's state and record of deployed files, the
+unpacker, the masterlist), a folder dialog for the others. It opens at the
+path in the field if that is a full path. The path picked goes into the
+field and counts as named by the user once confirmed, as a typed one does;
+typing and pasting still work.
+
+The dialog comes from Tauri's dialog plugin (`tauri-plugin-dialog`,
+`@tauri-apps/plugin-dialog`). The window is granted only its open dialog
+(`dialog:allow-open`). The dialog reads nothing and writes nothing; it
+hands back a path, and nothing is read before the places are confirmed.

@@ -4,7 +4,7 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSession } from "./Actions";
+import { useDecisions, useSession } from "./Actions";
 import { AreaLayer, isGamePlugin, LOOK, objectKey } from "./area-layer";
 import { isCollision, stepOf } from "./arrange";
 import {
@@ -14,7 +14,7 @@ import {
   type StageSegment,
 } from "./CompareStage3D";
 import { useCollisionStepTexts } from "./collision-step-texts";
-import { decidedOfParts, keepSide, leftoversOf, mergeDoors } from "./decisions";
+import { decidedOfParts, keepSide, leftoversOf, mergeDoors, withLeftOnPurpose } from "./decisions";
 import { DoorPanel } from "./doors";
 import type { AreaObject } from "./generated/area-objects";
 import type { ObjectAnchors } from "./generated/object-anchors";
@@ -89,7 +89,9 @@ interface Stored {
   place?: string | null;
   /**
    * Parts of a mod given up that the user said to leave as they are
-   * where they still collide (ADR 0080), by {@link objectKey}.
+   * where they still collide (ADR 0080), as the review kept them before
+   * they moved into the settings with the other decisions. They move once,
+   * the next time the review is open, and are gone from here afterwards.
    */
   accepted?: string[];
 }
@@ -112,7 +114,10 @@ export function storedReview(game: string): Stored | null {
     const accepted = Array.isArray(value.accepted)
       ? value.accepted.filter((key): key is string => typeof key === "string")
       : [];
-    return step === undefined ? null : { step, seen, place, accepted };
+    if (step === undefined) {
+      return null;
+    }
+    return accepted.length === 0 ? { step, seen, place } : { step, seen, place, accepted };
   } catch {
     return null;
   }
@@ -158,7 +163,8 @@ interface ReviewProps {
  * remembered per game.
  */
 export function Review({ report, game, onOpen }: ReviewProps) {
-  const { ignored, decisions, patchChoices } = useSession();
+  const { ignored, decisions, patchChoices, decided, book, setBook } = useSession();
+  const { leaveOnPurpose } = useDecisions();
   const r = useReviewTexts();
   const [stored, setStored] = useState<Stored>(
     () => storedReview(game) ?? { step: "install", seen: [] },
@@ -168,7 +174,16 @@ export function Review({ report, game, onOpen }: ReviewProps) {
   // lead there, and remembered so that coming back from another page finds it.
   const clusterAt = stored.place ?? null;
   const setClusterAt = (place: string) => setStored((before) => ({ ...before, place }));
-  const accepted = useMemo(() => new Set(stored.accepted ?? []), [stored.accepted]);
+  // Parts left on purpose are kept with the other decisions (ADR 0080);
+  // those the review kept in the window's storage before move there once.
+  const legacyAccepted = stored.accepted;
+  useEffect(() => {
+    if (book === null || legacyAccepted === undefined) {
+      return;
+    }
+    setBook(withLeftOnPurpose(book, legacyAccepted));
+    setStored(({ accepted: _moved, ...rest }) => rest);
+  }, [book, setBook, legacyAccepted]);
   // Where the collisions step puts its buttons for every place: in the bar of the steps.
   const [bar, setBar] = useState<HTMLElement | null>(null);
   // The segments of the places measured so far, by place, for the suggestions by size.
@@ -257,13 +272,8 @@ export function Review({ report, game, onOpen }: ReviewProps) {
             report={report}
             game={game}
             bar={bar}
-            accepted={accepted}
-            onAccept={(keys) =>
-              setStored((before) => ({
-                ...before,
-                accepted: [...new Set([...(before.accepted ?? []), ...keys])],
-              }))
-            }
+            accepted={decided.leftOnPurpose}
+            onAccept={leaveOnPurpose}
             survey={survey}
             onSurvey={(key, found) => setSurvey((before) => new Map(before).set(key, found))}
             clusters={clusters}
@@ -368,7 +378,7 @@ export function CollisionsStep({
   /** Where the buttons for every place go, if not above the place. */
   bar: HTMLElement | null;
   /** Parts left where they still collide on purpose, by {@link objectKey}. */
-  accepted: Set<string>;
+  accepted: ReadonlySet<string>;
   /** Leaves these parts as they are where they still collide. */
   onAccept: (keys: string[]) => void;
   survey: Map<string, StageSegment[]>;
@@ -1927,28 +1937,33 @@ function SideColumn({
       ) : (
         effect.parts.length > 0 && (
           <>
-            <p className="review-side-effect">
+            <Note
+              tone={nothing ? "warning" : "info"}
+              compact
+              className="review-side-effect"
+              actions={
+                effect.go.length > 0 && (
+                  <button
+                    type="button"
+                    className="small quiet"
+                    aria-pressed={shownApart === `${side}:go`}
+                    onClick={() =>
+                      onShowApart(`${side}:go`, effect.go, c.goingParts(effect.go.length, other))
+                    }
+                  >
+                    <Eye open /> {c.showThese}
+                  </button>
+                )
+              }
+            >
               {nothing ? (
-                <>
-                  <span>{c.effectNothing(other)}</span>
-                  <InfoTip text={c.effectNothingTip} />
-                </>
+                <p>
+                  {c.effectNothing(other)} <InfoTip text={c.effectNothingTip} />
+                </p>
               ) : (
-                <span>{c.effectGo(other, effect.go.length, effect.parts.length)}</span>
+                <p>{c.effectGo(other, effect.go.length, effect.parts.length)}</p>
               )}
-              {effect.go.length > 0 && (
-                <button
-                  type="button"
-                  className="small quiet"
-                  aria-pressed={shownApart === `${side}:go`}
-                  onClick={() =>
-                    onShowApart(`${side}:go`, effect.go, c.goingParts(effect.go.length, other))
-                  }
-                >
-                  <Eye open /> {c.showThese}
-                </button>
-              )}
-            </p>
+            </Note>
             {badges.length > 0 && (
               <div className="review-side-badges">
                 {badges.map((badge) => (

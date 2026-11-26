@@ -28,8 +28,10 @@ import { catalogueTexts } from "./catalogue-texts";
 import { choicesAtStart, chooseDuel, snapshotOf, withLegacyDuels, worldOf } from "./decisions";
 import type { DependencyTarget } from "./dependencies";
 import { EditingChip } from "./editing-chip";
+import { lastHealthOf, sameHealth } from "./game-health";
 import { GameLacks } from "./game-lacks";
 import { type Games, useGames } from "./games";
+import type { LastHealth } from "./generated/game-choice";
 import type { PatchBook } from "./generated/patch-book";
 import type { RenderedLink } from "./generated/rendered-link";
 import type { RenderedPlaces } from "./generated/rendered-places";
@@ -124,6 +126,9 @@ const TOOLBOX_EVERY = 15000;
 
 /** How long the patch's choices rest before they are saved, in milliseconds. */
 const SAVE_CHOICES_AFTER = 400;
+
+/** How long the score has to rest before it is kept for the page of all games, in milliseconds. */
+const KEEP_HEALTH_AFTER = 1500;
 
 export default function App({ api, startLang }: AppProps) {
   const [lang, setLang] = useState<Lang>(startLang);
@@ -674,6 +679,30 @@ export default function App({ api, startLang }: AppProps) {
     () => (report === null ? null : healthOf(report, ignored, split.active)),
     [report, ignored, split],
   );
+  // The score of the game in use is kept with its settings, so that the
+  // page of all games shows it while another game is in use (ADR 0048).
+  // It is weighed with the decisions, so it waits for the book; and it is
+  // written once the score rests, not at every step of a change.
+  const keptHealth = useRef<LastHealth | null | undefined>(undefined);
+  const activeGame = games.active;
+  useEffect(() => {
+    if (report === null || health === null || book === null || activeGame === null) {
+      return;
+    }
+    const next = lastHealthOf(health, report.scannedAt);
+    const kept = keptHealth.current === undefined ? activeGame.lastHealth : keptHealth.current;
+    if (sameHealth(kept, next)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      keptHealth.current = next;
+      api.setLastHealth(next).catch(() => {
+        // Only shown on the page of all games; the next change tries again.
+        keptHealth.current = kept ?? null;
+      });
+    }, KEEP_HEALTH_AFTER);
+    return () => window.clearTimeout(timer);
+  }, [api, report, health, book, activeGame]);
 
   // Nothing is read before the user has seen where Mod Mallet looks.
   const askFirst = places !== null && !places.confirmed;

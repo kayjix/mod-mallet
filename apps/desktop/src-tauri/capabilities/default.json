@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "What the main window may ask the app to do. Grant only what a feature needs.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

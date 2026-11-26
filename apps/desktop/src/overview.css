@@ -397,38 +397,7 @@
 .mod-collision-kinds {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: 0.85rem;
-}
-
-.kind-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.kind-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--spot-overlap);
-}
-
-.kind-count[data-kind="duplicate"] .kind-dot {
-  background: var(--spot-duplicate);
-}
-
-.kind-count[data-kind="door"] .kind-dot {
-  background: var(--spot-door);
-}
-
-.kind-count[data-kind="deep"] .kind-dot {
-  background: var(--spot-deep);
-}
-
-.kind-count[data-kind="touch"] .kind-dot {
-  background: var(--spot-touch);
+  gap: 4px 6px;
 }
 
 @media (max-width: 760px) {

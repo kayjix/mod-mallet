@@ -178,21 +178,31 @@ export function SearchField({
   );
 }
 
-/** A short state in words, tinted by its tone; `icon` adds the tone's sign. */
+/**
+ * A short state in words, tinted by its tone; `icon` adds the tone's sign.
+ * With a `colour` it names something that has a colour of its own, such
+ * as a kind of collision: a dot of that colour goes in front, and the words
+ * say what it is, so that the colour is never alone.
+ */
 export function Chip({
   tone = "neutral",
   icon = false,
+  colour,
   title,
   children,
 }: {
   tone?: Tone;
   icon?: boolean;
+  /** The colour of what it names, as a CSS colour. */
+  colour?: string;
   title?: string;
   children: ReactNode;
 }) {
+  const style = colour === undefined ? undefined : ({ "--chip-colour": colour } as CSSProperties);
   return (
-    <span className="chip" data-tone={tone} title={title}>
+    <span className="chip" data-tone={tone} title={title} style={style}>
       {icon && <ToneIcon tone={tone} />}
+      {colour !== undefined && <span className="chip-dot" aria-hidden="true" />}
       {children}
     </span>
   );

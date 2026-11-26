@@ -47,6 +47,7 @@ desktop app's own dependencies go into `apps/desktop/package.json`.
 | Logging | `tracing`, `tracing-subscriber` | |
 | System locations | `dirs`, `winreg` (Windows only) | |
 | Desktop shell | `tauri` | |
+| Picking a place in the system's dialog | `tauri-plugin-dialog`, `@tauri-apps/plugin-dialog` | Only its open dialog is granted to the window (ADR 0018). Brings `rfd` |
 | Tests | `proptest`, `insta`, `tempfile` | |
 
 ## Written ourselves, and why

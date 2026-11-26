@@ -31,6 +31,7 @@ import {
   mergeDoors,
   snapshotOf,
   spotsByFinding,
+  withLeftOnPurpose,
   withLegacyDuels,
 } from "../src/decisions.ts";
 import type { PatchBook } from "../src/generated/patch-book";
@@ -437,7 +438,7 @@ const topNeeded = spotAt(PAIR, [roof, neededLadder]);
 const neededWorld = () => ({ ...worldOf(), spots: spotsByFinding([walls, topNeeded, doorway]) });
 
 /** The bunkhouse as Go through it reads it: its two spots, and its sections. */
-function reviewPlace(accepted: Set<string> = new Set()) {
+function reviewPlace(accepted: ReadonlySet<string> = new Set()) {
   const entries = [walls, topNeeded].map((spot) => ({
     key: spotKey(spot as never) as string,
     spot: spot as never,
@@ -460,6 +461,53 @@ function reviewPlace(accepted: Set<string> = new Set()) {
 }
 
 const keys = [walls, top].map((spot) => spotKey(spot as never) as string);
+
+test("parts left on purpose are kept in the book outside every patch, on every machine", () => {
+  const window = new Window(bookFromChoices({}), neededWorld());
+  window.change((d) =>
+    d.keepSide({
+      kept: [wall.object, roof.object],
+      gone: [townWall.object, crate.object],
+      spots: keys,
+      loser: TOWN,
+    }),
+  );
+  const choices = countedChoices(window.book);
+  assert.notEqual(leftoversOf(window.decisions, reviewPlace(window.decisions.leftOnPurpose)), null);
+  // "Keep both for those" in the review.
+  window.book = withLeftOnPurpose(window.book, [matchKey(ladder.object)]);
+  assert.equal(leftoversOf(window.decisions, reviewPlace(window.decisions.leftOnPurpose)), null);
+  // No decision changed, and no patch holds it.
+  assert.deepEqual(countedChoices(window.book), choices);
+  assert.ok(
+    window.book.patches.every(
+      (patch) => !Object.keys(patch.decisions).some((key) => key.includes(matchKey(ladder.object))),
+    ),
+  );
+  // Another machine reads the same settings and does not ask again.
+  const elsewhere = new Window(JSON.parse(JSON.stringify(window.book)), neededWorld());
+  assert.equal(
+    leftoversOf(elsewhere.decisions, reviewPlace(elsewhere.decisions.leftOnPurpose)),
+    null,
+  );
+  // A later decision on any page keeps them.
+  window.change((d) => d.hide([lamp]));
+  assert.deepEqual(window.book.leftOnPurpose, [matchKey(ladder.object)]);
+});
+
+test("the review's parts left on purpose move from the window's storage once", () => {
+  const book = bookFromChoices({});
+  const moved = withLeftOnPurpose(book, ["a.esp:7", "b.esp:9", "a.esp:7"]);
+  assert.deepEqual(moved.leftOnPurpose, ["a.esp:7", "b.esp:9"]);
+  // Moving again, or nothing, changes nothing: the same book, so nothing is saved.
+  assert.equal(withLeftOnPurpose(moved, ["b.esp:9"]), moved);
+  assert.equal(withLeftOnPurpose(book, []), book);
+  assert.deepEqual(withLeftOnPurpose(moved, ["c.esp:1"]).leftOnPurpose, [
+    "a.esp:7",
+    "b.esp:9",
+    "c.esp:1",
+  ]);
+});
 
 test("a side kept in the review shows on every page, and the leftover line names what still collides", () => {
   const window = new Window(bookFromChoices({}), neededWorld());

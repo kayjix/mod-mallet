@@ -92,9 +92,8 @@ pages; this record states the rules.
 
 - Fewer buttons per page, and each decision has an obvious place. Someone
   used to deciding a pair on the patch page has to go to Collisions.
-- The overview and *All games* are two pages where Home was one. A score
-  per game on *All games* needs the last scan of each game to be kept;
-  until it is, only the game in use shows one.
+- The overview and *All games* are two pages where Home was one. Every
+  game scanned shows a score on *All games* (see the amendment below).
 - The comparison, once reached only through a duel's button, has a place
   in the navigation, and the ranking with it.
 - Reading every WRLD on every scan costs little (a few hundred records)
@@ -130,3 +129,17 @@ pages; this record states the rules.
   it is why Blackreach appeared as a fragment and the cities' worldspaces
   as odd entries. The map's job is to look at places, not only at
   collisions.
+
+## Amendment 2026-11-26: every game scanned shows its score
+
+*All games* showed a score only for the game in use, since the score is
+weighed in the window from the last scan and the decisions (ADR 0045) and
+only the game in use has both at hand. Now the window keeps the score of
+the game in use, with its verdict and the time of the scan it was weighed
+from, in that game's settings (`lastHealth`) once it has rested for a
+moment. The list of games returns it with each game. Each card shows a
+small ring with the score and the verdict: the game in use as it stands
+now, every other game as it was when the user last looked at it, with the
+date of that scan. A game that is installed and has no score says "Not
+scanned yet". A game scanned before scores were kept shows one once it has
+been opened again.

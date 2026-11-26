@@ -85,6 +85,7 @@ import { DisablePluginsButton, ShowFilesButton, STILL_LOADED, stillFiles } from 
 import { switchedOffTexts } from "./switched-off-texts";
 import { TaskList } from "./Tasks";
 import {
+  Chip,
   EmptyState,
   Note as NoteBox,
   PageHeader,
@@ -1323,6 +1324,7 @@ function WorkList({
   passageAt,
   onPassage,
 }: WorkListProps) {
+  const { t } = useSession();
   const pinText = usePinTexts();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const currentGroup = current === null ? null : groupOf(current, by).key;
@@ -1384,9 +1386,10 @@ function WorkList({
               </span>
               <span className="work-group-counts">
                 {kinds.map(({ kind, count }) => (
-                  <span key={kind} className="work-count" data-kind={kind}>
+                  <Chip key={kind} colour={`var(--spot-${kind})`} title={t.spotKinds[kind]}>
+                    <span className="visually-hidden">{t.spotKinds[kind]} </span>
                     {count}
-                  </span>
+                  </Chip>
                 ))}
                 <span className="aside">
                   {decided}/{items.length}
@@ -1884,9 +1887,9 @@ function Spot(props: SpotProps & SpotFrameProps) {
         ) : (
           <>
             <div className="work-nav">
-              <span className="work-kind" data-kind={item.kind} title={t.spotKindHints[item.kind]}>
+              <Chip colour={`var(--spot-${item.kind})`} title={t.spotKindHints[item.kind]}>
                 {t.spotKinds[item.kind]}
-              </span>
+              </Chip>
               <strong>{item.region.label}</strong>
               {item.region.aside !== null && <span className="aside">{item.region.aside}</span>}
               {depth !== null && item.kind !== "duplicate" && (

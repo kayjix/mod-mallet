@@ -76,6 +76,11 @@ pub struct Settings {
     /// one found on the machine is suggested (ADR 0064).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manager: Option<String>,
+    /// How healthy the setup was when the user last looked at it, as the
+    /// window weighed it, for the list of games (ADR 0048). `None` until
+    /// the game was scanned and looked at.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_health: Option<mallet_core::LastHealth>,
 }
 
 impl Settings {
@@ -336,8 +341,8 @@ pub fn known_games(path: &Path) -> Result<GameChoice, EngineError> {
     let games = Game::ALL
         .into_iter()
         .map(|game| {
-            let named = file
-                .of(game)
+            let settings = file.of(game);
+            let named = settings
                 .places
                 .get(&LocationRole::GameDir)
                 .map(|dir| (dir.clone(), LocationOrigin::Given));
@@ -349,6 +354,7 @@ pub fn known_games(path: &Path) -> Result<GameChoice, EngineError> {
                 dir: found.as_ref().map(|(dir, _)| dir.display().to_string()),
                 origin: found.map(|(_, origin)| origin),
                 script_extender: game.script_extender().short_name.to_owned(),
+                last_health: settings.last_health,
             }
         })
         .collect();
@@ -670,6 +676,36 @@ mod tests {
     }
 
     #[test]
+    fn every_game_shows_the_health_it_had_when_last_looked_at() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        let skyrim = mallet_core::LastHealth {
+            score: 72,
+            verdict: mallet_core::HealthVerdict::Suffers,
+            scanned_at: 1_764_000_000,
+        };
+        select_game(&path, "skyrimse").unwrap();
+        update_settings(&path, |settings| settings.last_health = Some(skyrim)).unwrap();
+        select_game(&path, "fallout4").unwrap();
+        let fallout = mallet_core::LastHealth {
+            score: 95,
+            verdict: mallet_core::HealthVerdict::Good,
+            scanned_at: 1_764_100_000,
+        };
+        update_settings(&path, |settings| settings.last_health = Some(fallout)).unwrap();
+
+        let games = known_games(&path).unwrap().games;
+        let health = |id: &str| games.iter().find(|game| game.id == id).unwrap().last_health;
+        assert_eq!(health("skyrimse"), Some(skyrim));
+        assert_eq!(health("fallout4"), Some(fallout));
+        // A game never scanned has none, and says nothing about it.
+        assert_eq!(health("falloutnv"), None);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"lastHealth\""), "{text}");
+        assert!(text.contains("\"suffers\""), "{text}");
+    }
+
+    #[test]
     fn settings_come_back_as_they_were_saved() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("nested").join("settings.json");
@@ -707,6 +743,7 @@ mod tests {
                 }],
                 active: "own".to_owned(),
                 pins: vec!["pin:spot:x".to_owned()],
+                left_on_purpose: vec!["a.esp:7".to_owned()],
             }),
             preferences: Some(mallet_core::PatchPreferences {
                 rules: vec![mallet_core::PreferenceRule {
@@ -717,6 +754,11 @@ mod tests {
                 ..mallet_core::PatchPreferences::default()
             }),
             manager: Some("mo2".to_owned()),
+            last_health: Some(mallet_core::LastHealth {
+                score: 41,
+                verdict: mallet_core::HealthVerdict::Crashes,
+                scanned_at: 1_764_000_000,
+            }),
         };
 
         save_settings(&path, &settings).unwrap();

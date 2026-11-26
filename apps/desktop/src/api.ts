@@ -6,6 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { AreaLand } from "./generated/area-land";
 import type { AreaObjects } from "./generated/area-objects";
 import type { AreaPaths } from "./generated/area-paths";
@@ -16,7 +17,7 @@ import type { CreatedPaths } from "./generated/created-paths";
 import type { DoorReach } from "./generated/door-reach";
 import type { FileComparison } from "./generated/file-comparison";
 import type { FilePreview } from "./generated/file-preview";
-import type { GameChoice } from "./generated/game-choice";
+import type { GameChoice, LastHealth } from "./generated/game-choice";
 import type { HiddenWalkways } from "./generated/hidden-walkways";
 import type { LoadedPatch } from "./generated/loaded-patch";
 import type { LodMesh } from "./generated/lod-mesh";
@@ -46,6 +47,7 @@ import type { SpotsReach } from "./generated/spots-reach";
 import type { WalkwayReach } from "./generated/walkway-reach";
 import type { WalkwayRepair } from "./generated/walkway-repair";
 import type { Lang } from "./i18n";
+import type { PlaceKind } from "./place-kinds";
 
 /** The places the user named, by what they are for. */
 export type NamedPlaces = Partial<Record<ScanLocation["role"], string>>;
@@ -95,6 +97,12 @@ export interface Api {
    * keeps the one before), and that they agreed to the rest.
    */
   confirmPlaces(named: NamedPlaces, manager: string | null, lang: Lang): Promise<RenderedPlaces>;
+  /**
+   * Asks the user for a file or a folder in the system's own dialog, opened
+   * at `start` if given, with `title` above it. Resolves to the path picked,
+   * or null if the dialog was closed. Nothing is read.
+   */
+  pickPlace(kind: PlaceKind, start: string | null, title: string): Promise<string | null>;
   /** The identities of the findings the user has set aside. */
   ignored(): Promise<string[]>;
   /** Sets a finding aside or brings it back; resolves to all set aside. */
@@ -281,6 +289,11 @@ export interface Api {
   games(): Promise<GameChoice>;
   /** Makes a game the one to look at; each game keeps its own settings. */
   selectGame(game: string): Promise<GameChoice>;
+  /**
+   * Remembers how healthy the setup of the game in use is, for the list of
+   * games while another game is in use (ADR 0048).
+   */
+  setLastHealth(health: LastHealth): Promise<void>;
 }
 
 const tauriApi: Api = {
@@ -301,6 +314,13 @@ const tauriApi: Api = {
     invoke<RenderedPlaces>("places_for_manager", { manager, instance, lang }),
   confirmPlaces: (named, manager, lang) =>
     invoke<RenderedPlaces>("confirm_places", { named, manager, lang }),
+  pickPlace: (kind, start, title) =>
+    open({
+      directory: kind === "folder",
+      multiple: false,
+      defaultPath: start ?? undefined,
+      title,
+    }),
   ignored: () => invoke<string[]>("ignored"),
   setIgnored: (id, ignored) => invoke<string[]>("set_ignored", { id, ignored }),
   setupFingerprint: () => invoke<string>("setup_fingerprint"),
@@ -369,6 +389,7 @@ const tauriApi: Api = {
   setDecision: (id, side) => invoke<Record<string, number>>("set_decision", { id, side }),
   games: () => invoke<GameChoice>("games"),
   selectGame: (game) => invoke<GameChoice>("select_game", { game }),
+  setLastHealth: (health) => invoke<void>("set_last_health", { health }),
 };
 
 function runsInsideTauri(): boolean {

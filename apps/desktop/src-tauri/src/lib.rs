@@ -275,6 +275,16 @@ fn set_preferences(preferences: mallet_core::PatchPreferences) -> Result<(), Str
     Ok(())
 }
 
+/// Remembers how healthy the setup of the game in use is, as the window
+/// weighed it from the last scan and the decisions, so that the list of
+/// games shows it while another game is in use (ADR 0048). Called when the
+/// score changes.
+#[tauri::command(async)]
+fn set_last_health(health: mallet_core::LastHealth) -> Result<(), String> {
+    change_settings(|settings| settings.last_health = Some(health))?;
+    Ok(())
+}
+
 /// Reads the patch in an archive the user picked, by its file name and its
 /// bytes. Nothing is installed or written.
 #[tauri::command(async)]
@@ -987,6 +997,9 @@ pub fn run() -> tauri::Result<()> {
         let _ = mallet_engine::start_logging(&dir);
     }
     tauri::Builder::default()
+        // Only the open dialog is granted (capabilities/default.json): it
+        // names a place to read, it reads and writes nothing itself.
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 fit_window(&window);
@@ -1060,7 +1073,8 @@ pub fn run() -> tauri::Result<()> {
             set_preferences,
             load_patch_archive,
             games,
-            select_game
+            select_game,
+            set_last_health
         ])
         .run(tauri::generate_context!())
 }

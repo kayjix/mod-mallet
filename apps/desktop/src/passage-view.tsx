@@ -19,7 +19,7 @@ import { useReviewTexts } from "./review-texts";
 import { findSegments, type StageSegment } from "./segments";
 import { Note, NoteRow } from "./spot-notes";
 import "./passage-view.css";
-import { Note as NoteBox, UndoButton } from "./ui/kit";
+import { Chip, Note as NoteBox, UndoButton } from "./ui/kit";
 
 /** What the view shows of a passage: the place now, or one side's version only. */
 export type PassageVersion = "now" | 0 | 1;
@@ -212,16 +212,16 @@ export function PassageHead({
   return (
     <div className="passage-head">
       <div className="work-nav passage-nav">
-        <span className="work-kind" data-kind={cluster.kind}>
-          {p.kind[passage.severity]}
-        </span>
+        <Chip colour={`var(--spot-${cluster.kind})`}>{p.kind[passage.severity]}</Chip>
         <strong>{title(passage, worlds)}</strong>
         <span className="aside">{facts.join(" · ")}</span>
         <NoteRow>
           <Note tone="info" summary={p.whyShort} hint={`${p.why[passage.severity]} ${p.bounded}`}>
-            <p className="aside">
-              {p.why[passage.severity]} {p.bounded}
-            </p>
+            <NoteBox tone="info">
+              <p>
+                {p.why[passage.severity]} {p.bounded}
+              </p>
+            </NoteBox>
           </Note>
           {outcome !== null && outcome.held > 0 && (
             <Note
@@ -229,9 +229,11 @@ export function PassageHead({
               summary={p.held(outcome.held)}
               hint={`${p.held(outcome.held)}. ${p.heldHint}`}
             >
-              <p className="aside">
-                {p.held(outcome.held)}. {p.heldHint}
-              </p>
+              <NoteBox tone="warning">
+                <p>
+                  {p.held(outcome.held)}. {p.heldHint}
+                </p>
+              </NoteBox>
             </Note>
           )}
         </NoteRow>

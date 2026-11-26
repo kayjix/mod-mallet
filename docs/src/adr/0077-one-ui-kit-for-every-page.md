@@ -80,10 +80,10 @@ own pieces.
 - `App.css` is gone. The split was mechanical first and was checked to give
   every element of every page the same computed style in both themes; the
   look changed only in the later, deliberate commits.
-- Some pages still carry their own variants of a note or a mark. These are
-  the passage and reach notes of the 3D panels, the review's effect lines,
-  and the work list's kind counts. They are to be moved onto the kit when
-  those pages change next. The Tasks page, redesigned at the same time,
+- Some pages still carried their own variants of a note or a mark: the
+  passage and reach notes of the 3D panels, the review's effect lines, and
+  the work list's kind counts. They are on the kit since 2026-11-26 (see
+  the last amendment). The Tasks page, redesigned at the same time,
   joins the kit with its rows and groups.
 - The kit's `Note` has the same name as the badge in `spot-notes.tsx`.
   Files that use both import the kit's as `NoteBox`.
@@ -136,3 +136,19 @@ redundant:
   spot.
 - Taking every suggestion moved to the page's head.
 - The collisions that name no spot fold below the worklist.
+
+## Amendment 2026-11-26: the last variants join the kit
+
+15. **A kind with a colour of its own is a `Chip` with a `colour`.** A dot
+    of the kind's colour stands in front of the words; where a chip holds
+    only a count, its kind is named for screen readers and in its tooltip.
+    The work list's counts per kind, the kind of a spot or passage in its
+    head, and the kinds of collision on a mod's page use it.
+16. **What a 3D panel's badge opens is a kit `Note`.** The reach of the
+    ways (all reached: ok; ways that change: warning) and the passage's
+    notes (why one version has to go: info; parts held back: warning) open
+    to the kit's note, and in full they stand as one.
+17. **The review's line on what keeping a side does is a compact `Note`**,
+    info, or warning where keeping it hides nothing, with "Show these" as
+    its action. A passage's summary is the kit's note that opens, without
+    a frame of its own.

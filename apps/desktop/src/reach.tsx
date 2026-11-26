@@ -11,6 +11,7 @@ import type { ReachChange, Route, WalkwayReach } from "./generated/walkway-reach
 import { reachTexts } from "./reach-texts";
 import { Note } from "./spot-notes";
 import { spotNotesTexts } from "./spot-notes-texts";
+import { Note as NoteBox } from "./ui/kit";
 import "./reach.css";
 
 /** How many changes a note lists before it counts the rest. */
@@ -134,7 +135,9 @@ export function ReachNote({
     const all = r.allReached(reach.checked);
     return (
       <Note tone="ok" summary={n.reachAll(reach.checked)} hint={all}>
-        <p className="reach-note reach-fine">{all}</p>
+        <NoteBox tone="ok" compact>
+          <p>{all}</p>
+        </NoteBox>
       </Note>
     );
   }
@@ -148,8 +151,8 @@ export function ReachNote({
       summary={n.reachChanges(reach.changes.length)}
       hint={reach.changes.map(sentence).join("\n")}
     >
-      <div className="reach-note">
-        <ul>
+      <NoteBox tone="warning">
+        <ul className="reach-list">
           {listed.map((change) => (
             <li
               key={`${change.outcome}|${change.destination.object.plugin}:${change.destination.object.localId}`}
@@ -161,7 +164,7 @@ export function ReachNote({
         </ul>
         {rest > 0 && <p className="reach-more">{r.more(rest)}</p>}
         <p className="reach-legend">{r.legend}</p>
-      </div>
+      </NoteBox>
       {offers}
     </Note>
   );

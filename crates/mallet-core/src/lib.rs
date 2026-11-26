@@ -60,11 +60,11 @@ pub use path::GamePath;
 pub use preferences::{PatchPreferences, PreferenceAnswer, PreferenceAnswerKind, PreferenceRule};
 pub use progress::{Progress, ScanProgress, ScanStep};
 pub use report::{
-    FilePreview, GameChoice, GameInfo, GameLack, GameSupport, InstalledPatch, KnownGame,
-    LoadedPlugin, LocationOrigin, LocationRole, MapBounds, MapCell, MapImage, MapMarker,
-    MapPassage, MapSpot, MapTerrain, MapWorld, ModInfo, PassageSeverity, PlaceKind, PlaceOrigin,
-    PreviewVersion, ScanLocation, ScanReport, SpotKind, SpotLocation, SpotPart, WorldMap,
-    WorldOrigin,
+    FilePreview, GameChoice, GameInfo, GameLack, GameSupport, HealthVerdict, InstalledPatch,
+    KnownGame, LastHealth, LoadedPlugin, LocationOrigin, LocationRole, MapBounds, MapCell,
+    MapImage, MapMarker, MapPassage, MapSpot, MapTerrain, MapWorld, ModInfo, PassageSeverity,
+    PlaceKind, PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotKind, SpotLocation,
+    SpotPart, WorldMap, WorldOrigin,
 };
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};
 pub use unreal::{PakFolder, UnrealPak};

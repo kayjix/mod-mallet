@@ -158,6 +158,37 @@ pub struct KnownGame {
     pub origin: Option<LocationOrigin>,
     /// The short name of the game's script extender, such as `SKSE`.
     pub script_extender: String,
+    /// How healthy its setup was when the user last looked at it, so that
+    /// every game scanned shows its score, not only the one in use (ADR
+    /// 0048). `None` while it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_health: Option<LastHealth>,
+}
+
+/// The health of a game's setup as the window last weighed it (ADR 0045),
+/// kept with the game's settings. The window weighs it from the last scan
+/// and the decisions; the engine only keeps it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LastHealth {
+    /// The score, from 0 to 100.
+    pub score: u8,
+    /// The verdict in one word.
+    pub verdict: HealthVerdict,
+    /// When the scan it was weighed from was made, in seconds since 1970.
+    pub scanned_at: u64,
+}
+
+/// What a setup is like, in one word (ADR 0045).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum HealthVerdict {
+    /// It plays well.
+    Good,
+    /// It plays, but will look wrong in places.
+    Suffers,
+    /// It is likely to crash.
+    Crashes,
 }
 
 /// A place the scan looked at, so that nobody has to wonder what was read.
