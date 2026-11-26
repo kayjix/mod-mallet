@@ -385,7 +385,7 @@ pub fn split_geometry(record: &Record) -> Option<Geometry> {
 /// How many entries of `len` bytes `field` holds, if it ends on a whole
 /// one.
 fn whole_entries(field: &[u8], len: usize) -> Option<usize> {
-    (field.len() % len == 0).then(|| field.len() / len)
+    field.len().is_multiple_of(len).then(|| field.len() / len)
 }
 
 /// The field with the triangles in `cut` taken out of the paths: nothing
@@ -931,29 +931,29 @@ mod tests {
         data.extend(count(links.len()));
         data.extend(count(0));
         data.extend(count(doors.len()));
-        let nvvx: Vec<u8> = vertices
+        let vertex_bytes: Vec<u8> = vertices
             .iter()
             .flat_map(|vertex| vertex.iter().flat_map(|value| value.to_le_bytes()))
             .collect();
-        let mut nvtr = Vec::new();
+        let mut triangle_bytes = Vec::new();
         for (corners, edges, flags) in triangles {
             for value in corners.iter().chain(edges) {
-                nvtr.extend(value.to_le_bytes());
+                triangle_bytes.extend(value.to_le_bytes());
             }
-            nvtr.extend(flags.to_le_bytes());
-            nvtr.extend(0x0101u16.to_le_bytes());
+            triangle_bytes.extend(flags.to_le_bytes());
+            triangle_bytes.extend(0x0101u16.to_le_bytes());
         }
-        let mut nvdp = Vec::new();
+        let mut door_bytes = Vec::new();
         for (triangle, door) in doors {
-            nvdp.extend(door.to_le_bytes());
-            nvdp.extend(triangle.to_le_bytes());
-            nvdp.extend([0; 2]);
+            door_bytes.extend(door.to_le_bytes());
+            door_bytes.extend(triangle.to_le_bytes());
+            door_bytes.extend([0; 2]);
         }
-        let mut nvex = Vec::new();
+        let mut link_bytes = Vec::new();
         for (navmesh, triangle) in links {
-            nvex.extend(0u32.to_le_bytes());
-            nvex.extend(navmesh.to_le_bytes());
-            nvex.extend(triangle.to_le_bytes());
+            link_bytes.extend(0u32.to_le_bytes());
+            link_bytes.extend(navmesh.to_le_bytes());
+            link_bytes.extend(triangle.to_le_bytes());
         }
         let mut subrecords = vec![
             field(b"EDID", b"Mesh\0".to_vec()),
@@ -963,12 +963,12 @@ mod tests {
             subrecords.push(field(b"DATA", data));
         }
         subrecords.extend([
-            field(b"NVVX", nvvx),
-            field(b"NVTR", nvtr),
+            field(b"NVVX", vertex_bytes),
+            field(b"NVTR", triangle_bytes),
             field(b"NVCA", Vec::new()),
-            field(b"NVDP", nvdp),
+            field(b"NVDP", door_bytes),
             field(b"NVGD", vec![7; 24]),
-            field(b"NVEX", nvex),
+            field(b"NVEX", link_bytes),
         ]);
         Record {
             signature: *b"NAVM",

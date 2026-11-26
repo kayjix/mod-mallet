@@ -90,6 +90,12 @@ pub enum LogPlace {
     },
 }
 
+/// Where OBSE64 writes its log, as its library names it (ADR 0092).
+const OBSE64_LOG: LogPlace = LogPlace::MyGames {
+    folder: "OBSE/Logs",
+    file: "obse64.txt",
+};
+
 /// A game's script extender: the loader that starts the game with it, and
 /// where its plugins and log are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -651,12 +657,8 @@ impl Game {
                 short_name: "OBSE64",
                 loader: "OblivionRemastered/Binaries/Win64/obse64_loader.exe",
                 plugin_dir: "oblivionremastered/binaries/win64/obse/plugins",
-                log: Some(LogPlace::MyGames {
-                    folder: "OBSE/Logs",
-                    file: "obse64.txt",
-                }),
-                // It ships one library per game version, but the versions of
-                // this game do not fit the packing versions are compared in.
+                log: Some(OBSE64_LOG),
+                // This game's versions do not fit the packing (ADR 0092).
                 versioned_library: None,
                 page: "https://www.nexusmods.com/oblivionremastered/mods/282",
             },
