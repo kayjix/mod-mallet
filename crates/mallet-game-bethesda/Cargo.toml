@@ -13,6 +13,7 @@ dirs.workspace = true
 libloadorder.workspace = true
 mallet-core.workspace = true
 mallet-formats-bethesda.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
@@ -20,7 +21,6 @@ winreg.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true

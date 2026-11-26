@@ -214,7 +214,13 @@ fn an_instance_of_another_game_is_not_used() {
         "MO2/ModOrganizer.ini",
         b"[General]\r\ngameName=Fallout 4\r\n",
     );
-    let report = scan(&setup.options()).unwrap();
+    // Without the instance's profile the list of active plugins is looked
+    // for elsewhere; never in the machine's own folders.
+    let options = ScanOptions {
+        local_dir: Some(setup.root.path().join("none")),
+        ..setup.options()
+    };
+    let report = scan(&options).unwrap();
     assert_eq!(report.mods, [] as [mallet_core::ModInfo; 0]);
     // Without the mods' folders, the mods' plugin is not in the game.
     assert_eq!(report.plugins_checked, 1);
