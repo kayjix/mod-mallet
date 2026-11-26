@@ -16,7 +16,7 @@ import type { WorkKind } from "./map-places";
 import { type ModFilter, type ModSort, useOverviewTexts } from "./overview-texts";
 import { LEFT_BEHIND, STILL_LOADED, StillLoadedHelp } from "./still-loaded";
 import { FindingRow } from "./Tasks";
-import { EmptyState, SearchField, Segmented, Toolbar } from "./ui/kit";
+import { Chip, EmptyState, SearchField, Segmented, Toolbar } from "./ui/kit";
 import { COLLIDES_WIDELY, toneOf, WideAdvice, WideTag } from "./wide-advice";
 import "./overview.css";
 
@@ -544,10 +544,9 @@ function ModDetails({ state }: { state: ModState }) {
                   <strong>{collided.other}</strong>
                   <span className="mod-collision-kinds">
                     {WORK_KINDS.filter((kind) => collided.kinds[kind] > 0).map((kind) => (
-                      <span key={kind} className="kind-count" data-kind={kind}>
-                        <span className="kind-dot" aria-hidden="true" />
+                      <Chip key={kind} colour={`var(--spot-${kind})`}>
                         {t.spotKinds[kind]} {collided.kinds[kind]}
-                      </span>
+                      </Chip>
                     ))}
                   </span>
                   <span className="aside">

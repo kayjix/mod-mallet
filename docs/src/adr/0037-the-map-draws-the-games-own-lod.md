@@ -1,6 +1,6 @@
 # 0037 The map draws the game's own level of detail
 
-- Status: accepted
+- Status: accepted; [ADR 0074](0074-level-of-detail-makes-room-for-real-objects.md): the level of detail makes room for real objects up close
 - Date: 2026-11-17
 - Changes: ADR 0011 (no renderer of our own) and ADR 0031 (places on the map and a 3D relief), for the land and what stands on it as the game shows it from afar
 

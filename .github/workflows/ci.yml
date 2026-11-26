@@ -24,8 +24,8 @@ jobs:
     # Windows is the primary platform: it is where the games run.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -44,6 +44,6 @@ jobs:
     # needs system libraries that the engine does not.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask ci --skip-desktop

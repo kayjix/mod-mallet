@@ -71,10 +71,14 @@ pub fn installed_games() -> Vec<(Game, PathBuf, LocationOrigin)> {
 pub fn extender_log(game: Game, game_dir: Option<&Path>) -> Option<PathBuf> {
     match game.script_extender().log? {
         LogPlace::MyGames { folder, file } => Some(
-            dirs::document_dir()?
-                .join("My Games")
-                .join(game.my_games_folder())
-                .join(folder)
+            folder
+                .split('/')
+                .fold(
+                    dirs::document_dir()?
+                        .join("My Games")
+                        .join(game.my_games_folder()),
+                    |path, part| path.join(part),
+                )
                 .join(file),
         ),
         LogPlace::GameDir { file } => game_dir.map(|dir| dir.join(file)),
@@ -327,7 +331,13 @@ mod tests {
         // The other games read below their installation.
         assert_eq!(data_root(Game::Oblivion, install.path()), install.path());
         assert_eq!(install_dir(Game::Oblivion, &root), root);
-        assert_eq!(extender_log(Game::OblivionRemastered, Some(&root)), None);
+        // OBSE64 logs into `My Games`, wherever the game lies.
+        if dirs::document_dir().is_some() {
+            assert!(
+                extender_log(Game::OblivionRemastered, Some(&root))
+                    .is_some_and(|log| log.ends_with("Oblivion Remastered/OBSE/Logs/obse64.txt"))
+            );
+        }
     }
 
     #[test]

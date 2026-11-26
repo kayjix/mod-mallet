@@ -1,6 +1,6 @@
 # 0059 Where characters still go once objects are hidden
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0069](0069-places-where-characters-do-something.md): a place that loses what it stood on can be moved or hidden too; [ADR 0071](0071-the-paths-mode-of-the-3d-views.md): the places characters walk to are drawn map-wide
 - Date: 2026-11-21
 - Changes: ADR 0051 (the finding `patch.hides-walkway` names what becomes
   unreachable); ADR 0052 (its check of what is cut off is joined by one of

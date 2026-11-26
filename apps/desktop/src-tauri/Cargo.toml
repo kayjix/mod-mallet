@@ -30,6 +30,7 @@ mallet-core.workspace = true
 mallet-engine.workspace = true
 mallet-messages.workspace = true
 tauri.workspace = true
+tauri-plugin-dialog.workspace = true
 tracing.workspace = true
 
 [lints]

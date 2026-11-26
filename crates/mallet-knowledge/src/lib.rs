@@ -48,6 +48,9 @@ fn loot_game(game: &str) -> Option<(GameType, &'static str)> {
         "falloutnv" => (GameType::FalloutNV, "FalloutNV"),
         "fallout3" => (GameType::Fallout3, "Fallout3"),
         "oblivion" => (GameType::Oblivion, "Oblivion"),
+        // LOOT reads Oblivion Remastered from its installation's top folder
+        // and finds the old game's data below it (ADR 0065, 0092).
+        "oblivionremastered" => (GameType::OblivionRemastered, "Oblivion Remastered"),
         // LOOT reads Enderal as Skyrim Special Edition, from a folder of its
         // own (ADR 0078).
         "enderalspecialedition" => (GameType::SkyrimSE, "Enderal Special Edition"),
@@ -468,6 +471,100 @@ plugins:
             incompatible,
             [("Other City.esp", true), ("Gone.esp", false)]
         );
+    }
+
+    #[test]
+    fn oblivion_remastered_is_read_from_its_installation() {
+        // Oblivion Remastered keeps the old game's data four folders below
+        // its installation, with the list of active plugins in `Data`.
+        let root = tempfile::tempdir().unwrap();
+        let data = root
+            .path()
+            .join("OblivionRemastered/Content/Dev/ObvData/Data");
+        fs::create_dir_all(data.join("OBSE/Plugins")).unwrap();
+        for name in ["Oblivion.esm", "Arena.esp"] {
+            fs::write(data.join(name), oblivion_plugin_bytes()).unwrap();
+        }
+        fs::write(data.join("OBSE/Plugins/Helper.dll"), b"x").unwrap();
+        fs::write(data.join("Plugins.txt"), "Oblivion.esm\r\nArena.esp\r\n").unwrap();
+        let masterlist = root.path().join("masterlist.yaml");
+        fs::write(
+            &masterlist,
+            r#"
+plugins:
+  - name: 'Arena.esp'
+    req: [ 'OBSE/Plugins/Helper.dll', 'Missing.esp' ]
+    msg:
+      - type: warn
+        content: 'Only when it is active.'
+        condition: 'active("Arena.esp")'
+"#,
+        )
+        .unwrap();
+        let plugins: Vec<PluginFacts> = ["Oblivion.esm", "Arena.esp"]
+            .iter()
+            .map(|name| PluginFacts {
+                name: (*name).to_owned(),
+                path: GamePath::new("data").join(name),
+                masters: Vec::new(),
+                npcs: Vec::new(),
+            })
+            .collect();
+
+        let knowledge = read(
+            "oblivionremastered",
+            root.path(),
+            None,
+            &masterlist,
+            &plugins,
+            &["oblivion.esm".to_owned()],
+        )
+        .unwrap();
+
+        let [arena] = knowledge.plugins.as_slice() else {
+            panic!("expected rules for one plugin, got {knowledge:?}");
+        };
+        let requirements: Vec<(&str, bool)> = arena
+            .requirements
+            .iter()
+            .map(|file| (file.label(), file.present))
+            .collect();
+        assert_eq!(
+            requirements,
+            [("OBSE/Plugins/Helper.dll", true), ("Missing.esp", false)]
+        );
+        assert_eq!(arena.messages.len(), 1, "{arena:?}");
+    }
+
+    #[test]
+    fn oblivion_remastered_has_its_own_places() {
+        let places = standard_places("oblivionremastered");
+        assert!(
+            places.iter().any(|place| place.ends_with(Path::new(
+                "Vortex/oblivionremastered/masterlist/masterlist.yaml"
+            )) || place
+                .ends_with(Path::new("LOOT/games/Oblivion Remastered/masterlist.yaml"))),
+            "{places:?}"
+        );
+    }
+
+    /// The smallest valid Oblivion plugin: a header record of Oblivion's
+    /// 20 bytes, holding a header field.
+    fn oblivion_plugin_bytes() -> Vec<u8> {
+        let mut hedr = Vec::new();
+        hedr.extend_from_slice(b"HEDR");
+        hedr.extend_from_slice(&12_u16.to_le_bytes());
+        hedr.extend_from_slice(&1.0_f32.to_le_bytes()); // version
+        hedr.extend_from_slice(&0_u32.to_le_bytes()); // records
+        hedr.extend_from_slice(&0x800_u32.to_le_bytes()); // next object id
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"TES4");
+        bytes.extend_from_slice(&u32::try_from(hedr.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // flags
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // form id
+        bytes.extend_from_slice(&0_u32.to_le_bytes()); // version control
+        bytes.extend_from_slice(&hedr);
+        bytes
     }
 
     #[test]

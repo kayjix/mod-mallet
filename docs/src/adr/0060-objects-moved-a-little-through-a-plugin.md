@@ -1,6 +1,6 @@
 # 0060 Objects are moved a little, through a plugin Mod Mallet writes
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0067](0067-stacked-doors-are-merged-into-one.md): the plugin of moves also leads doors elsewhere; [ADR 0069](0069-places-where-characters-do-something.md): moving is offered for invisible markers; [ADR 0070](0070-several-patches-that-say-what-they-decide.md): one plugin of moves
 - Date: 2026-11-21
 - Changes: [ADR 0025](0025-patches-through-base-object-swapper.md) (a patch
   that changes records is decided here, for the place of placed objects);

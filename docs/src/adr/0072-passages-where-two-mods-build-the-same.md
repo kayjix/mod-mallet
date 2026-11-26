@@ -1,6 +1,6 @@
 # 0072 Passages: where two mods build the same thing, decided as one
 
-- Status: accepted
+- Status: accepted, amended 2026-11-22 (Map collisions groups by passage instead of listing them)
 - Date: 2026-11-22
 - Changes: ADR 0040 (what a passage is), ADR 0050 (what the review's places
   are and in which order they come)

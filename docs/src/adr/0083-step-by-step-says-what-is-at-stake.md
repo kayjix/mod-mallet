@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-11-25
+- Changes: ADR 0050 (a guided review through the homes): its name, its steps
+  and what each says; ADR 0080 (the collisions step): how the sections of a
+  place and their parts are laid out
 
 ## Context
 

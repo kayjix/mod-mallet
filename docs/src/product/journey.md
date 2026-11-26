@@ -4,27 +4,34 @@ The desktop app grew one view at a time, each added for a problem found in
 a real setup. By November 2026 the same things were shown and decided in
 several places: a collision could be decided on four pages, the duels
 appeared on three, the scan button and the game picker twice. This page
-takes stock and sets the structure the app grows into: one job per page,
-at most two ways to do something on it, and links instead of copies.
-The decisions are recorded in
-[ADR 0048](../adr/0048-one-job-per-page.md). On the same day the user
-added a page for the comparison of files, then called *Assets*; this page
-describes the plan with it. Since then that page is *Asset collisions*, and
-*Assets* is the catalogue of things ([ADR 0054](../adr/0054-a-catalogue-of-the-games-things.md)).
+took stock and set the structure the app grew into: one job per page, at
+most two ways to do something on it, and links instead of copies. The
+decisions are recorded in [ADR 0048](../adr/0048-one-job-per-page.md), and
+the structure has been built.
 
-The page describes the window as it stands on `main` at `fa8c395` plus the
-work merged with it on the same day: the health score, the task page by
-steps and the new mods page (ADR 0045), interiors in 3D (ADR 0042), and
-the scan button at the top of the sidebar.
+The page describes the window as it stands on 2026-11-26. Two parts are
+history and say so: "Where it started" (the window before ADR 0048, kept
+as the reason for the structure) and the work packages at the end (done).
+Since the structure was set, ADR 0050 added the guided review, now *Step by
+step* (ADR 0083); ADR 0054 split the file duels (*Asset collisions*) from
+the catalogue of the game's things (*Assets*); ADR 0072 made *passages* the
+unit of a collision and removed the *Mod against mod* tab of the collisions
+page; ADR 0070 made the patch several patches, each its own mod; ADR 0077
+gave every page one UI kit; and ADR 0086 added a small helper, Mal the
+Rubber Mallet.
 
-The sidebar and the pages below are the window as built: *Overview*, *Go
-through it* ([ADR 0050](../adr/0050-a-guided-review-through-the-homes.md)),
-*Tasks*, *Map collisions*, *Asset collisions*, *Patch*, *Map*, *Assets*,
-*Mods*, then *Toolbox* and *Settings*, with the start page behind the name
-*Mod Mallet*. The tables under "What there is today" describe the window
-before this plan and are kept as the reason for it.
+The sidebar and the pages are, from the top: *Overview* (the home of the
+game in use), *Step by step*, *Tasks*, *Map collisions*, *Asset
+collisions*, *Patch*, *Map*, *Assets* (the catalogue of things), *Mods*;
+beside them *Toolbox* and *Settings*; and the start page behind the name
+*Mod Mallet*, which lists all games.
 
-## What there is today
+## Where it started
+
+The tables below describe the window as it was when ADR 0048 was written,
+with the pages it had then (*Home*, *Collisions · Mod against mod*,
+*Compare*). They are kept as the reason for the structure and are no longer
+true of the window.
 
 ### The frame
 
@@ -99,13 +106,14 @@ scan finds belongs to one game, so every page but *all games* and
 *settings* is a page of the game in use.
 
 ```text
-All games ──▶ Overview of a game ──▶ Tasks
-                      │             ├─▶ Map collisions    (Spots | Mod against mod)
+All games ──▶ Overview of a game ──▶ Step by step  (the guided review, ADR 0083)
+                      │             ├─▶ Tasks
+                      │             ├─▶ Map collisions    (grouped by region, mod pair or passage)
                       │             ├─▶ Asset collisions  (Duels | Ranking)
-                      │             ├─▶ Patch
+                      │             ├─▶ Patch             (several patches, ADR 0070)
                       │             ├─▶ Map
-                      │             ├─▶ Assets            (by kind, material or as sets)
-                      │             └─▶ Mods
+                      │             ├─▶ Assets            (the catalogue: by kind, material or as sets)
+                      │             └─▶ Mods              (List | Dependencies)
                       └─ the sidebar reaches every page directly
 Toolbox, Settings: beside the game's pages, always reachable
 ```
@@ -120,11 +128,12 @@ Toolbox, Settings: beside the game's pages, always reachable
 │ │ [ Scan ]  14:02 ·live│ │
 │ └──────────────────────┘ │
 │ ▣ Overview               │
-│ ➜ Step by step   3/5    │  ← the guided review (ADR 0050)
+│ ➜ Step by step           │  ← the guided review (ADR 0050, 0083)
 │ ☑ Tasks              12  │  ← open tasks (ADR 0045 counts.tasks)
 │ ⧉ Map collisions     37  │  ← open spots
 │ ▨ Asset collisions    4  │  ← duels about files without a side picked
 │ ✎ Patch               ●  │  ← dot: decided but not in the patch
+│   [editing: Patch 1]     │  ← the patch being edited, on the pages that decide
 │ ⌖ Map                    │
 │ ▥ Assets                 │  ← every thing of the game and the mods
 │ ≡ Mods                   │
@@ -157,14 +166,14 @@ Toolbox, Settings: beside the game's pages, always reachable
 | **Overview** | Say how the game stands and where to go | the health with its reasons; a tile per page | list findings, decide anything |
 | **Step by step** | Lead through the setup step by step, and remember how far | the steps in order; a step's own items, shown by the homes' own rows | own any item: it is a path through the homes (ADR 0050) |
 | **Tasks** | Work through what is to do, except collisions and duels | by step | list collisions or duels (one line each leads to them) |
-| **Map collisions** | Decide every collision spot | *Spots*: one spot at a time, in 3D; *Mod against mod*: a pair as a whole | build the patch |
-| **Patch** | Build and install what was decided | the list of decisions (undo, or *change* in Collisions); create and install | make new decisions |
+| **Map collisions** | Decide every collision spot | the worklist grouped by region, by pair of mods or by passage (ADR 0072), one spot at a time in 3D; a passage or a whole pair decided from the stage | build the patch |
+| **Patch** | Keep, build and install the patches: one patch is the one being edited, the others keep their decisions (ADR 0070) | the list of a patch's decisions (undo, or *change* in the page it was made on); create, load, switch off and install | make new decisions |
 | **Map** | Look at the places of any worldspace | flat or relief | decide; a spot links to the worklist |
 | **Asset collisions** | Decide whose textures, meshes and faces the game shows where two mods bring their own | *Duels*: two mods side by side on the comparison stage; *Ranking*: which mods to prefer, which suggests every duel's side | decide placed objects (Map collisions does) |
 | **Assets** | Look at every thing of the game and the mods, and choose the version of one thing (ADR 0054) | the list, by kind, material or as sets; a thing's versions side by side | decide whole pairs of mods (Asset collisions does) |
-| **Mods** | Know the mods, one at a time | the list; a mod's details | decide collisions or duels in place |
+| **Mods** | Know the mods, one at a time | *List*: the mods and a mod's details; *Dependencies*: which plugin needs which, as arcs (ADR 0068) | decide collisions or duels in place |
 | **Toolbox** | Have the tools the setup needs | the list; the one button a tool offers | – |
-| **Settings** | Where Mod Mallet reads, language, theme | tabs | – |
+| **Settings** | Where Mod Mallet reads, language, theme, which preferences it may offer | tabs: *General*, *Places*, *Preferences* (ADR 0086), *About* | – |
 
 ### Explanations
 
@@ -190,13 +199,16 @@ them.
 |---|---|---|
 | Finding (not a collision) | Tasks, in its step | a reason on the overview; a row in a mod's details |
 | Recommendation about a mod (ADR 0043) | Tasks, *recommendations* | a line in the mod's details |
-| Collision spot | Collisions · Spots | counts (sidebar, overview, Tasks' collisions line, a mod's details); a pin on the map with *open in the worklist* |
-| Pair of mods whose objects collide | Collisions · Mod against mod | a line in each mod's details with *open the pair* |
-| Duel about placed objects | merged into its pair on *Mod against mod* | – |
+| Collision spot | Map collisions | counts (sidebar, overview, Tasks' collisions tile, a mod's details); a pin on the map with *open in the worklist* |
+| Passage (places where two mods build the same thing, ADR 0072) | Map collisions, when grouped by passage; Step by step, in its collisions step (ADR 0080) | the spots it holds |
+| Pair of mods whose objects collide | the pair's panel under the stage in Map collisions | a line in each mod's details with *open the pair*; the report per pair in Step by step |
+| Duel about placed objects | merged into its pair | – |
 | Duel about files (textures, meshes, faces) | Asset collisions · Duels | a count on the overview and in Tasks' *choose* step, a line in each mod's details, each with *compare*, which opens Asset collisions at the duel |
 | The comparison stage | Asset collisions · Duels | the same stage shows a thing's versions on Assets |
 | Ranking of mods | Asset collisions · Ranking | the reason given under a duel's decision |
-| Patch choices | made in Collisions; listed in Patch | the dot on Patch; *waiting* spots in the worklist |
+| Patch choices | made in Map collisions, Asset collisions, Step by step and the 3D views, into the patch being edited; listed in Patch (ADR 0070, 0081) | the dot on Patch; *waiting* spots in the worklist |
+| A preference between mods, learned from the decisions | Settings, *Preferences*; offered by Mal in the corner (ADR 0086) | – |
+| Version changes since the last scan (ADR 0079) | the overview | the toolbox counts the plugins that fit |
 | Places and worldspaces | Map | the place named on a spot |
 | A thing of the game (weapon, armour, character, item), its versions and the version chosen for it | Assets | – |
 | Outfit (a set of things characters wear) | Assets, *as sets* | a line under each of its things |
@@ -206,16 +218,19 @@ them.
 The rule for the collision decisions in particular:
 
 - **A spot, its passage, or one object** is decided on the stage of
-  *Spots*.
-- **A pair as a whole** is decided on *Mod against mod*. The stage offers
-  *decide all spots of this pair* as a link that opens the pair there; the
-  worklist's group heads no longer decide.
+  *Map collisions*, or in the collisions step of *Step by step*, which
+  writes the same choices.
+- **A pair as a whole** is decided from the pair's panel under the stage,
+  which the stage opens with *this pair*. The *Mod against mod* tab of the
+  first plan is gone: passages (ADR 0072) took its place, and the report
+  per pair of Step by step says what was decided per pair.
 - **A duel about placed objects is the pair.** Its side picks become the
-  pair's verdict; the duel card on that tab goes.
-- **Patch** shows what was decided, grouped by pair, with *undo* and
-  *change*, which opens the pair or the spot in Collisions. *Suggest all*
-  moves to *Mod against mod* as *take every suggestion*. *Clear* stays on
-  Patch, since it empties the patch.
+  pair's verdict; there is no card of its own.
+- **Patch** shows what was decided, grouped by what it is about (places
+  where mods collide, objects hidden or shown on their own, moved objects
+  and merged doors, repaired paths, file choices), with *undo* and
+  *change*, which opens the place where it was made. Every decision goes
+  into the patch being edited; the other patches keep theirs.
 - **A collision finding** (on a mod's details, or set aside) offers
   *open in the worklist*, no *hide* buttons. *Show on map* stays for
   findings that are not collisions but have a place, such as a door cut
@@ -258,7 +273,7 @@ of the game in use; the start page is one click away.
 ┌─ Step by step ───────────────────────────────────────────────────┐
 │ ① Installation ✓  ② Assets 2  ③ World map  ④ Collisions  ⑤ Report │
 ├───────────────────────────────────────────────────────────────────┤
-│ Collisions · structure 4 of 31        Lux Via ⟷ JK's Outskirts    │
+│ Collisions · place 4 of 31            Lux Via ⟷ JK's Outskirts    │
 │ ┌─────────────────┬─────────────────┬─────────────────┐           │
 │ │ now             │ only Lux Via    │ only JK's       │           │
 │ │  blue + orange  │  blue           │  orange         │           │
@@ -306,75 +321,98 @@ writes. ADR 0050 records the rules.
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-The overview is Home's health panel and tiles of ADR 0045, moved under the
-game, with a tile per page. Each tile is one button to its page; nothing on
-the overview is decided.
+The overview is the home of a game. Its banner names the game and its
+version and carries the button that starts or continues *Step by step*.
+Under it are the health panel and the tiles of ADR 0045, with a tile per
+page, then what changed since the last scan (ADR 0079: a game or mod update
+and what it did to the setup), and the scan statistics folded at the bottom.
+Each tile is one button to its page; nothing on the overview is decided.
+Before a scan it only offers the scan.
 
 #### Tasks
 
-As ADR 0045 sets it out, with three changes: the scan statistics and
-*what was read* move to the overview; a collision finding never appears
-here (it already does not); the step *choose* no longer holds the duel
-cards but one line, like the collisions' line: how many duels about files
-are still open, and the way to Asset collisions.
+The tasks of ADR 0045, laid out as ADR 0076 and 0082 set it out: a headline
+with the number of open things, and over one list a row of **tiles by
+category**: everything open (crash risks first), collisions, one click
+(the mod manager does it), decisions (which of two mods wins, with the
+duels about files), things to do yourself, advice, notes, and what was set
+aside. Each tile says in a few words what it means and how many of its
+rows can crash the game; a tile chooses what the list below shows. The
+scan statistics and *what was read* are on the overview; a collision
+finding never appears here, only the tile that leads to Map collisions; the
+duels about files are one line that leads to Asset collisions.
 
 An opened task row is compact: what the finding is, then one row of
 buttons right under it (the mod manager's action, the way to where it is
 decided, the mod's page, the map, *leave it as it is*). Everything else,
 the places, the mods' versions, what to do and what it means, is under
-*more about it*. The page explains nothing in hint lines: its step titles
+*more about it*. The page explains nothing in hint lines: its tile names
 and buttons say what they are for.
 
-#### Collisions
+#### Map collisions
 
 ```text
-┌─ Collisions ──────────────────────────────────────────────────────┐
-│ [ Spots 212 | Mod against mod 31 ]   ▓▓▓▓░░ 140/212   [To patch]  │
+┌─ Map collisions ──────────────────────────────────────────────────┐
+│ ▓▓▓▓░░ 140/212 decided           [Take suggestions] [To patch]    │
 ├────────────────────┬──────────────────────────────────────────────┤
 │ search · kinds     │  Riverwood, by the mill · overlap            │
 │ by region | by mods│  ┌────────────────────────────────────────┐  │
-│ ▾ Riverwood (6)    │  │         3D close-up of the spot        │  │
-│   ● mill overlap   │  │                                        │  │
-│   ○ bridge touch   │  └────────────────────────────────────────┘  │
-│ ▸ Whiterun (14)    │  JK's Riverwood ⟷ Riverwood Trader          │
-│ ▸ Falkreath (3)    │  [Hide JK's] [Hide Trader's] [Keep both]     │
-│                    │  this passage (3 spots) · this pair: 12 ▸    │
+│ | by passage       │  │         3D close-up of the spot        │  │
+│ ▾ Riverwood (6)    │  │                                        │  │
+│   ● mill overlap   │  └────────────────────────────────────────┘  │
+│   ○ bridge touch   │  JK's Riverwood ⟷ Riverwood Trader           │
+│ ▸ Whiterun (14)    │  [Keep JK's] [Keep Trader's] [Keep both]     │
+│ ▸ Falkreath (3)    │  this passage (3 spots) · this pair: 12 ▸    │
 │                    │  [◂ prev] [next open ▸]     [show on map]    │
 └────────────────────┴──────────────────────────────────────────────┘
-
-┌─ Collisions · Mod against mod ────────────────────────────────────┐
-│ [take every suggestion]                              sort: open ▾ │
-│ JK's Riverwood ⟷ Riverwood Trader   12 spots  5 open  2 dup 3 ovl │
-│    suggested: hide Trader's (smaller, later)                      │
-│    [Hide JK's] [Hide Trader's] [Keep both]            [Spots ▸]   │
-│    also: 1 object of the game moved by both (finding, no spot)    │
-│    their textures differ too: 1 duel               [Asset coll.▸] │
-│ Cutting Room Floor ⟷ Lanterns of Skyrim   …                       │
-└───────────────────────────────────────────────────────────────────┘
 ```
 
-*Spots* is the visual way, *Mod against mod* the technical one (*fachlich*).
-*Spots ▸* opens *Spots* grouped by mods at that pair; *this pair: 12 ▸* on
-the stage opens the pair on *Mod against mod*. *Show on map* opens the map
-at the spot. The duels about placed objects are folded into their pair
-(the spots show them in 3D), and the collision findings without a spot are
-listed under their pair as *also*. Where the same two mods also have a duel
-about files, the pair says so and leads to Asset collisions.
+One worklist and one stage. The worklist groups the spots by *region*, by
+*pair of mods* or by *passage* (ADR 0072: where two mods build the same
+thing, such as a stable that both rebuilt, decided as one). The stage shows
+the spot, interior or exterior, in 3D with what collides tinted, says in a
+few words what differs, and offers the choices: keep one mod's version,
+keep both, hide single objects or parts of a mod there. *This pair* opens the pair's
+panel with all its spots below; a passage can be decided as a whole. The
+magic wand picks what belongs together in the 3D view (ADR 0055).
+Duels about placed objects are folded into their pair, and the collision
+findings without a spot are listed with their pair. The *Mod against mod*
+tab of the first plan was removed with ADR 0072.
+
+Beside the choices, a spot carries notes that say why something cannot just
+go: tied in, walked on, needed by the game, resting on another object
+(ADR 0046). Moved objects and doors stacked on each other (ADR 0060, 0067)
+are decided here as well. A learned preference between two mods (ADR 0086)
+can take the open spots between them at once; it is offered by Mal.
 
 #### Patch
 
 ```text
 ┌─ Patch ───────────────────────────────────────────────────────────┐
-│ 214 objects hidden · installed: 190 · 24 not in the game yet      │
-│ [ Create ] [ Install through Vortex ]   [Clear]   [open folder]   │
+│ Your patches          [New patch] [Load a patch…]                 │
+│ ● Patch 1  editing · on in the game · 214 decisions               │
+│     This patch hides 214 objects, moves 3 and repairs the paths   │
+│     in 2 places.      [Update in Vortex] [Rename] [Switch off]    │
+│   JK's Whiterun, shared · by someone · not installed yet          │
 ├───────────────────────────────────────────────────────────────────┤
-│ Decided                                                           │
-│ JK's Riverwood ⟷ Riverwood Trader  hide Trader's  12 objects      │
-│     4 spots decided on their own              [change] [undo]     │
-│ Single objects hidden (3)                       [show again]      │
-│ Waiting for a decision: 72 spots in 18 pairs   [to Collisions]    │
+│ Decisions of the patch                                            │
+│ Places where mods collide · Objects hidden or shown on their own  │
+│ Moved objects and merged doors · Repaired paths · File choices    │
+│ each decision with [change] [undo]                                │
 └───────────────────────────────────────────────────────────────────┘
 ```
+
+The patch is several patches since ADR 0070. Each is a mod of its own in
+the mod manager with its own decisions and says what it decides: it hides
+objects (through Base Object Swapper, needed only for that), moves them
+through a plugin of overrides, repairs paths, and keeps file choices.
+One patch is *being edited*: the decisions made anywhere go into it, and a
+chip in the sidebar names it on the pages that decide. A patch somebody
+shared can be loaded; Mod Mallet does not change its decisions, but it can
+be made one's own. A patch is installed in Vortex, written only as an
+archive to share or install by hand, or switched off, which keeps its
+decisions. A shared archive carries a FOMOD installer (ADR 0053), so it
+installs in any mod manager.
 
 #### Map
 
@@ -401,7 +439,7 @@ nothing. The worldspaces are named and grouped as set out in
 #### Asset collisions
 
 ```text
-┌─ Asset collisions ──────────────────────────────────────────────────────────┐
+┌─ Asset collisions ────────────────────────────────────────────────┐
 │ [ Duels 6 | Ranking ]                                             │
 ├──────────────────┬─────────────────────────────┬──────────────────┤
 │ search · open ▾  │  Cut Content ⟷ Face Overhaul│ What they share  │
@@ -418,7 +456,10 @@ Asset collisions is the comparison view made a page of its own: the duels about
 files in the list on the left, the two mods' files side by side on the
 stage, the decision under it, and *Ranking* as the second tab. The
 duel list is grouped by what the mods compete for (faces, textures,
-meshes). A duel opened from elsewhere (Tasks, a mod's details) opens here,
+meshes, and other files). Meshes are shown as pictures drawn in the engine
+(ADR 0085); a file that is neither texture nor mesh, such as a script or a
+configuration file, is compared side by side as text, by its functions or
+by size and date (ADR 0066). A duel opened from elsewhere (Tasks, a mod's details) opens here,
 at that duel; the page has no *back* button, since the sidebar is the way
 back.
 
@@ -430,9 +471,10 @@ the mods.
 
 #### Assets
 
-The catalogue of the game's things (ADR 0054): weapons, armour, characters
-and the other things with a model of their own, listed by kind, by material
-or as the game's outfits. A thing opens to its versions, from the game and
+The catalogue of the game's things (ADR 0054), named *Assets* in the
+sidebar: characters, weapons, armour and clothes, items and other things
+with a model of their own, listed by kind, by material or as the game's
+outfits. A thing opens to its versions, from the game and
 from each mod, side by side on the same stage as the duels; choosing one
 puts it into the game through Vortex's file overrides. The page decides
 things, not whole pairs of mods.
@@ -441,6 +483,7 @@ things, not whole pairs of mods.
 
 ```text
 ┌─ Mods ────────────────────────────────────────────────────────────┐
+│ [ List | Dependencies ]                                           │
 │ search…   [all|problems|off]   sort ▾                             │
 │ ▾ JK's Riverwood   2.1  on   1 problem · 5 open spots   [page]    │
 │     Problems: (the same rows as on Tasks)                         │
@@ -452,20 +495,50 @@ things, not whole pairs of mods.
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-*Compare ▸* opens Asset collisions at the duel; *open the pair* opens the pair on
-*Mod against mod*; *show on map* opens the map filtered to the mod.
+*Compare ▸* opens Asset collisions at the duel; *open the pair* opens the
+pair in Map collisions; *show on map* opens the map filtered to the mod.
+*Dependencies* draws which plugin needs which as arcs, for one mod or for
+the whole setup (ADR 0068).
 
 #### Toolbox
 
-Unchanged in shape. What changes is what it knows (see
-[The toolbox](#the-toolbox)): LOOT inside Vortex counts as LOOT, and the
-Creation Kit is optional, with what it is for.
+The tools the setup needs, by group: the mod manager, Mod Mallet's link
+into it, what the game needs (its script extender), helpers such as 7-Zip,
+and the modding tools the mod manager lists, with the state and version of
+each and the one button a tool offers. LOOT inside Vortex counts as LOOT,
+the Creation Kit is optional with what it is for (see
+[The toolbox](#the-toolbox)), and Mod Mallet itself can be added to
+Vortex's tools, but only when the user asks.
+
+#### Settings
+
+Four tabs: *General* (language, theme, scanning again by itself), *Places*
+(where Mod Mallet reads, which the user confirms first), *Preferences*
+(the preferences learned from the decisions, ADR 0086, and which of them
+may be offered) and *About* (the version with its build, ADR 0057).
+
+#### Mal the Rubber Mallet
+
+A small helper in the corner of the window (ADR 0086): the logo's rubber
+mallet, called Mal. It is not a page and decides nothing. When Mod Mallet
+has learned a preference between two mods from the decisions made, Mal
+waits with the number of favourites on a badge and makes a short move now
+and then, never while a button is held or a key is typed, and not with
+reduced motion. Clicked, a panel slides up with one favourite at a time:
+the topic, how often it was kept, *Show list* and *Apply*; *Don't suggest
+this again* sits in a small menu. Closing puts the panel back into the
+mallet. The same mallet is the logo at the top of the sidebar, a toy that
+breaks the frame when clicked often enough.
 
 ## Fixes along the way
 
+Both fixes below are built (work packages F, G and H). Each section keeps
+what was wrong, since that is why the fix is what it is, and says what
+became of it.
+
 ### Worldspaces
 
-**What happens today.** The map's worlds come with the scan
+**What happened before the fix.** The map's worlds come with the scan
 (`world_map`, `crates/mallet-analysis/src/map.rs`). A worldspace is on the
 list when a mod places an object in it or when any plugin has a place of
 the world map in it; nothing else decides. It is named by its editor ID
@@ -489,7 +562,7 @@ flags and its bounds (MNAM, NAM0/NAM9) are not read. Three things follow:
   game's own are in archives. Worlds without loose LOD files get no
   picture.
 
-**What the map lists.** Every worldspace that has land (LAND records) or
+**What the map lists** (built; ADR 0048, point 7). Every worldspace that has land (LAND records) or
 places, from every plugin, read on every scan (WRLD records are few; the
 cache must not drop them). Each gets:
 
@@ -530,8 +603,8 @@ on a transparent background. For Tamriel that reads as land. Blackreach is
 a cave floor under a ceiling of objects; drawn alike, and cut to the few
 cells where mods place things (see above), it is a small green blot.
 
-The relief becomes one renderer for every world, without special cases
-by name:
+The relief became one renderer for every world, without special cases
+by name (built; ADR 0037, 0041, 0074, 0085):
 
 1. **The whole land**, from the world's bounds (above).
 2. **The game's own colours.** The land is coloured with the world's LOD
@@ -567,36 +640,45 @@ to 61), so the bounds come from NAM0/NAM9 first.
 
 ### The toolbox
 
-**LOOT.** Today LOOT counts as present when `%LOCALAPPDATA%\LOOT` or
-`LOOT.exe` exists. Vortex sorts plugins with LOOT's library and keeps the
+**LOOT.** Before the fix LOOT counted as present when `%LOCALAPPDATA%\LOOT` or
+`LOOT.exe` existed. Vortex sorts plugins with LOOT's library and keeps the
 masterlist at `%APPDATA%\Vortex\<game>\masterlist\masterlist.yaml`, which
 Mod Mallet already reads for its rules (ADR 0030). The toolbox shows LOOT as
-**ready, built into Vortex** when Vortex is the mod manager and that
+**ready, built into Vortex** (built) when Vortex is the mod manager and that
 masterlist exists, with its date (the masterlist reader already finds it);
 standalone LOOT is then not needed and not listed as missing. Without
 Vortex, LOOT is optional as today.
 
 **The Creation Kit stays, as optional, with what it is for.** What Mod
-Mallet does to a setup it does through its own patch: hiding objects now
-(ADR 0025), moving them when that is built. None of that needs the
-Creation Kit. What remains for it:
+Mallet does to a setup it does through its own patches: hiding objects
+(ADR 0025), moving them through a plugin of overrides (ADR 0060), and
+repairing the paths over hidden objects in the navigation meshes of Skyrim
+(ADR 0052, 0058), including the door paths of merged doors (ADR 0088).
+None of that needs the Creation Kit. What remains for it:
 
-- **Repairing navigation meshes**, which the vision leaves as manual work.
-  Findings about navigation meshes link to the Creation Kit's row.
+- **Repairing navigation meshes where Mod Mallet does not**: it only
+  writes Skyrim's, and only the repairs of ADR 0052 and 0058. Findings
+  about other navigation meshes link to the Creation Kit's row.
 - **Looking at a cell as the game builds it**, with its lighting, for
   someone who wants more than the close-up.
 - **Making mods of one's own.**
 
-Its row says this, and *not needed to play or to use Mod Mallet*. The rule
+Its row says this, and *not needed to play or to use Mod Mallet*. (The
+text of that row in `crates/mallet-messages/locales/*/ui.ftl` still says
+that Mod Mallet can only point at the navigation meshes to repair.) The rule
 for every tool: the toolbox lists a tool only when the game or a feature of
 Mod Mallet needs it, says what for, and folds the optional ones under
 *optional*. xEdit is not listed until Mod Mallet writes xEdit scripts.
 
 ## Work packages
 
-The build is split so that packages running at the same time never touch
-the same files. Two files are shared by nearly everything and are handled
-by rule:
+**All packages, A to H, are done and merged.** They are kept as the record
+of how the build was split. Where later decisions reshaped a package, the
+last column says so.
+
+The build was split so that packages running at the same time never
+touched the same files. Two files are shared by nearly everything and were
+handled by rule:
 
 - **Texts.** `i18n.ts` is not extended; each package keeps its new texts in
   a module of its own, as `overview-texts.ts` and `interior-texts.ts` do.
@@ -604,19 +686,19 @@ by rule:
   `cargo xtask gen` after rebasing; generated files are never merged by
   hand.
 
-| # | Package | Files | Size | After |
-|---|---|---|---|---|
-| A | **Frame and overview.** Two levels; sidebar without the game select, with the game card, badges that match their pages, Toolbox and Settings at the bottom, toolbox pill gone; *All games* page (Home's game grid, with a score per game where a scan is kept); *Overview* page (Home's health and tiles plus a tile per page, scan statistics and *what was read*); *Assets* in the sidebar and as a tile, its route showing today's comparison view; new session links (`openPair`, `showModOnMap`; `openCompare` now opens Assets); the old report's code and styles removed. | `App.tsx`, `App.css`, `Actions.tsx`, `Home.tsx` → `AllGames.tsx`, new `Overview.tsx`, new `journey-texts.ts`, new `journey.css`; in `Tasks.tsx` only the removal of the statistics | L | the overview pages merged (ADR 0045) |
-| B | **Collisions.** *Mod against mod* with the duels about placed objects folded into their pair, the findings without a spot as *also*, a pair's duel about files as a link to Assets, *take every suggestion*, open at `pairAt`; group heads no longer decide; on the stage *this pair* and *show on map*; `App.tsx` stops passing `Duels` and `TaskList` as children. | `Collisions.tsx`, new `collisions-texts.ts`, the collisions route in `App.tsx` | M | A |
-| C | **Patch.** Decisions listed by pair with *change* and *undo*; *suggest all* and the per-pair buttons gone; *waiting* line. | `PatchView.tsx`, `patch.ts` | S | A |
-| D | **Assets.** The comparison view as a page: no *back* button, the duel list grouped by faces, textures and meshes, only duels about files (those about placed objects belong to Collisions), *Duels* and *Ranking* as its two tabs; a compact duel line for other pages to link with. | `Compare.tsx`, `Duels.tsx`, new `assets-texts.ts` | M | A |
-| D2 | **Mods.** A mod's links: *open the pair*, *compare ▸* (Assets at the duel), *show on map*; no duel cards of its own. | `ModsView.tsx` | S | A (uses D's duel line if merged, else a plain link) |
-| E | **Task rows.** A collision finding offers *open in the worklist* instead of *hide*; *show on map* only for findings that are not collisions; the step *choose* shows one line to Assets instead of the duel cards. | `Tasks.tsx` (`FindingRow`, `Choices`, `Spots`, `TasksPage`) | S | A |
-| F | **Worldspaces.** WRLD read on every scan (EDID, FULL, WNAM, flags, MNAM, NAM0/NAM9), worlds listed by land or places, `title`, `origin`, `parent`, `bounds`, `small`; terrain over the bounds; picker grouped; density colouring of cells removed; sample worlds (a DLC world, a mod world, a small one, a child). | `crates/mallet-game-bethesda` (`objects.rs`, `ingest.rs`, `terrain.rs`), `crates/mallet-core/src/report.rs`, `crates/mallet-analysis/src/map.rs`, generated, `MapView.tsx`, the world part of `dev/sample-api.ts` | L | – |
-| G | **Relief for every world.** LOD textures from archives for the flat picture and the relief's colours, water by flags, height by range, relief from the land where there is no LOD, child worlds; Blackreach checked on the reference setup first. | `MapView3D.tsx`, `lod-layer.ts`, `land-layer.ts`, `crates/mallet-game-bethesda/src/lod.rs`, `lod_library.rs` | L | F, and the area terrain session's work on `MapView3D.tsx` merged |
-| H | **Toolbox.** LOOT inside Vortex; the Creation Kit's purpose; optional tools folded; tools in the sample. | `crates/mallet-game-bethesda/src/tools.rs`, `crates/mallet-engine/src/toolbox.rs`, `crates/mallet-core/src/toolbox.rs` (a *provided by* field), `crates/mallet-messages/locales/*/ui.ftl`, `Toolbox.tsx`, the tools part of `dev/sample-api.ts` | S | – |
+| # | Package | Files | Size | After | State |
+|---|---|---|---|---|---|
+| A | **Frame and overview.** Two levels; sidebar without the game select, with the game card, badges that match their pages, Toolbox and Settings at the bottom, toolbox pill gone; *All games* page (Home's game grid, with a score per game where a scan is kept); *Overview* page (Home's health and tiles plus a tile per page, scan statistics and *what was read*); *Assets* in the sidebar and as a tile, its route showing today's comparison view; new session links (`openPair`, `showModOnMap`; `openCompare` now opens Assets); the old report's code and styles removed. | `App.tsx`, `App.css`, `Actions.tsx`, `Home.tsx` → `AllGames.tsx`, new `Overview.tsx`, new `journey-texts.ts`, new `journey.css`; in `Tasks.tsx` only the removal of the statistics | L | the overview pages merged (ADR 0045) | done; the start page and the overview are in `AllGames.tsx` and `Overview.tsx` (ADR 0048) |
+| B | **Collisions.** *Mod against mod* with the duels about placed objects folded into their pair, the findings without a spot as *also*, a pair's duel about files as a link to Assets, *take every suggestion*, open at `pairAt`; group heads no longer decide; on the stage *this pair* and *show on map*; `App.tsx` stops passing `Duels` and `TaskList` as children. | `Collisions.tsx`, new `collisions-texts.ts`, the collisions route in `App.tsx` | M | A | done, then reshaped: the *Mod against mod* tab was removed for passages and the guided review (ADR 0050, 0072) |
+| C | **Patch.** Decisions listed by pair with *change* and *undo*; *suggest all* and the per-pair buttons gone; *waiting* line. | `PatchView.tsx`, `patch.ts` | S | A | done, then reshaped: the patch became several patches (ADR 0070) |
+| D | **Assets.** The comparison view as a page: no *back* button, the duel list grouped by faces, textures and meshes, only duels about files (those about placed objects belong to Collisions), *Duels* and *Ranking* as its two tabs; a compact duel line for other pages to link with. | `Compare.tsx`, `Duels.tsx`, new `assets-texts.ts` | M | A | done; the page is *Asset collisions*, and *Assets* became the catalogue (ADR 0054) |
+| D2 | **Mods.** A mod's links: *open the pair*, *compare ▸* (Assets at the duel), *show on map*; no duel cards of its own. | `ModsView.tsx` | S | A (uses D's duel line if merged, else a plain link) | done; the Mods page also has *Dependencies* (ADR 0068) |
+| E | **Task rows.** A collision finding offers *open in the worklist* instead of *hide*; *show on map* only for findings that are not collisions; the step *choose* shows one line to Assets instead of the duel cards. | `Tasks.tsx` (`FindingRow`, `Choices`, `Spots`, `TasksPage`) | S | A | done; the task page is now tiles by category (ADR 0076, 0082) |
+| F | **Worldspaces.** WRLD read on every scan (EDID, FULL, WNAM, flags, MNAM, NAM0/NAM9), worlds listed by land or places, `title`, `origin`, `parent`, `bounds`, `small`; terrain over the bounds; picker grouped; density colouring of cells removed; sample worlds (a DLC world, a mod world, a small one, a child). | `crates/mallet-game-bethesda` (`objects.rs`, `ingest.rs`, `terrain.rs`), `crates/mallet-core/src/report.rs`, `crates/mallet-analysis/src/map.rs`, generated, `MapView.tsx`, the world part of `dev/sample-api.ts` | L | – | done (ADR 0048, point 7) |
+| G | **Relief for every world.** LOD textures from archives for the flat picture and the relief's colours, water by flags, height by range, relief from the land where there is no LOD, child worlds; Blackreach checked on the reference setup first. | `MapView3D.tsx`, `lod-layer.ts`, `land-layer.ts`, `crates/mallet-game-bethesda/src/lod.rs`, `lod_library.rs` | L | F, and the area terrain session's work on `MapView3D.tsx` merged | done (ADR 0037, 0041, 0074, 0085) |
+| H | **Toolbox.** LOOT inside Vortex; the Creation Kit's purpose; optional tools folded; tools in the sample. | `crates/mallet-game-bethesda/src/tools.rs`, `crates/mallet-engine/src/toolbox.rs`, `crates/mallet-core/src/toolbox.rs` (a *provided by* field), `crates/mallet-messages/locales/*/ui.ftl`, `Toolbox.tsx`, the tools part of `dev/sample-api.ts` | S | – | done; the row of the Creation Kit still says Mod Mallet cannot repair navigation meshes (see the toolbox section) |
 
-Order:
+Order in which they were built:
 
 ```text
 now:            A ─────────┐        F ──────────▶ G (after area terrain)
@@ -624,9 +706,9 @@ now:            A ─────────┐        F ───────�
 after A:        B   C   D   D2   E   (all five at once)
 ```
 
-A, F and H can start at once: A is the window's frame, F and H are engine
-work with their own corner of the window. B to E start when A is merged,
-since each needs its links, and run side by side. G waits for F and for the
+A, F and H could start at once: A is the window's frame, F and H are engine
+work with their own corner of the window. B to E started when A was merged,
+since each needs its links, and ran side by side. G waited for F and for the
 session on the ground up close, which also changes `MapView3D.tsx`. F and H
 both regenerate contracts and both touch `dev/sample-api.ts` in different
 parts; whichever merges second rebases and runs `cargo xtask gen`.

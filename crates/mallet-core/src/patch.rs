@@ -100,6 +100,13 @@ pub struct PatchBook {
     /// (`pin:…`). A pin is no decision and belongs to no patch (ADR 0050).
     #[serde(default)]
     pub pins: Vec<String>,
+    /// The parts the user said to leave as they are where they still
+    /// collide after a decision, by the window's key of the object (ADR
+    /// 0080). Like a pin, this is no decision and belongs to no patch: it
+    /// changes nothing in the game, it only keeps the review from asking
+    /// again.
+    #[serde(default)]
+    pub left_on_purpose: Vec<String>,
 }
 
 /// One patch of the [`PatchBook`].

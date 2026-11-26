@@ -179,6 +179,15 @@ struct OutputArgs {
     #[arg(long)]
     notes: bool,
 
+    /// Make the result fit for sharing, in a forum post or a bug report:
+    /// your user name, your computer's name and the folders of your user
+    /// account and your setup are replaced by placeholders such as
+    /// `%USERPROFILE%` and `<game>`. Mods, plugins and findings stay. The
+    /// text is Markdown and lists the notes, the places read and the load
+    /// order, too.
+    #[arg(long)]
+    share: bool,
+
     /// Where the result of the last scan is kept.
     #[arg(long, value_name = "FILE")]
     cache: Option<PathBuf>,
@@ -263,32 +272,18 @@ where
             let report = if args.no_cache {
                 mallet_engine::scan(&options)?
             } else {
-                mallet_engine::scan_and_store(&options, &cache_path(args.output.cache)?)?
+                mallet_engine::scan_and_store(&options, &cache_path(args.output.cache.clone())?)?
             };
-            print(
-                &report,
-                args.output.format,
-                args.output.notes || cli.verbose,
-                cli.verbose,
-                &messages,
-                out,
-            )
+            print(&report, &args.output, cli.verbose, &messages, out)
         }
         Command::Report(args) => {
-            let cache = cache_path(args.output.cache)?;
+            let cache = cache_path(args.output.cache.clone())?;
             let options = ScanOptions {
                 game: Some(cli.game.clone()),
                 ..ScanOptions::default()
             };
             if let Some(report) = mallet_engine::last_report(&options, &cache)? {
-                print(
-                    &report,
-                    args.output.format,
-                    args.output.notes || cli.verbose,
-                    cli.verbose,
-                    &messages,
-                    out,
-                )
+                print(&report, &args.output, cli.verbose, &messages, out)
             } else {
                 writeln!(out, "{}", messages.text("report-no-scan", &[]))?;
                 Ok(())
@@ -365,15 +360,26 @@ fn cache_path(chosen: Option<PathBuf>) -> anyhow::Result<PathBuf> {
 
 fn print(
     report: &ScanReport,
-    format: Format,
-    show_notes: bool,
-    show_locations: bool,
+    output: &OutputArgs,
+    verbose: bool,
     messages: &Messages,
     out: &mut dyn Write,
 ) -> anyhow::Result<()> {
-    match format {
+    if output.share {
+        let shared = mallet_engine::share_report(report)?;
+        match output.format {
+            Format::Text => write!(out, "{}", messages.render_share(&shared).text)?,
+            Format::Json => {
+                serde_json::to_writer_pretty(&mut *out, &shared.report)?;
+                writeln!(out)?;
+            }
+        }
+        return Ok(());
+    }
+    let show_notes = output.notes || verbose;
+    match output.format {
         Format::Text => {
-            if show_locations {
+            if verbose {
                 text::write_locations(report, messages, out)?;
             }
             write_report(report, messages, show_notes, out)?;

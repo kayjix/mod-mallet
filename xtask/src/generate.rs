@@ -11,7 +11,7 @@ use anyhow::{Context, Result, bail};
 use mallet_core::walkway_repair::WalkwayRepair;
 use mallet_core::{ScanReport, kinds};
 use mallet_messages::{
-    Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
+    Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport, RenderedShare,
     RenderedToolbox,
 };
 
@@ -43,6 +43,10 @@ const DESKTOP_CONTRACTS: &[(&str, &str)] = &[
     (
         "schemas/rendered-toolbox.schema.json",
         "apps/desktop/src/generated/rendered-toolbox.ts",
+    ),
+    (
+        "schemas/rendered-share.schema.json",
+        "apps/desktop/src/generated/rendered-share.ts",
     ),
     (
         "schemas/map-image.schema.json",
@@ -169,6 +173,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<()> {
         schema_of::<RenderedLink>("schemas/rendered-link.schema.json")?,
         schema_of::<RenderedPlaces>("schemas/rendered-places.schema.json")?,
         schema_of::<RenderedToolbox>("schemas/rendered-toolbox.schema.json")?,
+        schema_of::<RenderedShare>("schemas/rendered-share.schema.json")?,
         schema_of::<mallet_core::MapImage>("schemas/map-image.schema.json")?,
         schema_of::<mallet_core::FilePreview>("schemas/file-preview.schema.json")?,
         schema_of::<mallet_core::mesh::MeshView>("schemas/mesh-view.schema.json")?,

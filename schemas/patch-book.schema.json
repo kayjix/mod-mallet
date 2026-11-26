@@ -8,6 +8,14 @@
       "description": "The identity of the patch new decisions go to, one of the user's\nown.",
       "type": "string"
     },
+    "leftOnPurpose": {
+      "description": "The parts the user said to leave as they are where they still\ncollide after a decision, by the window's key of the object (ADR\n0080). Like a pin, this is no decision and belongs to no patch: it\nchanges nothing in the game, it only keeps the review from asking\nagain.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
     "patches": {
       "description": "The patches, in the order in which they count: on the same decision\nthe later one wins.",
       "type": "array",

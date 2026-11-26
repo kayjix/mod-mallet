@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use mallet_core::{Action, ArgValue, GameChoice, LocationRole, ObjectRef, ScanReport};
 use mallet_engine::{ManagerOptions, Settings};
 use mallet_messages::{
-    Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport,
+    Locale, Messages, RenderedLink, RenderedOutcome, RenderedPlaces, RenderedReport, RenderedShare,
     RenderedToolbox,
 };
 use tauri::{Emitter, Manager};
@@ -272,6 +272,16 @@ fn preferences() -> Result<Option<mallet_core::PatchPreferences>, String> {
 #[tauri::command(async)]
 fn set_preferences(preferences: mallet_core::PatchPreferences) -> Result<(), String> {
     change_settings(|settings| settings.preferences = Some(preferences))?;
+    Ok(())
+}
+
+/// Remembers how healthy the setup of the game in use is, as the window
+/// weighed it from the last scan and the decisions, so that the list of
+/// games shows it while another game is in use (ADR 0048). Called when the
+/// score changes.
+#[tauri::command(async)]
+fn set_last_health(health: mallet_core::LastHealth) -> Result<(), String> {
+    change_settings(|settings| settings.last_health = Some(health))?;
     Ok(())
 }
 
@@ -889,6 +899,55 @@ fn restart_manager() -> Result<(), String> {
     mallet_engine::restart_manager().map_err(|error| error.to_string())
 }
 
+/// The last scan's report with the private parts of its paths replaced
+/// (ADR 0091), or nothing if no scan is stored.
+fn last_shared() -> Result<Option<mallet_core::SharedReport>, String> {
+    let Some(cache) = mallet_engine::default_cache_path() else {
+        return Ok(None);
+    };
+    let Some(report) = mallet_engine::last_report(&settings()?.scan_options(), &cache)
+        .map_err(|error| error.to_string())?
+    else {
+        return Ok(None);
+    };
+    mallet_engine::share_report(&report)
+        .map(Some)
+        .map_err(|error| error.to_string())
+}
+
+/// The last scan's report made fit for sharing, as text in the language
+/// `lang`, with a sentence saying what was removed; nothing if no scan is
+/// stored.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn shared_report(lang: String) -> Result<Option<RenderedShare>, String> {
+    Ok(last_shared()?.map(|shared| messages(&lang).render_share(&shared)))
+}
+
+/// Saves the last scan's report made fit for sharing as `md` (the text in
+/// the language `lang`) or `json` into Mod Mallet's own folder, shows it in
+/// the file explorer and returns where it is. Only ever called because the
+/// user pressed a button.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+fn save_shared_report(lang: String, format: String) -> Result<String, String> {
+    let shared = last_shared()?.ok_or_else(|| "no scan has been stored yet".to_owned())?;
+    let text = messages(&lang).render_share(&shared).text;
+    let file = if format == "json" {
+        mallet_engine::SharedFile::Json
+    } else {
+        mallet_engine::SharedFile::Markdown(&text)
+    };
+    let path = mallet_engine::save_shared_report(&shared, file).map_err(|error| {
+        tracing::warn!(%error, "shared report not written");
+        error.to_string()
+    })?;
+    if let Err(error) = reveal(&path) {
+        tracing::warn!(%error, "shared report not shown");
+    }
+    Ok(path.display().to_string())
+}
+
 /// Where the app writes its log, for showing it to the user.
 #[tauri::command]
 fn log_file() -> Option<String> {
@@ -987,6 +1046,9 @@ pub fn run() -> tauri::Result<()> {
         let _ = mallet_engine::start_logging(&dir);
     }
     tauri::Builder::default()
+        // Only the open dialog is granted (capabilities/default.json): it
+        // names a place to read, it reads and writes nothing itself.
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 fit_window(&window);
@@ -1018,6 +1080,8 @@ pub fn run() -> tauri::Result<()> {
             open_folder,
             show_data_file,
             log_file,
+            shared_report,
+            save_shared_report,
             toolbox,
             restart_manager,
             game_art,
@@ -1060,7 +1124,8 @@ pub fn run() -> tauri::Result<()> {
             set_preferences,
             load_patch_archive,
             games,
-            select_game
+            select_game,
+            set_last_health
         ])
         .run(tauri::generate_context!())
 }

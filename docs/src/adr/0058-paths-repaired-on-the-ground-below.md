@@ -1,6 +1,6 @@
 # 0058 Paths over hidden objects are repaired on the ground below
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0070](0070-several-patches-that-say-what-they-decide.md): one plugin of paths beside one of moves; [ADR 0071](0071-the-paths-mode-of-the-3d-views.md): its layer of the repair also draws the paths mode; [ADR 0088](0088-door-paths-re-attached-to-the-kept-door.md): the plugin of paths also carries door triangles
 - Date: 2026-11-21
 - Changes: [ADR 0052](0052-paths-over-hidden-objects-are-cut-out.md) (its
   first rule, "a repair cuts out; it never adds", and its step of writing

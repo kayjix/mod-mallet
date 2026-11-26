@@ -1,6 +1,6 @@
 # 0027 Findings offer decisions; the window has a home and themes
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0045](0045-a-health-score-and-tasks-by-what-to-do.md): the home page shows a health score and a verdict; [ADR 0048](0048-one-job-per-page.md): home is the overview of the game in use, and the list of all games is a level above; amended 2026-11-26 (LOD tiles in archives)
 - Date: 2026-11-16
 
 ## Context
@@ -58,3 +58,8 @@ each drew its own boxes with its own distances.
   decision of its own.
 - LOD tiles inside archives are not read yet; a worldspace without loose
   LOD tiles keeps the height relief as its ground.
+  *Amended 2026-11-26:* done. The level-of-detail files are found in the
+  archives in load order and in the loose files, and read on demand
+  ([ADR 0037](0037-the-map-draws-the-games-own-lod.md); `lod_library.rs` in
+  `mallet-game-bethesda`). The height relief is the ground only of a
+  worldspace that has no level-of-detail files at all.

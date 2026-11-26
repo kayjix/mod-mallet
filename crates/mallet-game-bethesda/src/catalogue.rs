@@ -7,8 +7,9 @@
 //! of a record replaces an earlier one, as in the game. Names of localized
 //! plugins come from their string tables.
 //!
-//! The record layouts are those of Skyrim; the other games of the family
-//! have no catalogue yet.
+//! The record layouts are those of Skyrim and Fallout 4 (ADR 0092), which
+//! differ in how a weapon says what it is and who may use it, and in the
+//! body slots; the older games of the family have no catalogue yet.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
@@ -38,6 +39,10 @@ pub const RECORDS: [Signature; 22] = [
 /// Record flag of armour: it cannot be worn by players (a creature's skin,
 /// for example).
 const FLAG_ARMOUR_NOT_PLAYABLE: u32 = 0x0000_0004;
+
+/// Record flag of Fallout 4's weapons, armour and ammunition: players
+/// cannot use it (a creature's claws, a turret's ammunition).
+const FLAG_FALLOUT4_NOT_PLAYABLE: u32 = 0x0000_0004;
 
 /// Flag in a weapon's `DNAM`: it cannot be used by players (a creature's
 /// claws, for example).
@@ -261,6 +266,9 @@ impl Collector {
     fn category(&self, entry: &Entry) -> Option<ItemCategory> {
         Some(match &entry.signature {
             b"WEAP" => self.weapon_category(entry),
+            b"ARMO" if self.game.family() == Family::Fallout4 => {
+                fallout4_armour_category(entry.slots)
+            }
             b"ARMO" => armour_category(entry.slots),
             b"AMMO" => ItemCategory::Ammunition,
             b"NPC_" => ItemCategory::Character,
@@ -283,6 +291,9 @@ impl Collector {
     /// The kind of weapon, by its keywords where it has the game's, else by
     /// how it is held.
     fn weapon_category(&self, entry: &Entry) -> ItemCategory {
+        if self.game.family() == Family::Fallout4 {
+            return self.fallout4_weapon_category(entry);
+        }
         let by_keyword = self.keyword_names(&entry.keywords).find_map(|keyword| {
             match keyword.to_ascii_lowercase().as_str() {
                 "weaptypesword" => Some(ItemCategory::Sword),
@@ -309,6 +320,42 @@ impl Collector {
             Some(9) => ItemCategory::Crossbow,
             _ => ItemCategory::OtherWeapon,
         })
+    }
+
+    /// The kind of weapon of Fallout 4, by its `WeaponType…` keywords. A
+    /// weapon has several (`WeaponTypeBallistic`, `WeaponTypePistol`); the
+    /// one that says most wins.
+    fn fallout4_weapon_category(&self, entry: &Entry) -> ItemCategory {
+        let kinds: Vec<String> = self
+            .keyword_names(&entry.keywords)
+            .filter_map(|keyword| {
+                let lower = keyword.to_ascii_lowercase();
+                lower.strip_prefix("weapontype").map(str::to_owned)
+            })
+            .collect();
+        let has = |names: &[&str]| kinds.iter().any(|kind| names.contains(&kind.as_str()));
+        if has(&["heavygun"]) {
+            ItemCategory::HeavyWeapon
+        } else if has(&["grenade", "mine", "thrown", "explosive", "molotov"]) {
+            ItemCategory::Explosive
+        } else if has(&["shotgun"]) {
+            ItemCategory::Shotgun
+        } else if has(&["pistol"]) {
+            ItemCategory::Pistol
+        } else if has(&[
+            "rifle",
+            "assaultrifle",
+            "sniper",
+            "gaussrifle",
+            "railwayrifle",
+            "lasermusket",
+        ]) {
+            ItemCategory::Rifle
+        } else if has(&["melee1h", "melee2h", "unarmed", "handtohand"]) {
+            ItemCategory::MeleeWeapon
+        } else {
+            ItemCategory::OtherWeapon
+        }
     }
 
     /// The models of a thing: its own, then for armour the ones worn.
@@ -462,6 +509,15 @@ fn entry(
         ..Entry::default()
     };
     match &record.signature {
+        b"WEAP" if game.family() == Family::Fallout4 => {
+            // Fallout 4's `DNAM` starts with the ammunition; what the weapon
+            // is comes from its keywords alone.
+            entry.playable = record.flags & FLAG_FALLOUT4_NOT_PLAYABLE == 0;
+            entry.template = form_id(b"CNAM");
+        }
+        b"AMMO" if game.family() == Family::Fallout4 => {
+            entry.playable = record.flags & FLAG_FALLOUT4_NOT_PLAYABLE == 0;
+        }
         b"WEAP" => {
             let data = record.first(b"DNAM");
             entry.animation = data.and_then(|data| data.first().copied());
@@ -555,10 +611,44 @@ fn armour_category(slots: u32) -> ItemCategory {
     }
 }
 
+/// The kind of thing worn in Fallout 4, by the body slots it covers. Slot
+/// 30 is the lowest bit. Clothes and armour cover the body (33), the
+/// clothes under armour (36 to 40) or the armour's pieces (41 to 45).
+fn fallout4_armour_category(slots: u32) -> ItemCategory {
+    const BODY: u32 = 1 << 3 | 1 << 6 | 1 << 11;
+    // Hair, headband, eyes, beard, mouth, scalp.
+    const HEAD: u32 = 1 << 0 | 1 << 1 | 1 << 16 | 1 << 17 | 1 << 18 | 1 << 19 | 1 << 22;
+    const ARMS: u32 = 1 << 7 | 1 << 8 | 1 << 12 | 1 << 13;
+    const LEGS: u32 = 1 << 9 | 1 << 10 | 1 << 14 | 1 << 15;
+    const HANDS: u32 = 1 << 4 | 1 << 5;
+    const JEWELLERY: u32 = 1 << 20 | 1 << 21;
+    const SHIELD: u32 = 1 << 29;
+    if slots & BODY != 0 {
+        ItemCategory::Body
+    } else if slots & HEAD != 0 {
+        ItemCategory::Head
+    } else if slots & ARMS != 0 {
+        ItemCategory::Arms
+    } else if slots & LEGS != 0 {
+        ItemCategory::Legs
+    } else if slots & HANDS != 0 {
+        ItemCategory::Hands
+    } else if slots & JEWELLERY != 0 {
+        ItemCategory::Jewellery
+    } else if slots & SHIELD != 0 {
+        ItemCategory::Shield
+    } else {
+        ItemCategory::OtherWorn
+    }
+}
+
 /// The material a keyword names, such as `Steel` for
 /// `WeapMaterialSteel` and `Chitin` for `DLC2ArmorMaterialChitinLight`.
 fn material(keyword: &str) -> Option<String> {
     let lower = keyword.to_ascii_lowercase();
+    if lower.starts_with("ma_") {
+        return fallout4_material(keyword);
+    }
     let at = lower
         .find("weapmaterial")
         .map(|at| at + "weapmaterial".len())
@@ -573,6 +663,43 @@ fn material(keyword: &str) -> Option<String> {
         .or_else(|| rest.strip_suffix("Light"))
         .unwrap_or(rest);
     (!rest.is_empty()).then(|| rest.to_owned())
+}
+
+/// The kind of armour one of Fallout 4's keywords for its modifications
+/// names: `Combat` for `ma_armor_Combat_Arm`, `T60` for `ma_T60_Torso`,
+/// `Raider` for `ma_armor_RaiderMod_Leg` and `ma_PA_Raider_Helmet`. Linings,
+/// paints and the other keywords that fit any armour name none.
+fn fallout4_material(keyword: &str) -> Option<String> {
+    let rest = keyword.get("ma_".len()..)?;
+    if rest
+        .split('_')
+        .any(|part| part.eq_ignore_ascii_case("lining"))
+    {
+        return None;
+    }
+    let mut parts = rest.split('_');
+    let first = parts.next()?;
+    let kind = match first.to_ascii_lowercase().as_str() {
+        "armor" | "pa" => parts.next()?,
+        "t45" | "t51" | "t60" | "x01" => first,
+        _ => return None,
+    };
+    // A piece follows the kind: `ma_PA_T45` names a frame, not a kind.
+    parts.next()?;
+    let kind = kind.strip_suffix("Mod").unwrap_or(kind);
+    let generic = [
+        "lining",
+        "universal",
+        "paint",
+        "material",
+        "misc",
+        "arm",
+        "leg",
+        "torso",
+        "helmet",
+    ];
+    (!kind.is_empty() && !generic.contains(&kind.to_ascii_lowercase().as_str()))
+        .then(|| kind.to_owned())
 }
 
 /// The name players see: `FULL`, looked up in the string table for a
@@ -609,7 +736,7 @@ pub fn read_catalogue(
     local_dir: Option<&Path>,
     language: &str,
 ) -> Catalogue {
-    if game.family() != Family::Skyrim {
+    if !game.has_catalogue() {
         return Catalogue::default();
     }
     let tables = LodLibrary::with_prefixes(game, game_dir, local_dir, &["strings/".to_owned()]);
@@ -650,7 +777,19 @@ pub fn string_table(
         .filter(|path| path.starts_with(&prefix) && path.ends_with(".strings"))
         .min()
         .map(str::to_owned);
-    [path(language), path("english"), path("en")]
+    // Skyrim names its tables by the language (`skyrim_german`), Fallout 4
+    // by its code (`fallout4_de`).
+    let code = match language {
+        "german" => "de",
+        "french" => "fr",
+        "spanish" => "es",
+        "italian" => "it",
+        "polish" => "pl",
+        "russian" => "ru",
+        "japanese" => "ja",
+        _ => "en",
+    };
+    [path(language), path(code), path("english"), path("en")]
         .into_iter()
         .chain(other)
         .find_map(|path| tables.read(&path))
@@ -957,6 +1096,177 @@ mod tests {
         assert_eq!(material("ArmorHelmet"), None);
     }
 
+    /// Slots of Fallout 4 as bits, from their numbers (30 and up).
+    fn slots(numbers: &[u32]) -> u32 {
+        numbers.iter().map(|number| 1 << (number - 30)).sum()
+    }
+
+    fn fallout4_plugin() -> Vec<u8> {
+        let fallout4_weapon = |form_id: u32, model: &str, keywords: &[u32]| {
+            RecordSpec::new(*b"WEAP", form_id)
+                .with(*b"MODL", fixture::zstring(model))
+                .with(*b"KWDA", form_ids(keywords))
+                // Fallout 4's data starts with the ammunition.
+                .with(*b"DNAM", [0x0700_0000u32.to_le_bytes(), [0; 4]].concat())
+        };
+        let fallout4_armour = |form_id: u32, slots: u32, addon: u32, keywords: &[u32]| {
+            RecordSpec::new(*b"ARMO", form_id)
+                .with(*b"MOD2", fixture::zstring("Armor\\Piece_go.nif"))
+                .with(*b"BOD2", slots.to_le_bytes().to_vec())
+                .with(*b"KWDA", form_ids(keywords))
+                .with(*b"INDX", 0u16.to_le_bytes().to_vec())
+                .with(*b"MODL", addon.to_le_bytes().to_vec())
+        };
+        fixture::plugin(
+            &[],
+            0,
+            &[
+                (
+                    *b"KYWD",
+                    vec![
+                        keyword(0x10, "WeaponTypeBallistic"),
+                        keyword(0x11, "WeaponTypePistol"),
+                        keyword(0x12, "WeaponTypeHeavyGun"),
+                        keyword(0x13, "WeaponTypeMelee1H"),
+                        keyword(0x14, "WeaponTypeGrenade"),
+                        keyword(0x15, "WeaponTypeExplosive"),
+                        keyword(0x16, "ma_armor_Combat_Arm"),
+                        keyword(0x17, "ma_armor_Lining_Leather_Limb"),
+                    ],
+                ),
+                (
+                    *b"WEAP",
+                    vec![
+                        fallout4_weapon(0x100, "Weapons\\10mmPistol\\10mm.nif", &[0x10, 0x11])
+                            // An object template's name comes before the
+                            // weapon's own here.
+                            .with(*b"OBTE", 1u32.to_le_bytes().to_vec())
+                            .with(*b"FULL", fixture::zstring("Default"))
+                            .with(*b"STOP", Vec::new())
+                            .with(*b"FULL", fixture::zstring("10mm Pistol")),
+                        fallout4_weapon(0x101, "Weapons\\Minigun\\Minigun.nif", &[0x10, 0x12]),
+                        fallout4_weapon(0x102, "Weapons\\Knife\\Knife.nif", &[0x13]),
+                        fallout4_weapon(0x103, "Weapons\\Grenade\\Frag.nif", &[0x14, 0x15]),
+                        {
+                            let mut claws = fallout4_weapon(0x104, "Weapons\\Claws.nif", &[0x13]);
+                            claws.flags |= FLAG_FALLOUT4_NOT_PLAYABLE;
+                            claws
+                        },
+                    ],
+                ),
+                (
+                    *b"ARMA",
+                    vec![
+                        addon(0x200, "Armor\\Combat\\ArmLeft.nif"),
+                        addon(0x201, "Armor\\Hat.nif"),
+                        addon(0x202, "Clothes\\Suit.nif"),
+                    ],
+                ),
+                (
+                    *b"ARMO",
+                    vec![
+                        fallout4_armour(0x300, slots(&[42]), 0x200, &[0x17, 0x16]),
+                        fallout4_armour(0x301, slots(&[30, 46]), 0x201, &[]),
+                        fallout4_armour(0x302, slots(&[33, 41, 42, 43, 44, 45]), 0x202, &[]),
+                        fallout4_armour(0x303, slots(&[45]), 0x200, &[]),
+                    ],
+                ),
+                (
+                    *b"AMMO",
+                    vec![
+                        RecordSpec::new(*b"AMMO", 0x400)
+                            .with(*b"MODL", fixture::zstring("Ammo\\10mm.nif")),
+                        {
+                            let mut turret = RecordSpec::new(*b"AMMO", 0x401)
+                                .with(*b"MODL", fixture::zstring("Ammo\\Turret.nif"));
+                            turret.flags |= FLAG_FALLOUT4_NOT_PLAYABLE;
+                            turret
+                        },
+                    ],
+                ),
+            ],
+        )
+    }
+
+    fn collect_fallout4() -> Catalogue {
+        let mut collector = Collector::new(Game::Fallout4);
+        collector.add("Fallout4.esm", &read(&fallout4_plugin()), &HashMap::new());
+        collector.finish(&|_| WorldOrigin::Game)
+    }
+
+    #[test]
+    fn fallout_4_weapons_are_sorted_by_their_keywords() {
+        let catalogue = collect_fallout4();
+        let category = |id: &str| item(&catalogue, id).category;
+        assert_eq!(category("fallout4.esm/00000100"), ItemCategory::Pistol);
+        assert_eq!(category("fallout4.esm/00000101"), ItemCategory::HeavyWeapon);
+        assert_eq!(category("fallout4.esm/00000102"), ItemCategory::MeleeWeapon);
+        assert_eq!(category("fallout4.esm/00000103"), ItemCategory::Explosive);
+        assert_eq!(
+            item(&catalogue, "fallout4.esm/00000100").name.as_deref(),
+            Some("10mm Pistol")
+        );
+    }
+
+    #[test]
+    fn fallout_4_leaves_out_what_its_records_flag_as_not_playable() {
+        let catalogue = collect_fallout4();
+        let ids: Vec<&str> = catalogue
+            .items
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect();
+        assert!(!ids.contains(&"fallout4.esm/00000104"), "{ids:?}");
+        assert!(!ids.contains(&"fallout4.esm/00000401"), "{ids:?}");
+        assert_eq!(
+            item(&catalogue, "fallout4.esm/00000400").category,
+            ItemCategory::Ammunition
+        );
+    }
+
+    #[test]
+    fn fallout_4_armour_is_sorted_by_its_body_slots() {
+        let catalogue = collect_fallout4();
+        let arm = item(&catalogue, "fallout4.esm/00000300");
+        assert_eq!(arm.category, ItemCategory::Arms);
+        assert_eq!(arm.material.as_deref(), Some("Combat"));
+        assert_eq!(
+            arm.models,
+            [
+                "meshes/armor/piece_go.nif",
+                "meshes/armor/combat/armleft.nif"
+            ]
+        );
+        assert_eq!(
+            item(&catalogue, "fallout4.esm/00000301").category,
+            ItemCategory::Head
+        );
+        assert_eq!(
+            item(&catalogue, "fallout4.esm/00000302").category,
+            ItemCategory::Body
+        );
+        assert_eq!(
+            item(&catalogue, "fallout4.esm/00000303").category,
+            ItemCategory::Legs
+        );
+    }
+
+    #[test]
+    fn fallout_4_materials_come_from_the_keywords_of_its_modifications() {
+        assert_eq!(material("ma_armor_Combat_Arm").as_deref(), Some("Combat"));
+        assert_eq!(
+            material("ma_armor_RaiderMod_Leg").as_deref(),
+            Some("Raider")
+        );
+        assert_eq!(material("ma_T60_Torso").as_deref(), Some("T60"));
+        assert_eq!(material("ma_PA_Raider_Helmet").as_deref(), Some("Raider"));
+        assert_eq!(material("ma_PA_T45"), None);
+        assert_eq!(material("ma_PA_Arm"), None);
+        assert_eq!(material("ma_armor_Lining_Leather_Limb"), None);
+        assert_eq!(material("ma_armor_RaiderModl_Lining_Torso"), None);
+        assert_eq!(material("ma_VaultSuit"), None);
+    }
+
     #[test]
     fn worn_things_are_sorted_by_body_slot() {
         assert_eq!(armour_category(1 << 2 | 1 << 3), ItemCategory::Body);
@@ -971,17 +1281,29 @@ mod tests {
         fn any_record_content_never_panics(
             fields in proptest::collection::vec(
                 (prop::sample::select(vec![*b"FULL", *b"MODL", *b"MOD2", *b"KWDA", *b"DNAM",
-                    *b"BOD2", *b"CNTO", *b"LVLO", *b"INAM", *b"ACBS", *b"DOFT", *b"TNAM"]),
+                    *b"BOD2", *b"CNTO", *b"LVLO", *b"INAM", *b"ACBS", *b"DOFT", *b"TNAM",
+                    *b"OBTE", *b"STOP"]),
                  proptest::collection::vec(any::<u8>(), 0..24)),
                 0..8),
             signature in prop::sample::select(RECORDS.to_vec()),
+            flags in any::<u32>(),
         ) {
             let mut spec = RecordSpec::new(signature, 0x800);
+            spec.flags = flags & !FLAG_DELETED;
             for (field, data) in fields {
                 spec = spec.with(field, data);
             }
             let bytes = fixture::plugin(&[], 0, &[(signature, vec![spec])]);
-            let _ = collect(&[("Skyrim.esm", game_plugin()), ("Any.esp", bytes)]);
+            let _ = collect(&[("Skyrim.esm", game_plugin()), ("Any.esp", bytes.clone())]);
+            let mut collector = Collector::new(Game::Fallout4);
+            collector.add("Fallout4.esm", &read(&fallout4_plugin()), &HashMap::new());
+            collector.add("Any.esp", &read(&bytes), &HashMap::new());
+            let _ = collector.finish(&|_| WorldOrigin::Mod);
+        }
+
+        #[test]
+        fn any_keyword_names_a_material_without_panicking(keyword in ".*") {
+            let _ = material(&keyword);
         }
     }
 }

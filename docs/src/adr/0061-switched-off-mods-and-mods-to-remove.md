@@ -1,6 +1,6 @@
 # 0061 Switched-off mods, and mods worth removing
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0073](0073-switched-off-mods-taken-out-through-vortex.md): switched-off mods still loaded are taken out through Vortex; [ADR 0076](0076-task-rows-crash-risks-first.md): the wide-collider advice on the task page
 - Date: 2026-11-21
 - Changes: ADR 0043 (suggestions about whole mods), points 5 and 7
 

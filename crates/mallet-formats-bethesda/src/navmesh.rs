@@ -44,12 +44,32 @@
 //! the flags' link bits agree with the edges of all 3.66 million
 //! triangles, and all 283,269 links name a triangle their mesh has.
 //!
-//! Both are read; only Skyrim's can be cut ([`cut`], [`unlink`]). Other
-//! games lay the field out differently; for them nothing is read.
+//! Both are read; only Skyrim's can be cut ([`cut`], [`unlink`]).
+//!
+//! Fallout 3 and New Vegas (format version 11, ADR 0092) keep the same
+//! parts in fields of their own, without counts in front; `DATA` holds
+//! the counts:
+//!
+//! ```text
+//! NVER  u32 version                11
+//! DATA  u32 cell, u32 vertices,    the counts of the fields below
+//!       u32 triangles, u32 links,
+//!       u32 cover triangles, u32 doors
+//! NVVX  n × 12 bytes               vertices, as in Skyrim
+//! NVTR  n × 16 bytes               triangles, as in Skyrim
+//! NVCA  n × 2 bytes                cover triangles
+//! NVDP  n × 8 bytes                door triangles: u32 door reference,
+//!                                  u16 triangle, 2 bytes unused
+//! NVGD                             the search grid
+//! NVEX  n × 10 bytes               links, as in Skyrim
+//! ```
+//!
+//! They are read by [`record_geometry`], which takes either layout.
 
 use std::collections::BTreeSet;
 
 use crate::Bytes;
+use crate::plugin::Record;
 
 /// The format version of Skyrim's navigation meshes.
 const SKYRIM_VERSION: u32 = 12;
@@ -239,6 +259,133 @@ pub fn geometry(nvnm: &[u8]) -> Option<Geometry> {
         edges,
         doors,
     })
+}
+
+/// The geometry of a navigation mesh record (`NAVM`) in any layout this
+/// reader knows: Skyrim's and Fallout 4's in one field (`NVNM`, see
+/// [`geometry`]), or Fallout 3's and New Vegas's in fields of their own
+/// (see [`split_geometry`]). `None` as for those.
+pub fn record_geometry(record: &Record) -> Option<Geometry> {
+    match record.first(b"NVNM") {
+        Some(nvnm) => geometry(nvnm),
+        None => split_geometry(record),
+    }
+}
+
+/// The door triangles of a navigation mesh record in any layout this
+/// reader knows, as [`door_triangles`] gives them. `None` as for
+/// [`record_geometry`].
+pub fn record_door_triangles(record: &Record) -> Option<Vec<(u16, u32)>> {
+    match record.first(b"NVNM") {
+        Some(nvnm) => door_triangles(nvnm),
+        None => split_geometry(record).map(|geometry| geometry.doors),
+    }
+}
+
+/// Bytes per entry of the fields of Fallout 3's and New Vegas's layout.
+const SPLIT_TRIANGLE_LEN: usize = 16;
+const SPLIT_LINK_LEN: usize = 10;
+const SPLIT_DOOR_LEN: usize = 8;
+
+/// The geometry of a navigation mesh of Fallout 3's and New Vegas's
+/// layout, whose vertices (`NVVX`), triangles (`NVTR`), links (`NVEX`) and
+/// door triangles (`NVDP`) lie in fields of their own. `None` if it has no
+/// triangles field, a field does not end on a whole entry, the counts in
+/// `DATA` disagree with the fields, or a triangle names a vertex the mesh
+/// does not have. An edge that names a triangle or link the mesh does not
+/// have leads nowhere, and a door on a triangle it does not have is left
+/// out.
+pub fn split_geometry(record: &Record) -> Option<Geometry> {
+    let field = |signature: &[u8; 4]| record.first(signature).unwrap_or_default();
+    let triangles_field = record.first(b"NVTR")?;
+    let (vertices_field, links_field, doors_field) =
+        (field(b"NVVX"), field(b"NVEX"), field(b"NVDP"));
+    let vertex_count = whole_entries(vertices_field, VERTEX_LEN)?;
+    let triangle_count = whole_entries(triangles_field, SPLIT_TRIANGLE_LEN)?;
+    let link_count = whole_entries(links_field, SPLIT_LINK_LEN)?;
+    let door_count = whole_entries(doors_field, SPLIT_DOOR_LEN)?;
+    if let Some(data) = record.first(b"DATA").filter(|data| data.len() >= 24) {
+        let count = |at: usize| read_u32(data, at).and_then(|n| usize::try_from(n).ok());
+        let agrees = [
+            (4, vertex_count),
+            (8, triangle_count),
+            (12, link_count),
+            (20, door_count),
+        ]
+        .iter()
+        .all(|&(at, found)| count(at) == Some(found));
+        if !agrees {
+            return None;
+        }
+    }
+
+    let mut bytes = Bytes::new(vertices_field);
+    let mut vertices = Vec::with_capacity(vertex_count);
+    for _ in 0..vertex_count {
+        vertices.push([bytes.f32()?, bytes.f32()?, bytes.f32()?]);
+    }
+    let mut links = Vec::with_capacity(link_count);
+    let mut bytes = Bytes::new(links_field);
+    for _ in 0..link_count {
+        bytes.skip(4)?;
+        let navmesh = bytes.u32()?;
+        let triangle = bytes.u16()?;
+        links.push(Beyond::Link { navmesh, triangle });
+    }
+    let mut triangles = Vec::with_capacity(triangle_count);
+    let mut edges = Vec::with_capacity(triangle_count);
+    let mut bytes = Bytes::new(triangles_field);
+    for _ in 0..triangle_count {
+        let triangle = [bytes.u16()?, bytes.u16()?, bytes.u16()?];
+        if triangle
+            .iter()
+            .any(|&vertex| usize::from(vertex) >= vertices.len())
+        {
+            return None;
+        }
+        let across = [bytes.u16()?, bytes.u16()?, bytes.u16()?];
+        let flags = bytes.u16()?;
+        bytes.skip(2)?;
+        let mut beyond = [Beyond::Nothing; 3];
+        for ((edge, value), slot) in across.iter().enumerate().zip(beyond.iter_mut()) {
+            *slot = if *value == NONE {
+                Beyond::Nothing
+            } else if flags & (1 << edge) != 0 {
+                links
+                    .get(usize::from(*value))
+                    .copied()
+                    .unwrap_or(Beyond::Nothing)
+            } else if usize::from(*value) < triangle_count {
+                Beyond::Triangle(*value)
+            } else {
+                Beyond::Nothing
+            };
+        }
+        triangles.push(triangle);
+        edges.push(beyond);
+    }
+    let mut doors = Vec::with_capacity(door_count);
+    let mut bytes = Bytes::new(doors_field);
+    for _ in 0..door_count {
+        let door = bytes.u32()?;
+        let triangle = bytes.u16()?;
+        bytes.skip(2)?;
+        if usize::from(triangle) < triangle_count {
+            doors.push((triangle, door));
+        }
+    }
+    Some(Geometry {
+        vertices,
+        triangles,
+        edges,
+        doors,
+    })
+}
+
+/// How many entries of `len` bytes `field` holds, if it ends on a whole
+/// one.
+fn whole_entries(field: &[u8], len: usize) -> Option<usize> {
+    field.len().is_multiple_of(len).then(|| field.len() / len)
 }
 
 /// The field with the triangles in `cut` taken out of the paths: nothing
@@ -761,6 +908,198 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    /// A navigation mesh record of Fallout 3's and New Vegas's layout with
+    /// the given fields, and `DATA` counting them unless `counts` is false.
+    fn split_record(
+        vertices: &[[f32; 3]],
+        triangles: &[Written],
+        links: &[(u32, u16)],
+        doors: &[(u16, u32)],
+        counts: bool,
+    ) -> Record {
+        let field = |signature: &[u8; 4], data: Vec<u8>| crate::plugin::Subrecord {
+            signature: *signature,
+            data,
+        };
+        let count = |n: usize| u32::try_from(n).unwrap().to_le_bytes();
+        let mut data = 0x0000_1A2Bu32.to_le_bytes().to_vec();
+        data.extend(count(vertices.len()));
+        data.extend(count(triangles.len()));
+        data.extend(count(links.len()));
+        data.extend(count(0));
+        data.extend(count(doors.len()));
+        let vertex_bytes: Vec<u8> = vertices
+            .iter()
+            .flat_map(|vertex| vertex.iter().flat_map(|value| value.to_le_bytes()))
+            .collect();
+        let mut triangle_bytes = Vec::new();
+        for (corners, edges, flags) in triangles {
+            for value in corners.iter().chain(edges) {
+                triangle_bytes.extend(value.to_le_bytes());
+            }
+            triangle_bytes.extend(flags.to_le_bytes());
+            triangle_bytes.extend(0x0101u16.to_le_bytes());
+        }
+        let mut door_bytes = Vec::new();
+        for (triangle, door) in doors {
+            door_bytes.extend(door.to_le_bytes());
+            door_bytes.extend(triangle.to_le_bytes());
+            door_bytes.extend([0; 2]);
+        }
+        let mut link_bytes = Vec::new();
+        for (navmesh, triangle) in links {
+            link_bytes.extend(0u32.to_le_bytes());
+            link_bytes.extend(navmesh.to_le_bytes());
+            link_bytes.extend(triangle.to_le_bytes());
+        }
+        let mut subrecords = vec![
+            field(b"EDID", b"Mesh\0".to_vec()),
+            field(b"NVER", 11u32.to_le_bytes().to_vec()),
+        ];
+        if counts {
+            subrecords.push(field(b"DATA", data));
+        }
+        subrecords.extend([
+            field(b"NVVX", vertex_bytes),
+            field(b"NVTR", triangle_bytes),
+            field(b"NVCA", Vec::new()),
+            field(b"NVDP", door_bytes),
+            field(b"NVGD", vec![7; 24]),
+            field(b"NVEX", link_bytes),
+        ]);
+        Record {
+            signature: *b"NAVM",
+            form_id: 0x0001_0000,
+            flags: 0,
+            subrecords,
+            groups: Vec::new(),
+        }
+    }
+
+    /// [`strip`] in Fallout 3's and New Vegas's layout.
+    fn split_strip(counts: bool) -> Record {
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [0.0, 100.0, 0.0],
+            [100.0, 0.0, 0.0],
+            [100.0, 100.0, 0.0],
+            [200.0, 0.0, 0.0],
+            [200.0, 100.0, 0.0],
+        ];
+        let triangles = [
+            ([0, 1, 2], [NONE, 1, NONE], 0),
+            ([1, 3, 2], [NONE, 2, 0], 0),
+            ([2, 3, 4], [1, 3, NONE], 0),
+            ([3, 5, 4], [NONE, 0, 1], 0b110 | 0x0040),
+        ];
+        split_record(
+            &vertices,
+            &triangles,
+            &[(NEIGHBOUR, 7), (NEIGHBOUR, 2)],
+            &[(1, 0x0000_1234)],
+            counts,
+        )
+    }
+
+    #[test]
+    fn the_older_layout_reads_like_skyrims() {
+        let skyrim = geometry(&strip()).unwrap();
+        assert_eq!(split_geometry(&split_strip(true)), Some(skyrim.clone()));
+        // Without counts, the fields' lengths say how many entries there are.
+        assert_eq!(split_geometry(&split_strip(false)), Some(skyrim.clone()));
+        assert_eq!(record_geometry(&split_strip(true)), Some(skyrim));
+        assert_eq!(
+            split_geometry(&split_strip(true)).unwrap().doors,
+            [(1, 0x0000_1234)]
+        );
+    }
+
+    #[test]
+    fn a_record_with_one_field_is_read_by_its_version() {
+        let record = Record {
+            signature: *b"NAVM",
+            form_id: 1,
+            flags: 0,
+            subrecords: vec![crate::plugin::Subrecord {
+                signature: *b"NVNM",
+                data: strip_in(FALLOUT_4_VERSION),
+            }],
+            groups: Vec::new(),
+        };
+        assert_eq!(record_geometry(&record), geometry(&strip()));
+    }
+
+    #[test]
+    fn an_older_mesh_that_does_not_hold_together_is_not_read() {
+        // Counts that disagree with the fields.
+        let mut record = split_strip(true);
+        if let Some(data) = record
+            .subrecords
+            .iter_mut()
+            .find(|field| &field.signature == b"DATA")
+        {
+            data.data[8] = 9;
+        }
+        assert_eq!(split_geometry(&record), None);
+        // A triangles field that ends inside a triangle.
+        let mut record = split_strip(false);
+        if let Some(triangles) = record
+            .subrecords
+            .iter_mut()
+            .find(|field| &field.signature == b"NVTR")
+        {
+            triangles.data.pop();
+        }
+        assert_eq!(split_geometry(&record), None);
+        // A triangle on a vertex the mesh does not have.
+        let vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        let broken = split_record(&vertices, &[([0, 1, 3], [NONE; 3], 0)], &[], &[], true);
+        assert_eq!(split_geometry(&broken), None);
+        // No triangles at all: not a mesh of this layout.
+        let mut record = split_strip(false);
+        record
+            .subrecords
+            .retain(|field| &field.signature != b"NVTR");
+        assert_eq!(split_geometry(&record), None);
+    }
+
+    proptest! {
+        #[test]
+        fn the_older_layout_never_panics(
+            fields in prop::collection::vec(
+                (prop::sample::select(vec![*b"DATA", *b"NVVX", *b"NVTR", *b"NVEX", *b"NVDP"]),
+                 prop::collection::vec(any::<u8>(), 0..96)),
+                0..8),
+        ) {
+            let record = Record {
+                signature: *b"NAVM",
+                form_id: 1,
+                flags: 0,
+                subrecords: fields
+                    .into_iter()
+                    .map(|(signature, data)| crate::plugin::Subrecord { signature, data })
+                    .collect(),
+                groups: Vec::new(),
+            };
+            let _ = split_geometry(&record);
+            let _ = record_geometry(&record);
+        }
+
+        #[test]
+        fn a_damaged_older_mesh_never_panics(
+            which in 0usize..9, at in 0usize..120, byte in any::<u8>(), keep in 0usize..120,
+        ) {
+            let mut record = split_strip(true);
+            if let Some(field) = record.subrecords.get_mut(which) {
+                if let Some(slot) = field.data.get_mut(at) {
+                    *slot = byte;
+                }
+                field.data.truncate(keep);
+            }
+            let _ = split_geometry(&record);
         }
     }
 }

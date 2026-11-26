@@ -1,6 +1,6 @@
 # 0022 The desktop app shows a report as a task list
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0045](0045-a-health-score-and-tasks-by-what-to-do.md): the report opens with a health score and tasks by what to do
 - Date: 2026-11-15
 
 ## Context

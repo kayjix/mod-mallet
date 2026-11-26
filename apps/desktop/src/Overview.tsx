@@ -14,6 +14,7 @@ import { useReviewTexts } from "./review-texts";
 import "./journey.css";
 import "./overview.css";
 import { LoadingScreen } from "./LoadingMallet";
+import { ShareReport } from "./share-report";
 import { VersionChanges } from "./version-changes";
 
 /** The pages the overview leads to. */
@@ -265,6 +266,7 @@ export function Overview({
           </dl>
         </details>
       </section>
+      <ShareReport />
     </div>
   );
 }

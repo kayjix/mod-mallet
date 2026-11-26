@@ -2,6 +2,7 @@
 
 - Status: proposed | accepted | superseded by [NNNN](NNNN-title.md)
 - Date: YYYY-MM-DD
+- Changes: ADR NNNN (what it changes; only when it changes an earlier record)
 
 ## Context
 

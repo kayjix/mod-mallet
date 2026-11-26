@@ -56,11 +56,13 @@ export interface Texts {
   /**
    * The games of the game menu. Those Mod Mallet reads have no quip; which
    * of them are installed comes from the Rust side. The others are a promise.
+   * `reach` says, for a game read not yet with every check, what works for
+   * it, as `docs/src/product/games.md` lists it.
    */
-  games: { id: string; name: string; quip?: string }[];
+  games: { id: string; name: string; quip?: string; reach?: string }[];
   /** A game Mod Mallet reads, but that is not on this machine. */
   gameNotInstalled: string;
-  /** A game Mod Mallet reads, but not yet with every check. */
+  /** A game Mod Mallet reads, but not yet with every check, without a `reach`. */
   gameBasic: string;
   homeNoArt: string;
   viewToolbox: string;
@@ -345,15 +347,49 @@ export const texts: Record<Lang, Texts> = {
     managerLinkMissing: "Link not installed",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
-      { id: "skyrimvr", name: "Skyrim VR" },
-      { id: "skyrim", name: "Skyrim (2011)" },
+      {
+        id: "skyrimvr",
+        name: "Skyrim VR",
+        reach: "everything but the plugins Mod Mallet writes for moves, paths and doors",
+      },
+      {
+        id: "skyrim",
+        name: "Skyrim (2011)",
+        reach: "nearly everything; no patches or plugins of its own yet",
+      },
       { id: "enderalspecialedition", name: "Enderal Special Edition" },
-      { id: "fallout4", name: "Fallout 4" },
-      { id: "fallout4vr", name: "Fallout 4 VR" },
-      { id: "falloutnv", name: "Fallout: New Vegas" },
-      { id: "fallout3", name: "Fallout 3" },
-      { id: "oblivion", name: "Oblivion" },
-      { id: "oblivionremastered", name: "Oblivion Remastered" },
+      {
+        id: "fallout4",
+        name: "Fallout 4",
+        reach:
+          "nearly everything: collisions, map and paths, catalogue, crash reports; no patches yet",
+      },
+      {
+        id: "fallout4vr",
+        name: "Fallout 4 VR",
+        reach:
+          "nearly everything: collisions, map and paths, catalogue, crash reports; no patches yet",
+      },
+      {
+        id: "falloutnv",
+        name: "Fallout: New Vegas",
+        reach: "load order, files, archives, collisions and 3D views, map and paths",
+      },
+      {
+        id: "fallout3",
+        name: "Fallout 3",
+        reach: "load order, files, archives, collisions and 3D views, map and paths",
+      },
+      {
+        id: "oblivion",
+        name: "Oblivion",
+        reach: "load order, files, archives, collisions and 3D views, map; no paths or catalogue",
+      },
+      {
+        id: "oblivionremastered",
+        name: "Oblivion Remastered",
+        reach: "load order and LOOT's rules, files, archives, map, Unreal mods; no 3D views",
+      },
       { id: "morrowind", name: "Morrowind", quip: "waiting for a silt strider" },
       { id: "starfield", name: "Starfield", quip: "the mallet needs a space suit" },
       { id: "tes6", name: "The Elder Scrolls VI", quip: "as soon as it exists" },
@@ -755,15 +791,54 @@ export const texts: Record<Lang, Texts> = {
     managerLinkMissing: "Verbindung nicht installiert",
     games: [
       { id: "skyrimse", name: "Skyrim Special Edition" },
-      { id: "skyrimvr", name: "Skyrim VR" },
-      { id: "skyrim", name: "Skyrim (2011)" },
+      {
+        id: "skyrimvr",
+        name: "Skyrim VR",
+        reach:
+          "alles außer den Plugins, die Mod Mallet für Verschiebungen, Wege und Türen schreibt",
+      },
+      {
+        id: "skyrim",
+        name: "Skyrim (2011)",
+        reach: "fast alles; noch keine Patches und keine eigenen Plugins",
+      },
       { id: "enderalspecialedition", name: "Enderal Special Edition" },
-      { id: "fallout4", name: "Fallout 4" },
-      { id: "fallout4vr", name: "Fallout 4 VR" },
-      { id: "falloutnv", name: "Fallout: New Vegas" },
-      { id: "fallout3", name: "Fallout 3" },
-      { id: "oblivion", name: "Oblivion" },
-      { id: "oblivionremastered", name: "Oblivion Remastered" },
+      {
+        id: "fallout4",
+        name: "Fallout 4",
+        reach:
+          "fast alles: Kollisionen, Karte und Wege, Katalog, Absturzberichte; noch keine Patches",
+      },
+      {
+        id: "fallout4vr",
+        name: "Fallout 4 VR",
+        reach:
+          "fast alles: Kollisionen, Karte und Wege, Katalog, Absturzberichte; noch keine Patches",
+      },
+      {
+        id: "falloutnv",
+        name: "Fallout: New Vegas",
+        reach:
+          "Ladereihenfolge, Dateien, Archive, Kollisionen und 3D-Ansichten, Karte; noch keine Wege",
+      },
+      {
+        id: "fallout3",
+        name: "Fallout 3",
+        reach:
+          "Ladereihenfolge, Dateien, Archive, Kollisionen und 3D-Ansichten, Karte; noch keine Wege",
+      },
+      {
+        id: "oblivion",
+        name: "Oblivion",
+        reach:
+          "Ladereihenfolge, Dateien, Archive, Kollisionen und 3D-Ansichten, Karte; keine Wege, kein Katalog",
+      },
+      {
+        id: "oblivionremastered",
+        name: "Oblivion Remastered",
+        reach:
+          "Ladereihenfolge und LOOT-Regeln, Dateien, Archive, Karte, Unreal-Mods; keine 3D-Ansichten",
+      },
       { id: "morrowind", name: "Morrowind", quip: "wartet noch auf einen Schlickschreiter" },
       { id: "starfield", name: "Starfield", quip: "der Hammer braucht noch einen Raumanzug" },
       { id: "tes6", name: "The Elder Scrolls VI", quip: "sobald es das gibt" },

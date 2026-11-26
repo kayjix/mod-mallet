@@ -310,7 +310,7 @@ tool-vc-runtime-purpose = Ein Windows-Baustein, mit dem fast jedes Script-Extend
 tool-base-object-swapper-name = Base Object Swapper
 tool-base-object-swapper-purpose = Ein SKSE-Plugin, das Objekte austauscht, während das Spiel läuft. Die Patches von Mod Mallet blenden damit kollidierende Objekte aus.
 tool-creation-kit-name = Creation Kit
-tool-creation-kit-purpose = Bethesdas Editor. Du brauchst ihn, um die Wege zu reparieren, auf denen Figuren laufen (Navigationsnetze) – Mod Mallet kann nur darauf zeigen –, um einen Ort so anzusehen, wie das Spiel ihn baut, mit seinem Licht, und um eigene Mods zu bauen. Zum Spielen und für Mod Mallet nicht nötig.
+tool-creation-kit-purpose = Bethesdas Editor. Mod Mallet repariert die Wege, auf denen Figuren laufen (Navigationsnetze), dort, wo sein eigener Patch etwas versteckt oder verschoben hat. Für Wege anderswo, um einen Ort so anzusehen, wie das Spiel ihn baut, mit seinem Licht, und um eigene Mods zu bauen, brauchst du das Creation Kit. Zum Spielen und für Mod Mallet nicht nötig.
 tool-skse-vr-name = Skyrim VR Script Extender (SKSEVR)
 tool-skse-vr-purpose = Erlaubt Mods, Skyrim VR Programmcode hinzuzufügen. Braucht eine Fassung genau für deine Spielversion.
 tool-skse-classic-name = Skyrim Script Extender (SKSE)
@@ -363,3 +363,34 @@ tool-need-required = Nötig
 tool-need-recommended = Empfohlen
 tool-need-optional = Optional
 tool-provided-by = In { $tool } eingebaut
+
+## Ein Bericht zum Weitergeben, in einem Forenbeitrag oder einem Fehlerbericht (ADR 0091).
+
+share-title = Mod-Mallet-Bericht
+share-removed = Dein Benutzername, der Name deines Computers und die Ordner deines Benutzerkontos und deines Setups sind durch Platzhalter wie %USERPROFILE% und <game> ersetzt; Mods, Plugins und Befunde sind unverändert.
+share-manager =
+    Mod-Manager: { $manager ->
+        [vortex] Vortex
+        [mo2] Mod Organizer 2
+       *[other] { $manager }
+    }
+share-placeholders = Platzhalter
+share-placeholder-game = der Ordner, in dem das Spiel installiert ist
+share-placeholder-staging = der Ordner, in dem der Mod-Manager die installierten Mods aufbewahrt
+share-placeholder-instance = der Ordner der Mod-Organizer-2-Instanz
+share-placeholder-downloads = der Ordner der heruntergeladenen Mod-Archive
+share-placeholder-documents = der Dokumente-Ordner, in dem das Spiel Spielstände und Protokolle ablegt
+share-placeholder-local-app-data = die lokalen Anwendungsdaten des Benutzerkontos
+share-placeholder-app-data = die servergespeicherten Anwendungsdaten des Benutzerkontos (Roaming)
+share-placeholder-user-profile = der Ordner des Benutzerkontos
+share-placeholder-user = ein Benutzername
+share-placeholder-machine = der Name des Computers
+share-placeholder-profile = ein Profil des Mod-Managers
+share-places = Gelesene Orte
+share-problems = Fehler und Warnungen
+share-notes = Hinweise
+share-load-order =
+    Ladereihenfolge ({ $count ->
+        [one] 1 Plugin
+       *[other] { $count } Plugins
+    })

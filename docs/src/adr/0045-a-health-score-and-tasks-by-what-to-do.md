@@ -1,6 +1,6 @@
 # 0045 A health score, and tasks by what to do
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0076](0076-task-rows-crash-risks-first.md): task rows, crash risks first
 - Date: 2026-11-18
 - Changes: ADR 0022 (the report as a task list), ADR 0027 (the home page)
 

@@ -120,6 +120,9 @@ Options:
       --notes
           Also list the notes: things worth knowing that need no action. The JSON format always contains them
 
+      --share
+          Make the result fit for sharing, in a forum post or a bug report: your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as `%USERPROFILE%` and `<game>`. Mods, plugins and findings stay. The text is Markdown and lists the notes, the places read and the load order, too
+
       --cache <FILE>
           Where the result of the last scan is kept
 
@@ -158,13 +161,16 @@ Options:
   -v, --verbose
           Show which places were read and how they were found, list the notes, and print what Mod Mallet is doing to the error stream
 
-      --cache <FILE>
-          Where the result of the last scan is kept
-
       --game <GAME>
           The game to look at: `skyrimse`, `skyrimvr`, `skyrim`, `enderalspecialedition`, `fallout4`, `fallout4vr`, `falloutnv`, `fallout3`, `oblivion` or `oblivionremastered`
 
           [default: skyrimse]
+
+      --share
+          Make the result fit for sharing, in a forum post or a bug report: your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as `%USERPROFILE%` and `<game>`. Mods, plugins and findings stay. The text is Markdown and lists the notes, the places read and the load order, too
+
+      --cache <FILE>
+          Where the result of the last scan is kept
 
   -h, --help
           Print help (see a summary with '-h')

@@ -114,9 +114,7 @@ impl Contribution {
             }
             b"NAVM" => {
                 let links = (record.flags & FLAG_DELETED == 0).then(|| {
-                    record
-                        .first(b"NVNM")
-                        .and_then(navmesh::door_triangles)
+                    navmesh::record_door_triangles(record)
                         .unwrap_or_default()
                         .into_iter()
                         .map(|(triangle, door)| {

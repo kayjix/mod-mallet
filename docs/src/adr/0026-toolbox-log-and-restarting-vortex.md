@@ -1,6 +1,6 @@
 # 0026 The app has a toolbox, a log, and can restart Vortex
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0048](0048-one-job-per-page.md): the toolbox is a page of its own and the sidebar loses its pill
 - Date: 2026-11-15
 
 ## Context

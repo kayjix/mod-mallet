@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderedShare",
+  "description": "A report meant for sharing, put into words.",
+  "type": "object",
+  "properties": {
+    "removed": {
+      "description": "One sentence saying what was removed from it.",
+      "type": "string"
+    },
+    "text": {
+      "description": "The report as Markdown, which also reads well as plain text.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text",
+    "removed"
+  ]
+}

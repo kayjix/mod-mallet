@@ -352,7 +352,7 @@ impl<'a> MarkerReader<'a> {
 /// reading it. `None` if that cannot be told for this installation.
 pub fn plugin_list_path(game: Game, game_dir: &Path, local_dir: Option<&Path>) -> Option<PathBuf> {
     let settings = load_order_settings(game, game_dir, local_dir).ok()?;
-    Some(settings.active_plugins_file().clone())
+    Some(spelt_on_disk(settings.active_plugins_file()))
 }
 
 /// The load order library's view of the installation. The library wants
@@ -401,11 +401,24 @@ fn active_plugins_in(
     let load_order_error = |error: loadorder::Error| IngestError::LoadOrder(error.to_string());
 
     let mut settings = load_order_settings(game, game_dir, local_dir).map_err(load_order_error)?;
+    let plugin_list = spelt_on_disk(settings.active_plugins_file());
+    // The library asks for the list by the name the game gives it,
+    // `Plugins.txt`. Mod Organizer's profiles spell it `plugins.txt`, which
+    // only a system that ignores case finds under the other name; elsewhere
+    // the library reads a copy that carries its name.
+    let _copy = if settings.active_plugins_file().is_file() || !plugin_list.is_file() {
+        None
+    } else {
+        let copy = renamed_copy(&plugin_list, settings.active_plugins_file())
+            .map_err(|error| IngestError::LoadOrder(error.to_string()))?;
+        settings =
+            load_order_settings(game, game_dir, Some(copy.path())).map_err(load_order_error)?;
+        Some(copy)
+    };
     if !folders.is_empty() {
         // The load order library takes the first folder that has a plugin.
         settings.set_additional_plugins_directories(folders.to_vec());
     }
-    let plugin_list = settings.active_plugins_file().clone();
     let mut load_order = settings.into_load_order();
     load_order.load().map_err(load_order_error)?;
     let names = load_order
@@ -414,6 +427,38 @@ fn active_plugins_in(
         .map(str::to_owned)
         .collect();
     Ok((names, plugin_list))
+}
+
+/// `file` as it is spelt on disk, whatever the case of its name; `file`
+/// itself where nothing by that name is there.
+fn spelt_on_disk(file: &Path) -> PathBuf {
+    match (file.parent(), file.file_name()) {
+        (Some(folder), Some(name)) => crate::locate::on_disk(folder, &name.to_string_lossy()),
+        _ => file.to_path_buf(),
+    }
+}
+
+/// The name of the list of every plugin in its order, which the load order
+/// library reads beside the list of active plugins for some games.
+const LOAD_ORDER_LIST: &str = "loadorder.txt";
+
+/// A folder of its own with a copy of the list `found` under the name
+/// `wanted` has, and a copy of the list of all plugins beside it, if there
+/// is one. Nothing is written where the lists are; the folder goes away
+/// when it is dropped.
+fn renamed_copy(found: &Path, wanted: &Path) -> io::Result<tempfile::TempDir> {
+    let folder = tempfile::tempdir()?;
+    let name = wanted
+        .file_name()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "the list has no name"))?;
+    std::fs::copy(found, folder.path().join(name))?;
+    if let Some(beside) = found.parent() {
+        let order = spelt_on_disk(&beside.join(LOAD_ORDER_LIST));
+        if order.is_file() {
+            std::fs::copy(&order, folder.path().join(LOAD_ORDER_LIST))?;
+        }
+    }
+    Ok(folder)
 }
 
 /// Every ordinary file below `directory`, as a path below `base` and as

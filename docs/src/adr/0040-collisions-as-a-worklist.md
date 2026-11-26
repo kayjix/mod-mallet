@@ -1,6 +1,6 @@
 # 0040 Collisions as a worklist, decided spot by spot
 
-- Status: accepted; changed by [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects can be hidden on their own; [ADR 0072](0072-passages-where-two-mods-build-the-same.md): what a passage is
+- Status: accepted; changed by [ADR 0046](0046-why-the-game-relies-on-an-object.md): which objects can be hidden on their own; [ADR 0072](0072-passages-where-two-mods-build-the-same.md): what a passage is; [ADR 0048](0048-one-job-per-page.md): deciding a pair of mods; [ADR 0050](0050-a-guided-review-through-the-homes.md): also structure by structure; [ADR 0055](0055-a-magic-wand-for-what-belongs-together.md): what the card of a picked object takes along; [ADR 0067](0067-stacked-doors-are-merged-into-one.md): doors of one group are a spot of their own
 - Date: 2026-11-17
 - Changes: ADR 0025 (what the patch hides is chosen per collision finding),
   ADR 0023 and ADR 0038 (the order in which a placed object is turned)

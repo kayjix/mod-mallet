@@ -80,3 +80,28 @@
   gap: 10px;
   margin-top: 18px;
 }
+
+/* The path and the button that picks it in the system's dialog. */
+.place-input {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.place-input input {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-browse {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.place-browse svg {
+  width: 16px;
+  height: 16px;
+}

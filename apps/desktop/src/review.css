@@ -310,41 +310,6 @@
   gap: var(--space-2);
 }
 
-/* What keeping a side does, and why some parts stay. */
-.review-effects {
-  display: grid;
-  gap: 6px;
-}
-
-.review-effect {
-  display: grid;
-  gap: 4px;
-  padding: 8px 12px;
-  border-left: 3px solid var(--ok);
-  border-radius: 6px;
-  background: var(--sunken);
-  font-size: 0.88rem;
-}
-
-.review-effect[data-nothing="true"] {
-  border-left-color: var(--warning);
-}
-
-.review-effect p {
-  margin: 0;
-}
-
-.review-effect > button {
-  justify-self: start;
-}
-
-.review-ties ul {
-  display: grid;
-  gap: 4px;
-  margin: 4px 0 0;
-  padding-left: 18px;
-}
-
 /* The report of what was decided, per pair of mods. */
 .pair-report {
   display: grid;
@@ -560,17 +525,9 @@
   box-shadow: 0 0 0 2px var(--ok);
 }
 
-.review-side-effect {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  margin: 0;
+/* What keeping a side does: the kit's note, its words a little stronger. */
+.review-side-effect p {
   font-weight: 600;
-}
-
-.review-side-effect button {
-  font-weight: 400;
 }
 
 .review-side-badges {

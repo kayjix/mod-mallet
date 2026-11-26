@@ -1,6 +1,6 @@
 # 0036 One adapter for the Bethesda family, settings per game
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0065](0065-oblivion-remastered.md): Oblivion Remastered, whose old game's data lies below the installation; [ADR 0078](0078-other-games-closer-to-skyrim.md): Enderal, Fallout 4's paths, and saying what does not apply
 - Date: 2026-11-17
 
 ## Context

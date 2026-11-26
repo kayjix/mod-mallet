@@ -1,0 +1,51 @@
+---
+source: crates/mallet-cli/tests/cli.rs
+expression: text
+---
+# Mod Mallet report
+
+Skyrim Special Edition 1.6.1170, script extender 2.2.6  
+3 script extender plugins checked  
+Mod manager: Vortex  
+2 plugins and 1 archive read
+
+> Your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as %USERPROFILE% and <game>; mods, plugins and findings are unchanged.
+
+## Placeholders
+
+- `<game>`: the folder the game is installed in
+- `<staging>`: the folder the mod manager keeps the installed mods in
+- `<documents>`: the documents folder, where the game keeps saves and logs
+- `%LOCALAPPDATA%`: the local application data of the user account
+- `%APPDATA%`: the roaming application data of the user account
+
+## Places read
+
+- Game directory: `<game>` (from the entry the game's launcher wrote into the Windows registry)
+- List of active plugins: `%LOCALAPPDATA%\Skyrim Special Edition\plugins.txt` (at its standard place)
+- Script extender log: `<documents>\My Games\Skyrim Special Edition\SKSE\skse64.log` (at its standard place)
+- Vortex's saved state: `%APPDATA%\Vortex\temp\state_backups_full\startup.json` (at its standard place)
+- Vortex's folder of installed mods (the names of their files, and the files of the things you look at under Assets): `<staging>` (named in Vortex's list of deployed files)
+- Folder of crash reports: `<documents>\My Games\Skyrim Special Edition\SKSE` (not found)
+
+## Errors and warnings
+
+### Error (certain): Script extender plugin does not support this game version
+
+Old.dll was switched off because it was not built for game version 1.6.1170.
+
+- File: `data/skse/plugins/old.dll`
+- Mod: Old Mod
+- What to do: Look on the mod's page for a version built for your game version and install it. If there is none yet, disable the mod until it has been updated.
+- Kind: `extender.plugin-incompatible`
+
+## Notes
+
+- The game crashed recently: A crash logger recorded 2 crashes of the game in the last 7 days, the last on <documents>\My Games\Skyrim Special Edition\SKSE\crash-2026-11-20.log. Where the game failed: SkyrimSE.exe+0x1234. (`crashes.recent`)
+
+1 error, 0 warnings, 1 note
+
+## Load order (2 plugins)
+
+1. Skyrim.esm
+2. OldMod.esp (Old Mod)

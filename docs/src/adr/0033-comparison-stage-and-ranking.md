@@ -1,6 +1,6 @@
 # 0033 Mods are compared on a stage and decided by a ranking
 
-- Status: accepted
+- Status: accepted; [ADR 0048](0048-one-job-per-page.md): the comparison stage is a page of its own, Assets
 - Date: 2026-11-16
 - Changes: ADR 0029 (duels and a 3D view of single things)
 

@@ -25,6 +25,10 @@ export interface JourneyTexts {
   brandHint: string;
   inUse: string;
   notScanned: string;
+  /** Under the score of the game in use: it is the one of now. */
+  scoreNow: string;
+  /** Under the last score of another game: from which scan it is. */
+  scoreAt: (when: string) => string;
 
   scanFirst: string;
   tasksOpen: (count: number) => string;
@@ -69,6 +73,8 @@ const en: JourneyTexts = {
   brandHint: "Start: all games",
   inUse: "In use",
   notScanned: "Not scanned yet",
+  scoreNow: "as it stands now",
+  scoreAt: (when) => `scan of ${when}`,
 
   scanFirst: "Scan this game to see how it stands and what there is to do.",
   tasksOpen: (count) => (count === 1 ? "1 thing to do" : `${count} things to do`),
@@ -117,6 +123,8 @@ const de: JourneyTexts = {
   brandHint: "Start: alle Spiele",
   inUse: "In Arbeit",
   notScanned: "Noch nicht geprüft",
+  scoreNow: "Stand jetzt",
+  scoreAt: (when) => `Prüfung vom ${when}`,
 
   scanFirst: "Prüfe dieses Spiel, um zu sehen, wie es steht und was zu tun ist.",
   tasksOpen: (count) => (count === 1 ? "1 Sache zu tun" : `${count} Sachen zu tun`),

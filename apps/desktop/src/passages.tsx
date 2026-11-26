@@ -69,7 +69,6 @@ export function PassageSummary({
   return (
     <Note
       tone={tone}
-      className="passage-summary"
       summary={
         <>
           <strong className="passage-title">{title(passage, worlds)}</strong>

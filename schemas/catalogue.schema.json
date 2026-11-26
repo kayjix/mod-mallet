@@ -242,12 +242,42 @@
           "const": "staff"
         },
         {
+          "description": "A pistol (Fallout 4).",
+          "type": "string",
+          "const": "pistol"
+        },
+        {
+          "description": "A rifle (Fallout 4).",
+          "type": "string",
+          "const": "rifle"
+        },
+        {
+          "description": "A shotgun (Fallout 4).",
+          "type": "string",
+          "const": "shotgun"
+        },
+        {
+          "description": "A heavy weapon: a minigun, a flamer, a missile launcher (Fallout 4).",
+          "type": "string",
+          "const": "heavy-weapon"
+        },
+        {
+          "description": "A weapon for close combat, with or without a blade (Fallout 4).",
+          "type": "string",
+          "const": "melee-weapon"
+        },
+        {
+          "description": "A grenade or a mine (Fallout 4).",
+          "type": "string",
+          "const": "explosive"
+        },
+        {
           "description": "Any other weapon.",
           "type": "string",
           "const": "other-weapon"
         },
         {
-          "description": "Arrows and bolts.",
+          "description": "Arrows, bolts and the ammunition of guns.",
           "type": "string",
           "const": "ammunition"
         },
@@ -270,6 +300,16 @@
           "description": "Something worn on the feet: boots, shoes.",
           "type": "string",
           "const": "feet"
+        },
+        {
+          "description": "A piece of armour for the arms (Fallout 4).",
+          "type": "string",
+          "const": "arms"
+        },
+        {
+          "description": "A piece of armour for the legs (Fallout 4).",
+          "type": "string",
+          "const": "legs"
         },
         {
           "description": "A shield.",

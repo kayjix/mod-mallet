@@ -48,3 +48,43 @@
   gap: 2px;
   padding: var(--space-2) var(--space-3);
 }
+
+/* Each game's health on its card (ADR 0048): a small ring and its verdict. */
+.game-score {
+  --verdict: var(--ok);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 2px 0;
+}
+
+.game-score[data-verdict="suffers"] {
+  --verdict: var(--warning);
+}
+
+.game-score[data-verdict="crashes"] {
+  --verdict: var(--error);
+}
+
+.game-score .score-ring {
+  width: 46px;
+  height: 46px;
+}
+
+.game-score .score-value strong {
+  font-size: 0.95rem;
+}
+
+.game-score .score-value span {
+  display: none;
+}
+
+.game-score-words {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.game-score .game-score-words strong {
+  color: var(--verdict);
+}

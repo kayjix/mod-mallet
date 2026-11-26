@@ -87,7 +87,8 @@ pub fn extender(game: Game, install: &Path) -> Option<ExtenderInstall> {
             }
         });
     let runtimes = extender.versioned_library.map_or_default(|prefix| {
-        let mut runtimes: Vec<RuntimeVersion> = file_names(install)
+        // The libraries lie beside the loader.
+        let mut runtimes: Vec<RuntimeVersion> = file_names(loader.parent().unwrap_or(install))
             .iter()
             .filter_map(|name| runtime_of_library(prefix, name))
             .collect();

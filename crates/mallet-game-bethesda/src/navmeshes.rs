@@ -3,7 +3,7 @@
 //!
 //! A navigation mesh (`NAVM`) lies in the children of its cell, like the
 //! objects placed there. Of its geometry only the doors characters walk
-//! through are read ([`navmesh::doors`]). A mesh's place is named after
+//! through are read ([`navmesh::record_door_triangles`]), in either layout. A mesh's place is named after
 //! its cell: the cell's internal name inside, the worldspace's
 //! internal name and the cell's grid position (`XCLC`) outside, which is
 //! what the game's console takes to go there.
@@ -95,11 +95,11 @@ fn cell_name(cell: &Record, worlds: &HashMap<u32, String>) -> Option<String> {
 /// The doors a navigation mesh lets characters walk through, if its
 /// geometry can be read.
 fn doors(record: &Record, masters: &[String], plugin_name: &str) -> Option<Vec<RecordId>> {
-    let doors = navmesh::doors(record.first(b"NVNM")?)?;
+    let doors = navmesh::record_door_triangles(record)?;
     Some(
         doors
             .into_iter()
-            .map(|door| record_id(door, masters, plugin_name))
+            .map(|(_, door)| record_id(door, masters, plugin_name))
             .collect(),
     )
 }

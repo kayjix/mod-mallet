@@ -299,6 +299,15 @@
   flex: none;
 }
 
+/* The colour of what the chip names, such as a kind of collision. */
+.chip-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--chip-colour, var(--muted));
+}
+
 /* What Mod Mallet suggests, beside the choice it suggests. */
 .suggested-mark {
   margin-left: 6px;

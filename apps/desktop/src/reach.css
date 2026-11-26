@@ -1,25 +1,13 @@
 /* What hiding objects does to the ways characters take (ADR 0059). */
 
-.reach-note {
-  margin: 4px 0 6px;
-  padding: 6px 10px;
-  border-left: 3px solid #d55e00;
-  border-radius: 4px;
-  background: var(--surface);
-  font-size: 0.9rem;
-}
-
-.reach-note ul {
+/* The ways that change, in the kit's warning note (ADR 0077). */
+.reach-list {
   margin: 0;
   padding-left: 18px;
 }
 
-.reach-note li[data-outcome="longer"] {
+.reach-list li[data-outcome="longer"] {
   list-style-type: circle;
-}
-
-.reach-note.reach-fine {
-  border-left-color: #009e73;
 }
 
 .reach-more,

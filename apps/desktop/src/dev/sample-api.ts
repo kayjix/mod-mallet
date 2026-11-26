@@ -9,7 +9,7 @@ import type { ActionPlace, AreaObject, AreaObjects } from "../generated/area-obj
 import type { AreaNavmesh, AreaPaths } from "../generated/area-paths";
 import type { AssetVersion, AssetVersions } from "../generated/asset-versions";
 import type { Catalogue, CatalogueItem } from "../generated/catalogue";
-import type { GameChoice, KnownGame } from "../generated/game-choice";
+import type { GameChoice, KnownGame, LastHealth } from "../generated/game-choice";
 import type { LodMesh } from "../generated/lod-mesh";
 import type { MeshThumbnail } from "../generated/mesh-thumbnail";
 import type { MeshView } from "../generated/mesh-view";
@@ -1531,6 +1531,11 @@ let chosen: Record<string, string | null> | null = {
 /** The game the sample looks at. */
 let activeGame = "skyrimse";
 
+/** The health each game had when last looked at; Fallout 4 was scanned a while ago. */
+const lastHealth: Record<string, LastHealth> = {
+  fallout4: { score: 83, verdict: "suffers", scannedAt: 1_763_500_000 },
+};
+
 /** The games of the sample: two installed, the others not. */
 function sampleGames(): GameChoice {
   const game = (
@@ -1545,6 +1550,7 @@ function sampleGames(): GameChoice {
     dir,
     origin: dir === null ? null : "steam",
     scriptExtender,
+    lastHealth: lastHealth[id] ?? null,
   });
   return {
     active: activeGame,
@@ -1628,6 +1634,9 @@ export const sampleApi: Api = {
     sampleManager = manager ?? sampleManager;
     return later(places(lang, confirmed, sampleManager));
   },
+  // No dialog in a plain browser: a made-up path shows how a pick fills the field.
+  pickPlace: (kind) =>
+    later(kind === "folder" ? "D:\\Games\\Picked Folder" : "D:\\Games\\picked-file.txt"),
   ignored: () => later([...ignoredIds]),
   setIgnored: (id, aside) => {
     if (aside) {
@@ -1993,6 +2002,10 @@ export const sampleApi: Api = {
     activeGame = game;
     return later(sampleGames());
   },
+  setLastHealth: (health) => {
+    lastHealth[activeGame] = health;
+    return later(undefined);
+  },
   // The sample has no terrain textures; the map draws its height relief.
   mapImage: () => later(null),
   // Two versions of every file: the game's, and a mod's that wins.
@@ -2081,6 +2094,21 @@ export const sampleApi: Api = {
       }),
     ),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
+  sharedReport: (lang) =>
+    later({
+      text:
+        lang === "de"
+          ? "# Mod-Mallet-Bericht\n\nSkyrim Special Edition 1.6.1170\n\n## Gelesene Orte\n\n- Spielordner: `<game>`\n- Liste der aktiven Plugins: `%LOCALAPPDATA%\\Skyrim Special Edition\\plugins.txt`\n"
+          : "# Mod Mallet report\n\nSkyrim Special Edition 1.6.1170\n\n## Places read\n\n- Game directory: `<game>`\n- List of active plugins: `%LOCALAPPDATA%\\Skyrim Special Edition\\plugins.txt`\n",
+      removed:
+        lang === "de"
+          ? "Dein Benutzername, der Name deines Computers und die Ordner deines Benutzerkontos und deines Setups sind durch Platzhalter wie %USERPROFILE% und <game> ersetzt; Mods, Plugins und Befunde sind unverändert."
+          : "Your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as %USERPROFILE% and <game>; mods, plugins and findings are unchanged.",
+    }),
+  saveSharedReport: (_lang, format) =>
+    later(
+      `C:\\Users\\you\\AppData\\Local\\mod-mallet\\shared\\mod-mallet-report-skyrimse.${format}`,
+    ),
 };
 
 // ---- objects up close ------------------------------------------------------------

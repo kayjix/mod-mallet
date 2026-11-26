@@ -1,6 +1,6 @@
 # 0067 Stacked doors are found and merged into one
 
-- Status: accepted
+- Status: accepted; changed by [ADR 0088](0088-door-paths-re-attached-to-the-kept-door.md): the paths of merged doors are re-attached to the kept door
 - Date: 2026-11-21
 - Changes: ADR 0060 (the plugin of moves also leads doors elsewhere);
   ADR 0039 and ADR 0040 (doors of one group are a spot of their
