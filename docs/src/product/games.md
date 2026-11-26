@@ -22,7 +22,7 @@ New Vegas were not installed.
 |---|---|---|---|---|---|---|---|---|---|---|
 | Found on the machine | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
 | Plugins, masters, load order | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
-| LOOT's rules | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✘ | ✘ |
+| LOOT's rules | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔ | ✘ |
 | Archives and loose files | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
 | Meshes and their textures | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ◐ | ✘ | ✘ |
 | Faces against their records | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ |
@@ -60,7 +60,10 @@ New Vegas were not installed.
   `Oblivion.esm`): 774 objects around the Imperial City, 52 of their 53
   models read, the ground of 9 cells. No navigation meshes.
 - **Oblivion Remastered**: as Oblivion for records; its meshes are not what
-  it draws (ADR 0065).
+  it draws (ADR 0065). LOOT's rules: its 20 active plugins were checked
+  against a masterlist written for the check that named them; a missing
+  master, an incompatible pair and a note on a condition came out as
+  findings, a rule on a switched-off plugin did not.
 - **Enderal Special Edition** is not installed: only an empty folder of the
   first Enderal (on Skyrim 2011) remains in the Steam library on `D:`. Its
   support is built and tested against a made-up installation; the numbers
@@ -70,7 +73,11 @@ New Vegas were not installed.
 
 **Found on the machine.** Morrowind is not a game of this adapter.
 
-**LOOT's rules.** Oblivion Remastered: not wired to LOOT's library yet.
+**LOOT's rules.** Every game but Morrowind. Oblivion Remastered is handed
+to LOOT's library from its installation's top folder, which finds the old
+game's data below it. Only Skyrim Special Edition's masterlist was on the
+reference machine; the other games were checked with a masterlist written
+for the check.
 
 **Meshes and their textures.** Oblivion: its meshes name textures in an
 older way, read only in part. Oblivion Remastered: the meshes in its data

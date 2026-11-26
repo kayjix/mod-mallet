@@ -52,9 +52,12 @@ pub(crate) fn read(
     }
 
     let started = Instant::now();
+    // LOOT's library finds a game's data from its installation, which for
+    // Oblivion Remastered lies above the folder the checks read (ADR 0065).
+    let install = mallet_game_bethesda::locate::install_dir(game, game_dir);
     match mallet_knowledge::read(
         game.id(),
-        game_dir,
+        &install,
         options.local_dir.as_deref(),
         &path,
         plugins,
