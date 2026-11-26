@@ -746,11 +746,17 @@ impl Game {
         matches!(self.family(), Family::Skyrim | Family::Fallout4)
     }
 
+    /// Whether Mod Mallet reads the game's things for the catalogue: the
+    /// item records of the Skyrim games and of Fallout 4 (ADR 0054, 0092).
+    pub const fn has_catalogue(self) -> bool {
+        matches!(self.family(), Family::Skyrim | Family::Fallout4)
+    }
+
     /// The parts of Mod Mallet that do not apply to the game, for the
     /// window to say so (ADR 0078).
     pub fn lacks(self) -> Vec<GameLack> {
         [
-            (GameLack::Catalogue, self.family() != Family::Skyrim),
+            (GameLack::Catalogue, !self.has_catalogue()),
             (GameLack::Patches, !self.has_object_swapper()),
             (GameLack::WrittenPlugins, !self.writes_plugins()),
             (GameLack::Walkways, !self.reads_walkways()),
@@ -880,13 +886,10 @@ mod tests {
         assert_eq!(Game::EnderalSe.lacks(), Vec::new());
         assert_eq!(
             Game::Fallout4.lacks(),
-            [
-                GameLack::Catalogue,
-                GameLack::Patches,
-                GameLack::WrittenPlugins
-            ]
+            [GameLack::Patches, GameLack::WrittenPlugins]
         );
         assert!(Game::Oblivion.lacks().contains(&GameLack::Walkways));
+        assert!(Game::Oblivion.lacks().contains(&GameLack::Catalogue));
         assert!(Game::FalloutNv.lacks().contains(&GameLack::Walkways));
         assert!(!Game::SkyrimVr.lacks().contains(&GameLack::Patches));
     }

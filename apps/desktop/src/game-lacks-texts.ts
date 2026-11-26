@@ -10,7 +10,7 @@ export type GameLackTexts = Record<GameLack, (game: string) => string>;
 export const gameLackTexts: Record<Lang, GameLackTexts> = {
   en: {
     catalogue: (game) =>
-      `The catalogue knows the weapons, armour and clothes of the Skyrim games only. It cannot list those of ${game} yet.`,
+      `The catalogue knows the weapons, armour and clothes of the Skyrim games and Fallout 4 only. It cannot list those of ${game} yet.`,
     patches: (game) =>
       `Mod Mallet's patches need Base Object Swapper, a small helper that exists only for Skyrim. ${game} has none, so no patch can be built for it.`,
     "written-plugins": (game) =>
@@ -20,7 +20,7 @@ export const gameLackTexts: Record<Lang, GameLackTexts> = {
   },
   de: {
     catalogue: (game) =>
-      `Der Katalog kennt bisher nur die Waffen, Rüstungen und Kleidung der Skyrim-Spiele. Die von ${game} kann er noch nicht zeigen.`,
+      `Der Katalog kennt bisher nur die Waffen, Rüstungen und Kleidung der Skyrim-Spiele und von Fallout 4. Die von ${game} kann er noch nicht zeigen.`,
     patches: (game) =>
       `Die Patches von Mod Mallet brauchen Base Object Swapper, ein kleines Hilfsprogramm, das es nur für Skyrim gibt. ${game} hat keins, deshalb lässt sich dafür kein Patch bauen.`,
     "written-plugins": (game) =>

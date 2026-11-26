@@ -55,12 +55,25 @@ pub(crate) fn spelt_name(record: &Record, localized: bool) -> Option<String> {
 
 /// The name players see (`FULL`), looked up in `names`, the string table
 /// by number, for a localized plugin. Untrimmed, and possibly empty.
+///
+/// The names of Fallout 4's object templates, between `OBTE` and `STOP`,
+/// are not the thing's.
 pub(crate) fn full_name(
     record: &Record,
     localized: bool,
     names: &HashMap<u32, String>,
 ) -> Option<String> {
-    record.first(b"FULL").and_then(|data| {
+    let mut in_templates = false;
+    let full = record.subrecords.iter().find_map(|field| {
+        match &field.signature {
+            b"OBTE" => in_templates = true,
+            b"STOP" => in_templates = false,
+            b"FULL" if !in_templates => return Some(field.data.as_slice()),
+            _ => {}
+        }
+        None
+    });
+    full.and_then(|data| {
         if localized {
             let number = u32::from_le_bytes(data.get(..4)?.try_into().ok()?);
             names.get(&number).cloned()

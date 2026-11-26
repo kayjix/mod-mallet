@@ -37,7 +37,7 @@ New Vegas were not installed.
 | Patches (hiding objects) | ✔ | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
 | Plugins Mod Mallet writes: moves, paths, doors | ✔ | ✔° | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
 | Passages | ✔ | ✔° | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✘ | ✘ |
-| Catalogue | ✔ | ✔° | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
+| Catalogue | ✔ | ✔° | ✔° | ✔° | ✔ | ✔° | ✘ | ✘ | ✘ | ✘ |
 | Vortex | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔ | ✘ |
 | Mod Organizer 2 | ✔ | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✔° | ✘ | ✘ |
 | Toolbox | ✔ | ✔° | ✔° | ✔° | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
@@ -53,6 +53,13 @@ New Vegas were not installed.
   triangles), and, after this round, 40 destinations checked for
   reachability and 26 navigation meshes drawn in the paths mode around the
   same point. `Fallout4.esm` holds 7,894 navigation meshes; all are read.
+  The catalogue: 10,328 things and 431 sets from the 21 plugins, read in
+  under three seconds, among them 8 pistols, 15 rifles, 2 shotguns, 30
+  heavy weapons, 35 melee weapons, 39 grenades and mines, 443 clothes and
+  pieces for the body, 156 for the head, 85 for the arms, 71 for the legs
+  and 810 characters with a face of their own; 11,121 of their 11,232
+  models are in the data folder or its archives. Names come in English and
+  German from the game's string tables.
 - **Skyrim (2011)**: everything above, but of the models around a point in
   Whiterun's hold 157 of 184 were read; the rest are older shapes (strips of
   triangles) the reader skips.
@@ -127,9 +134,15 @@ need a writer of their own.
 **Passages.** Found and shown for every game whose objects are read; deciding
 one hides objects through a patch, so it is decided only where patches work.
 
-**Catalogue.** It reads the item records of the Skyrim games (weapons,
-armour, clothes and their models). Fallout 4's are close, the older games'
-differ more; none is read yet.
+**Catalogue.** It reads the item records of the Skyrim games and Fallout 4
+(weapons, armour, clothes and their models). Fallout 4's weapons are
+sorted by their `WeaponType…` keywords into pistols, rifles, shotguns,
+heavy weapons, melee weapons and grenades, its armour by its body slots,
+with pieces for the arms and the legs; what players cannot use is flagged
+in the record itself. Fallout 4 builds most guns from parts at run time:
+the catalogue shows the model the weapon's record names, which for those
+guns is only the receiver. The older games' records differ more; none is
+read yet.
 
 **Mod Organizer 2.** The game names it writes are mapped for every game but
 Oblivion Remastered.

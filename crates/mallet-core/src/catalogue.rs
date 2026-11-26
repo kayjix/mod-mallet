@@ -112,9 +112,21 @@ pub enum ItemCategory {
     Crossbow,
     /// A staff.
     Staff,
+    /// A pistol (Fallout 4).
+    Pistol,
+    /// A rifle (Fallout 4).
+    Rifle,
+    /// A shotgun (Fallout 4).
+    Shotgun,
+    /// A heavy weapon: a minigun, a flamer, a missile launcher (Fallout 4).
+    HeavyWeapon,
+    /// A weapon for close combat, with or without a blade (Fallout 4).
+    MeleeWeapon,
+    /// A grenade or a mine (Fallout 4).
+    Explosive,
     /// Any other weapon.
     OtherWeapon,
-    /// Arrows and bolts.
+    /// Arrows, bolts and the ammunition of guns.
     Ammunition,
     /// Something worn on the head: a helmet, a hood, a circlet.
     Head,
@@ -124,6 +136,10 @@ pub enum ItemCategory {
     Hands,
     /// Something worn on the feet: boots, shoes.
     Feet,
+    /// A piece of armour for the arms (Fallout 4).
+    Arms,
+    /// A piece of armour for the legs (Fallout 4).
+    Legs,
     /// A shield.
     Shield,
     /// A ring or a necklace.
@@ -172,12 +188,20 @@ impl ItemCategory {
             | Self::Bow
             | Self::Crossbow
             | Self::Staff
+            | Self::Pistol
+            | Self::Rifle
+            | Self::Shotgun
+            | Self::HeavyWeapon
+            | Self::MeleeWeapon
+            | Self::Explosive
             | Self::OtherWeapon
             | Self::Ammunition => ItemGroup::Weapons,
             Self::Head
             | Self::Body
             | Self::Hands
             | Self::Feet
+            | Self::Arms
+            | Self::Legs
             | Self::Shield
             | Self::Jewellery
             | Self::OtherWorn => ItemGroup::Apparel,
