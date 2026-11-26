@@ -379,7 +379,7 @@ fn version(
 ) -> (RecordId, Option<NavmeshShape>) {
     let id = record_id(record.form_id, masters, plugin_name);
     let shape = (record.flags & FLAG_DELETED == 0)
-        .then(|| record.first(b"NVNM").and_then(navmesh::geometry))
+        .then(|| navmesh::record_geometry(record))
         .flatten()
         .map(|geometry| NavmeshShape {
             id: id.clone(),
@@ -597,6 +597,53 @@ mod tests {
         assert_eq!((near.ground[0].x, near.ground[0].y), (5, 3));
         assert_eq!(near.ground[0].heights.len(), 33 * 33);
         assert_eq!(near.ground[0].heights[0], 8);
+    }
+
+    #[test]
+    fn meshes_of_fallout_3_and_new_vegas_are_read_from_their_fields() {
+        let mut vertices = Vec::new();
+        for vertex in [[0.0f32, 0.0, 32.0], [100.0, 0.0, 32.0], [0.0, 100.0, 32.0]] {
+            for value in vertex {
+                vertices.extend(value.to_le_bytes());
+            }
+        }
+        let mut triangle = Vec::new();
+        for value in [0u16, 1, 2, 0xFFFF, 0xFFFF, 0xFFFF, 0, 0] {
+            triangle.extend(value.to_le_bytes());
+        }
+        let mut door = 0x0000_0120u32.to_le_bytes().to_vec();
+        door.extend([0; 4]);
+        let mut data = 0x0000_0100u32.to_le_bytes().to_vec();
+        for count in [3u32, 1, 0, 0, 1] {
+            data.extend(count.to_le_bytes());
+        }
+        let vault =
+            RecordSpec::new(*b"CELL", 0x0000_0100).with(*b"EDID", fixture::zstring("Vault101"));
+        let mesh = RecordSpec::new(NAVMESH, 0x0000_0110)
+            .with(*b"NVER", 11u32.to_le_bytes().to_vec())
+            .with(*b"DATA", data)
+            .with(*b"NVVX", vertices)
+            .with(*b"NVTR", triangle)
+            .with(*b"NVDP", door);
+        let game = fixture::plugin_with_raw_groups(
+            &[],
+            0,
+            &[fixture::interior_cells(&[(vault, vec![mesh])])],
+        );
+        let (_directory, plugins) = crate::test_support::plugin_files(&[("Fallout3.esm", game)]);
+        let around = Around {
+            worlds: BTreeMap::new(),
+            interiors: BTreeSet::from([RecordId::new("fallout3.esm", 0x100)]),
+        };
+        let near = read_plugins(&plugins, &around);
+
+        let [shape] = near.navmeshes.as_slice() else {
+            panic!("expected one mesh, got {:?}", near.navmeshes);
+        };
+        assert_eq!(shape.place_name.as_deref(), Some("Vault101"));
+        assert_eq!(shape.triangles, vec![[0, 1, 2]]);
+        assert_eq!(shape.vertices[1], [100, 0, 32]);
+        assert_eq!(shape.doors, vec![(0, RecordId::new("fallout3.esm", 0x120))]);
     }
 
     #[test]

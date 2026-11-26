@@ -739,11 +739,13 @@ impl Game {
     }
 
     /// Whether Mod Mallet reads the paths characters walk in the game: the
-    /// navigation meshes of Skyrim's and Fallout 4's layout. Oblivion keeps
-    /// path grids instead, Fallout 3 and New Vegas navigation meshes of an
-    /// older layout.
+    /// navigation meshes of Skyrim, Fallout 4, Fallout 3 and New Vegas
+    /// (ADR 0092). Oblivion keeps path grids instead.
     pub const fn reads_walkways(self) -> bool {
-        matches!(self.family(), Family::Skyrim | Family::Fallout4)
+        matches!(
+            self.family(),
+            Family::Skyrim | Family::Fallout4 | Family::Fallout3
+        )
     }
 
     /// Whether Mod Mallet reads the game's things for the catalogue: the
@@ -890,7 +892,7 @@ mod tests {
         );
         assert!(Game::Oblivion.lacks().contains(&GameLack::Walkways));
         assert!(Game::Oblivion.lacks().contains(&GameLack::Catalogue));
-        assert!(Game::FalloutNv.lacks().contains(&GameLack::Walkways));
+        assert!(!Game::FalloutNv.lacks().contains(&GameLack::Walkways));
         assert!(!Game::SkyrimVr.lacks().contains(&GameLack::Patches));
     }
 

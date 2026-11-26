@@ -33,7 +33,7 @@ New Vegas were not installed.
 | Map: places and cells | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✔ | ✔ | ✘ |
 | Map: picture from above | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✘ | ✘ | ✘ | ✘ |
 | Map: relief and level of detail in 3D | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ◐ | ◐ | ◐ | ✘ |
-| Walkways, paths mode, reachability | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✘ | ✘ | ✘ | ✘ |
+| Walkways, paths mode, reachability | ✔ | ✔° | ✔° | ✔ | ✔ | ✔° | ✔° | ✘ | ✘ | ✘ |
 | Patches (hiding objects) | ✔ | ✔° | ✔° | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
 | Plugins Mod Mallet writes: moves, paths, doors | ✔ | ✔° | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
 | Passages | ✔ | ✔° | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ✘ | ✘ |
@@ -118,9 +118,12 @@ for every game; the level of detail of Skyrim and Fallout 4 (`.btr` and
 
 **Walkways.** Skyrim and Fallout 4 keep the paths characters walk in
 navigation meshes of two layouts (version 12 and 15) that Mod Mallet reads.
-Fallout 3 and New Vegas use navigation meshes of an older layout, with
-vertices and triangles in separate fields; reading them is the next step.
-Oblivion has path grids of points and lines, a different thing altogether.
+Fallout 3 and New Vegas use navigation meshes of an older layout (version
+11), with vertices, triangles, links and doors in fields of their own; they
+are read too, as xEdit describes them, and tested against made-up meshes
+only, since neither game is installed on the reference machine. Only
+Skyrim's layout is cut or written. Oblivion has path grids of points and
+lines, a different thing altogether.
 
 **Patches.** Mod Mallet's patches are read by Base Object Swapper, which
 exists for Skyrim Special Edition and VR only (and works for Enderal, on the

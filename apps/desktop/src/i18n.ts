@@ -373,12 +373,12 @@ export const texts: Record<Lang, Texts> = {
       {
         id: "falloutnv",
         name: "Fallout: New Vegas",
-        reach: "load order, files, archives, collisions and 3D views, map; no paths yet",
+        reach: "load order, files, archives, collisions and 3D views, map and paths",
       },
       {
         id: "fallout3",
         name: "Fallout 3",
-        reach: "load order, files, archives, collisions and 3D views, map; no paths yet",
+        reach: "load order, files, archives, collisions and 3D views, map and paths",
       },
       {
         id: "oblivion",
