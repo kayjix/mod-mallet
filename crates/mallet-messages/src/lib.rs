@@ -93,6 +93,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unic_langid::LanguageIdentifier;
 
+mod share;
+
+pub use share::RenderedShare;
+
 /// A language Mod Mallet can speak.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]

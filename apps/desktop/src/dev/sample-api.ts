@@ -2094,6 +2094,21 @@ export const sampleApi: Api = {
       }),
     ),
   logFile: () => later("C:\\Users\\you\\AppData\\Local\\mod-mallet\\logs\\mod-mallet.log"),
+  sharedReport: (lang) =>
+    later({
+      text:
+        lang === "de"
+          ? "# Mod-Mallet-Bericht\n\nSkyrim Special Edition 1.6.1170\n\n## Gelesene Orte\n\n- Spielordner: `<game>`\n- Liste der aktiven Plugins: `%LOCALAPPDATA%\\Skyrim Special Edition\\plugins.txt`\n"
+          : "# Mod Mallet report\n\nSkyrim Special Edition 1.6.1170\n\n## Places read\n\n- Game directory: `<game>`\n- List of active plugins: `%LOCALAPPDATA%\\Skyrim Special Edition\\plugins.txt`\n",
+      removed:
+        lang === "de"
+          ? "Dein Benutzername, der Name deines Computers und die Ordner deines Benutzerkontos und deines Setups sind durch Platzhalter wie %USERPROFILE% und <game> ersetzt; Mods, Plugins und Befunde sind unverändert."
+          : "Your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as %USERPROFILE% and <game>; mods, plugins and findings are unchanged.",
+    }),
+  saveSharedReport: (_lang, format) =>
+    later(
+      `C:\\Users\\you\\AppData\\Local\\mod-mallet\\shared\\mod-mallet-report-skyrimse.${format}`,
+    ),
 };
 
 // ---- objects up close ------------------------------------------------------------

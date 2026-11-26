@@ -1,0 +1,127 @@
+---
+source: crates/mallet-cli/tests/cli.rs
+expression: json
+---
+{
+  "schemaVersion": 1,
+  "scannedAt": 0,
+  "game": {
+    "id": "skyrimse",
+    "name": "Skyrim Special Edition",
+    "version": "1.6.1170",
+    "extenderVersion": "2.2.6"
+  },
+  "extenderPluginsChecked": 3,
+  "pluginsChecked": 2,
+  "archivesChecked": 1,
+  "installersChecked": 0,
+  "meshesChecked": 0,
+  "locations": [
+    {
+      "role": "game-dir",
+      "path": "<game>",
+      "origin": "registry",
+      "found": true
+    },
+    {
+      "role": "plugin-list",
+      "path": "%LOCALAPPDATA%\\Skyrim Special Edition\\plugins.txt",
+      "origin": "standard",
+      "found": true
+    },
+    {
+      "role": "extender-log",
+      "path": "<documents>\\My Games\\Skyrim Special Edition\\SKSE\\skse64.log",
+      "origin": "standard",
+      "found": true
+    },
+    {
+      "role": "manager-state",
+      "path": "%APPDATA%\\Vortex\\temp\\state_backups_full\\startup.json",
+      "origin": "standard",
+      "found": true
+    },
+    {
+      "role": "mod-staging",
+      "path": "<staging>",
+      "origin": "manager",
+      "found": true
+    },
+    {
+      "role": "crash-logs",
+      "path": "<documents>\\My Games\\Skyrim Special Edition\\SKSE",
+      "origin": "standard",
+      "found": false
+    }
+  ],
+  "findings": [
+    {
+      "id": "extender.plugin-incompatible:file:data/skse/plugins/old.dll",
+      "kind": "extender.plugin-incompatible",
+      "severity": "error",
+      "confidence": "certain",
+      "subject": {
+        "type": "file",
+        "path": "data/skse/plugins/old.dll"
+      },
+      "args": {
+        "file": "Old.dll",
+        "gameVersion": "1.6.1170"
+      },
+      "provider": {
+        "source": "vortex",
+        "id": "Old Mod-123-1-0",
+        "name": "Old Mod"
+      }
+    },
+    {
+      "id": "crashes.recent:setup",
+      "kind": "crashes.recent",
+      "severity": "info",
+      "confidence": "certain",
+      "subject": {
+        "type": "setup"
+      },
+      "args": {
+        "count": 2,
+        "days": 7,
+        "examples": "SkyrimSE.exe+0x1234",
+        "last": "<documents>\\My Games\\Skyrim Special Edition\\SKSE\\crash-2026-11-20.log"
+      }
+    }
+  ],
+  "mods": [],
+  "map": {
+    "owners": [],
+    "worlds": [],
+    "spots": [],
+    "passages": []
+  },
+  "objectSwapper": false,
+  "installedPatch": null,
+  "duels": [],
+  "switchedOffPlugins": [],
+  "manager": "vortex",
+  "loadOrder": [
+    {
+      "name": "Skyrim.esm",
+      "origin": "game",
+      "masters": []
+    },
+    {
+      "name": "OldMod.esp",
+      "origin": "mod",
+      "masters": [
+        "Skyrim.esm"
+      ],
+      "provider": {
+        "source": "vortex",
+        "id": "Old Mod-123-1-0",
+        "name": "Old Mod"
+      }
+    }
+  ],
+  "versions": {
+    "plugins": []
+  }
+}

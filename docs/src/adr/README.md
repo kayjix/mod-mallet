@@ -132,3 +132,4 @@ used; no record with these numbers was ever committed.
 | [0088](0088-door-paths-re-attached-to-the-kept-door.md) | The paths of merged doors are re-attached to the kept door | accepted |
 | [0089](0089-when-the-game-rewrites-the-load-order.md) | When the game rewrites the load order, it is told why | accepted |
 | [0090](0090-the-vision-catches-up.md) | The vision draws its lines where Mod Mallet's own work ends | accepted |
+| [0091](0091-a-report-to-share.md) | A report to share, without who and where the user is | accepted |

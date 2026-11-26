@@ -1,0 +1,51 @@
+---
+source: crates/mallet-cli/tests/cli.rs
+expression: text
+---
+# Mod-Mallet-Bericht
+
+Skyrim Special Edition 1.6.1170, Script Extender 2.2.6  
+3 Script-Extender-Plugins geprüft  
+Mod-Manager: Vortex  
+2 Plugins und 1 Archiv gelesen
+
+> Dein Benutzername, der Name deines Computers und die Ordner deines Benutzerkontos und deines Setups sind durch Platzhalter wie %USERPROFILE% und <game> ersetzt; Mods, Plugins und Befunde sind unverändert.
+
+## Platzhalter
+
+- `<game>`: der Ordner, in dem das Spiel installiert ist
+- `<staging>`: der Ordner, in dem der Mod-Manager die installierten Mods aufbewahrt
+- `<documents>`: der Dokumente-Ordner, in dem das Spiel Spielstände und Protokolle ablegt
+- `%LOCALAPPDATA%`: die lokalen Anwendungsdaten des Benutzerkontos
+- `%APPDATA%`: die servergespeicherten Anwendungsdaten des Benutzerkontos (Roaming)
+
+## Gelesene Orte
+
+- Spielordner: `<game>` (aus dem Eintrag, den der Launcher des Spiels in die Windows-Registry schreibt)
+- Liste der aktiven Plugins: `%LOCALAPPDATA%\Skyrim Special Edition\plugins.txt` (am üblichen Ort)
+- Protokoll des Script Extenders: `<documents>\My Games\Skyrim Special Edition\SKSE\skse64.log` (am üblichen Ort)
+- Vortex' gespeicherter Zustand: `%APPDATA%\Vortex\temp\state_backups_full\startup.json` (am üblichen Ort)
+- Vortex' Ordner der installierten Mods (die Namen ihrer Dateien, und die Dateien der Dinge, die du unter Assets ansiehst): `<staging>` (genannt in Vortex' Liste der bereitgestellten Dateien)
+- Ordner mit Absturzberichten: `<documents>\My Games\Skyrim Special Edition\SKSE` (nicht gefunden)
+
+## Fehler und Warnungen
+
+### Fehler (sicher): Script-Extender-Plugin passt nicht zur Spielversion
+
+Old.dll wurde abgeschaltet, weil es nicht für die Spielversion 1.6.1170 gebaut ist.
+
+- Datei: `data/skse/plugins/old.dll`
+- Mod: Old Mod
+- Was tun: Sieh auf der Seite der Mod nach, ob es eine Version für deine Spielversion gibt, und installiere sie. Gibt es noch keine, deaktiviere die Mod, bis sie aktualisiert wurde.
+- Art: `extender.plugin-incompatible`
+
+## Hinweise
+
+- Das Spiel ist kürzlich abgestürzt: Ein Crash-Logger hat 2 Abstürze des Spiels in den letzten 7 Tagen aufgezeichnet, zuletzt am <documents>\My Games\Skyrim Special Edition\SKSE\crash-2026-11-20.log. Wo das Spiel versagt hat: SkyrimSE.exe+0x1234. (`crashes.recent`)
+
+1 Fehler, 0 Warnungen, 1 Hinweis
+
+## Ladereihenfolge (2 Plugins)
+
+1. Skyrim.esm
+2. OldMod.esp (Old Mod)

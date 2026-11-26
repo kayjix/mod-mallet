@@ -41,6 +41,7 @@ import type {
   RecordChange,
   RenderedReport,
 } from "./generated/rendered-report";
+import type { RenderedShare } from "./generated/rendered-share";
 import type { RenderedToolbox } from "./generated/rendered-toolbox";
 import type { ScanProgress } from "./generated/scan-progress";
 import type { SpotsReach } from "./generated/spots-reach";
@@ -62,6 +63,14 @@ export interface Api {
   onScanProgress(listener: (progress: ScanProgress) => void): () => void;
   /** The result of the last scan, or `null` if there is none yet. */
   lastReport(lang: Lang): Promise<RenderedReport | null>;
+  /**
+   * The last report made fit for sharing (ADR 0091): Markdown text with the
+   * private parts of paths replaced, and a sentence saying what was removed.
+   * Null if no scan is stored.
+   */
+  sharedReport(lang: Lang): Promise<RenderedShare | null>;
+  /** Saves the shared report as a file of Mod Mallet's own, shows it, and resolves to where it is. */
+  saveSharedReport(lang: Lang, format: "md" | "json"): Promise<string>;
   /**
    * Every thing of the setup worth looking at (ADR 0054): weapons, armour,
    * characters and other things, with the outfits they form. The first call
@@ -332,6 +341,8 @@ const tauriApi: Api = {
   openFolder: (which) => invoke<void>("open_folder", { which }),
   showDataFile: (name) => invoke<void>("show_data_file", { name }),
   logFile: () => invoke<string | null>("log_file"),
+  sharedReport: (lang) => invoke<RenderedShare | null>("shared_report", { lang }),
+  saveSharedReport: (lang, format) => invoke<string>("save_shared_report", { lang, format }),
   toolbox: (lang) => invoke<RenderedToolbox>("toolbox", { lang }),
   restartManager: () => invoke<void>("restart_manager"),
   gameArt: (game) => invoke<string | null>("game_art", { game }),

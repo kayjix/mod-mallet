@@ -37,6 +37,7 @@ mod preview;
 mod raster;
 mod reach;
 mod settings;
+mod share;
 mod staging;
 mod switched_off;
 mod thumbnail;
@@ -83,6 +84,10 @@ pub use reach::{
 pub use settings::{
     Settings, default_settings_path, known_games, load_settings, planned_locations, save_settings,
     select_game, setup_fingerprint, update_settings,
+};
+pub use share::{
+    SharedFile, machine_shortener, save_shared_report, share_report, share_report_with,
+    shared_report_dir,
 };
 pub use switched_off::data_file;
 pub use thumbnail::mesh_thumbnails;
@@ -264,6 +269,9 @@ pub enum EngineError {
     /// An archive picked as a patch holds no patch of Mod Mallet.
     #[error("the archive holds no patch of Mod Mallet")]
     NotAPatch,
+    /// A report could not be made fit for sharing, or not be saved.
+    #[error("the report could not be shared: {0}")]
+    Share(String),
     /// A patch's manifest is in a format this Mod Mallet does not know.
     #[error("the patch was made by a newer Mod Mallet (manifest format {0}); update Mod Mallet")]
     ManifestFormat(u32),

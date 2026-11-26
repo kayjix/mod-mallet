@@ -39,6 +39,7 @@ pub mod preferences;
 pub mod progress;
 pub mod reach;
 pub mod report;
+pub mod share;
 pub mod toolbox;
 pub mod unreal;
 pub mod versions;
@@ -66,6 +67,7 @@ pub use report::{
     PlaceKind, PlaceOrigin, PreviewVersion, ScanLocation, ScanReport, SpotKind, SpotLocation,
     SpotPart, WorldMap, WorldOrigin,
 };
+pub use share::{Placeholder, SharedReport, Shortener};
 pub use toolbox::{Tool, ToolGroup, ToolNeed, ToolState};
 pub use unreal::{PakFolder, UnrealPak};
 pub use versions::{

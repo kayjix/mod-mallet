@@ -387,3 +387,34 @@ tool-need-required = Required
 tool-need-recommended = Recommended
 tool-need-optional = Optional
 tool-provided-by = Built into { $tool }
+
+## A report meant for sharing, in a forum post or a bug report (ADR 0091).
+
+share-title = Mod Mallet report
+share-removed = Your user name, your computer's name and the folders of your user account and your setup are replaced by placeholders such as %USERPROFILE% and <game>; mods, plugins and findings are unchanged.
+share-manager =
+    Mod manager: { $manager ->
+        [vortex] Vortex
+        [mo2] Mod Organizer 2
+       *[other] { $manager }
+    }
+share-placeholders = Placeholders
+share-placeholder-game = the folder the game is installed in
+share-placeholder-staging = the folder the mod manager keeps the installed mods in
+share-placeholder-instance = the folder of the Mod Organizer 2 instance
+share-placeholder-downloads = the folder of downloaded mod archives
+share-placeholder-documents = the documents folder, where the game keeps saves and logs
+share-placeholder-local-app-data = the local application data of the user account
+share-placeholder-app-data = the roaming application data of the user account
+share-placeholder-user-profile = the folder of the user account
+share-placeholder-user = a user name
+share-placeholder-machine = the computer's name
+share-placeholder-profile = a profile of the mod manager
+share-places = Places read
+share-problems = Errors and warnings
+share-notes = Notes
+share-load-order =
+    Load order ({ $count ->
+        [one] 1 plugin
+       *[other] { $count } plugins
+    })

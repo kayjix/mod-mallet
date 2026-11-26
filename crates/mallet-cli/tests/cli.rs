@@ -217,3 +217,197 @@ fn an_unsupported_language_is_rejected() {
     let error = run(&["--lang", "fr", "kinds"]).unwrap_err();
     assert!(error.to_string().contains("not a supported language"));
 }
+
+/// A made-up report of a made-up user, Alice, whose paths name her
+/// everywhere.
+fn report_of_alice() -> mallet_core::ScanReport {
+    use mallet_core::{Finding, GamePath, LoadedPlugin, ModRef, Subject, WorldOrigin, kinds};
+    let old_mod = ModRef {
+        source: "vortex".to_owned(),
+        id: "Old Mod-123-1-0".to_owned(),
+        name: "Old Mod".to_owned(),
+    };
+    let mut report: mallet_core::ScanReport = serde_json::from_value(serde_json::json!({
+        "schemaVersion": 1,
+        "scannedAt": 0,
+        "game": {
+            "id": "skyrimse",
+            "name": "Skyrim Special Edition",
+            "version": "1.6.1170",
+            "extenderVersion": "2.2.6"
+        },
+        "extenderPluginsChecked": 3,
+        "pluginsChecked": 2,
+        "archivesChecked": 1,
+        "findings": [],
+        "manager": "vortex",
+    }))
+    .unwrap();
+    report.locations = alices_places();
+    report.findings = vec![
+        Finding::new(
+            &kinds::EXTENDER_PLUGIN_INCOMPATIBLE,
+            Subject::File {
+                path: GamePath::new("data/skse/plugins/old.dll"),
+            },
+        )
+        .with_arg("file", "Old.dll")
+        .with_arg("gameVersion", "1.6.1170")
+        .with_provider(Some(old_mod.clone())),
+        Finding::new(&kinds::CRASHES_RECENT, Subject::Setup)
+            .with_arg("count", 2_i64)
+            .with_arg("days", 7_i64)
+            .with_arg(
+                "last",
+                r"C:\Users\Alice\Documents\My Games\Skyrim Special Edition\SKSE\crash-2026-11-20.log",
+            )
+            .with_arg("examples", "SkyrimSE.exe+0x1234"),
+    ];
+    report.load_order = vec![
+        LoadedPlugin {
+            name: "Skyrim.esm".to_owned(),
+            origin: WorldOrigin::Game,
+            masters: Vec::new(),
+            provider: None,
+        },
+        LoadedPlugin {
+            name: "OldMod.esp".to_owned(),
+            origin: WorldOrigin::Mod,
+            masters: vec!["Skyrim.esm".to_owned()],
+            provider: Some(old_mod),
+        },
+    ];
+    report
+}
+
+/// The places a scan read on Alice's made-up machine.
+fn alices_places() -> Vec<mallet_core::ScanLocation> {
+    use mallet_core::{LocationOrigin, LocationRole, ScanLocation};
+    let location = |role, path: &str, origin, found| ScanLocation {
+        role,
+        path: path.to_owned(),
+        origin,
+        found,
+    };
+    vec![
+        location(
+            LocationRole::GameDir,
+            r"D:\SteamLibrary\steamapps\common\Skyrim Special Edition",
+            LocationOrigin::Registry,
+            true,
+        ),
+        location(
+            LocationRole::PluginList,
+            r"C:\Users\Alice\AppData\Local\Skyrim Special Edition\plugins.txt",
+            LocationOrigin::Standard,
+            true,
+        ),
+        location(
+            LocationRole::ExtenderLog,
+            r"C:\Users\Alice\Documents\My Games\Skyrim Special Edition\SKSE\skse64.log",
+            LocationOrigin::Standard,
+            true,
+        ),
+        location(
+            LocationRole::ManagerState,
+            r"C:\Users\Alice\AppData\Roaming\Vortex\temp\state_backups_full\startup.json",
+            LocationOrigin::Standard,
+            true,
+        ),
+        location(
+            LocationRole::ModStaging,
+            r"E:\Alice\Vortex Mods\skyrimse",
+            LocationOrigin::Manager,
+            true,
+        ),
+        location(
+            LocationRole::CrashLogs,
+            r"C:\Users\Alice\Documents\My Games\Skyrim Special Edition\SKSE",
+            LocationOrigin::Standard,
+            false,
+        ),
+    ]
+}
+
+/// The private folders and names of Alice's made-up machine.
+fn alices_machine(report: &mallet_core::ScanReport) -> mallet_core::Shortener {
+    use mallet_core::{LocationRole, Placeholder};
+    let mut shortener = mallet_core::Shortener::new();
+    for location in &report.locations {
+        match location.role {
+            LocationRole::GameDir => {
+                shortener = shortener.with_root(&location.path, Placeholder::Game);
+            }
+            LocationRole::ModStaging => {
+                shortener = shortener.with_root(&location.path, Placeholder::Staging);
+            }
+            _ => {}
+        }
+    }
+    shortener
+        .with_root(r"C:\Users\Alice\Documents", Placeholder::Documents)
+        .with_root(r"C:\Users\Alice\AppData\Local", Placeholder::LocalAppData)
+        .with_root(r"C:\Users\Alice\AppData\Roaming", Placeholder::AppData)
+        .with_root(r"C:\Users\Alice", Placeholder::UserProfile)
+        .with_name("Alice", Placeholder::User)
+        .with_name("ALICE-DESKTOP", Placeholder::Machine)
+}
+
+fn shared_text(lang: &str) -> String {
+    let report = report_of_alice();
+    let shared = mallet_engine::share_report_with(&report, &alices_machine(&report)).unwrap();
+    let locale = mallet_messages::Locale::from_tag(lang).unwrap();
+    mallet_messages::Messages::new(locale)
+        .render_share(&shared)
+        .text
+}
+
+#[test]
+fn a_shared_report_in_english() {
+    let text = shared_text("en");
+    assert!(!text.contains("Alice"), "{text}");
+    insta::assert_snapshot!(text);
+}
+
+#[test]
+fn a_shared_report_in_german() {
+    let text = shared_text("de");
+    assert!(!text.contains("Alice"), "{text}");
+    insta::assert_snapshot!(text);
+}
+
+#[test]
+fn a_shared_report_as_json() {
+    let report = report_of_alice();
+    let shared = mallet_engine::share_report_with(&report, &alices_machine(&report)).unwrap();
+    let json = serde_json::to_string_pretty(&shared.report).unwrap();
+    assert!(!json.contains("Alice"), "{json}");
+    insta::assert_snapshot!(json);
+}
+
+#[test]
+fn report_share_leaves_no_folder_of_the_machine() {
+    let root = tempfile::tempdir().unwrap();
+    let setup_args = setup(root.path());
+    run_scan(&[], &setup_args, &[]);
+    let cache = setup_args.last().unwrap();
+    let game_dir = root.path().join("Game").to_string_lossy().into_owned();
+
+    for format in ["text", "json"] {
+        let shared = run(&["report", "--share", "--format", format, "--cache", cache]).unwrap();
+        assert!(shared.contains("<game>"), "{shared}");
+        let flat = shared.replace("\\\\", "\\").to_lowercase();
+        assert!(!flat.contains(&game_dir.to_lowercase()), "{shared}");
+        if let Some(home) = dirs_home() {
+            assert!(!flat.contains(&home.to_lowercase()), "{shared}");
+        }
+    }
+}
+
+/// The home directory, where the test can tell it: a path of more than one
+/// folder below the root.
+fn dirs_home() -> Option<String> {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })?;
+    let home = std::path::PathBuf::from(home);
+    (home.components().count() > 2).then(|| home.to_string_lossy().into_owned())
+}
