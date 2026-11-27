@@ -55,10 +55,24 @@ pub(crate) fn read(
     // LOOT's library finds a game's data from its installation, which for
     // Oblivion Remastered lies above the folder the checks read (ADR 0065).
     let install = mallet_game_bethesda::locate::install_dir(game, game_dir);
+    // LOOT's library asks for `Plugins.txt` as the load order library does.
+    let copy = mallet_game_bethesda::ingest::ListCopy::if_needed(
+        game,
+        game_dir,
+        options.local_dir.as_deref(),
+    )
+    .unwrap_or_else(|error| {
+        tracing::info!(%error, "the list of plugins could not be copied under its name");
+        None
+    });
+    let local_dir = copy
+        .as_ref()
+        .map(mallet_game_bethesda::ingest::ListCopy::path)
+        .or(options.local_dir.as_deref());
     match mallet_knowledge::read(
         game.id(),
         &install,
-        options.local_dir.as_deref(),
+        local_dir,
         &path,
         plugins,
         &mallet_game_bethesda::locate::shipped_plugins(game, game_dir),

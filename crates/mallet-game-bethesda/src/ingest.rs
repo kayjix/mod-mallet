@@ -402,19 +402,12 @@ fn active_plugins_in(
 
     let mut settings = load_order_settings(game, game_dir, local_dir).map_err(load_order_error)?;
     let plugin_list = spelt_on_disk(settings.active_plugins_file());
-    // The library asks for the list by the name the game gives it,
-    // `Plugins.txt`. Mod Organizer's profiles spell it `plugins.txt`, which
-    // only a system that ignores case finds under the other name; elsewhere
-    // the library reads a copy that carries its name.
-    let _copy = if settings.active_plugins_file().is_file() || !plugin_list.is_file() {
-        None
-    } else {
-        let copy = renamed_copy(&plugin_list, settings.active_plugins_file())
-            .map_err(|error| IngestError::LoadOrder(error.to_string()))?;
+    let copy = ListCopy::if_needed(game, game_dir, local_dir)
+        .map_err(|error| IngestError::LoadOrder(error.to_string()))?;
+    if let Some(copy) = &copy {
         settings =
             load_order_settings(game, game_dir, Some(copy.path())).map_err(load_order_error)?;
-        Some(copy)
-    };
+    }
     if !folders.is_empty() {
         // The load order library takes the first folder that has a plugin.
         settings.set_additional_plugins_directories(folders.to_vec());
@@ -441,6 +434,46 @@ fn spelt_on_disk(file: &Path) -> PathBuf {
 /// The name of the list of every plugin in its order, which the load order
 /// library reads beside the list of active plugins for some games.
 const LOAD_ORDER_LIST: &str = "loadorder.txt";
+
+/// The list of active plugins under the name the load order libraries ask
+/// for, `Plugins.txt`, where the folder spells it otherwise. Mod
+/// Organizer's profiles say `plugins.txt`, which only a system that ignores
+/// case finds under the other name; elsewhere the libraries (the load order
+/// library and LOOT's) read this copy instead. Nothing is written where the
+/// list is; the copy goes away when this is dropped.
+#[derive(Debug)]
+pub struct ListCopy(tempfile::TempDir);
+
+impl ListCopy {
+    /// A copy for the list of `game` in `local_dir` if the libraries would
+    /// not find it under its own name; `None` where they do, or where there
+    /// is no list at all.
+    ///
+    /// # Errors
+    ///
+    /// The copy could not be made.
+    pub fn if_needed(
+        game: Game,
+        game_dir: &Path,
+        local_dir: Option<&Path>,
+    ) -> io::Result<Option<Self>> {
+        let Ok(settings) = load_order_settings(game, game_dir, local_dir) else {
+            return Ok(None);
+        };
+        let wanted = settings.active_plugins_file();
+        let found = spelt_on_disk(wanted);
+        if wanted.is_file() || !found.is_file() {
+            return Ok(None);
+        }
+        renamed_copy(&found, wanted).map(|folder| Some(Self(folder)))
+    }
+
+    /// The folder to give the libraries in place of the list's own.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        self.0.path()
+    }
+}
 
 /// A folder of its own with a copy of the list `found` under the name
 /// `wanted` has, and a copy of the list of all plugins beside it, if there

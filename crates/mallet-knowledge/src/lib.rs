@@ -108,7 +108,9 @@ pub fn find_masterlist(game: &str) -> Option<PathBuf> {
 /// (`skyrimse`), installed in `game_dir`.
 ///
 /// `local_dir` is the directory of the list of active plugins, if it is not
-/// the standard one. `shipped` names, in lower case, the plugins that come
+/// the standard one. LOOT's library reads the list as `Plugins.txt`; on a
+/// file system that tells case apart, a list spelt otherwise (as Mod
+/// Organizer's `plugins.txt`) has to be handed over under that name. `shipped` names, in lower case, the plugins that come
 /// with the game. A plugin whose rules cannot be evaluated is left out and
 /// logged; the others are still reported.
 pub fn read(
@@ -383,7 +385,8 @@ mod tests {
                     "
 ",
                 );
-            fs::write(root.path().join("local").join("plugins.txt"), list).unwrap();
+            // Named as the game names it; see `read` on other spellings.
+            fs::write(root.path().join("local").join("Plugins.txt"), list).unwrap();
             Self { root }
         }
 
