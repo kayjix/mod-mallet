@@ -64,7 +64,9 @@ pub(crate) fn run(root: &Path, skip_desktop: bool, require_tools: bool) -> Resul
 
     step("Tests");
     let mut test = tools::cargo();
-    test.current_dir(root).args(["test", "--workspace"]);
+    // Every failing test binary is reported, not only the first.
+    test.current_dir(root)
+        .args(["test", "--workspace", "--no-fail-fast"]);
     exclude_desktop(&mut test, skip_desktop);
     tools::run(test, "cargo test")?;
 
