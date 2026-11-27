@@ -27,7 +27,7 @@ pub fn requirements(game: Game, game_dir: &Path, game_version: Option<&str>) -> 
     // The extender and the editor lie in the installation, which for
     // Oblivion Remastered is above the folder the checks read (ADR 0065).
     let install = crate::locate::install_dir(game, game_dir);
-    let plugins = install.join(game.script_extender().plugin_dir);
+    let plugins = crate::locate::on_disk(&install, game.script_extender().plugin_dir);
     let mut tools = vec![script_extender(game, &install, game_version)];
     if let Some(library) = game.address_library() {
         tools.push(address_library(library, &plugins, game_version));
@@ -177,7 +177,7 @@ fn address_library(library: AddressLibrary, plugins: &Path, game_version: Option
 
 /// Base Object Swapper, which Mod Mallet's patches use.
 fn swapper(game_dir: &Path) -> Tool {
-    let path = game_dir.join("Data").join(SWAPPER_PLUGIN);
+    let path = crate::locate::on_disk(game_dir, &format!("Data/{SWAPPER_PLUGIN}"));
     let state = if path.is_file() {
         ToolState::Ready
     } else {

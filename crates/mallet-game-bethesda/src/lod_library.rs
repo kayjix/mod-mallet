@@ -237,7 +237,14 @@ impl LodLibrary {
     fn read_from(&self, path: &str, source: Source) -> Option<Vec<u8>> {
         match source {
             Source::Loose => {
-                let file = self.data_dir.join(path);
+                // Paths are kept in lower case; a file system that tells
+                // case apart is asked for the file as it is spelt.
+                let exact = self.data_dir.join(path);
+                let file = if exact.is_file() {
+                    exact
+                } else {
+                    crate::locate::on_disk(&self.data_dir, path)
+                };
                 let small = std::fs::metadata(&file).is_ok_and(|meta| meta.len() <= MAX_LOOSE);
                 small.then(|| std::fs::read(&file).ok()).flatten()
             }
